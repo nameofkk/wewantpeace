@@ -7,8 +7,8 @@ TensionCalculator: 국가별 긴장도 지수 계산.
   EventScore    = 로그 스케일 cumulative severity×confidence 합계 → 0~100
                   (이벤트 많을수록 점수 올라가되 diminishing returns)
   ActivityScore = 볼륨(60%) + 가속도(40%) 혼합 → 0~100
-                  볼륨: 이벤트 20개면 포화 (지속 분쟁지도 점수 획득)
-                  가속도: 급증 시 보너스
+                  볼륨: 이벤트 calibration.VOLUME_SATURATION개면 포화
+                  가속도: 급증 시 보너스 (calibration.ACCEL_BASELINE 기준)
   Spillover     = 인접 국가 클러스터 최대 severity / 100
 
   percentile  = 현재 Raw의 최근 30일 분포 내 위치 → 0~100
@@ -19,6 +19,7 @@ TensionCalculator: 국가별 긴장도 지수 계산.
     3 = 위기  (75–100)
 
 결과를 tension_index 테이블에 저장.
+모든 튜닝 가능한 상수는 calibration.py에서 관리.
 """
 import logging
 import math
@@ -30,6 +31,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.tension_index import TensionIndex
+from worker.processor.calibration import (
+    EVENT_SCORE_MULTIPLIER,
+    VOLUME_SATURATION,
+    ACCEL_BASELINE,
+    STALE_DECAY,
+    TENSION_WARMUP_RECORDS,
+    TENSION_WARMUP_FACTOR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +97,8 @@ def _calc_event_score(clusters: list[IssueCluster]) -> float:
        "우크라이나 전쟁 클러스터 event_count=11" 같은 고밀도 이슈를 정확히 반영
     2. 단순 평균이 아닌 로그 누적합 → 클러스터 많을수록 점수 상승 (단 감쇠)
 
-    예시:
-      UA: 1클러스터 × severity85 × conf0.7 × log2(12) ≈ total 215 → ~58점
+    예시 (EVENT_SCORE_MULTIPLIER=25):
+      UA: 1클러스터 × severity85 × conf0.7 × log2(81) ≈ total 377 → ~64점
       KR: 1클러스터 × severity35 × conf0.6 × log2(2) ≈ total 21 → ~33점
     """
     if not clusters:
@@ -99,8 +108,8 @@ def _calc_event_score(clusters: list[IssueCluster]) -> float:
         c.severity * c.confidence * math.log2(1.0 + c.event_count)
         for c in clusters
     )
-    # log10 스케일 정규화: total=10→23, total=100→50, total=500→84, total=1000→100
-    return min(100.0, 25.0 * math.log10(1.0 + total))
+    # log10 스케일 정규화 (calibration.EVENT_SCORE_MULTIPLIER)
+    return min(100.0, EVENT_SCORE_MULTIPLIER * math.log10(1.0 + total))
 
 
 def _calc_accel_score(
@@ -112,13 +121,13 @@ def _calc_accel_score(
 
     개선 사항:
     - 볼륨: 클러스터 수가 아닌 총 이벤트 수 기준 (event_count 합계)
-      → 우크라이나 1클러스터 event_count=11 → volume=0.55 (이전엔 0.05)
     - 가속도: 클러스터 수 증감 기준 유지 (prev 클러스터 대비)
-    - 이벤트 20개면 볼륨 포화, 급증 시 가속도 보너스
+    - VOLUME_SATURATION개면 볼륨 포화 (calibration.py 참조)
+    - 급증 시 가속도 보너스
     """
-    volume = min(1.0, current_events / 20.0)
+    volume = min(1.0, current_events / float(VOLUME_SATURATION))
     if prev_cluster_count == 0:
-        accel = min(1.0, current_cluster_count / 5.0)
+        accel = min(1.0, current_cluster_count / float(ACCEL_BASELINE))
     else:
         ratio = (current_cluster_count - prev_cluster_count) / max(prev_cluster_count, 1)
         accel = min(1.0, max(0.0, ratio))
@@ -161,10 +170,10 @@ async def _get_percentile_30d(
     )
     historical = [row[0] for row in result.fetchall()]
 
-    # 워밍업: 히스토리 20개 미만이면 raw_score를 보수적으로 절반 할인하여 percentile 사용
-    # (5개 미만 → raw_score 그대로 사용 시 50점 raw_score가 50th percentile로 과대 판정됨)
-    if len(historical) < 20:
-        return min(100.0, raw_score * 0.6)
+    # 워밍업: 히스토리 TENSION_WARMUP_RECORDS개 미만이면 raw_score 할인 적용
+    # (히스토리 부족 시 raw_score 그대로 사용 → 과대 판정 방지)
+    if len(historical) < TENSION_WARMUP_RECORDS:
+        return min(100.0, raw_score * TENSION_WARMUP_FACTOR)
 
     # 모든 히스토리가 같은 값이면 의미있는 분포 없음 → raw_score 사용
     unique = set(round(h, 1) for h in historical)
@@ -207,10 +216,10 @@ async def calculate_country_tension(
     recent_clusters = [c for c in all_clusters if c.last_event_at >= recent_cutoff]
     stale_clusters  = [c for c in all_clusters if c.last_event_at < recent_cutoff]
 
-    # Decayed EventScore: 최신 + 오래된×0.5
+    # Decayed EventScore: 최신 + 오래된×STALE_DECAY
     event_score = (
         _calc_event_score(recent_clusters)
-        + _calc_event_score(stale_clusters) * 0.5
+        + _calc_event_score(stale_clusters) * STALE_DECAY
     )
     event_score = min(100.0, event_score)
 

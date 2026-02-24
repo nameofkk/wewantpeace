@@ -1,10 +1,11 @@
 """
 TrendingEngine: KScore 기반 트렌딩 키워드 계산.
 
-KScore = 0.40*(log2(1+k10)*spike_factor) + 0.20*quality + 0.20*severity_norm + 0.20*spread
-포함 조건: k10 >= 6 OR (event_count >= 20 AND is_spike) AND KScore >= 1.2
+KScore = 0.35*velocity + 0.15*quality + 0.35*severity_norm + 0.15*spread
+포함 조건: KScore >= calibration.KSCORE_MIN
 
 결과를 trending_keywords 테이블에 UPSERT.
+모든 튜닝 가능한 상수는 calibration.py에서 관리.
 """
 import logging
 import math
@@ -17,12 +18,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.trending_keyword import TrendingKeyword
+from worker.processor.calibration import (
+    VELOCITY_CAP,
+    VELOCITY_EXPONENT,
+    SPIKE_FACTOR,
+    SPREAD_SATURATION,
+    KSCORE_MIN,
+    TRENDING_LIMIT,
+    KSCORE_VALID_MINUTES,
+)
 
 logger = logging.getLogger(__name__)
 
-TRENDING_LIMIT = 20
-KSCORE_MIN = 0.4   # 단일 이벤트도 포함 (초기 데이터 부족 시 너무 많이 걸러지는 것 방지)
-VALID_MINUTES = 60 * 24  # 24시간 유효 (Celery beat가 없어도 캐시 유지)
+# 모듈 수준 alias (하위 호환 및 가독성)
+VALID_MINUTES = KSCORE_VALID_MINUTES
 
 
 def _calc_kscore(
@@ -38,21 +47,21 @@ def _calc_kscore(
 
     KScore = 0.35*velocity + 0.15*quality + 0.35*severity_norm + 0.15*spread
 
-    velocity 개선:
-    - log2 → k10^0.65 (소규모 구간 1~10 이벤트 변별력 향상)
-    - log2(1+1)=1.0 == 1^0.65=1.0 (1이벤트 기준점 동일)
-    - k10=3: log2(4)=2.0 → 3^0.65=2.24 (+12%)
-    - k10=7: log2(8)=3.0 → 7^0.65=3.73 (+24%)
-    - velocity 상한 6.0 (스파이크 10+이벤트 과도 방지)
+    velocity:
+    - k10^VELOCITY_EXPONENT × spike_factor, 상한 VELOCITY_CAP
+    - 소규모(1~10) 구간 변별력 유지, 대규모에서 cap에 수렴
+    - k10=5: 3.09, k10=10: 5.01, k10=15: 6.0(cap)
 
     가중치 조정:
     - velocity 0.45→0.35 (속도), severity 0.25→0.35 (심각도)
     - quality/spread 각 0.15 유지
+
+    상수 변경 시: calibration.py 수정 후 이 함수는 자동 반영됨.
     """
     k10 = max(1, event_count)
 
-    spike_factor = 1.5 if is_spike else 1.0
-    velocity = min(6.0, (k10 ** 0.7) * spike_factor)
+    sf = SPIKE_FACTOR if is_spike else 1.0
+    velocity = min(VELOCITY_CAP, (k10 ** VELOCITY_EXPONENT) * sf)
 
     # quality: confidence + tier 보너스
     tier_bonus = sum(
@@ -63,8 +72,8 @@ def _calc_kscore(
 
     severity_norm = severity / 100.0
 
-    # spread: 독립출처 수 기반 (최대 1.0)
-    spread = min(1.0, independent_sources / 5.0)
+    # spread: 독립출처 수 기반 (최대 1.0, calibration.SPREAD_SATURATION 기준)
+    spread = min(1.0, independent_sources / float(SPREAD_SATURATION))
 
     kscore = (
         0.35 * velocity
