@@ -75,9 +75,11 @@ export default function OnboardingPage() {
           className="mb-8 max-w-xs text-sm leading-relaxed text-muted-foreground"
           style={{ animation: "fadeSlideUp 0.6s ease-out 0.1s both" }}
         >
-          {lang === "ko"
-            ? "AI가 전세계 분쟁·긴장 이슈를 실시간 분석해\n검증된 중요 소식만 전달합니다"
-            : "AI analyzes global conflicts in real time\nand delivers only verified critical updates"}
+          {lang === "ko" ? (
+            <>전세계 분쟁·긴장 이슈를 실시간 분석해<br />검증된 중요 소식만 전달합니다</>
+          ) : (
+            <>Global conflicts analyzed in real time<br />Only verified critical updates delivered</>
+          )}
         </p>
 
         {/* 특징 3가지 */}
