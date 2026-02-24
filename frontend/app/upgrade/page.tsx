@@ -19,7 +19,7 @@ interface Feature {
 const FEATURES: Feature[] = [
   {
     labelKo: "관심 국가",         labelEn: "Monitored countries",
-    free: "2개",                  pro: "10개",                    proplus: "무제한",
+    free: "2개",                  pro: "5개",                     proplus: "무제한",
   },
   {
     labelKo: "글로벌 트렌딩",      labelEn: "Global trending",
@@ -284,7 +284,7 @@ export default function UpgradePage() {
                     {plan.id === "pro" && (
                       <>
                         <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "🗺️ 실시간 글로벌 이슈 지도 잠금 해제" : "🗺️ Real-time global issue map"}</p>
-                        <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "관심 국가 최대 10개 · 속보 알림" : "Up to 10 countries · Fast alerts"}</p>
+                        <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "관심 국가 최대 5개 · 속보 알림" : "Up to 5 countries · Fast alerts"}</p>
                         <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "KScore 필터 · KScore/긴장도 30일 히스토리" : "KScore filter · 30-day KScore & tension history"}</p>
                       </>
                     )}

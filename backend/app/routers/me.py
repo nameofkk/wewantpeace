@@ -22,7 +22,7 @@ from backend.app.models.user import User, UserArea, UserPushToken, UserPreferenc
 router = APIRouter(prefix="/me", tags=["me"])
 
 FREE_AREA_LIMIT = 2
-PRO_AREA_LIMIT = 10
+PRO_AREA_LIMIT = 5
 
 
 # ── Pydantic 스키마 ───────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ interface FilterState {
 }
 
 const FREE_COUNTRY_LIMIT = 2;
-const PRO_COUNTRY_LIMIT = 10;
+const PRO_COUNTRY_LIMIT = 5;
 
 interface AppStore {
   // 지도 상태
