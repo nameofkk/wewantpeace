@@ -1,0 +1,50 @@
+# Fly.io 배포 설정 - WeWantPeace Backend
+app = "wewantpeace-backend"
+primary_region = "nrt"  # 도쿄
+
+[build]
+  dockerfile = "infra/Dockerfile.backend"
+
+[env]
+  PORT = "8000"
+  DISABLE_AUTH = "false"
+  ENVIRONMENT = "production"
+  DEBUG = "false"
+  LOG_LEVEL = "WARNING"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    grace_period = "30s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    port = 8000
+    timeout = "10s"
+    type = "http"
+
+# Secrets (fly secrets set으로 설정):
+# fly secrets set DATABASE_URL="postgresql+asyncpg://..."
+# fly secrets set REDIS_URL="redis://..."
+# fly secrets set SECRET_KEY="$(openssl rand -hex 32)"
+# fly secrets set TELEGRAM_BOT_TOKEN="..."
+# fly secrets set TOSS_SECRET_KEY="live_sk_..."
+# fly secrets set ALLOWED_ORIGINS='["https://wewantpeace.io","https://www.wewantpeace.io"]'
+# fly secrets set FCM_PROJECT_ID="..."
+# fly secrets set GOOGLE_APPLICATION_CREDENTIALS_JSON="$(base64 -w0 serviceAccountKey.json)"

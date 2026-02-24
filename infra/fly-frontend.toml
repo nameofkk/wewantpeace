@@ -1,0 +1,47 @@
+# Fly.io 프론트엔드 앱 설정
+# 배포: flyctl deploy --config infra/fly-frontend.toml --dockerfile infra/Dockerfile.frontend
+
+app = "wewantpeace-frontend"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "infra/Dockerfile.frontend"
+
+[build.args]
+  NEXT_PUBLIC_API_URL = "https://wewantpeace-backend.fly.dev"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 200
+    soft_limit = 150
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[statics]]
+  guest_path = "/app/.next/static"
+  url_prefix = "/_next/static"
+
+[checks]
+  [checks.alive]
+    port = 3000
+    type = "http"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "get"
+    path = "/"

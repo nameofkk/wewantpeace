@@ -1,0 +1,238 @@
+"""
+EventClusterer: 60분 윈도우 기반 이슈 클러스터링.
+
+클러스터 키: {geohash5}:{topic}
+60분 윈도우 내 같은 키 → 같은 IssueCluster에 묶음.
+"""
+import logging
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from backend.app.models.normalized_event import NormalizedEvent
+from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
+
+logger = logging.getLogger(__name__)
+
+WINDOW_MINUTES = 60
+
+# geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
+MAX_EVENTS_UNKNOWN_GEO = 2
+
+# 제목 단어 최소 겹침 비율 — 이 미만이면 같은 키라도 새 클러스터 생성
+# (미국 폭풍 + 미국 총기 사건이 같은 US:disaster 버킷에 혼입되는 문제 방지)
+MIN_TITLE_OVERLAP = 0.15
+
+
+def _title_overlap(title_a: str, title_b: str) -> float:
+    """두 제목의 단어 집합 교집합 비율 (Jaccard 유사도)."""
+    _stop = {"the", "a", "an", "in", "on", "at", "to", "of", "and", "or",
+             "is", "are", "was", "were", "has", "have", "had", "for", "with",
+             "that", "this", "it", "its", "by", "be", "as", "not", "but"}
+    def _words(t: str) -> set[str]:
+        import re
+        tokens = re.findall(r"[a-zA-Z가-힣]+", t.lower())
+        return {w for w in tokens if w not in _stop and len(w) > 2}
+    a, b = _words(title_a), _words(title_b)
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+# ── 클러스터 제목 생성 ────────────────────────────────────────────────────────
+
+_TOPIC_LABELS_KO: dict[str, str] = {
+    "conflict":  "무장 충돌",
+    "terror":    "폭력·테러",
+    "coup":      "정변·쿠데타",
+    "sanctions": "경제 제재",
+    "cyber":     "사이버 공격",
+    "protest":   "시위·집회",
+    "diplomacy": "외교",
+    "maritime":  "해상 분쟁",
+    "disaster":  "재난·재해",
+    "health":    "감염병·보건",
+    "unknown":   "이슈",
+}
+
+_COUNTRY_NAMES_KO: dict[str, str] = {
+    "US": "미국", "UA": "우크라이나", "RU": "러시아",
+    "PS": "팔레스타인", "IL": "이스라엘", "IR": "이란",
+    "CN": "중국", "KP": "북한", "KR": "한국", "TW": "대만",
+    "SY": "시리아", "MM": "미얀마", "SD": "수단", "ET": "에티오피아",
+    "SO": "소말리아", "VE": "베네수엘라", "HT": "아이티",
+    "LB": "레바논", "IQ": "이라크", "AF": "아프가니스탄",
+    "PK": "파키스탄", "IN": "인도", "MX": "멕시코",
+    "GB": "영국", "FR": "프랑스", "DE": "독일",
+    "JP": "일본", "BR": "브라질", "AU": "호주",
+    "TR": "터키", "SA": "사우디", "YE": "예멘",
+    "LY": "리비아", "NG": "나이지리아", "ML": "말리",
+    # ── 추가 국가 ────────────────────────────────────────────────────────────
+    "IT": "이탈리아", "ES": "스페인", "PT": "포르투갈",
+    "NL": "네덜란드", "BE": "벨기에", "SE": "스웨덴",
+    "NO": "노르웨이", "DK": "덴마크", "CH": "스위스",
+    "AT": "오스트리아", "GR": "그리스", "CZ": "체코",
+    "HU": "헝가리", "PL": "폴란드", "RO": "루마니아",
+    "RS": "세르비아", "HR": "크로아티아", "EE": "에스토니아",
+    "FI": "핀란드", "CA": "캐나다", "NZ": "뉴질랜드",
+    "ZA": "남아공", "KE": "케냐", "GH": "가나",
+    "MA": "모로코", "DZ": "알제리", "EG": "이집트",
+    "TH": "태국", "VN": "베트남", "ID": "인도네시아",
+    "MY": "말레이시아", "SG": "싱가포르", "PH": "필리핀",
+    "BD": "방글라데시", "CO": "콜롬비아", "PE": "페루",
+    "CL": "칠레", "AR": "아르헨티나", "BO": "볼리비아",
+    "EC": "에콰도르", "UG": "우간다", "SN": "세네갈",
+}
+
+
+def _make_cluster_title_ko(
+    title: str,
+    topic: str,
+    country_code: str | None,
+) -> str | None:
+    """
+    클러스터 홈 카드용 직관적 제목 생성.
+    형식: "[국가] 유형 · 번역된 핵심 제목"
+    예: "[미국] 폭력·테러 · 트럼프 클럽 총기 용의자 사살"
+    """
+    try:
+        from deep_translator import GoogleTranslator
+        title_ko = GoogleTranslator(source="en", target="ko").translate(title[:200])
+    except Exception as e:
+        logger.debug("한국어 번역 실패: %s", e)
+        title_ko = None
+
+    topic_label = _TOPIC_LABELS_KO.get(topic, "이슈")
+    country_name = _COUNTRY_NAMES_KO.get(country_code or "", "") if country_code else ""
+
+    if country_name:
+        prefix = f"[{country_name}] {topic_label}"
+    else:
+        prefix = topic_label
+
+    if title_ko and title_ko.strip():
+        short = title_ko.strip()
+        combined = f"{prefix} · {short}"
+        if len(combined) > 70:
+            combined = combined[:68] + "…"
+        return combined
+
+    return prefix or None
+
+
+def _cluster_key(event: "NormalizedEvent") -> str:
+    """
+    클러스터 키 생성 전략 (우선순위):
+    1. geohash 4자리 있으면 → {geohash4}:{topic}  (지역별 격리 — 미국 동부 폭풍 vs 서부 총기 등 혼입 방지)
+    2. country_code 있으면 → {country_code}:{topic} (geo 없는 경우 국가 단위)
+    3. 없으면 → 0000:{topic}                        (최후 버킷, 크기 제한 적용)
+
+    ※ country_code 우선 → geohash 방식은 미국·중국·러시아 같은 대국에서
+      전혀 다른 지역의 동일 토픽 이벤트가 같은 클러스터에 뭉치는 문제를 초래함.
+      geohash4(~39km²) 기준으로 묶으면 지리적으로 관련된 이벤트만 클러스터링됨.
+    """
+    geo4 = (event.geohash5 or "")[:4]
+    if geo4:
+        return f"{geo4}:{event.topic}"
+    if event.country_code:
+        return f"{event.country_code}:{event.topic}"
+    return f"0000:{event.topic}"
+
+
+async def assign_cluster(
+    event: NormalizedEvent,
+    db: AsyncSession,
+) -> IssueCluster | None:
+    """
+    NormalizedEvent를 60분 윈도우 내 같은 cluster_key의 IssueCluster에 할당.
+    없으면 새 클러스터 생성.
+
+    severity < 20 또는 topic="unknown" + severity < 25이면 None 반환 (잡음 제거).
+    """
+    # 잡음 필터: 연예·스포츠 등 낮은 severity 이벤트 제외
+    if event.severity < 20:
+        return None
+    if event.topic == "unknown" and event.severity <= 25:
+        return None
+
+    geohash5 = event.geohash5 or "00000"
+    key = _cluster_key(event)
+    window_cutoff = event.event_time - timedelta(minutes=WINDOW_MINUTES)
+
+    # 윈도우 내 기존 클러스터 조회 (window_end가 현재 이벤트 시각 이후면 아직 활성)
+    result = await db.execute(
+        select(IssueCluster).where(
+            IssueCluster.cluster_key == key,
+            IssueCluster.window_end >= event.event_time,
+        ).order_by(IssueCluster.last_event_at.desc()).limit(1)
+    )
+    cluster = result.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+
+    # ── 클러스터 혼입 방지 체크 ─────────────────────────────────────────────
+    if cluster:
+        no_country = not event.country_code
+        no_geo = not event.geohash5
+
+        # (1) 지오/국가 미분류 버킷이 MAX_EVENTS 초과 → 새 클러스터
+        if no_country and no_geo and cluster.event_count >= MAX_EVENTS_UNKNOWN_GEO:
+            cluster = None
+
+        # (2) 제목 단어 겹침이 너무 낮으면 → 다른 이슈로 판단, 새 클러스터
+        elif _title_overlap(event.title, cluster.title) < MIN_TITLE_OVERLAP:
+            cluster = None
+
+    if cluster:
+        n = cluster.event_count
+        cluster.event_count = n + 1
+        cluster.last_event_at = event.event_time
+        cluster.window_end = event.event_time + timedelta(minutes=WINDOW_MINUTES)
+        # confidence: 이동 평균
+        cluster.confidence = round(
+            (cluster.confidence * n + event.confidence) / (n + 1), 3
+        )
+        # severity: 최대값 유지
+        if event.severity > cluster.severity:
+            cluster.severity = event.severity
+        # independent_sources: 이벤트마다 +1 (각 이벤트 = 독립 보도 1건)
+        cluster.independent_sources = (cluster.independent_sources or 1) + 1
+        # source_tiers: 새 tier 추가
+        if event.source_tier:
+            existing = list(cluster.source_tiers or [])
+            existing.append(event.source_tier)
+            cluster.source_tiers = existing
+        # geo: 아직 없으면 이벤트 것으로 채우기
+        if cluster.lat is None and event.lat is not None:
+            cluster.lat = event.lat
+            cluster.lon = event.lon
+            cluster.country_code = event.country_code
+            cluster.geohash5 = event.geohash5
+        cluster.updated_at = now
+    else:
+        title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
+        cluster = IssueCluster(
+            cluster_key=key,
+            geohash5=geohash5,
+            topic=event.topic,
+            entity_anchor=event.entity_anchor,
+            country_code=event.country_code,
+            lat=event.lat,
+            lon=event.lon,
+            title=event.title,
+            title_ko=title_ko,
+            event_count=1,
+            severity=event.severity,
+            confidence=event.confidence,
+            kscore=0.0,
+            is_spike=False,
+            source_tiers=[event.source_tier] if event.source_tier else [],
+            independent_sources=1,
+            first_event_at=event.event_time,
+            last_event_at=event.event_time,
+            window_start=window_cutoff,
+            window_end=event.event_time + timedelta(minutes=WINDOW_MINUTES),
+            is_verified=False,
+        )
+        db.add(cluster)
+        await db.flush()
+
+    db.add(ClusterEvent(cluster_id=cluster.id, event_id=event.id))
+    return cluster

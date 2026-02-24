@@ -1,0 +1,64 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, model_validator
+from typing import List
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # DB
+    database_url: str = "postgresql+asyncpg://wwp:wwplocal@localhost/wewantpeace"
+
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Telegram
+    telegram_bot_token: str = ""
+
+    # Firebase / FCM
+    fcm_project_id: str = ""
+    google_application_credentials: str = ""
+
+    # 보안
+    secret_key: str = "dev-secret-change-me-in-production"
+
+    @model_validator(mode="after")
+    def warn_insecure_defaults(self) -> "Settings":
+        import logging
+        _log = logging.getLogger(__name__)
+        if self.secret_key == "dev-secret-change-me-in-production":
+            _log.warning(
+                "⚠️  SECRET_KEY is using the default insecure value. "
+                "Set SECRET_KEY environment variable before deploying to production!"
+            )
+        return self
+
+    allowed_origins: List[str] = ["http://localhost:3000"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",")]
+        return v
+
+    # 앱 설정
+    app_name: str = "WeWantPeace API"
+    debug: bool = False
+    log_level: str = "INFO"
+    disable_auth: bool = False
+    upload_dir: str = "media/uploads"
+
+    # 수집 설정
+    telegram_collect_interval: int = 300   # 5분 (초)
+    rss_collect_interval: int = 600        # 10분 (초)
+    tension_calc_interval: int = 900       # 15분 (초)
+    trending_calc_interval: int = 900      # 15분 (초)
+
+
+settings = Settings()

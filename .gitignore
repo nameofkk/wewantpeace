@@ -1,0 +1,67 @@
+# ── 환경변수 (절대 커밋 금지) ────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+frontend/.env.local
+frontend/.env.production
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+*.egg
+
+# ── Node / Next.js ───────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── 로그 ─────────────────────────────────────────────────────────────────────
+*.log
+/tmp/*.log
+logs/
+
+# ── 업로드 파일 ──────────────────────────────────────────────────────────────
+media/uploads/
+
+# ── DB / 마이그레이션 임시 ───────────────────────────────────────────────────
+*.sqlite3
+*.db
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Firebase 서비스 계정 키 ───────────────────────────────────────────────────
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+firebase-credentials.json
+
+# ── 기타 ─────────────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.cert
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/

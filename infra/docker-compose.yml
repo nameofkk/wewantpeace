@@ -1,0 +1,110 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_DB: wewantpeace
+      POSTGRES_USER: wwp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wwplocal}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wwp -d wewantpeace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      DISABLE_AUTH: ${DISABLE_AUTH:-false}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../backend:/app/backend
+      - ../worker:/app/worker
+    command: >
+      sh -c "
+        cd /app &&
+        alembic -c backend/alembic.ini upgrade head &&
+        uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+      "
+
+  worker-collector:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
+      REDIS_URL: redis://redis:6379/0
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker.celery_app worker -Q collect -c 4 --loglevel=info
+    volumes:
+      - ../backend:/app/backend
+      - ../worker:/app/worker
+
+  worker-processor:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A worker.celery_app worker -Q process -c 8 --loglevel=info
+    volumes:
+      - ../backend:/app/backend
+      - ../worker:/app/worker
+
+  worker-beat:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A worker.celery_app beat --loglevel=info
+    volumes:
+      - ../backend:/app/backend
+      - ../worker:/app/worker
+
+volumes:
+  pgdata:

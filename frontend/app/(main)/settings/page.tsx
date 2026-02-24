@@ -1,0 +1,954 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Bell, BellOff, MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
+import { t, type Lang } from "@/lib/i18n";
+import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken } from "@/lib/api";
+import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken } from "@/lib/fcm";
+import { ALL_COUNTRIES, getCountryName, getRegionName } from "@/lib/countries";
+import { useAuth, signOut } from "@/lib/auth";
+import { LogoIcon } from "@/components/ui/logo-icon";
+import { useRouter } from "next/navigation";
+
+// ── 국가 선택 패널 ─────────────────────────────────────────────────────────
+function CountryPickerPanel({
+  selected, onAdd, onClose, canAdd, plan, lang,
+}: {
+  selected: string[];
+  onAdd: (code: string) => void;
+  onClose: () => void;
+  canAdd: boolean;
+  plan: string;
+  lang: Lang;
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = search.trim()
+    ? ALL_COUNTRIES.filter(
+        (c) =>
+          c.name.includes(search) ||
+          c.code.toLowerCase().includes(search.toLowerCase()) ||
+          getCountryName(c.code, lang).toLowerCase().includes(search.toLowerCase())
+      )
+    : ALL_COUNTRIES;
+
+  const regions = Array.from(new Set(filtered.map((c) => c.region)));
+
+  return (
+    <div className="border-t border-border bg-background/98 p-4 space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder={t(lang, "settings_search_country")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+          className="w-full rounded-lg border border-border bg-secondary pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-primary"
+        />
+      </div>
+
+      {!canAdd && (
+        <p className="text-[11px] text-amber-400 text-center">
+          {plan === "free"
+            ? t(lang, "settings_free_limit", { n: FREE_COUNTRY_LIMIT })
+            : t(lang, "settings_pro_limit", { n: PRO_COUNTRY_LIMIT })}
+        </p>
+      )}
+
+      <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
+        {regions.map((region) => {
+          const list = filtered.filter((c) => c.region === region);
+          return (
+            <div key={region}>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                {getRegionName(region, lang)}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {list.map((country) => {
+                  const isSelected = selected.includes(country.code);
+                  return (
+                    <button
+                      key={country.code}
+                      onClick={() => { if (!isSelected) onAdd(country.code); }}
+                      disabled={isSelected || (!canAdd && !isSelected)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        isSelected
+                          ? "bg-primary/15 border border-primary/40 text-primary cursor-default"
+                          : canAdd
+                          ? "bg-secondary hover:bg-secondary/80 border border-transparent"
+                          : "bg-secondary/40 border border-transparent opacity-40 cursor-not-allowed"
+                      )}
+                    >
+                      <span className="text-base leading-none">{country.flag}</span>
+                      <span className="flex-1 text-xs truncate">{getCountryName(country.code, lang)}</span>
+                      {isSelected && <span className="text-[10px] text-primary font-bold">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={onClose}
+        className="w-full py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/30"
+      >
+        {t(lang, "settings_close")}
+      </button>
+    </div>
+  );
+}
+
+// ── 메인 설정 페이지 ──────────────────────────────────────────────────────
+export default function SettingsPage() {
+  const router = useRouter();
+  const { user: firebaseUser, loading: authLoading } = useAuth();
+  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang } = useAppStore();
+  const { data: me } = useMe();
+  const { data: prefs } = useMyPreferences();
+  const { data: areas } = useMyAreas();
+  const patchPrefs = usePatchPreferences();
+  const addArea = useAddArea();
+  const deleteArea = useDeleteArea();
+  const patchArea = usePatchArea();
+  const registerToken = useRegisterPushToken();
+  const deleteToken = useDeletePushToken();
+
+  const areasMap = Object.fromEntries((areas ?? []).map((a) => [a.country_code, a]));
+
+  const [showPicker, setShowPicker] = useState(false);
+  const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied">("idle");
+  const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태
+
+  // 알림 설정 로컬 상태
+  const [kscoreValue, setKscoreValue] = useState(1.0);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [quietStart, setQuietStart] = useState("");
+  const [quietEnd, setQuietEnd] = useState("");
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifSaved, setNotifSaved] = useState(false);
+
+  // 프로필 편집
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [editNickname, setEditNickname] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  async function handleSignOut() {
+    await signOut();
+    router.push("/login");
+  }
+
+  function openProfileEdit() {
+    const meData = me as { nickname?: string; bio?: string } | undefined;
+    setEditNickname(meData?.nickname || firebaseUser?.displayName || "");
+    setEditBio(meData?.bio || "");
+    setProfileError(null);
+    setProfileSuccess(false);
+    setShowProfileEdit(true);
+  }
+
+  async function handleProfileSave() {
+    if (!firebaseUser) return;
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/auth/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ nickname: editNickname.trim(), bio: editBio.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err.detail;
+        throw new Error(
+          Array.isArray(detail) ? detail.map((d: { msg: string }) => d.msg).join(", ")
+          : typeof detail === "string" ? detail : "저장에 실패했습니다."
+        );
+      }
+      setProfileSuccess(true);
+      setShowProfileEdit(false);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setProfileError(err.message || "저장에 실패했습니다.");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  // prefs 로드 시 알림 상태 동기화
+  useEffect(() => {
+    if (prefs) {
+      setKscoreValue(prefs.min_kscore ?? 1.0);
+      setSelectedTopics(prefs.topics ?? []);
+      setQuietStart(prefs.quiet_hours_start ?? "");
+      setQuietEnd(prefs.quiet_hours_end ?? "");
+    }
+  }, [prefs]);
+
+  // ?section=countries 파라미터로 진입 시 picker 자동 오픈
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("section") === "countries") {
+      setShowPicker(true);
+    }
+  }, []);
+
+  const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
+  const canAdd = plan === "pro_plus"
+    ? true
+    : plan === "pro"
+    ? myCountries.length < PRO_COUNTRY_LIMIT
+    : myCountries.length < FREE_COUNTRY_LIMIT;
+
+  const TOPICS = ["conflict", "terror", "coup", "sanctions", "cyber", "protest"];
+  const TOPIC_LABELS: Record<string, { ko: string; en: string }> = {
+    conflict: { ko: "분쟁", en: "Conflict" },
+    terror: { ko: "테러", en: "Terror" },
+    coup: { ko: "쿠데타", en: "Coup" },
+    sanctions: { ko: "제재", en: "Sanctions" },
+    cyber: { ko: "사이버", en: "Cyber" },
+    protest: { ko: "시위", en: "Protest" },
+  };
+
+  async function saveNotifPatch(patch: Parameters<typeof patchPrefs.mutate>[0]) {
+    setNotifSaving(true);
+    setNotifSaved(false);
+    try {
+      await patchPrefs.mutateAsync(patch);
+      setNotifSaved(true);
+      setTimeout(() => setNotifSaved(false), 2000);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  function handleSaveKscore() {
+    saveNotifPatch({ min_kscore: kscoreValue });
+  }
+
+  function handleSaveTopics() {
+    saveNotifPatch({ topics: selectedTopics });
+  }
+
+  function handleSaveQuietHours() {
+    saveNotifPatch({ quiet_hours_start: quietStart, quiet_hours_end: quietEnd });
+  }
+
+  // 국가 코드 → 이름+플래그
+  const countryMap = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c]));
+
+  function handleAdd(code: string) {
+    const ok = addMyCountry(code);
+    if (!ok) return; // 제한 초과 (store에서 처리)
+    // 백엔드에도 저장
+    addArea.mutate({ area_type: "country", country_code: code });
+    const newCount = myCountries.length + 1;
+    if ((plan === "free" && newCount >= FREE_COUNTRY_LIMIT) ||
+        (plan === "pro" && newCount >= PRO_COUNTRY_LIMIT)) {
+      setShowPicker(false);
+    }
+  }
+
+  async function handleEnableNotifications() {
+    setNotifStatus("loading");
+    const token = await requestAndGetFCMToken();
+    if (!token) {
+      // 권한이 "denied"인 경우와 단순 실패 구분
+      const perm = typeof window !== "undefined" ? Notification.permission : "default";
+      setNotifStatus(perm === "denied" ? "denied" : "idle");
+      return;
+    }
+    try {
+      await registerToken.mutateAsync({ fcm_token: token, platform: "web" });
+      setNotifStatus("done");
+    } catch {
+      setNotifStatus("idle");
+    }
+  }
+
+  async function handleDisableNotifications() {
+    setNotifStatus("loading");
+    const token = getStoredFCMToken();
+    if (token && firebaseUser) {
+      try {
+        await deleteToken.mutateAsync({ fcm_token: token });
+      } catch {
+        // 서버 오류여도 로컬 토큰은 삭제
+      }
+    }
+    clearStoredFCMToken();
+    setNotifStatus("idle");
+  }
+
+  const hasFCMToken =
+    notifStatus === "done" ||
+    (typeof window !== "undefined" && !!getStoredFCMToken());
+
+  return (
+    <div className="flex flex-col">
+      {/* 헤더 */}
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-4">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "4px" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <h1 className="text-lg font-bold">{t(lang, "settings_title")}</h1>
+          </div>
+          <LogoIcon height={34} />
+          <div />
+        </div>
+        <p className="text-[11px] text-muted-foreground">{t(lang, "settings_subtitle")}</p>
+      </div>
+
+      <div className="px-4 py-4 space-y-6">
+
+        {/* ── 로그인 상태 카드 ────────────────────────────────────── */}
+        <section>
+          <div className="rounded-xl border border-border bg-card p-4">
+            {authLoading ? (
+              <div className="flex items-center gap-3 animate-pulse">
+                <div className="h-10 w-10 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-32 bg-muted rounded" />
+                  <div className="h-2 w-24 bg-muted rounded" />
+                </div>
+              </div>
+            ) : firebaseUser ? (
+              <div className="flex items-center gap-3">
+                {firebaseUser.photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={firebaseUser.photoURL} alt="프로필" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {(me as { nickname?: string })?.nickname || firebaseUser.displayName || "사용자"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground truncate">{firebaseUser.email}</p>
+                  <span className="inline-block mt-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    {plan.toUpperCase()}
+                  </span>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  {t(lang, "settings_logout")}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground">{t(lang, "settings_login_prompt")}</p>
+                  <p className="text-[11px] text-muted-foreground">{t(lang, "settings_login_prompt_sub")}</p>
+                </div>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  {t(lang, "settings_login_btn")}
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── 관심지역 ─────────────────────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t(lang, "settings_monitored")}
+            </h2>
+            {firebaseUser && (
+              <span className="text-[10px] text-muted-foreground">
+                {myCountries.length}/
+                {plan === "free" ? FREE_COUNTRY_LIMIT : plan === "pro" ? PRO_COUNTRY_LIMIT : t(lang, "settings_unlimited")}
+              </span>
+            )}
+          </div>
+
+
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {/* 비로그인 상태 */}
+            {!firebaseUser ? (
+              <div className="p-6 flex flex-col items-center gap-3 text-center">
+                <MapPin className="h-8 w-8 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "settings_login_required_title")}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{t(lang, "settings_login_required_desc")}</p>
+                </div>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  {t(lang, "settings_login_btn")}
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* 선택된 국가 목록 */}
+                {myCountries.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    {t(lang, "settings_add_country")}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {myCountries.map((code) => {
+                      const c = countryMap[code];
+                      const area = areasMap[code];
+                      return (
+                        <div key={code} className="flex items-center gap-3 px-4 py-3">
+                          <span className="text-xl">{c?.flag ?? "🌐"}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{getCountryName(code, lang)}</p>
+                            {area ? (
+                              <div className="mt-2 space-y-1.5">
+                                {/* Verified 토글 */}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => patchArea.mutate({ id: area.id, body: { notify_verified: !area.notify_verified } })}
+                                      className={cn(
+                                        "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
+                                        area.notify_verified ? "bg-green-500" : "bg-muted"
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
+                                        area.notify_verified ? "translate-x-3.5" : "translate-x-0.5"
+                                      )} />
+                                    </button>
+                                    <span className={cn("text-[11px]", area.notify_verified ? "text-green-400" : "text-muted-foreground")}>
+                                      {area.notify_verified
+                                        ? (lang === "ko" ? "공식 확인 이슈 알림 켜짐" : "Verified alerts on")
+                                        : (lang === "ko" ? "공식 확인 이슈 알림 꺼짐" : "Verified alerts off")}
+                                    </span>
+                                    <button
+                                      onClick={() => setOpenInfo(openInfo === `verified-${code}` ? null : `verified-${code}`)}
+                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none"
+                                    >
+                                      ⓘ
+                                    </button>
+                                  </div>
+                                  {openInfo === `verified-${code}` && (
+                                    <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
+                                      {lang === "ko"
+                                        ? "AP, Reuters 등 공신력 있는 소스로 확인된 이슈만 알려드려요."
+                                        : "Notifies you only for issues confirmed by trusted sources like AP, Reuters."}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Fast 토글 */}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => { if (plan !== "free") patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } }); }}
+                                      disabled={plan === "free"}
+                                      className={cn(
+                                        "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
+                                        plan === "free" ? "bg-muted opacity-40 cursor-not-allowed"
+                                          : area.notify_fast ? "bg-orange-500" : "bg-muted"
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
+                                        area.notify_fast && plan !== "free" ? "translate-x-3.5" : "translate-x-0.5"
+                                      )} />
+                                    </button>
+                                    <span className={cn(
+                                      "text-[11px]",
+                                      plan === "free" ? "text-muted-foreground/40"
+                                        : area.notify_fast ? "text-orange-400" : "text-muted-foreground"
+                                    )}>
+                                      {plan === "free"
+                                        ? (lang === "ko" ? "속보 알림 (Pro 전용)" : "Fast alerts (Pro only)")
+                                        : area.notify_fast
+                                        ? (lang === "ko" ? "미확인 속보 알림 켜짐" : "Fast alerts on")
+                                        : (lang === "ko" ? "미확인 속보 알림 꺼짐" : "Fast alerts off")}
+                                    </span>
+                                    <button
+                                      onClick={() => setOpenInfo(openInfo === `fast-${code}` ? null : `fast-${code}`)}
+                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none"
+                                    >
+                                      ⓘ
+                                    </button>
+                                  </div>
+                                  {openInfo === `fast-${code}` && (
+                                    <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
+                                      {lang === "ko"
+                                        ? "확인 전 속보도 즉시 알려드려요. 더 빠르지만 오탐이 있을 수 있어요."
+                                        : "Alerts you before official confirmation. Faster, but may include false positives."}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-muted-foreground">{c?.region ?? ""} · {code}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              removeMyCountry(code);
+                              if (area) deleteArea.mutate(area.id);
+                            }}
+                            className="rounded-full p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 추가 버튼 */}
+                {canAdd ? (
+                  <button
+                    onClick={() => setShowPicker((v) => !v)}
+                    className="flex items-center gap-3 px-4 py-3 w-full text-left hover:bg-muted/30 transition-colors border-t border-border"
+                  >
+                    <div className="h-7 w-7 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center">
+                      {showPicker ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {showPicker ? t(lang, "settings_collapse_picker") : t(lang, "settings_add_country")}
+                    </span>
+                    {plan === "free" && (
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {myCountries.length}/{FREE_COUNTRY_LIMIT}
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 px-4 py-3 border-t border-border">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-[11px] text-muted-foreground">
+                      {t(lang, "settings_upgrade_for_unlimited")}
+                    </p>
+                  </div>
+                )}
+
+                {showPicker && (
+                  <CountryPickerPanel
+                    selected={myCountries}
+                    onAdd={handleAdd}
+                    onClose={() => setShowPicker(false)}
+                    canAdd={canAdd}
+                    plan={plan}
+                    lang={lang}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ── 언어 설정 ─────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_language")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card p-1 flex gap-1">
+            {(["ko", "en"] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className={cn(
+                  "flex-1 py-2 rounded-lg text-sm font-medium transition-colors",
+                  lang === l
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {l === "ko" ? "🇰🇷 한국어" : "🇺🇸 English"}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ── 알림 설정 ─────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_notifications")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card divide-y divide-border">
+
+            {/* 1. 푸시 알림 토글 */}
+            <div className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {lang === "ko" ? "푸시 알림" : "Push Notifications"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {hasFCMToken
+                      ? (lang === "ko" ? "이슈 발생 시 즉시 알림을 받습니다" : "You'll get instant alerts for new issues")
+                      : notifStatus === "denied"
+                      ? (lang === "ko" ? "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요" : "Blocked — allow in your browser settings")
+                      : (lang === "ko" ? "중요 이슈 발생 시 즉시 알림 수신" : "Get instant alerts for critical events")
+                    }
+                  </p>
+                </div>
+
+                {hasFCMToken ? (
+                  <button
+                    onClick={handleDisableNotifications}
+                    disabled={notifStatus === "loading"}
+                    className="shrink-0 flex items-center gap-1.5 rounded-full bg-green-500/15 border border-green-500/30 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-colors"
+                  >
+                    {notifStatus === "loading" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Bell className="h-3.5 w-3.5" />
+                    )}
+                    {lang === "ko" ? "알림 비활성화" : "Disable"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleEnableNotifications}
+                    disabled={notifStatus === "loading" || notifStatus === "denied"}
+                    className={cn(
+                      "shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      notifStatus === "denied"
+                        ? "border-border text-muted-foreground opacity-50 cursor-not-allowed"
+                        : "border-primary/40 text-primary hover:bg-primary/10"
+                    )}
+                  >
+                    {notifStatus === "loading" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <BellOff className="h-3.5 w-3.5" />
+                    )}
+                    {lang === "ko" ? "알림 활성화" : "Enable"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 2. KScore 슬라이더 */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "notif_kscore_title")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "notif_kscore_desc")}</p>
+                </div>
+                <span className="text-sm font-mono font-bold tabular-nums ml-3">
+                  {kscoreValue.toFixed(1)}
+                </span>
+              </div>
+              {plan === "free" ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-muted" />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {t(lang, "notif_kscore_free_hint")}
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-2 space-y-1">
+                  <input
+                    type="range"
+                    min={plan === "pro_plus" ? 0.5 : 1.0}
+                    max={4.0}
+                    step={0.1}
+                    value={kscoreValue}
+                    onChange={(e) => setKscoreValue(parseFloat(e.target.value))}
+                    onMouseUp={handleSaveKscore}
+                    onTouchEnd={handleSaveKscore}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted-foreground">
+                    <span>{plan === "pro_plus" ? "0.5" : "1.0"} · {t(lang, "notif_kscore_low")}</span>
+                    <span>4.0 · {t(lang, "notif_kscore_high")}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. 토픽 필터 (Pro / Pro+) */}
+            <div className={cn("p-4", plan === "free" && "opacity-70")}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "notif_topics_title")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "notif_topics_desc")}</p>
+                </div>
+                {plan === "free" && (
+                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors">
+                    Pro →
+                  </a>
+                )}
+              </div>
+              {plan === "free" && (
+                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
+                  <span>🔓</span>
+                  <span>{lang === "ko" ? "Pro 플랜으로 토픽 필터를 잠금 해제하세요" : "Unlock topic filter with Pro plan"}</span>
+                </a>
+              )}
+              {plan !== "free" ? (
+                <>
+                  <div className="flex gap-3 mb-2">
+                    <button
+                      onClick={() => setSelectedTopics(TOPICS)}
+                      className="text-[10px] text-primary hover:underline"
+                    >
+                      {t(lang, "notif_topics_all")}
+                    </button>
+                    <span className="text-[10px] text-muted-foreground">·</span>
+                    <button
+                      onClick={() => setSelectedTopics([])}
+                      className="text-[10px] text-muted-foreground hover:underline"
+                    >
+                      {t(lang, "notif_topics_none")}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {TOPICS.map((topic) => (
+                      <button
+                        key={topic}
+                        onClick={() =>
+                          setSelectedTopics((prev) =>
+                            prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg border px-2 py-1.5 text-xs transition-colors",
+                          selectedTopics.includes(topic)
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-muted-foreground"
+                        )}
+                      >
+                        {TOPIC_LABELS[topic]?.[lang === "ko" ? "ko" : "en"] ?? topic}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleSaveTopics}
+                    disabled={notifSaving}
+                    className="mt-3 text-[10px] text-primary hover:underline"
+                  >
+                    {notifSaving ? t(lang, "notif_saving") : notifSaved ? t(lang, "notif_saved") : t(lang, "notif_quiet_save")}
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {TOPICS.map((topic) => (
+                    <span key={topic} className="rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground">
+                      {TOPIC_LABELS[topic]?.[lang === "ko" ? "ko" : "en"] ?? topic}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 4. 방해금지 시간 (Pro / Pro+) */}
+            <div className={cn("p-4", plan === "free" && "opacity-60")}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "notif_quiet_title")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_desc")}</p>
+                </div>
+                {plan === "free" && (
+                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors">
+                    Pro →
+                  </a>
+                )}
+              </div>
+              {plan === "free" && (
+                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
+                  <span>🔓</span>
+                  <span>{lang === "ko" ? "Pro 플랜으로 방해금지 시간을 설정하세요" : "Set quiet hours with Pro plan"}</span>
+                </a>
+              )}
+              {plan !== "free" && (
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_from")}</span>
+                    <input
+                      type="time"
+                      value={quietStart}
+                      onChange={(e) => setQuietStart(e.target.value)}
+                      className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
+                    />
+                  </div>
+                  <span className="text-muted-foreground">—</span>
+                  <div className="flex-1 flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_to")}</span>
+                    <input
+                      type="time"
+                      value={quietEnd}
+                      onChange={(e) => setQuietEnd(e.target.value)}
+                      className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveQuietHours}
+                    disabled={notifSaving}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white whitespace-nowrap"
+                  >
+                    {notifSaving ? "..." : t(lang, "notif_quiet_save")}
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </section>
+
+        {/* ── 플랜 ──────────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_plan")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Shield className={cn(
+                "h-4 w-4",
+                plan === "pro_plus" ? "text-purple-400" :
+                plan === "pro" ? "text-yellow-400" :
+                "text-muted-foreground"
+              )} />
+              <p className="text-sm font-medium">
+                {plan === "pro_plus" ? t(lang, "settings_plan_proplus") :
+                 plan === "pro" ? t(lang, "settings_plan_pro") :
+                 t(lang, "settings_plan_free")}
+              </p>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {plan === "pro_plus" ? t(lang, "settings_plan_proplus_desc") :
+               plan === "pro" ? t(lang, "settings_plan_pro_desc") :
+               t(lang, "settings_plan_free_desc", { n: FREE_COUNTRY_LIMIT })}
+            </p>
+
+            {/* Free 플랜 잠긴 기능 목록 */}
+            {plan === "free" && (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {lang === "ko" ? "Pro에서 열리는 기능" : "Unlock with Pro"}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { icon: "🗺️", ko: "실시간 이슈 지도", en: "Real-time map" },
+                    { icon: "⚡", ko: "속보 알림", en: "Fast alerts" },
+                    { icon: "📊", ko: "KScore 필터", en: "KScore filter" },
+                    { icon: "🔕", ko: "방해금지 시간", en: "Quiet hours" },
+                    { icon: "📍", ko: `관심지역 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} regions` },
+                  ].map((f) => (
+                    <span key={f.ko} className="flex items-center gap-1 rounded-full bg-primary/8 border border-primary/20 px-2 py-0.5 text-[10px] text-primary/80">
+                      <span>{f.icon}</span>
+                      <span>{lang === "ko" ? f.ko : f.en}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {plan === "free" && (
+              <a href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-center text-sm font-bold text-white">
+                {t(lang, "settings_upgrade_btn")}
+              </a>
+            )}
+            {plan === "pro" && (
+              <a href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 py-2.5 text-center text-sm font-bold text-white">
+                {t(lang, "settings_plan_upgrade_proplus")}
+              </a>
+            )}
+            {plan === "pro_plus" && (
+              <p className="mt-3 text-center text-xs text-green-400 font-medium">
+                ✓ {t(lang, "settings_plan_active")}
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* ── 계정 ──────────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_account")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card divide-y divide-border">
+            {showProfileEdit ? (
+              <div className="p-4 space-y-3">
+                <p className="text-sm font-semibold">{t(lang, "settings_profile_edit")}</p>
+                {profileError && <p className="text-xs text-destructive">{profileError}</p>}
+                <div>
+                  <label className="text-[11px] text-muted-foreground">{t(lang, "settings_nickname")}</label>
+                  <input
+                    type="text"
+                    value={editNickname}
+                    onChange={(e) => setEditNickname(e.target.value)}
+                    maxLength={20}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground">{t(lang, "settings_bio")}</label>
+                  <textarea
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                    maxLength={200}
+                    rows={3}
+                    placeholder={t(lang, "settings_bio_placeholder")}
+                    className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleProfileSave}
+                    disabled={profileSaving || !editNickname.trim()}
+                    className="flex-1 rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    {profileSaving && <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />}
+                    {t(lang, "settings_save")}
+                  </button>
+                  <button onClick={() => setShowProfileEdit(false)} className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground">
+                    {t(lang, "settings_cancel")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={openProfileEdit} className="flex items-center justify-between px-4 py-3 text-sm w-full text-left hover:bg-secondary/50">
+                <span>{t(lang, "settings_profile_edit")}</span>
+                <span className="text-muted-foreground text-xs">→</span>
+              </button>
+            )}
+            <a href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+              <span>{t(lang, "settings_my_posts")}</span>
+              <span className="text-xs">→</span>
+            </a>
+            <a href="/terms" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+              <span>{t(lang, "settings_terms")}</span>
+              <span className="text-xs">→</span>
+            </a>
+            <a href="/privacy" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+              <span>{t(lang, "settings_privacy")}</span>
+              <span className="text-xs">→</span>
+            </a>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

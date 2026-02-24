@@ -1,0 +1,363 @@
+"""
+/me/* 사용자 API.
+
+GET/POST/DELETE /me/areas          관심지역 CRUD (Free: 국가 2개 제한)
+GET/PATCH       /me/preferences    알림 설정
+POST            /me/push-tokens    FCM 토큰 등록
+DELETE          /me/push-tokens    FCM 토큰 삭제
+"""
+from __future__ import annotations
+
+import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel
+from sqlalchemy import select, delete, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.app.core.auth import get_current_user, get_db, _PLAN_ORDER
+from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
+
+router = APIRouter(prefix="/me", tags=["me"])
+
+FREE_AREA_LIMIT = 2
+PRO_AREA_LIMIT = 10
+
+
+# ── Pydantic 스키마 ───────────────────────────────────────────────────────────
+
+class AreaCreate(BaseModel):
+    area_type: str = "country"
+    country_code: Optional[str] = None
+    label: Optional[str] = None
+    notify_verified: bool = True
+    notify_fast: bool = False
+
+
+class AreaOut(BaseModel):
+    id: int
+    area_type: str
+    country_code: Optional[str]
+    label: Optional[str]
+    notify_verified: bool
+    notify_fast: bool
+    created_at: str
+
+
+class PreferencesOut(BaseModel):
+    language: str
+    min_severity: int
+    min_kscore: float
+    topics: list[str]
+    quiet_hours_start: Optional[str]
+    quiet_hours_end: Optional[str]
+    timezone: str
+
+
+class PreferencesPatch(BaseModel):
+    language: Optional[str] = None
+    min_severity: Optional[int] = None
+    min_kscore: Optional[float] = None
+    topics: Optional[list[str]] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+    timezone: Optional[str] = None
+
+
+class PushTokenCreate(BaseModel):
+    fcm_token: str
+    platform: str = "web"
+
+
+class UserOut(BaseModel):
+    id: str
+    firebase_uid: str
+    plan: str
+    email: Optional[str]
+
+
+# ── 헬퍼 ─────────────────────────────────────────────────────────────────────
+
+def _area_to_out(a: UserArea) -> AreaOut:
+    return AreaOut(
+        id=a.id,
+        area_type=a.area_type,
+        country_code=a.country_code,
+        label=a.label,
+        notify_verified=a.notify_verified,
+        notify_fast=a.notify_fast,
+        created_at=a.created_at.isoformat(),
+    )
+
+
+def _pref_to_out(p: UserPreference) -> PreferencesOut:
+    return PreferencesOut(
+        language=p.language,
+        min_severity=p.min_severity,
+        min_kscore=p.min_kscore,
+        topics=p.topics or [],
+        quiet_hours_start=p.quiet_hours_start.isoformat() if p.quiet_hours_start else None,
+        quiet_hours_end=p.quiet_hours_end.isoformat() if p.quiet_hours_end else None,
+        timezone=p.timezone,
+    )
+
+
+# ── /me (내 정보) ─────────────────────────────────────────────────────────────
+
+@router.get("", response_model=UserOut)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return UserOut(
+        id=str(current_user.id),
+        firebase_uid=current_user.firebase_uid,
+        plan=current_user.plan,
+        email=current_user.email,
+    )
+
+
+# ── /me/areas ─────────────────────────────────────────────────────────────────
+
+@router.get("/areas", response_model=list[AreaOut])
+async def list_areas(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserArea).where(UserArea.user_id == current_user.id)
+        .order_by(UserArea.created_at.asc())
+    )
+    return [_area_to_out(a) for a in result.scalars().all()]
+
+
+@router.post("/areas", response_model=AreaOut, status_code=201)
+async def create_area(
+    body: AreaCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # 플랜별 관심지역 개수 제한
+    count_result = await db.execute(
+        select(func.count()).select_from(UserArea)
+        .where(UserArea.user_id == current_user.id)
+    )
+    count = count_result.scalar() or 0
+    plan = current_user.plan.lower()
+    if plan == "free" and count >= FREE_AREA_LIMIT:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "FREE_AREA_LIMIT",
+                "message": f"Free 플랜은 관심지역 {FREE_AREA_LIMIT}개까지 가능합니다.",
+                "upgrade_url": "/upgrade",
+            },
+        )
+    if plan == "pro" and count >= PRO_AREA_LIMIT:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "PRO_AREA_LIMIT",
+                "message": f"Pro 플랜은 관심지역 {PRO_AREA_LIMIT}개까지 가능합니다. Pro+로 업그레이드하세요.",
+                "upgrade_url": "/upgrade",
+            },
+        )
+
+    # notify_fast는 Pro 이상만 허용
+    if body.notify_fast and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "Fast 알림은 Pro 플랜 전용입니다."},
+        )
+
+    area = UserArea(
+        user_id=current_user.id,
+        area_type=body.area_type,
+        country_code=body.country_code.upper() if body.country_code else None,
+        label=body.label,
+        notify_verified=body.notify_verified,
+        notify_fast=body.notify_fast,
+    )
+    db.add(area)
+    await db.flush()
+    return _area_to_out(area)
+
+
+@router.patch("/areas/{area_id}", response_model=AreaOut)
+async def update_area(
+    area_id: int,
+    body: AreaCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserArea).where(
+            UserArea.id == area_id,
+            UserArea.user_id == current_user.id,
+        )
+    )
+    area = result.scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
+
+    if body.notify_verified is not None:
+        area.notify_verified = body.notify_verified
+    if body.notify_fast is not None:
+        area.notify_fast = body.notify_fast
+    if body.label is not None:
+        area.label = body.label
+
+    await db.flush()
+    return _area_to_out(area)
+
+
+@router.delete("/areas/{area_id}", status_code=204)
+async def delete_area(
+    area_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserArea).where(
+            UserArea.id == area_id,
+            UserArea.user_id == current_user.id,
+        )
+    )
+    area = result.scalar_one_or_none()
+    if not area:
+        raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
+
+    await db.delete(area)
+    await db.flush()
+
+
+# ── /me/preferences ───────────────────────────────────────────────────────────
+
+@router.get("/preferences", response_model=PreferencesOut)
+async def get_preferences(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == current_user.id)
+    )
+    pref = result.scalar_one_or_none()
+    if not pref:
+        pref = UserPreference(user_id=current_user.id)
+        db.add(pref)
+        await db.flush()
+    return _pref_to_out(pref)
+
+
+@router.patch("/preferences", response_model=PreferencesOut)
+async def update_preferences(
+    body: PreferencesPatch,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == current_user.id)
+    )
+    pref = result.scalar_one_or_none()
+    if not pref:
+        pref = UserPreference(user_id=current_user.id)
+        db.add(pref)
+        await db.flush()
+
+    # notify_fast는 Pro 이상만 가능
+    if getattr(body, "notify_fast_global", None) is True:
+        if _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "Fast 알림은 Pro 플랜 전용입니다."},
+            )
+
+    if body.language is not None:
+        pref.language = body.language
+    if body.min_severity is not None:
+        pref.min_severity = body.min_severity
+    if body.min_kscore is not None:
+        # Free 플랜은 1.0 이상으로 고정
+        plan_lower = current_user.plan.lower()
+        min_allowed = 1.0 if plan_lower == "free" else (0.5 if plan_lower == "pro_plus" else 1.0)
+        pref.min_kscore = max(min_allowed, min(body.min_kscore, 5.0))
+    if body.topics is not None:
+        pref.topics = body.topics
+    if body.timezone is not None:
+        pref.timezone = body.timezone
+    # quiet_hours: "" = 해제, "HH:MM" = 설정
+    if body.quiet_hours_start is not None:
+        from datetime import time as dt_time
+        if body.quiet_hours_start == "":
+            pref.quiet_hours_start = None
+        else:
+            try:
+                parts = body.quiet_hours_start.split(":")
+                if len(parts) != 2:
+                    raise ValueError
+                h, m = int(parts[0]), int(parts[1])
+                pref.quiet_hours_start = dt_time(h, m)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=422, detail="quiet_hours_start 형식 오류: HH:MM")
+    if body.quiet_hours_end is not None:
+        from datetime import time as dt_time
+        if body.quiet_hours_end == "":
+            pref.quiet_hours_end = None
+        else:
+            try:
+                parts = body.quiet_hours_end.split(":")
+                if len(parts) != 2:
+                    raise ValueError
+                h, m = int(parts[0]), int(parts[1])
+                pref.quiet_hours_end = dt_time(h, m)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=422, detail="quiet_hours_end 형식 오류: HH:MM")
+
+    await db.flush()
+    return _pref_to_out(pref)
+
+
+# ── /me/push-tokens ───────────────────────────────────────────────────────────
+
+@router.post("/push-tokens", status_code=201)
+async def register_push_token(
+    body: PushTokenCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # 이미 존재하면 last_used 갱신
+    result = await db.execute(
+        select(UserPushToken).where(
+            UserPushToken.user_id == current_user.id,
+            UserPushToken.fcm_token == body.fcm_token,
+        )
+    )
+    token = result.scalar_one_or_none()
+
+    if token:
+        from datetime import datetime, timezone
+        token.last_used = datetime.now(timezone.utc)
+    else:
+        token = UserPushToken(
+            user_id=current_user.id,
+            fcm_token=body.fcm_token,
+            platform=body.platform,
+        )
+        db.add(token)
+
+    await db.flush()
+    return {"status": "ok", "platform": body.platform}
+
+
+@router.delete("/push-tokens")
+async def delete_push_token(
+    fcm_token: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        delete(UserPushToken).where(
+            UserPushToken.user_id == current_user.id,
+            UserPushToken.fcm_token == fcm_token,
+        )
+    )
+    await db.flush()
+    return {"status": "ok"}

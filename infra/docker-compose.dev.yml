@@ -1,0 +1,35 @@
+# WeWantPeace 로컬 개발용 (포트 충돌 방지: 5433, 6380)
+# 기존 face-eval-report 컨테이너와 함께 실행 가능
+
+services:
+  wwp-postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: wwp_postgres
+    environment:
+      POSTGRES_DB: wewantpeace
+      POSTGRES_USER: wwp
+      POSTGRES_PASSWORD: wwplocal
+    ports:
+      - "5433:5432"
+    volumes:
+      - wwp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wwp -d wewantpeace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wwp-redis:
+    image: redis:7-alpine
+    container_name: wwp_redis
+    ports:
+      - "6380:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  wwp_pgdata:

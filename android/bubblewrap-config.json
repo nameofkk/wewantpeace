@@ -1,0 +1,55 @@
+{
+  "packageId": "com.wewantpeace.app",
+  "host": "wewantpeace.fly.dev",
+  "name": "WeWantPeace",
+  "launcherName": "WeWantPeace",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#1a1a2e",
+  "navigationColor": "#1a1a2e",
+  "navigationColorDark": "#0d0d1a",
+  "navigationDividerColor": "#1a1a2e",
+  "navigationDividerColorDark": "#0d0d1a",
+  "backgroundColor": "#1a1a2e",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://wewantpeace.fly.dev/icons/icon-512.png",
+  "maskableIconUrl": "https://wewantpeace.fly.dev/icons/icon-512.png",
+  "monochromeIconUrl": "https://wewantpeace.fly.dev/icons/icon-96.png",
+  "appVersion": "1",
+  "appVersionName": "1.0.0",
+  "shortcuts": [
+    {
+      "name": "긴장도 지수",
+      "short_name": "긴장도",
+      "url": "/tension",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "세계 지도",
+      "short_name": "지도",
+      "url": "/map",
+      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://wewantpeace.fly.dev/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": { "enabled": false },
+    "playBilling": { "enabled": false }
+  },
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://wewantpeace.fly.dev/",
+  "minSdkVersion": 19,
+  "rotationEnabled": false,
+  "signingKey": {
+    "path": "./android/signing-key.jks",
+    "alias": "wewantpeace"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "enableSplashScreenIconPadding": false
+}
