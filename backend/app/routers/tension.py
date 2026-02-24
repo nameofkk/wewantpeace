@@ -172,24 +172,10 @@ async def tension_mine(
     results = []
     for code in codes:
         t = tension_map.get(code)
+        # DB에 데이터 없는 국가는 스킵 (온더플라이 계산 제거 — 타임아웃 방지)
+        # Celery beat calc-tension 이 15분마다 채워줌
         if t is None:
-            from worker.processor.tension_calculator import calculate_country_tension
-            try:
-                async with db.begin_nested():
-                    calc = await calculate_country_tension(code, db)
-                if calc is None:
-                    continue
-                t_res = await db.execute(
-                    select(TensionIndex)
-                    .where(TensionIndex.country_code == code)
-                    .order_by(TensionIndex.time.desc())
-                    .limit(1)
-                )
-                t = t_res.scalar_one_or_none()
-                if t is None:
-                    continue
-            except Exception:
-                continue
+            continue
 
         top5 = await _get_top5(code, db, min_severity=user_min_severity)
         results.append(_tension_to_out(t, top5))
@@ -207,16 +193,7 @@ async def tension_country(
     t = await _latest_tension(code, db)
 
     if t is None:
-        # 실시간 계산 시도
-        from worker.processor.tension_calculator import calculate_country_tension
-        try:
-            async with db.begin_nested():
-                calc = await calculate_country_tension(code, db)
-            if calc is None:
-                raise HTTPException(status_code=404, detail=f"긴장도 데이터 없음: {code}")
-            t = await _latest_tension(code, db)
-        except Exception as exc:
-            raise HTTPException(status_code=404, detail=f"긴장도 데이터 없음: {code}") from exc
+        raise HTTPException(status_code=404, detail=f"긴장도 데이터 없음: {code}")
 
     top5 = await _get_top5(code, db)
     return _tension_to_out(t, top5)
