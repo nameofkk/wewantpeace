@@ -383,7 +383,7 @@ def upgrade() -> None:
                    feed_url, topics, geo_focus, is_active)
                 SELECT
                   :display_name, :source_type, :tier, :base_confidence, :language,
-                  :feed_url, :topics::text[], :geo_focus::text[], true
+                  :feed_url, (:topics)::text[], (:geo_focus)::text[], true
                 WHERE NOT EXISTS (
                   SELECT 1 FROM source_channels WHERE feed_url = :feed_url
                 )

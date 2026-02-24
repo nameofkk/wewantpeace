@@ -138,7 +138,7 @@ def upgrade() -> None:
                    feed_url, topics, geo_focus, is_active)
                 VALUES
                   (:display_name, :source_type, :tier, :base_confidence, :language,
-                   :feed_url, :topics::text[], :geo_focus::text[], true)
+                   :feed_url, (:topics)::text[], (:geo_focus)::text[], true)
                 ON CONFLICT DO NOTHING
             """),
             {
