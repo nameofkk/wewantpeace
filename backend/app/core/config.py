@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     # DB
     database_url: str = "postgresql+asyncpg://wwp:wwplocal@localhost/wewantpeace"
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_db_url_scheme(cls, v: str) -> str:
+        """Railway는 postgres:// 또는 postgresql:// 형태로 제공 → asyncpg 드라이버로 변환."""
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 

@@ -617,7 +617,7 @@ export default function MapPage() {
 
       {/* ── 더미 데이터 미리보기 배너 ──────────────────────────────── */}
       {isLocked && showPreview && (
-        <div className="absolute z-20" style={{ top: "60px", left: "12px", right: "12px" }}>
+        <div className="absolute z-20" style={{ top: "108px", left: "12px", right: "12px" }}>
           <div
             style={{
               borderRadius: "12px",

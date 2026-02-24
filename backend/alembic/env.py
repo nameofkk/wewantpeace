@@ -48,6 +48,11 @@ async def run_async_migrations() -> None:
     # DATABASE_URL env var 직접 사용 (configparser % 이스케이프 우회)
     raw_url = os.environ.get("DATABASE_URL")
     if raw_url:
+        # Railway는 postgres:// 또는 postgresql:// 제공 → asyncpg 드라이버로 변환
+        if raw_url.startswith("postgres://"):
+            raw_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif raw_url.startswith("postgresql://"):
+            raw_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         from sqlalchemy.ext.asyncio import create_async_engine
         connectable = create_async_engine(raw_url, poolclass=pool.NullPool)
     else:
