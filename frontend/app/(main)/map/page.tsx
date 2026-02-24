@@ -517,7 +517,8 @@ export default function MapPage() {
       )}
 
       {isLoading && isMapReady && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 rounded-full bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground border border-border backdrop-blur-sm">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 rounded-full bg-background/90 px-4 py-2 text-[11px] text-muted-foreground border border-border backdrop-blur-sm flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
           {t(lang, "map_data_loading")}
         </div>
       )}
@@ -617,7 +618,7 @@ export default function MapPage() {
 
       {/* ── 더미 데이터 미리보기 배너 ──────────────────────────────── */}
       {isLocked && showPreview && (
-        <div className="absolute z-20" style={{ top: "108px", left: "12px", right: "12px" }}>
+        <div className="absolute z-20" style={{ top: "90px", left: "12px", right: "12px" }}>
           <div
             style={{
               borderRadius: "12px",
