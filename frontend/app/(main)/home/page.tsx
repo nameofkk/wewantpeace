@@ -239,10 +239,10 @@ function KScoreHistorySection({
         >
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0" />
-            <span style={{ wordBreak: "keep-all" }}>
+            <span className="whitespace-nowrap">
               {userLevel < (PLAN_ORDER["pro"] ?? 1)
-                ? (lang === "ko" ? "30일 히스토리는 Pro · 90일은 Pro+ 플랜에서 이용 가능" : "30-day requires Pro · 90-day requires Pro+")
-                : (lang === "ko" ? "90일 히스토리는 Pro+ 플랜에서 이용 가능" : "90-day history requires Pro+ plan")}
+                ? (lang === "ko" ? "Pro 30일 · Pro+ 90일 히스토리" : "Pro: 30d · Pro+: 90d history")
+                : (lang === "ko" ? "90일 히스토리는 Pro+ 전용" : "90d history — Pro+ only")}
             </span>
           </div>
           <a
@@ -447,7 +447,7 @@ export default function HomePage() {
         <div className="grid grid-cols-3 items-center mb-3">
           {/* 왼쪽 */}
           <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <h1 className="text-sm font-bold shrink-0 truncate">{t(lang, "home_title")}</h1>
+            <h1 className="text-sm font-bold truncate">{t(lang, "home_title")}</h1>
             <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-400">LIVE</span>
@@ -465,6 +465,7 @@ export default function HomePage() {
                 {spikeCount}
               </span>
             )}
+            <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button
               onClick={handleRefresh}
               className="text-muted-foreground hover:text-foreground disabled:opacity-50"
@@ -530,8 +531,8 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-2 px-4 pb-2">
               <p className="text-[10px] text-muted-foreground" style={{ wordBreak: "keep-all" }}>
                 {lang === "ko"
-                  ? `📍 Pro 10개 · Pro+ 무제한 — 더 많은 관심지역 추가 가능`
-                  : `📍 Pro: 10 regions · Pro+: Unlimited`}
+                  ? `📍 Pro 5개 · Pro+ 무제한`
+                  : `📍 Pro: 5 regions · Pro+: Unlimited`}
               </p>
               <a
                 href="/upgrade"
@@ -561,10 +562,10 @@ export default function HomePage() {
           </Link>
           {userPlan === "free" && (
             <div className="mt-4 flex items-center justify-between gap-2 w-full max-w-xs rounded-lg px-3 py-2" style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
-              <p className="text-[11px] text-muted-foreground text-left" style={{ wordBreak: "keep-all" }}>
+              <p className="text-[11px] text-muted-foreground text-left whitespace-nowrap">
                 {lang === "ko"
-                  ? `📍 Pro 10개 · Pro+ 무제한 — 더 많은 관심지역 추가 가능`
-                  : `📍 Pro: 10 regions · Pro+: Unlimited`}
+                  ? `📍 Pro 5개 · Pro+ 무제한`
+                  : `📍 Pro: 5 regions · Pro+: Unlimited`}
               </p>
               <a
                 href="/upgrade"
