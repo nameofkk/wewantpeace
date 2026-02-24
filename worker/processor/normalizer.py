@@ -22,10 +22,27 @@ logger = logging.getLogger(__name__)
 
 TOPIC_KEYWORDS: dict[str, list[str]] = {
     "conflict": [
+        # 직접 전투
         "attack", "missile", "bomb", "explosion", "airstrike", "artillery",
         "troops", "military", "war", "combat", "offensive", "drone", "strike",
         "killed", "casualties", "ceasefire", "battle", "forces", "shelling",
         "rocket", "mortar", "tank", "infantry", "navy", "airforce",
+        # 추가: 분쟁/전쟁 일반
+        "conflict", "warfare", "hostilities", "armed",
+        "invasion", "invade", "invading", "invades",
+        "occupation", "occupied", "occupying",
+        "frontline", "front line", "war zone", "warzone",
+        "siege", "ambush", "sniper", "gunfire", "firefight",
+        # 추가: 병력/무기
+        "soldier", "soldiers", "fighter", "fighters", "combatant",
+        "weapon", "weapons", "arms", "nuclear", "warhead",
+        "nuclear weapon", "nuclear weapons", "ballistic",
+        "arms transfer", "arms supply", "weapons transfer",
+        "military aid", "military support", "military assistance",
+        "military operation", "military action", "military force",
+        "armed forces", "armed conflict", "armed group",
+        "deployment", "deployed", "mobilization", "reinforcements",
+        "war effort", "prolong", "prolonging",
     ],
     "terror": [
         "terror", "terrorist", "hostage", "isis", "al-qaeda", "extremist",
@@ -44,6 +61,7 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
     "sanctions": [
         "sanctions", "embargo", "trade ban", "export control", "asset freeze",
         "blacklist", "tariff", "economic pressure", "restriction",
+        "sanctioned", "penalty", "penalties", "sanctioning",
     ],
     "cyber": [
         "cyberattack", "hacked", "ransomware", "malware", "ddos",
@@ -462,7 +480,11 @@ def _translate_to_korean(text: str) -> Optional[str]:
 # 강력한 신호 키워드 (1개만 있어도 topic 분류 확정)
 _STRONG_KEYWORDS: dict[str, set[str]] = {
     "conflict":  {"missile", "airstrike", "artillery", "ceasefire", "shelling",
-                  "rocket", "mortar", "offensive", "bombardment", "warplane"},
+                  "rocket", "mortar", "offensive", "bombardment", "warplane",
+                  # 추가 강력 키워드
+                  "nuclear weapon", "nuclear weapons", "warhead", "ballistic missile",
+                  "invasion", "invade", "armed conflict", "military conflict",
+                  "weapons transfer", "arms transfer"},
     "terror":    {"terrorist", "suicide bomb", "isis", "al-qaeda", "jihadist",
                   "beheading", "cartel", "drug lord", "hostage"},
     "coup":      {"coup", "junta", "seized power", "military takeover",

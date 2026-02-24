@@ -77,7 +77,7 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
             IssueCluster.last_event_at >= cutoff,
             IssueCluster.severity >= max(min_severity, 1),  # 최소 1 이상 유지
         )
-        .order_by(IssueCluster.kscore.desc())
+        .order_by(IssueCluster.kscore.desc(), IssueCluster.severity.desc())
         .limit(5)
     )
     clusters = result.scalars().all()
