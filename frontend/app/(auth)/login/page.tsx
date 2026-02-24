@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Globe, Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   signInWithGoogle,
@@ -242,8 +243,10 @@ export default function LoginPage() {
     <div className="rounded-2xl border border-border bg-card shadow-xl p-8">
       {/* 로고 */}
       <div className="flex items-center gap-2 justify-center mb-6">
-        <Globe className="h-6 w-6 text-primary" />
-        <span className="text-lg font-bold">WeWantPeace</span>
+        <div className="relative h-7 w-16">
+          <Image src="/logo-eye.png" alt="WeWantPeace" fill className="object-contain" priority />
+        </div>
+        <span className="text-lg font-bold tracking-tight">WeWantPeace</span>
       </div>
 
       {/* 구글 신규 가입 헤더 */}
