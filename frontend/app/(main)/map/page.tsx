@@ -446,40 +446,44 @@ export default function MapPage() {
 
       {/* ── 상단 헤더 바 ─────────────────────────────────────────── */}
       <div className="absolute top-3 left-3 right-3 z-10">
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-background/90 px-3 py-2 backdrop-blur-sm">
-          <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 border border-red-500/30">
-            <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
-            <span className="text-[10px] font-bold text-red-400">LIVE</span>
-          </span>
-
-          <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[11px] text-muted-foreground">
-            {t(lang, "map_issues", { n: clusters.length })}
-          </span>
-
-          {spikeCount > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400">
-              <AlertTriangle className="h-2.5 w-2.5" />
-              {t(lang, "map_spike", { n: spikeCount })}
-            </span>
-          )}
-
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing || isFetching}
-            className="ml-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
-          >
-            <RefreshCw className={cn("h-3 w-3", (isRefreshing || isFetching) && "animate-spin")} />
-          </button>
-
-          {elapsed && (
-            <span className="text-[10px] text-muted-foreground">{elapsed} {t(lang, "map_updated")}</span>
-          )}
-
-          <div className="ml-auto flex items-center gap-2">
+        <div className="rounded-xl border border-border bg-background/90 px-3 py-2 backdrop-blur-sm space-y-1.5">
+          {/* Row 1: LIVE + 이슈/스파이크 (왼쪽) | 새로고침 + 경과시간 (오른쪽) */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+              <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 border border-red-500/30 shrink-0">
+                <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
+                <span className="text-[10px] font-bold text-red-400">LIVE</span>
+              </span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+                <Layers className="h-3 w-3" />
+                {t(lang, "map_issues", { n: clusters.length })}
+              </span>
+              {spikeCount > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400 shrink-0">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  {t(lang, "map_spike", { n: spikeCount })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing || isFetching}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-40"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", (isRefreshing || isFetching) && "animate-spin")} />
+              </button>
+              {elapsed && (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
+              )}
+            </div>
+          </div>
+          {/* Row 2: 범례 */}
+          <div className="flex items-center gap-3">
             {LEGEND.map(([label, col]) => (
               <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: col }} />{label}
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
+                {label}
               </span>
             ))}
             <InfoTooltip direction="down" text={t(lang, "map_kscore_legend")} />
