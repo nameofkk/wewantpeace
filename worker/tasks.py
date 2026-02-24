@@ -242,23 +242,24 @@ def process_raw_event(self, raw_event_id: str):
 
                 if not is_dup:
                     cluster = await assign_cluster(ne, db)
-                    cluster_id = str(cluster.id)
+                    if cluster is not None:
+                        cluster_id = str(cluster.id)
 
-                    # 스파이크 감지 (Redis 필요)
-                    try:
-                        redis = get_redis()
-                        is_spike = await evaluate_spike(
-                            cluster_id=cluster_id,
-                            cluster_key=cluster.cluster_key,
-                            severity=cluster.severity,
-                            redis=redis,
-                        )
-                        if is_spike and not cluster.is_spike:
-                            from datetime import datetime, timezone
-                            cluster.is_spike = True
-                            cluster.spike_at = datetime.now(timezone.utc)
-                    except Exception as e:
-                        logger.warning("스파이크 감지 오류 (무시): %s", e)
+                        # 스파이크 감지 (Redis 필요)
+                        try:
+                            redis = get_redis()
+                            is_spike = await evaluate_spike(
+                                cluster_id=cluster_id,
+                                cluster_key=cluster.cluster_key,
+                                severity=cluster.severity,
+                                redis=redis,
+                            )
+                            if is_spike and not cluster.is_spike:
+                                from datetime import datetime, timezone
+                                cluster.is_spike = True
+                                cluster.spike_at = datetime.now(timezone.utc)
+                        except Exception as e:
+                            logger.warning("스파이크 감지 오류 (무시): %s", e)
 
                 # 7. 처리 완료 플래그
                 raw_event.processed = True
