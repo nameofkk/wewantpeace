@@ -72,6 +72,7 @@ export default function LoginPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (meRes.ok) {
+        localStorage.setItem("onboarding_done", "true");
         router.push("/home");
       } else {
         setGoogleUser(user);
@@ -131,7 +132,8 @@ export default function LoginPage() {
           : (typeof detail === "string" ? detail : (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
         throw new Error(msg);
       }
-      router.push("/onboarding");
+      localStorage.setItem("onboarding_done", "true");
+      router.push("/home");
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
@@ -151,6 +153,7 @@ export default function LoginPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (meRes.ok) {
+        localStorage.setItem("onboarding_done", "true");
         router.push("/home");
       } else {
         setError(lang === "en"
@@ -224,7 +227,8 @@ export default function LoginPage() {
         throw new Error(msg);
       }
 
-      router.push("/onboarding");
+      localStorage.setItem("onboarding_done", "true");
+      router.push("/home");
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || (lang === "en" ? "Registration failed." : "회원가입에 실패했습니다."));

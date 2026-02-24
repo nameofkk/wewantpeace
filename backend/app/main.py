@@ -11,6 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from backend.app.core.config import settings
 from backend.app.core.redis import close_redis
 from backend.app.core.sentry import init_sentry
+from backend.app.core.firebase_init import init_firebase
 from backend.app.routers import issues, trending, tension, me
 from backend.app.routers import auth as auth_router, community, admin as admin_router, subscriptions, terms as terms_router
 import structlog
@@ -27,6 +28,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
+    init_firebase()
     logger.info("WeWantPeace API starting up", env=settings.debug)
     yield
     await close_redis()
