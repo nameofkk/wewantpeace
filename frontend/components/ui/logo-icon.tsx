@@ -7,7 +7,7 @@ import { useState } from "react";
 // logo-eye.png: 585×255px (눈만 크롭, 투명 배경)
 const RATIO = 585 / 255; // ≈ 2.294
 
-export function LogoIcon({ height = 32 }: { height?: number }) {
+export function LogoIcon({ height = 32, hideText = false }: { height?: number; hideText?: boolean }) {
   const [tapped, setTapped] = useState(false);
   const width = Math.round(height * RATIO);
 
@@ -52,18 +52,20 @@ export function LogoIcon({ height = 32 }: { height?: number }) {
         />
       </div>
 
-      <span
-        style={{
-          fontSize: "14px",
-          fontWeight: 600,
-          letterSpacing: "0.02em",
-          color: "inherit",
-          lineHeight: 1,
-          whiteSpace: "nowrap",
-        }}
-      >
-        WeWantPeace
-      </span>
+      {!hideText && (
+        <span
+          style={{
+            fontSize: "14px",
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+            color: "inherit",
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          WeWantPeace
+        </span>
+      )}
     </Link>
   );
 }

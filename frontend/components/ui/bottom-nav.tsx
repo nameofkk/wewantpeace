@@ -19,7 +19,7 @@ export function BottomNav() {
     { href: "/settings", icon: Settings, label: t(lang, "nav_settings") },
   ];
 
-  if (pathname === "/onboarding") return null;
+  if (pathname === "/onboarding" || pathname.startsWith("/login")) return null;
 
   return (
     <nav className="tab-bar fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm">

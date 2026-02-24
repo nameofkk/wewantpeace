@@ -143,36 +143,37 @@ export default function CommunityPage() {
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "12px" }}>
+        <div className="grid grid-cols-3 items-center mb-3">
           {/* 왼쪽 */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <h1 className="text-lg font-bold">{t(lang, "community_title")}</h1>
+          <div className="flex items-center min-w-0 overflow-hidden">
+            <h1 className="text-sm font-bold truncate">{t(lang, "community_title")}</h1>
           </div>
           {/* 중앙 — 로고 */}
-          <LogoIcon height={34} />
-          {/* 오른쪽 */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
+          {/* 오른쪽 — 아이콘 버튼만 */}
+          <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => setSortBy(sortBy === "latest" ? "popular" : "latest")}
               className={cn(
-                "flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors",
+                "flex items-center justify-center rounded-full border p-1.5 transition-colors",
                 sortBy === "popular"
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground hover:text-foreground"
               )}
+              title={sortBy === "latest" ? t(lang, "community_sort_latest") : t(lang, "community_sort_popular")}
             >
-              <ArrowUpDown className="h-3 w-3" />
-              {sortBy === "latest" ? t(lang, "community_sort_latest") : t(lang, "community_sort_popular")}
+              <ArrowUpDown className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => user ? router.push("/community/new") : router.push("/login")}
-              className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+              className="flex items-center justify-center rounded-full bg-primary p-1.5"
             >
-              <Plus className="h-3 w-3" />
-              {t(lang, "community_write")}
+              <Plus className="h-3.5 w-3.5 text-primary-foreground" />
             </button>
           </div>
         </div>

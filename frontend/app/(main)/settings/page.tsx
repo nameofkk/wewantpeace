@@ -299,12 +299,14 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col">
       {/* 헤더 */}
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-4">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "4px" }}>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <h1 className="text-lg font-bold">{t(lang, "settings_title")}</h1>
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
+        <div className="grid grid-cols-3 items-center mb-1">
+          <div className="flex items-center min-w-0 overflow-hidden">
+            <h1 className="text-sm font-bold truncate">{t(lang, "settings_title")}</h1>
           </div>
-          <LogoIcon height={34} />
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
           <div />
         </div>
         <p className="text-[11px] text-muted-foreground">{t(lang, "settings_subtitle")}</p>

@@ -444,37 +444,34 @@ export default function HomePage() {
     <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="grid grid-cols-3 items-center mb-3">
           {/* 왼쪽 */}
           <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <h1 className="text-base font-bold shrink-0">{t(lang, "home_title")}</h1>
-            <span className="shrink-0 flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
+            <h1 className="text-sm font-bold shrink-0 truncate">{t(lang, "home_title")}</h1>
+            <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
-              <span className="text-[10px] font-bold text-red-400">LIVE</span>
+              <span className="text-[9px] font-bold text-red-400">LIVE</span>
             </span>
+          </div>
+          {/* 중앙 — 로고 (항상 정중앙) */}
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
+          {/* 오른쪽 */}
+          <div className="flex items-center justify-end gap-1.5">
             {spikeCount > 0 && (
-              <span className="shrink-0 flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
+              <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {spikeCount}
               </span>
             )}
-          </div>
-          {/* 중앙 — 로고 */}
-          <div className="shrink-0">
-            <LogoIcon height={30} />
-          </div>
-          {/* 오른쪽 */}
-          <div className="flex items-center justify-end gap-1.5 min-w-0">
             <button
               onClick={handleRefresh}
-              className="shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className="text-muted-foreground hover:text-foreground disabled:opacity-50"
               disabled={spinning || isFetching}
             >
               <RefreshCw className={cn("h-3.5 w-3.5", (spinning || isFetching) && "animate-spin")} />
             </button>
-            {elapsed && (
-              <span className="text-[10px] text-muted-foreground truncate">{elapsed}</span>
-            )}
           </div>
         </div>
 
