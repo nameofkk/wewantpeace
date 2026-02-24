@@ -449,7 +449,7 @@ async def react_post(
     if reaction:
         if reaction.reaction_type == body.reaction_type:
             # 토글: 삭제
-            await db.delete(reaction)
+            db.delete(reaction)
             if body.reaction_type == "like":
                 post.like_count = max(0, post.like_count - 1)
             elif body.reaction_type == "dislike":
@@ -618,7 +618,7 @@ async def react_comment(
 
     if reaction:
         if reaction.reaction_type == body.reaction_type:
-            await db.delete(reaction)
+            db.delete(reaction)
             if body.reaction_type == "like":
                 comment.like_count = max(0, comment.like_count - 1)
             return {"action": "removed"}
