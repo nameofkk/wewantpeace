@@ -337,6 +337,8 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
       className={cn(
         "relative card-enter rounded-xl border bg-card p-4 transition-all",
         scoreBorderStyle(data.raw_score),
+        displayLevel === 3 && "alert-pulse-critical",
+        displayLevel === 2 && "alert-pulse-warning",
       )}
       style={{ animationDelay: `${index * 100}ms` }}
     >
