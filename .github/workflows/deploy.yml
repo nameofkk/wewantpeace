@@ -21,7 +21,7 @@ jobs:
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
-          # backend용 railway.json 그대로 사용 (Dockerfile.backend)
+          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
           railway up --service backend --detach
 
   deploy-worker:
@@ -38,6 +38,7 @@ jobs:
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
+          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
           cp railway-worker.json railway.json
           railway up --service worker --detach
 
@@ -55,5 +56,6 @@ jobs:
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
+          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
           cp railway-frontend.json railway.json
           railway up --service frontend --detach
