@@ -21,7 +21,7 @@ from backend.app.models.trending_keyword import TrendingKeyword
 logger = logging.getLogger(__name__)
 
 TRENDING_LIMIT = 20
-KSCORE_MIN = 0.7   # 단일 저심각도 클러스터 필터링
+KSCORE_MIN = 0.4   # 단일 이벤트도 포함 (초기 데이터 부족 시 너무 많이 걸러지는 것 방지)
 VALID_MINUTES = 60 * 24  # 24시간 유효 (Celery beat가 없어도 캐시 유지)
 
 
@@ -151,14 +151,14 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
         )
         db.add(kw)
 
-    # 새 레코드(calculated_at=now) 삽입 후, 이전 실행 때 쌓인 중복 행 제거
-    # DELETE WHERE calculated_at < now → 이번 배치보다 오래된 모든 행 삭제
-    # (NOT IN 방식은 같은 keyword의 오래된 행을 살려두어 중복을 유발하는 버그가 있음)
+    # 만료된 레코드만 삭제 (valid_until < now)
+    # ← 핵심 수정: 이전에는 calculated_at < now로 모든 과거 배치를 삭제해서
+    #   히스토리가 최대 15분치만 남는 버그가 있었음.
+    #   valid_until = now + VALID_MINUTES(24h) 이므로 24시간치 히스토리 누적됨.
     await db.flush()
     await db.execute(
         delete(TrendingKeyword).where(
-            TrendingKeyword.scope == "global",
-            TrendingKeyword.calculated_at < now,
+            TrendingKeyword.valid_until < now,
         )
     )
 

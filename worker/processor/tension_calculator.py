@@ -161,9 +161,10 @@ async def _get_percentile_30d(
     )
     historical = [row[0] for row in result.fetchall()]
 
-    # 워밍업: 히스토리 5개 미만이거나 분포가 없으면(전부 동일값) raw_score를 percentile로 사용
-    if len(historical) < 5:
-        return min(100.0, raw_score)
+    # 워밍업: 히스토리 20개 미만이면 raw_score를 보수적으로 절반 할인하여 percentile 사용
+    # (5개 미만 → raw_score 그대로 사용 시 50점 raw_score가 50th percentile로 과대 판정됨)
+    if len(historical) < 20:
+        return min(100.0, raw_score * 0.6)
 
     # 모든 히스토리가 같은 값이면 의미있는 분포 없음 → raw_score 사용
     unique = set(round(h, 1) for h in historical)
