@@ -36,6 +36,9 @@ ENV PORT 3000
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# sharp: Next.js standalone 이미지 최적화 필수
+RUN apk add --no-cache libc6-compat && npm install sharp@0.33.4 --ignore-scripts=false
+
 # standalone 출력물 복사
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
