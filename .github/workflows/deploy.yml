@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+env:
+  RAILWAY_PROJECT_ID: 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed
+
 jobs:
   deploy-backend:
     name: Deploy Backend
