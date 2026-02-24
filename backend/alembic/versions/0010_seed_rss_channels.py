@@ -13,10 +13,8 @@ down_revision: Union[str, None] = "0009"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-# RSS 소스 채널 시드 데이터
-# tier: A=주요언론/공식, B=검증된OSINT, C=일반OSINT, D=미검증
 RSS_CHANNELS = [
-    # Tier A - 주요 국제 언론
+    # Tier A
     {
         "display_name": "Reuters World News",
         "source_type": "rss",
@@ -24,8 +22,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.92,
         "language": "en",
         "feed_url": "https://feeds.reuters.com/reuters/topNews",
-        "topics": "{conflict,diplomacy,sanctions}",
-        "geo_focus": "{global}",
+        "topics": ["conflict", "diplomacy", "sanctions"],
+        "geo_focus": ["global"],
     },
     {
         "display_name": "BBC World News",
@@ -34,8 +32,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.90,
         "language": "en",
         "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
-        "topics": "{conflict,diplomacy,coup,protest}",
-        "geo_focus": "{global}",
+        "topics": ["conflict", "diplomacy", "coup", "protest"],
+        "geo_focus": ["global"],
     },
     {
         "display_name": "Al Jazeera English",
@@ -44,8 +42,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.88,
         "language": "en",
         "feed_url": "https://www.aljazeera.com/xml/rss/all.xml",
-        "topics": "{conflict,diplomacy,protest}",
-        "geo_focus": "{ME,AF,AS}",
+        "topics": ["conflict", "diplomacy", "protest"],
+        "geo_focus": ["ME", "AF", "AS"],
     },
     {
         "display_name": "AP News International",
@@ -54,8 +52,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.92,
         "language": "en",
         "feed_url": "https://rsshub.app/apnews/topics/apf-intlnews",
-        "topics": "{conflict,diplomacy,sanctions,coup}",
-        "geo_focus": "{global}",
+        "topics": ["conflict", "diplomacy", "sanctions", "coup"],
+        "geo_focus": ["global"],
     },
     {
         "display_name": "Deutsche Welle World",
@@ -64,8 +62,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.87,
         "language": "en",
         "feed_url": "https://rss.dw.com/xml/rss-en-world",
-        "topics": "{conflict,diplomacy,sanctions}",
-        "geo_focus": "{EU,ME,AS}",
+        "topics": ["conflict", "diplomacy", "sanctions"],
+        "geo_focus": ["EU", "ME", "AS"],
     },
     {
         "display_name": "The Guardian World",
@@ -74,10 +72,10 @@ RSS_CHANNELS = [
         "base_confidence": 0.86,
         "language": "en",
         "feed_url": "https://www.theguardian.com/world/rss",
-        "topics": "{conflict,protest,diplomacy,coup}",
-        "geo_focus": "{global}",
+        "topics": ["conflict", "protest", "diplomacy", "coup"],
+        "geo_focus": ["global"],
     },
-    # Tier B - 검증된 OSINT / 전문 미디어
+    # Tier B
     {
         "display_name": "Kyiv Independent",
         "source_type": "rss",
@@ -85,8 +83,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.80,
         "language": "en",
         "feed_url": "https://kyivindependent.com/feed",
-        "topics": "{conflict}",
-        "geo_focus": "{UA,RU,EU}",
+        "topics": ["conflict"],
+        "geo_focus": ["UA", "RU", "EU"],
     },
     {
         "display_name": "Radio Free Asia",
@@ -95,8 +93,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.78,
         "language": "en",
         "feed_url": "https://www.rfa.org/english/RSS",
-        "topics": "{conflict,coup,protest}",
-        "geo_focus": "{AS,KP,MM,CN}",
+        "topics": ["conflict", "coup", "protest"],
+        "geo_focus": ["AS", "KP", "MM", "CN"],
     },
     {
         "display_name": "Middle East Eye",
@@ -105,8 +103,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.78,
         "language": "en",
         "feed_url": "https://www.middleeasteye.net/rss",
-        "topics": "{conflict,diplomacy,protest}",
-        "geo_focus": "{ME,PS,IL,IR,SY,YE}",
+        "topics": ["conflict", "diplomacy", "protest"],
+        "geo_focus": ["ME", "PS", "IL", "IR", "SY", "YE"],
     },
     {
         "display_name": "NHK World News",
@@ -115,8 +113,8 @@ RSS_CHANNELS = [
         "base_confidence": 0.85,
         "language": "en",
         "feed_url": "https://www3.nhk.or.jp/rss/news/cat6.xml",
-        "topics": "{conflict,diplomacy,maritime}",
-        "geo_focus": "{AS,KP,TW,JP,KR}",
+        "topics": ["conflict", "diplomacy", "maritime"],
+        "geo_focus": ["AS", "KP", "TW", "JP", "KR"],
     },
 ]
 
@@ -124,7 +122,6 @@ RSS_CHANNELS = [
 def upgrade() -> None:
     conn = op.get_bind()
 
-    # 이미 데이터가 있으면 스킵 (멱등성)
     result = conn.execute(sa.text("SELECT COUNT(*) FROM source_channels WHERE source_type = 'rss'"))
     count = result.scalar()
     if count and count > 0:
@@ -138,9 +135,12 @@ def upgrade() -> None:
                    feed_url, topics, geo_focus, is_active)
                 VALUES
                   (:display_name, :source_type, :tier, :base_confidence, :language,
-                   :feed_url, (:topics)::text[], (:geo_focus)::text[], true)
+                   :feed_url, :topics, :geo_focus, true)
                 ON CONFLICT DO NOTHING
-            """),
+            """).bindparams(
+                sa.bindparam("topics", type_=sa.ARRAY(sa.Text())),
+                sa.bindparam("geo_focus", type_=sa.ARRAY(sa.Text())),
+            ),
             {
                 "display_name": ch["display_name"],
                 "source_type": ch["source_type"],
