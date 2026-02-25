@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -93,15 +94,16 @@ const SECTIONS_EN = [
 
 export default function PrivacyPage() {
   const lang = useAppStore((s) => s.lang);
+  const router = useRouter();
   const sections = lang === "en" ? SECTIONS_EN : SECTIONS_KO;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
-          <Link href="/" className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-5 w-5" />
-          </Link>
+          </button>
           <h1 className="text-xl font-bold">{t(lang, "privacy_title")}</h1>
         </div>
 
