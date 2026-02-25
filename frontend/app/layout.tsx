@@ -20,11 +20,20 @@ export const metadata: Metadata = {
     siteName: "WeWantPeace",
     title: "WeWantPeace — 세계정세 모니터링",
     description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
+    images: [
+      {
+        url: "/icons/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "WeWantPeace",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "WeWantPeace — 세계정세 모니터링",
     description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
+    images: ["/icons/og-image.png"],
   },
   appleWebApp: {
     capable: true,
