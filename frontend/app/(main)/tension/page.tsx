@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin } from "lucide-react";
+import { Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
@@ -10,7 +10,7 @@ import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
 import { TensionHistoryChart } from "@/components/tension/TensionHistoryChart";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
-import { ALL_MONITORED_COUNTRIES, getCountryName, getFlag } from "@/lib/countries";
+import { ALL_MONITORED_COUNTRIES, COUNTRY_MAP, getCountryName, getFlag } from "@/lib/countries";
 
 interface ClusterSummary {
   id: string;
@@ -614,6 +614,35 @@ export default function TensionPage() {
           ))}
         </div>
       </div>
+
+      {/* ── 내 관심지역 국가 표시 바 (관심지역 탭) ─────────────────── */}
+      {viewMode === "mine" && hydrated && myCountries.length > 0 && (
+        <div className="border-b border-border/40 bg-secondary/20">
+          <div className="flex items-center gap-2 px-4 py-2">
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {myCountries.map((code) => {
+                const c = COUNTRY_MAP[code];
+                return (
+                  <span
+                    key={code}
+                    className="flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium"
+                  >
+                    <span>{c?.flag ?? "🌐"}</span>
+                    <span>{getCountryName(code, lang)}</span>
+                  </span>
+                );
+              })}
+            </div>
+            <Link
+              href="/settings?section=countries"
+              className="flex items-center gap-1 shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+            >
+              <Pencil className="h-2.5 w-2.5" />
+              {t(lang, "home_change")}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* ── Free 플랜 업그레이드 힌트 (관심지역 탭일 때) ──────────── */}
       {viewMode === "mine" && userPlan === "free" && (

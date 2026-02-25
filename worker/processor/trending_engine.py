@@ -160,14 +160,14 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
         )
         db.add(kw)
 
-    # 만료된 레코드만 삭제 (valid_until < now)
-    # ← 핵심 수정: 이전에는 calculated_at < now로 모든 과거 배치를 삭제해서
-    #   히스토리가 최대 15분치만 남는 버그가 있었음.
-    #   valid_until = now + VALID_MINUTES(24h) 이므로 24시간치 히스토리 누적됨.
+    # 히스토리 보관: 90일 이전 레코드만 삭제
+    # valid_until은 현재 트렌딩 표시용 (24h), calculated_at 기준으로 90일 보관.
+    # Pro+ 사용자가 90일 KScore 히스토리를 조회할 수 있어야 함.
+    history_cutoff = now - timedelta(days=91)
     await db.flush()
     await db.execute(
         delete(TrendingKeyword).where(
-            TrendingKeyword.valid_until < now,
+            TrendingKeyword.calculated_at < history_cutoff,
         )
     )
 

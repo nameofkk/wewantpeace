@@ -370,7 +370,9 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
       )}
 
       {showHistory && clusterId && (
-        <KScoreHistorySection clusterId={clusterId} userPlan={userPlan} lang={lang} />
+        <div onClick={(e) => e.stopPropagation()}>
+          <KScoreHistorySection clusterId={clusterId} userPlan={userPlan} lang={lang} />
+        </div>
       )}
     </div>
   );
