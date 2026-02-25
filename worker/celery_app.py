@@ -1,5 +1,6 @@
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import worker_ready
 import os
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
@@ -60,3 +61,10 @@ app.conf.beat_schedule = {
         "options": {"queue": "process"},
     },
 }
+
+
+@worker_ready.connect
+def on_worker_ready(**kwargs):
+    """워커 시작 시 긴장도·트렌딩 즉시 계산 (beat 스케줄 대기 없이)."""
+    app.send_task("worker.tasks.calculate_tension", queue="process")
+    app.send_task("worker.tasks.calculate_trending", queue="process")
