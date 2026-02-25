@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: "WeWantPeace",
     template: "%s | WeWantPeace",
   },
-  description: "세계정세 알림·지도·긴장도 지수. 스파이크 기반 중요 이슈만 필터링하여 신뢰할 수 있는 정보를 제공합니다.",
+  description: "실시간 세계정세 모니터링 · 긴장도 지수 · 이슈 알림",
   manifest: "/manifest.json",
   metadataBase: new URL(SITE_URL),
   openGraph: {
@@ -21,8 +21,8 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 세계정세 알림·지도·긴장도 지수",
-    description: "스파이크 기반 중요 이슈만 필터링. 출처 투명성(티어/확신도). 긴장도 지수로 한눈에.",
+    title: "WeWantPeace — 실시간 세계정세 모니터링",
+    description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
     images: [
       {
         url: "/icons/og-image.png",
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace — 세계정세 알림·지도·긴장도 지수",
-    description: "스파이크 기반 중요 이슈만 필터링. 출처 투명성(티어/확신도). 긴장도 지수로 한눈에.",
+    title: "WeWantPeace — 실시간 세계정세 모니터링",
+    description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
     images: ["/icons/og-image.png"],
   },
   appleWebApp: {
@@ -68,7 +68,8 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark">
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.ico" sizes="48x48" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-screen bg-background antialiased">
         <Providers>
