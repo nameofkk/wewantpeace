@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, get_optional_user, get_db, plan_required
+from backend.app.core.auth import get_current_user, get_optional_user, get_db, plan_required, require_admin
 from backend.app.models.user import User
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.issue_cluster import IssueCluster
@@ -406,9 +406,10 @@ async def tension_history(
 
 @router.post("/recalculate")
 async def tension_recalculate(
+    admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """긴장도 즉시 재계산 (tension_index 비어있을 때 수동 트리거용)."""
+    """긴장도 즉시 재계산 (admin 전용)."""
     import logging
     _logger = logging.getLogger(__name__)
 
@@ -421,5 +422,5 @@ async def tension_recalculate(
                 _logger.info("tension_recalculate 완료: %d개국", len(results))
                 return {"status": "ok", "countries": len(results)}
     except Exception as e:
-        _logger.error("tension_recalculate 실패: %s", e)
-        raise HTTPException(500, detail=str(e))
+        _logger.error("tension_recalculate 실패: %s", e, exc_info=True)
+        raise HTTPException(500, detail="긴장도 재계산 중 오류가 발생했습니다.")

@@ -640,8 +640,8 @@ async def admin_tension_recalculate(
                 await _log_action(db, admin, "tension_recalculate", detail={"countries": len(results)})
                 return {"status": "ok", "countries": len(results)}
     except Exception as e:
-        _logger.error("admin_tension_recalculate 실패: %s", e)
-        raise HTTPException(500, detail=str(e))
+        _logger.error("admin_tension_recalculate 실패: %s", e, exc_info=True)
+        raise HTTPException(500, detail="긴장도 재계산 중 오류가 발생했습니다.")
 
 
 @router.post("/trending/recalculate")
@@ -662,8 +662,8 @@ async def admin_trending_recalculate(
                 await _log_action(db, admin, "trending_recalculate", detail={"keywords": len(results)})
                 return {"status": "ok", "keywords": len(results)}
     except Exception as e:
-        _logger.error("admin_trending_recalculate 실패: %s", e)
-        raise HTTPException(500, detail=str(e))
+        _logger.error("admin_trending_recalculate 실패: %s", e, exc_info=True)
+        raise HTTPException(500, detail="트렌딩 재계산 중 오류가 발생했습니다.")
 
 
 # ── 7일 이벤트 추이 (차트용) ────────────────────────────────────────────────

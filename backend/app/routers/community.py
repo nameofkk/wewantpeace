@@ -21,7 +21,27 @@ from backend.app.models.issue_cluster import IssueCluster
 router = APIRouter(prefix="/community", tags=["community"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# 매직바이트 → MIME 타입 매핑
+_MAGIC_SIGNATURES = [
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+    (b"RIFF", "image/webp"),  # RIFF....WEBP
+]
+
+
+def _detect_image_type(data: bytes) -> str | None:
+    """매직바이트로 이미지 MIME 타입 감지."""
+    for sig, mime in _MAGIC_SIGNATURES:
+        if data[:len(sig)] == sig:
+            if mime == "image/webp" and data[8:12] != b"WEBP":
+                continue
+            return mime
+    return None
 
 
 # ── 스키마 ───────────────────────────────────────────────────────────────────
@@ -146,7 +166,16 @@ async def upload_image(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(422, detail="파일 크기는 5MB를 초과할 수 없습니다.")
 
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
+    # 매직바이트 검증
+    detected = _detect_image_type(contents)
+    if detected not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(422, detail="파일 내용이 허용된 이미지 형식이 아닙니다.")
+
+    # 확장자 화이트리스트
+    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else ""
+    if ext not in ALLOWED_EXTENSIONS:
+        ext = detected.split("/")[-1]  # MIME에서 추출 (jpeg, png, gif, webp)
+
     filename = f"{uuid.uuid4()}.{ext}"
     filepath = os.path.join(settings.upload_dir, filename)
 

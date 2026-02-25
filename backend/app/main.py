@@ -132,6 +132,9 @@ app = FastAPI(
     version="0.1.0",
     description="세계정세 알림·지도·긴장도 지수 API",
     lifespan=lifespan,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
 # Rate limit 설정 (SlowAPIMiddleware: 모든 라우트에 default_limits 자동 적용)
