@@ -118,23 +118,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
-  // 인증 + 어드민 권한 확인
+  // 인증 + 어드민 권한 확인 (10초 타임아웃)
   useEffect(() => {
     if (loading) return;
     if (!user) {
       setAuthStatus("denied");
       return;
     }
-    user.getIdToken().then(async (token) => {
-      try {
-        const res = await fetch(`${API_BASE}/admin/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setAuthStatus(res.ok ? "ok" : "denied");
-      } catch {
-        setAuthStatus("denied");
-      }
-    });
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) setAuthStatus("denied");
+    }, 10_000);
+
+    user
+      .getIdToken()
+      .then(async (token) => {
+        try {
+          const res = await fetch(`${API_BASE}/admin/stats`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (!cancelled) setAuthStatus(res.ok ? "ok" : "denied");
+        } catch {
+          if (!cancelled) setAuthStatus("denied");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAuthStatus("denied");
+      })
+      .finally(() => clearTimeout(timeout));
+
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, [user, loading]);
 
   if (loading || authStatus === "loading") {

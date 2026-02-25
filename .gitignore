@@ -32,6 +32,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# ── PWA (next-pwa 빌드 산출물, 빌드 시 자동 생성) ────────────────────────────
+frontend/public/sw.js
+frontend/public/sw.js.map
+frontend/public/workbox-*.js
+frontend/public/workbox-*.js.map
+
 # ── 로그 ─────────────────────────────────────────────────────────────────────
 *.log
 /tmp/*.log
