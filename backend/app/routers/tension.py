@@ -169,28 +169,6 @@ async def tension_mine(
         if row.country_code not in tension_map:
             tension_map[row.country_code] = row
 
-    # DB에 tension 데이터가 전혀 없으면 온더플라이 계산 (최초 부팅 / 재시작 직후)
-    if not tension_map:
-        import logging
-        _logger = logging.getLogger(__name__)
-        _logger.info("tension_index 비어있음 — 온더플라이 계산 시작")
-        from worker.processor.tension_calculator import calculate_country_tension, MONITORED_COUNTRIES
-        calc_codes = [c for c in codes if c in MONITORED_COUNTRIES]
-        for code in calc_codes:
-            try:
-                result = await calculate_country_tension(code, db)
-                if result:
-                    tension_map[code] = (await db.execute(
-                        select(TensionIndex)
-                        .where(TensionIndex.country_code == code)
-                        .order_by(TensionIndex.time.desc())
-                        .limit(1)
-                    )).scalar_one_or_none()
-            except Exception as e:
-                _logger.warning("온더플라이 계산 실패 %s: %s", code, e)
-        await db.commit()
-        _logger.info("온더플라이 계산 완료: %d개국", len([v for v in tension_map.values() if v]))
-
     results = []
     for code in codes:
         t = tension_map.get(code)

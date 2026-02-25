@@ -25,12 +25,48 @@ init_sentry()
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 
+async def _startup_tension_calculation():
+    """백엔드 기동 시 긴장도·트렌딩 즉시 계산 (백그라운드).
+
+    Celery beat 스케줄 대기 없이 배포 직후 데이터가 비어있는 구간을 방지.
+    FastAPI 프로세스 안에서 실행되므로 이벤트 루프 문제가 없다.
+    """
+    import asyncio
+    await asyncio.sleep(5)  # DB 연결 안정화 대기
+
+    from backend.app.core.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                from worker.processor.tension_calculator import calculate_all_tensions
+                results = await calculate_all_tensions(db)
+                logger.info("startup_tension_calculation 완료: %d개국", len(results))
+    except Exception as e:
+        logger.error("startup_tension_calculation 실패: %s", e)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                from worker.processor.trending_engine import calculate_global_trending
+                results = await calculate_global_trending(db)
+                logger.info("startup_trending_calculation 완료: %d개", len(results))
+    except Exception as e:
+        logger.error("startup_trending_calculation 실패: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     os.makedirs(settings.upload_dir, exist_ok=True)
     init_firebase()
     logger.info("WeWantPeace API starting up", env=settings.debug)
+
+    # 백그라운드로 긴장도·트렌딩 즉시 계산 (배포 후 빈 데이터 방지)
+    task = asyncio.create_task(_startup_tension_calculation())
+
     yield
+
+    task.cancel()
     await close_redis()
     logger.info("WeWantPeace API shut down")
 
