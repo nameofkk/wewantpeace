@@ -257,21 +257,31 @@ class ReportAction(BaseModel):
 
 @router.get("/reports")
 async def list_reports(
-    status: str = Query("pending"),
+    status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Report).where(Report.status == status)
-        .order_by(Report.created_at.desc())
-        .offset((page - 1) * 20).limit(20)
-    )
+    q = select(Report)
+    if status:
+        q = q.where(Report.status == status)
+    q = q.order_by(Report.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
     reports = result.scalars().all()
+
+    # reporter nickname 조회
+    reporter_ids = [r.reporter_id for r in reports if r.reporter_id]
+    nickname_map: dict[uuid.UUID, str] = {}
+    if reporter_ids:
+        user_result = await db.execute(
+            select(User.id, User.nickname).where(User.id.in_(reporter_ids))
+        )
+        nickname_map = {row.id: row.nickname for row in user_result.all()}
+
     return [
         {
             "id": r.id,
-            "reporter_id": str(r.reporter_id) if r.reporter_id else None,
+            "reporter_nickname": nickname_map.get(r.reporter_id) if r.reporter_id else None,
             "target_type": r.target_type,
             "target_id": r.target_id,
             "reason": r.reason,
@@ -323,27 +333,48 @@ async def list_admin_posts(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    from sqlalchemy.orm import selectinload
+
     q = select(Post)
+    filters = []
     if status:
-        q = q.where(Post.status == status)
+        filters.append(Post.status == status)
     if search:
-        q = q.where(Post.title.ilike(f"%{search}%"))
+        filters.append(Post.title.ilike(f"%{search}%"))
+    if filters:
+        q = q.where(and_(*filters))
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     q = q.order_by(Post.created_at.desc()).offset((page - 1) * 20).limit(20)
     result = await db.execute(q)
     posts = result.scalars().all()
-    return [
-        {
-            "id": str(p.id),
-            "title": p.title,
-            "post_type": p.post_type,
-            "status": p.status,
-            "view_count": p.view_count,
-            "like_count": p.like_count,
-            "comment_count": p.comment_count,
-            "created_at": p.created_at.isoformat(),
-        }
-        for p in posts
-    ]
+
+    # author nickname 조회 (User join)
+    user_ids = [p.user_id for p in posts if p.user_id]
+    nickname_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        user_result = await db.execute(
+            select(User.id, User.nickname).where(User.id.in_(user_ids))
+        )
+        nickname_map = {row.id: row.nickname for row in user_result.all()}
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(p.id),
+                "title": p.title,
+                "post_type": p.post_type,
+                "status": p.status,
+                "views": p.view_count,
+                "likes": p.like_count,
+                "comment_count": p.comment_count,
+                "author_nickname": nickname_map.get(p.user_id) if p.user_id else None,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in posts
+        ],
+    }
 
 
 @router.patch("/posts/{post_id}/hide")
@@ -367,27 +398,40 @@ async def hide_post(
 @router.get("/subscriptions")
 async def list_subscriptions(
     page: int = Query(1, ge=1),
+    status: Optional[str] = Query(None),
+    plan: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(Subscription).order_by(Subscription.created_at.desc())
-        .offset((page - 1) * 20).limit(20)
-    )
+    q = select(Subscription)
+    if status:
+        q = q.where(Subscription.status == status)
+    if plan:
+        q = q.where(Subscription.plan == plan)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(Subscription.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
     subs = result.scalars().all()
-    return [
-        {
-            "id": str(s.id),
-            "user_id": str(s.user_id),
-            "plan": s.plan,
-            "status": s.status,
-            "amount": s.amount,
-            "started_at": s.started_at.isoformat(),
-            "expires_at": s.expires_at.isoformat() if s.expires_at else None,
-            "next_billing_at": s.next_billing_at.isoformat() if s.next_billing_at else None,
-        }
-        for s in subs
-    ]
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(s.id),
+                "user_id": str(s.user_id),
+                "plan": s.plan,
+                "status": s.status,
+                "amount": s.amount,
+                "currency": s.currency,
+                "platform": s.platform,
+                "started_at": s.started_at.isoformat(),
+                "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+                "next_billing_at": s.next_billing_at.isoformat() if s.next_billing_at else None,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in subs
+        ],
+    }
 
 
 # ── 앱 설정 ──────────────────────────────────────────────────────────────────
@@ -549,6 +593,7 @@ async def list_events(
     source: Optional[str] = Query(None),
     country: Optional[str] = Query(None),
     severity: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -559,6 +604,11 @@ async def list_events(
         q = q.where(NormalizedEvent.country_code == country.upper())
     if severity is not None:
         q = q.where(NormalizedEvent.severity >= severity)
+    if search:
+        q = q.where(
+            (NormalizedEvent.title.ilike(f"%{search}%"))
+            | (NormalizedEvent.title_ko.ilike(f"%{search}%"))
+        )
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     q = q.order_by(NormalizedEvent.event_time.desc()).offset((page - 1) * limit).limit(limit)
