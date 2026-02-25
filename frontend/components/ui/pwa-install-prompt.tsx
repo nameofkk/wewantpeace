@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 
 const DISMISS_KEY = "pwa_install_dismissed";
@@ -12,6 +13,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function PWAInstallPrompt() {
+  const pathname = usePathname();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -49,7 +51,7 @@ export function PWAInstallPrompt() {
     localStorage.setItem(DISMISS_KEY, String(Date.now()));
   };
 
-  if (!visible) return null;
+  if (!visible || pathname === "/upgrade") return null;
 
   return (
     <div className="fixed bottom-[72px] left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">

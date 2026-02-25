@@ -408,7 +408,7 @@ export default function UpgradePage() {
             onClick={() => setSelected("pro")}
           >
             {/* 인기 배지 */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 badge-float">
+            <div className="absolute -top-3.5 left-0 right-0 flex justify-center z-10 badge-float">
               <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 px-4 py-1 shadow-lg shadow-blue-500/25">
                 <Zap className="h-3 w-3 text-white" />
                 <span className="text-[11px] font-bold text-white">
@@ -500,7 +500,7 @@ export default function UpgradePage() {
             onClick={() => setSelected("pro_plus")}
           >
             {/* 최고 배지 */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 badge-float">
+            <div className="absolute -top-3.5 left-0 right-0 flex justify-center z-10 badge-float">
               <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-1 shadow-lg shadow-purple-500/25">
                 <Crown className="h-3 w-3 text-white" />
                 <span className="text-[11px] font-bold text-white">
