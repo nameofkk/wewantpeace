@@ -122,6 +122,16 @@ export default function SettingsPage() {
 
   const areasMap = Object.fromEntries((areas ?? []).map((a) => [a.country_code, a]));
 
+  // area가 없는 관심지역 자동 생성 (로그인 전에 추가했거나 API 실패 시 복구)
+  useEffect(() => {
+    if (!firebaseUser || !areas) return;
+    const missing = myCountries.filter((code) => !areasMap[code]);
+    missing.forEach((code) => {
+      addArea.mutate({ area_type: "country", country_code: code });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebaseUser, areas, myCountries.length]);
+
   const [showPicker, setShowPicker] = useState(false);
   const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied">("idle");
   const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태
@@ -505,7 +515,10 @@ export default function SettingsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-[10px] text-muted-foreground">{c?.region ?? ""} · {code}</p>
+                              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                {lang === "ko" ? "알림 설정 로딩중..." : "Loading alert settings..."}
+                              </div>
                             )}
                           </div>
                           <button
