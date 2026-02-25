@@ -107,11 +107,19 @@ async def lifespan(app: FastAPI):
     # 어드민 이메일 자동 승격 (ADMIN_EMAILS 환경변수)
     await _bootstrap_admin()
 
-    # 긴장도·트렌딩 계산 완료 후 서버 시작 (첫 요청부터 데이터 보장)
-    try:
-        await asyncio.wait_for(_startup_tension_calculation(), timeout=45)
-    except asyncio.TimeoutError:
-        logger.warning("startup_tension_calculation 타임아웃(45초) — 서버 먼저 시작")
+    # 긴장도·트렌딩 계산을 백그라운드로 실행 (서버 즉시 시작, 완료 추적)
+    app.state.tension_ready = False
+
+    async def _bg_tension():
+        try:
+            await asyncio.wait_for(_startup_tension_calculation(), timeout=120)
+        except asyncio.TimeoutError:
+            logger.warning("startup_tension_calculation 타임아웃(120초)")
+        finally:
+            app.state.tension_ready = True
+            logger.info("tension_ready = True")
+
+    asyncio.create_task(_bg_tension())
 
     yield
     await close_redis()

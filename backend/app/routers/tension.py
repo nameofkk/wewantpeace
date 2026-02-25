@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_optional_user, get_db, plan_required
@@ -95,6 +95,63 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
     ]
 
 
+async def _get_top5_batch(
+    country_codes: list[str], db: AsyncSession, min_severity: int = 0,
+) -> dict[str, list[ClusterSummary]]:
+    """국가별 top5 클러스터를 1회 배치 쿼리로 조회 (window function)."""
+    if not country_codes:
+        return {}
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    effective_min = max(min_severity, 1)
+
+    rn_col = sa_func.row_number().over(
+        partition_by=IssueCluster.country_code,
+        order_by=[IssueCluster.kscore.desc(), IssueCluster.severity.desc()],
+    ).label("rn")
+
+    subq = (
+        select(
+            IssueCluster.id,
+            IssueCluster.country_code,
+            IssueCluster.title,
+            IssueCluster.title_ko,
+            IssueCluster.severity,
+            IssueCluster.confidence,
+            IssueCluster.topic,
+            IssueCluster.kscore,
+            rn_col,
+        )
+        .where(
+            IssueCluster.country_code.in_(country_codes),
+            IssueCluster.last_event_at >= cutoff,
+            IssueCluster.severity >= effective_min,
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(subq)
+        .where(subq.c.rn <= 5)
+        .order_by(subq.c.country_code, subq.c.rn)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    top5_map: dict[str, list[ClusterSummary]] = {}
+    for row in rows:
+        cs = ClusterSummary(
+            id=str(row.id),
+            title=row.title,
+            title_ko=row.title_ko,
+            severity=row.severity,
+            confidence=round(row.confidence, 3),
+            topic=row.topic,
+            kscore=round(row.kscore, 2),
+        )
+        top5_map.setdefault(row.country_code, []).append(cs)
+    return top5_map
+
+
 def _tension_to_out(t: TensionIndex, top5: list[ClusterSummary]) -> TensionOut:
     return TensionOut(
         country_code=t.country_code,
@@ -157,26 +214,54 @@ async def tension_mine(
         if pref:
             user_min_severity = pref.min_severity
 
-    # 활성 국가 목록 TensionIndex 최신값 조회 (ORM .in_() 사용 — asyncpg array 타입 문제 회피)
+    # ── DB에서 국가별 최신 1건만 조회 (DISTINCT ON) ──
     raw_result = await db.execute(
         select(TensionIndex)
         .where(TensionIndex.country_code.in_(codes))
+        .distinct(TensionIndex.country_code)
         .order_by(TensionIndex.country_code, TensionIndex.time.desc())
     )
-    all_rows = raw_result.scalars().all()
-    tension_map: dict[str, TensionIndex] = {}
-    for row in all_rows:
-        if row.country_code not in tension_map:
-            tension_map[row.country_code] = row
+    tension_map: dict[str, TensionIndex] = {
+        row.country_code: row for row in raw_result.scalars().all()
+    }
+
+    # ── 데이터 없으면 요청 국가만 온더플라이 계산 (경량 fallback) ──
+    missing_codes = [c for c in codes if c not in tension_map]
+    if missing_codes:
+        import logging
+        _logger = logging.getLogger(__name__)
+        _logger.info("tension fallback: %d개국 온더플라이 계산 시작", len(missing_codes))
+        from backend.app.core.database import AsyncSessionLocal
+        try:
+            async with AsyncSessionLocal() as calc_db:
+                async with calc_db.begin():
+                    from worker.processor.tension_calculator import calculate_country_tension
+                    for mc in missing_codes:
+                        result = await calculate_country_tension(mc, calc_db)
+                        if result:
+                            _logger.info("tension fallback 완료: %s", mc)
+            # fallback 계산 후 다시 조회
+            raw_result2 = await db.execute(
+                select(TensionIndex)
+                .where(TensionIndex.country_code.in_(missing_codes))
+                .distinct(TensionIndex.country_code)
+                .order_by(TensionIndex.country_code, TensionIndex.time.desc())
+            )
+            for row in raw_result2.scalars().all():
+                tension_map[row.country_code] = row
+        except Exception as e:
+            _logger.warning("tension fallback 실패: %s", e)
+
+    # ── 국가별 top5 클러스터 일괄 조회 (1회 배치 쿼리) ──
+    active_codes = [c for c in codes if c in tension_map]
+    top5_map = await _get_top5_batch(active_codes, db, min_severity=user_min_severity)
 
     results = []
     for code in codes:
         t = tension_map.get(code)
         if t is None:
             continue
-
-        top5 = await _get_top5(code, db, min_severity=user_min_severity)
-        results.append(_tension_to_out(t, top5))
+        results.append(_tension_to_out(t, top5_map.get(code, [])))
 
     return results
 
