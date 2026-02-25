@@ -44,21 +44,77 @@ logger = logging.getLogger(__name__)
 
 # 긴장도 인접 관계 (같은 분쟁 지역 내 spillover)
 NEIGHBOR_MAP: dict[str, list[str]] = {
-    "UA": ["RU", "BY", "PL"],
-    "RU": ["UA", "BY"],
-    "PS": ["IL", "LB", "SY"],
-    "IL": ["PS", "LB", "SY", "IR"],
-    "IR": ["IQ", "SY", "AF", "IL"],
-    "IQ": ["IR", "SY"],
-    "SY": ["TR", "IQ", "LB", "IL", "JO"],
+    # 유럽·코카서스
+    "UA": ["RU", "BY", "MD"],
+    "RU": ["UA", "BY", "GE", "AZ", "KZ"],
+    "BY": ["UA", "RU"],
+    "MD": ["UA"],
+    "RS": ["XK", "BA"],
+    "XK": ["RS"],
+    "BA": ["RS"],
+    "GE": ["RU", "AM", "AZ"],
+    "AM": ["GE", "AZ", "IR", "TR"],
+    "AZ": ["GE", "AM", "IR", "RU"],
+    # 중동
+    "PS": ["IL", "LB", "SY", "EG"],
+    "IL": ["PS", "LB", "SY", "EG"],
+    "IR": ["IQ", "SY", "AF", "PK", "AZ", "TR"],
+    "IQ": ["IR", "SY", "SA", "TR"],
+    "SY": ["TR", "IQ", "LB", "IL"],
+    "LB": ["SY", "IL"],
+    "YE": ["SA"],
+    "SA": ["YE", "IQ", "EG"],
+    "TR": ["SY", "IQ", "GE", "AM", "AZ"],
+    "EG": ["IL", "PS", "LY", "SD", "SA"],
+    # 동아시아
     "KP": ["KR", "CN"],
     "KR": ["KP"],
     "TW": ["CN"],
-    "CN": ["TW", "KP"],
-    "MM": ["TH", "IN"],
-    "SD": ["ET", "SS"],
-    "ET": ["SD", "SO"],
-    "SO": ["ET"],
+    "CN": ["TW", "KP", "MM", "IN", "AF", "KG", "KZ", "TJ"],
+    # 동남아
+    "MM": ["TH", "IN", "CN"],
+    "PH": ["VN", "ID"],
+    "VN": ["CN", "PH"],
+    "ID": ["PH", "TH"],
+    "TH": ["MM", "ID"],
+    # 남아시아·중앙아시아
+    "PK": ["AF", "IN", "IR"],
+    "AF": ["PK", "IR", "TJ", "KG"],
+    "IN": ["PK", "CN", "MM", "BD"],
+    "BD": ["IN", "MM"],
+    "KZ": ["RU", "KG", "TJ"],
+    "TJ": ["AF", "KG", "KZ", "CN"],
+    "KG": ["KZ", "TJ", "CN"],
+    # 아프리카
+    "SD": ["ET", "SS", "EG", "LY", "TD", "CF", "ER"],
+    "SS": ["SD", "ET", "CD", "CF"],
+    "ET": ["SD", "SO", "ER", "SS"],
+    "SO": ["ET", "ER"],
+    "LY": ["EG", "SD", "TD", "DZ", "TN"],
+    "ML": ["BF", "NE", "DZ", "GN"],
+    "BF": ["ML", "NE", "GN", "CM"],
+    "NE": ["ML", "BF", "NG", "TD"],
+    "NG": ["NE", "CM", "TD"],
+    "CM": ["NG", "CF", "TD"],
+    "CF": ["CM", "CD", "SD", "SS", "TD"],
+    "CD": ["CF", "SS", "MZ"],
+    "MZ": ["CD"],
+    "TD": ["SD", "LY", "NE", "NG", "CM", "CF"],
+    "GN": ["ML", "BF"],
+    "ER": ["ET", "SD", "SO"],
+    "DZ": ["LY", "ML", "TN", "MA"],
+    "TN": ["LY", "DZ"],
+    "MA": ["DZ"],
+    # 아메리카
+    "VE": ["CO"],
+    "HT": ["CU"],
+    "CO": ["VE", "EC"],
+    "EC": ["CO"],
+    "MX": ["GT"],
+    "NI": ["HN", "GT"],
+    "CU": ["HT"],
+    "GT": ["MX", "HN"],
+    "HN": ["GT", "NI"],
 }
 
 
@@ -258,10 +314,7 @@ async def calculate_country_tension(
 
     spillover = _calc_spillover(country_code, neighbor_clusters) * 100.0
 
-    # 자체 클러스터도 없고 spillover도 없으면 생략 (데이터 없는 국가)
     current_clusters = all_clusters  # 하위 호환 변수명 유지
-    if not current_clusters and prev_count == 0 and spillover == 0.0:
-        return None
 
     raw_score = round(
         0.55 * event_score + 0.35 * accel_score + 0.10 * spillover,
@@ -307,11 +360,23 @@ async def calculate_country_tension(
     }
 
 
-# 모니터링 대상 국가 목록
+# 모니터링 대상 국가 목록 (프론트엔드 ALL_MONITORED_COUNTRIES와 동기화)
 MONITORED_COUNTRIES = [
-    "UA", "RU", "PS", "IL", "IR", "SY", "IQ", "AF",
-    "KP", "KR", "TW", "CN", "MM", "SD", "ET", "SO",
-    "LB", "YE", "VE", "HT",
+    # 유럽·코카서스
+    "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
+    # 중동
+    "PS", "IL", "IR", "IQ", "SY", "LB", "YE", "SA", "TR", "EG",
+    # 동아시아
+    "KP", "TW", "CN", "KR",
+    # 동남아
+    "MM", "PH", "VN", "ID", "TH",
+    # 남아시아·중앙아시아
+    "PK", "AF", "IN", "BD", "KZ", "TJ", "KG",
+    # 아프리카
+    "SD", "SS", "ET", "SO", "LY", "ML", "BF", "NE", "NG", "CM",
+    "CF", "CD", "MZ", "TD", "GN", "ER", "DZ", "TN", "MA",
+    # 아메리카
+    "VE", "HT", "CO", "EC", "MX", "NI", "CU", "GT", "HN",
 ]
 
 

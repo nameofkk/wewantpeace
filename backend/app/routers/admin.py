@@ -135,30 +135,44 @@ async def list_users(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(User)
+    filters = []
     if search:
-        q = q.where((User.email.ilike(f"%{search}%")) | (User.nickname.ilike(f"%{search}%")))
+        filters.append((User.email.ilike(f"%{search}%")) | (User.nickname.ilike(f"%{search}%")))
     if status:
-        q = q.where(User.status == status)
+        filters.append(User.status == status)
     if plan:
-        q = q.where(User.plan == plan)
+        filters.append(User.plan == plan)
+
+    # total count
+    count_q = select(func.count(User.id))
+    if filters:
+        count_q = count_q.where(and_(*filters))
+    total = (await db.execute(count_q)).scalar() or 0
+
+    # paginated rows
+    q = select(User)
+    if filters:
+        q = q.where(and_(*filters))
     q = q.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
     result = await db.execute(q)
     users = result.scalars().all()
 
-    return [
-        {
-            "id": str(u.id),
-            "email": u.email,
-            "nickname": u.nickname,
-            "plan": u.plan,
-            "status": u.status,
-            "role": u.role,
-            "created_at": u.created_at.isoformat(),
-            "last_active": u.last_active.isoformat(),
-        }
-        for u in users
-    ]
+    return {
+        "total": total,
+        "users": [
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "nickname": u.nickname,
+                "plan": u.plan,
+                "status": u.status,
+                "role": u.role,
+                "created_at": u.created_at.isoformat(),
+                "last_active": u.last_active.isoformat() if u.last_active else None,
+            }
+            for u in users
+        ],
+    }
 
 
 @router.get("/users/{user_id}")

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useAppStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Ban, CheckCircle, Crown, Loader2 } from "lucide-react";
+import { Search, Ban, CheckCircle, Crown, Loader2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -33,6 +35,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function AdminUsersPage() {
   const { user } = useAuth();
+  const { lang } = useAppStore();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -84,13 +87,15 @@ export default function AdminUsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div>
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">회원 관리</h1>
+          <h1 className="text-2xl font-bold">{t(lang, "admin_users")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            전체 {data?.total ?? 0}명
+            {data?.total ?? 0} {lang === "ko" ? "명" : "users"}
           </p>
         </div>
 
@@ -100,7 +105,7 @@ export default function AdminUsersPage() {
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="이메일/닉네임 검색"
+            placeholder={t(lang, "admin_search")}
             className="rounded-lg border border-border bg-card pl-9 pr-4 py-2 text-sm outline-none focus:border-primary w-56"
           />
         </div>
@@ -110,17 +115,22 @@ export default function AdminUsersPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : !data?.users?.length ? (
+        <div className="flex flex-col items-center py-16 text-muted-foreground">
+          <Users className="h-10 w-10 mb-3" />
+          <p className="text-sm">{t(lang, "admin_no_data")}</p>
+        </div>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-secondary/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">회원</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">플랜</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">역할</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">상태</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">가입일</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">액션</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "회원" : "User"}</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "플랜" : "Plan"}</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "역할" : "Role"}</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "상태" : "Status"}</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "가입일" : "Joined"}</th>
+                <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -128,7 +138,7 @@ export default function AdminUsersPage() {
                 <tr key={u.id} className="hover:bg-secondary/20">
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium">{u.nickname || "닉네임 없음"}</p>
+                      <p className="font-medium">{u.nickname || (lang === "ko" ? "닉네임 없음" : "No name")}</p>
                       <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
                     </div>
                   </td>
@@ -154,14 +164,14 @@ export default function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {new Date(u.created_at).toLocaleDateString("ko-KR")}
+                    {new Date(u.created_at).toLocaleDateString(locale)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => suspendMutation.mutate({ userId: u.id, suspend: u.status === "active" })}
                       disabled={suspendMutation.isPending}
                       className="text-muted-foreground hover:text-foreground"
-                      title={u.status === "active" ? "정지" : "정지 해제"}
+                      title={u.status === "active" ? (lang === "ko" ? "정지" : "Suspend") : (lang === "ko" ? "정지 해제" : "Unsuspend")}
                     >
                       {u.status === "active"
                         ? <Ban className="h-4 w-4 hover:text-red-400" />
@@ -176,28 +186,31 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* 페이지네이션 */}
-      {(data?.total ?? 0) > 20 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            이전
-          </button>
-          <span className="flex items-center px-3 text-sm text-muted-foreground">
-            {page} / {Math.ceil((data?.total ?? 0) / 20)}
-          </span>
-          <button
-            onClick={() => setPage((p) => p + 1)}
-            disabled={page >= Math.ceil((data?.total ?? 0) / 20)}
-            className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            다음
-          </button>
-        </div>
-      )}
+      {/* Pagination */}
+      {(data?.total ?? 0) > 20 && (() => {
+        const totalPages = Math.ceil((data?.total ?? 0) / 20);
+        return (
+          <div className="flex justify-center gap-2 mt-4">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              {t(lang, "admin_prev")}
+            </button>
+            <span className="flex items-center px-3 text-sm text-muted-foreground">
+              {t(lang, "admin_page_of", { page, total: totalPages })}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              {t(lang, "admin_next")}
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
