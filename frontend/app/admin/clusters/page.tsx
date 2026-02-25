@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Loader2, Layers } from "lucide-react";
+import { Search, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCountryName, getFlag } from "@/lib/countries";
+import { useAdminToast } from "@/components/ui/admin-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -36,9 +37,12 @@ const SEVERITY_COLORS: Record<number, string> = {
   5: "bg-red-600/30 text-red-300",
 };
 
+const TOPICS = ["conflict", "terror", "coup", "sanctions", "cyber", "protest", "diplomacy", "maritime", "disaster", "health", "unknown"];
+
 export default function AdminClustersPage() {
   const { user } = useAuth();
   const { lang } = useAppStore();
+  const { toast } = useAdminToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -76,13 +80,15 @@ export default function AdminClustersPage() {
       });
       if (!res.ok) throw new Error("Update failed");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-clusters"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-clusters"] });
+      toast(t(lang, "admin_toast_updated"), "success");
+    },
+    onError: () => toast(t(lang, "admin_toast_error"), "error"),
   });
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
   const locale = lang === "en" ? "en-US" : "ko-KR";
-
-  const TOPICS = ["conflict", "terror", "coup", "sanctions", "cyber", "protest", "diplomacy", "maritime", "disaster", "health", "unknown"];
 
   return (
     <div>
@@ -135,84 +141,167 @@ export default function AdminClustersPage() {
         />
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <>
+          {/* Desktop skeleton */}
+          <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+            <div className="bg-secondary/50 h-10" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex gap-4 p-3 border-t border-border animate-pulse">
+                <div className="h-4 w-48 rounded bg-secondary" />
+                <div className="h-4 w-12 rounded bg-secondary" />
+                <div className="h-4 w-16 rounded bg-secondary" />
+                <div className="h-4 w-12 rounded bg-secondary" />
+                <div className="h-4 w-12 rounded bg-secondary" />
+              </div>
+            ))}
+          </div>
+          {/* Mobile skeleton */}
+          <div className="md:hidden space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse space-y-3">
+                <div className="h-4 w-48 rounded bg-secondary" />
+                <div className="h-3 w-24 rounded bg-secondary" />
+                <div className="flex gap-2"><div className="h-5 w-16 rounded bg-secondary" /><div className="h-5 w-12 rounded bg-secondary" /></div>
+              </div>
+            ))}
+          </div>
+        </>
       ) : !data?.items.length ? (
         <div className="flex flex-col items-center py-16 text-muted-foreground">
           <Layers className="h-10 w-10 mb-3" />
           <p className="text-sm">{t(lang, "admin_no_data")}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/50">
-              <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_title_col")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_country")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_topic")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_severity")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">KScore</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_event_count")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_updated_at")}</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_actions")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {data.items.map((c) => (
-                <tr key={c.id} className="hover:bg-secondary/20">
-                  <td className="px-3 py-3 max-w-[250px]">
-                    <p className="text-sm truncate font-medium">{lang === "ko" && c.title_ko ? c.title_ko : c.title}</p>
-                    {c.is_spike && (
-                      <span className="text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-xs">
-                    {c.country_code ? `${getFlag(c.country_code)} ${c.country_code}` : "—"}
-                  </td>
-                  <td className="px-3 py-3 text-xs">{c.topic}</td>
-                  <td className="px-3 py-3">
-                    <select
-                      value={c.severity}
-                      onChange={(e) => patchMutation.mutate({ id: c.id, body: { severity: Number(e.target.value) } })}
-                      className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", SEVERITY_COLORS[c.severity] ?? "")}
-                    >
-                      {[0, 1, 2, 3, 4, 5].map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={cn(
-                      "text-xs font-bold tabular-nums",
-                      c.kscore >= 3 ? "text-red-400" : c.kscore >= 2 ? "text-orange-400" : c.kscore >= 1 ? "text-yellow-400" : "text-muted-foreground"
-                    )}>
-                      {c.kscore.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-xs tabular-nums">{c.event_count}</td>
-                  <td className="px-3 py-3 text-xs text-muted-foreground">
-                    {new Date(c.last_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    {c.severity > 0 ? (
-                      <button
-                        onClick={() => patchMutation.mutate({ id: c.id, body: { is_active: false } })}
-                        className="text-xs text-red-400 hover:underline"
-                      >
-                        {lang === "ko" ? "비활성화" : "Deactivate"}
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">{t(lang, "admin_inactive")}</span>
-                    )}
-                  </td>
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-xl border border-border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_title_col")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_country")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_topic")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_severity")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">KScore</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_event_count")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_updated_at")}</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_actions")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.items.map((c) => (
+                  <tr key={c.id} className="hover:bg-secondary/20">
+                    <td className="px-3 py-3 max-w-[250px]">
+                      <p className="text-sm truncate font-medium">{lang === "ko" && c.title_ko ? c.title_ko : c.title}</p>
+                      {c.is_spike && (
+                        <span className="text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-xs">
+                      {c.country_code ? `${getFlag(c.country_code)} ${c.country_code}` : "\u2014"}
+                    </td>
+                    <td className="px-3 py-3">
+                      <select
+                        value={c.topic}
+                        onChange={(e) => patchMutation.mutate({ id: c.id, body: { topic: e.target.value } })}
+                        className="rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer bg-secondary"
+                      >
+                        {TOPICS.map((tp) => (
+                          <option key={tp} value={tp}>{tp}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-3">
+                      <select
+                        value={c.severity}
+                        onChange={(e) => patchMutation.mutate({ id: c.id, body: { severity: Number(e.target.value) } })}
+                        className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", SEVERITY_COLORS[c.severity] ?? "")}
+                      >
+                        {[0, 1, 2, 3, 4, 5].map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={cn(
+                        "text-xs font-bold tabular-nums",
+                        c.kscore >= 3 ? "text-red-400" : c.kscore >= 2 ? "text-orange-400" : c.kscore >= 1 ? "text-yellow-400" : "text-muted-foreground"
+                      )}>
+                        {c.kscore.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-xs tabular-nums">{c.event_count}</td>
+                    <td className="px-3 py-3 text-xs text-muted-foreground">
+                      {new Date(c.last_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {c.severity > 0 ? (
+                        <button
+                          onClick={() => patchMutation.mutate({ id: c.id, body: { is_active: false } })}
+                          className="text-xs text-red-400 hover:underline"
+                        >
+                          {t(lang, "admin_deactivate")}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{t(lang, "admin_inactive")}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile card layout */}
+          <div className="md:hidden space-y-3">
+            {data.items.map((c) => (
+              <div key={c.id} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{lang === "ko" && c.title_ko ? c.title_ko : c.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {c.country_code ? `${getFlag(c.country_code)} ${c.country_code}` : "\u2014"}
+                      {c.is_spike && <span className="ml-2 text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>}
+                    </p>
+                  </div>
+                  <span className={cn("text-xs font-bold tabular-nums", c.kscore >= 3 ? "text-red-400" : c.kscore >= 2 ? "text-orange-400" : c.kscore >= 1 ? "text-yellow-400" : "text-muted-foreground")}>
+                    {c.kscore.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <select
+                    value={c.topic}
+                    onChange={(e) => patchMutation.mutate({ id: c.id, body: { topic: e.target.value } })}
+                    className="rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer bg-secondary"
+                  >
+                    {TOPICS.map((tp) => (<option key={tp} value={tp}>{tp}</option>))}
+                  </select>
+                  <select
+                    value={c.severity}
+                    onChange={(e) => patchMutation.mutate({ id: c.id, body: { severity: Number(e.target.value) } })}
+                    className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", SEVERITY_COLORS[c.severity] ?? "")}
+                  >
+                    {[0,1,2,3,4,5].map((s) => (<option key={s} value={s}>{s}</option>))}
+                  </select>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{c.event_count} events</span>
+                  <span>{new Date(c.last_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                {c.severity > 0 && (
+                  <button
+                    onClick={() => patchMutation.mutate({ id: c.id, body: { is_active: false } })}
+                    className="mt-2 text-xs text-red-400 hover:underline"
+                  >
+                    {t(lang, "admin_deactivate")}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Pagination */}
