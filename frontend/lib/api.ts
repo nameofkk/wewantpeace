@@ -102,8 +102,9 @@ export function useTensionMine(countries?: string[] | null) {
     queryKey: ["tension", "mine", param],
     queryFn: () => apiFetch("/tension/mine", param ? { countries: param } : undefined),
     enabled: countries !== null,
-    staleTime: 15 * 60 * 1000,
-    refetchInterval: 15 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 }
 
@@ -121,7 +122,8 @@ export function useTensionHistory(countryCode: string, range: "7d" | "30d" | "90
     queryFn: () =>
       apiFetch<TensionHistoryPoint[]>(`/tension/country/${countryCode}/history`, { range }),
     enabled: !!countryCode,
-    staleTime: 15 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+    refetchOnMount: "always",
   });
 }
 

@@ -530,6 +530,14 @@ export default function TensionPage() {
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
   const [spinning, setSpinning] = useState(false);
 
+  // 빈 배열이면 10초 후 자동 refetch (서버 시작 직후 데이터 아직 준비 안 된 경우)
+  useEffect(() => {
+    if (tensions && tensions.length === 0 && !isLoading) {
+      const timer = setTimeout(() => refetch(), 10_000);
+      return () => clearTimeout(timer);
+    }
+  }, [tensions, isLoading, refetch]);
+
   const crisisCount = (tensions ?? []).filter((item) => item.raw_score >= 75).length;
   const warningCount = (tensions ?? []).filter((item) => item.raw_score >= 50).length;
 
@@ -695,7 +703,7 @@ export default function TensionPage() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {isLoading && <LoadingSkeleton />}
+          {(isLoading || (!isError && !tensions)) && <LoadingSkeleton />}
 
           {isError && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -742,7 +750,7 @@ export default function TensionPage() {
             </div>
           )}
 
-          {!isLoading && !isError && tensions && tensions.map((item, i) => (
+          {!isLoading && !isError && tensions && tensions.length > 0 && tensions.map((item, i) => (
             <TensionCard key={item.country_code} data={item} userPlan={userPlan} index={i} lang={lang} />
           ))}
         </div>

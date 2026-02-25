@@ -8,14 +8,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, cast, Date, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db
 from backend.app.core.redis import get_redis
-from backend.app.models.user import User
+from backend.app.models.user import User, UserPushToken
 from backend.app.models.community import Post, Report, AdminLog
 from backend.app.models.subscription import Subscription, PaymentHistory
+from backend.app.models.issue_cluster import IssueCluster
+from backend.app.models.normalized_event import NormalizedEvent
+from backend.app.models.tension_index import TensionIndex
+from backend.app.models.raw_event import RawEvent
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -74,6 +78,29 @@ async def get_stats(
         select(func.count()).select_from(Report).where(Report.status == "pending")
     )).scalar()
 
+    # 활성 클러스터 수
+    active_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0)
+    )).scalar() or 0
+
+    # 오늘 수집된 이벤트 수
+    events_today = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start)
+    )).scalar() or 0
+
+    # 위기 국가 수 (tension_level=3)
+    crisis_countries_q = await db.execute(
+        select(TensionIndex.country_code)
+        .where(TensionIndex.tension_level == 3)
+        .group_by(TensionIndex.country_code)
+    )
+    crisis_countries = len(crisis_countries_q.all())
+
+    # 활성 푸시 토큰 수
+    push_tokens = (await db.execute(
+        select(func.count()).select_from(UserPushToken)
+    )).scalar() or 0
+
     return {
         "total_users": total_users,
         "new_today": new_today,
@@ -81,6 +108,10 @@ async def get_stats(
         "subscribers": subscribers,
         "monthly_revenue": monthly_revenue,
         "pending_reports": pending_reports,
+        "active_clusters": active_clusters,
+        "events_today": events_today,
+        "crisis_countries": crisis_countries,
+        "push_tokens": push_tokens,
     }
 
 
@@ -386,3 +417,281 @@ async def update_settings(
         pass
     await _log_action(db, admin, "update_settings", detail=body.dict())
     return body
+
+
+# ── 클러스터 관리 ───────────────────────────────────────────────────────────
+
+class ClusterPatch(BaseModel):
+    severity: Optional[int] = None
+    topic: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/clusters")
+async def list_clusters(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    severity: Optional[int] = Query(None),
+    topic: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(IssueCluster)
+    if search:
+        q = q.where(
+            (IssueCluster.title.ilike(f"%{search}%"))
+            | (IssueCluster.title_ko.ilike(f"%{search}%"))
+        )
+    if severity is not None:
+        q = q.where(IssueCluster.severity == severity)
+    if topic:
+        q = q.where(IssueCluster.topic == topic)
+    if country:
+        q = q.where(IssueCluster.country_code == country.upper())
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(IssueCluster.last_event_at.desc()).offset((page - 1) * limit).limit(limit)
+    result = await db.execute(q)
+    clusters = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(c.id),
+                "title": c.title,
+                "title_ko": c.title_ko,
+                "country_code": c.country_code,
+                "topic": c.topic,
+                "severity": c.severity,
+                "kscore": round(c.kscore, 2),
+                "event_count": c.event_count,
+                "confidence": round(c.confidence, 3),
+                "is_spike": c.is_spike,
+                "first_event_at": c.first_event_at.isoformat(),
+                "last_event_at": c.last_event_at.isoformat(),
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in clusters
+        ],
+    }
+
+
+@router.patch("/clusters/{cluster_id}")
+async def update_cluster(
+    cluster_id: str,
+    body: ClusterPatch,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(IssueCluster).where(IssueCluster.id == uuid.UUID(cluster_id))
+    )
+    cluster = result.scalar_one_or_none()
+    if not cluster:
+        raise HTTPException(404)
+
+    changes = {}
+    if body.severity is not None:
+        cluster.severity = body.severity
+        changes["severity"] = body.severity
+    if body.topic is not None:
+        cluster.topic = body.topic
+        changes["topic"] = body.topic
+    if body.is_active is not None:
+        # is_active → severity 0 으로 비활성화
+        if not body.is_active:
+            cluster.severity = 0
+            changes["deactivated"] = True
+        changes["is_active"] = body.is_active
+
+    await db.flush()
+    await _log_action(db, admin, "update_cluster", "cluster", cluster_id, changes)
+    return {"status": "ok"}
+
+
+@router.delete("/clusters/{cluster_id}", status_code=204)
+async def delete_cluster(
+    cluster_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(IssueCluster).where(IssueCluster.id == uuid.UUID(cluster_id))
+    )
+    cluster = result.scalar_one_or_none()
+    if not cluster:
+        raise HTTPException(404)
+    # soft delete: severity 0으로 설정
+    cluster.severity = 0
+    await db.flush()
+    await _log_action(db, admin, "delete_cluster", "cluster", cluster_id)
+
+
+# ── 이벤트 뷰어 ─────────────────────────────────────────────────────────────
+
+@router.get("/events")
+async def list_events(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    source: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    severity: Optional[int] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(NormalizedEvent).where(NormalizedEvent.is_duplicate == False)
+    if source:
+        q = q.where(NormalizedEvent.source_tier == source)
+    if country:
+        q = q.where(NormalizedEvent.country_code == country.upper())
+    if severity is not None:
+        q = q.where(NormalizedEvent.severity >= severity)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(NormalizedEvent.event_time.desc()).offset((page - 1) * limit).limit(limit)
+    result = await db.execute(q)
+    events = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(e.id),
+                "title": e.title,
+                "title_ko": e.title_ko,
+                "country_code": e.country_code,
+                "topic": e.topic,
+                "severity": e.severity,
+                "source_tier": e.source_tier,
+                "confidence": round(e.confidence, 3),
+                "event_time": e.event_time.isoformat(),
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in events
+        ],
+    }
+
+
+# ── 긴장도 현황 ─────────────────────────────────────────────────────────────
+
+@router.get("/tension")
+async def list_tension(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전 국가 최신 긴장도."""
+    raw_result = await db.execute(
+        select(TensionIndex).order_by(TensionIndex.country_code, TensionIndex.time.desc())
+    )
+    all_rows = raw_result.scalars().all()
+    tension_map: dict[str, TensionIndex] = {}
+    for row in all_rows:
+        if row.country_code not in tension_map:
+            tension_map[row.country_code] = row
+
+    return [
+        {
+            "country_code": t.country_code,
+            "raw_score": round(t.raw_score, 1),
+            "tension_level": t.tension_level,
+            "percentile_30d": round(t.percentile_30d or 0.0, 1),
+            "event_score": round(t.event_score or 0.0, 1),
+            "accel_score": round(t.accel_score or 0.0, 1),
+            "spillover_score": round(t.spillover_score or 0.0, 1),
+            "updated_at": t.time.isoformat(),
+        }
+        for t in sorted(tension_map.values(), key=lambda x: x.raw_score, reverse=True)
+    ]
+
+
+@router.post("/tension/recalculate")
+async def admin_tension_recalculate(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """긴장도 수동 재계산."""
+    import logging
+    _logger = logging.getLogger(__name__)
+    from backend.app.core.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as calc_db:
+            async with calc_db.begin():
+                from worker.processor.tension_calculator import calculate_all_tensions
+                results = await calculate_all_tensions(calc_db)
+                _logger.info("admin_tension_recalculate 완료: %d개국", len(results))
+                await _log_action(db, admin, "tension_recalculate", detail={"countries": len(results)})
+                return {"status": "ok", "countries": len(results)}
+    except Exception as e:
+        _logger.error("admin_tension_recalculate 실패: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+@router.post("/trending/recalculate")
+async def admin_trending_recalculate(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """트렌딩 수동 재계산."""
+    import logging
+    _logger = logging.getLogger(__name__)
+    from backend.app.core.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as calc_db:
+            async with calc_db.begin():
+                from worker.processor.trending_engine import calculate_global_trending
+                results = await calculate_global_trending(calc_db)
+                _logger.info("admin_trending_recalculate 완료: %d개", len(results))
+                await _log_action(db, admin, "trending_recalculate", detail={"keywords": len(results)})
+                return {"status": "ok", "keywords": len(results)}
+    except Exception as e:
+        _logger.error("admin_trending_recalculate 실패: %s", e)
+        raise HTTPException(500, detail=str(e))
+
+
+# ── 7일 이벤트 추이 (차트용) ────────────────────────────────────────────────
+
+@router.get("/events/daily-counts")
+async def events_daily_counts(
+    days: int = Query(7, ge=1, le=30),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """최근 N일 일별 이벤트 수집 수."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = await db.execute(
+        select(
+            cast(NormalizedEvent.created_at, Date).label("day"),
+            func.count().label("count"),
+        )
+        .where(NormalizedEvent.created_at >= cutoff)
+        .group_by("day")
+        .order_by("day")
+    )
+    return [{"date": str(row.day), "count": row.count} for row in result.all()]
+
+
+# ── 푸시 통계 ───────────────────────────────────────────────────────────────
+
+@router.get("/push-stats")
+async def push_stats(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    total_tokens = (await db.execute(
+        select(func.count()).select_from(UserPushToken)
+    )).scalar() or 0
+
+    # 플랫폼별 분포
+    platform_result = await db.execute(
+        select(UserPushToken.platform, func.count().label("count"))
+        .group_by(UserPushToken.platform)
+    )
+    platforms = {row.platform: row.count for row in platform_result.all()}
+
+    return {
+        "total_tokens": total_tokens,
+        "platforms": platforms,
+    }

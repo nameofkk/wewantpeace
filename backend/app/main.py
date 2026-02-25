@@ -72,9 +72,7 @@ async def _startup_tension_calculation():
     Celery beat 스케줄 대기 없이 배포 직후 데이터가 비어있는 구간을 방지.
     FastAPI 프로세스 안에서 실행되므로 이벤트 루프 문제가 없다.
     """
-    import asyncio
     import traceback
-    await asyncio.sleep(3)  # DB 연결 안정화 대기
 
     from backend.app.core.database import AsyncSessionLocal
 
@@ -109,12 +107,13 @@ async def lifespan(app: FastAPI):
     # 어드민 이메일 자동 승격 (ADMIN_EMAILS 환경변수)
     await _bootstrap_admin()
 
-    # 백그라운드로 긴장도·트렌딩 즉시 계산 (배포 후 빈 데이터 방지)
-    task = asyncio.create_task(_startup_tension_calculation())
+    # 긴장도·트렌딩 계산 완료 후 서버 시작 (첫 요청부터 데이터 보장)
+    try:
+        await asyncio.wait_for(_startup_tension_calculation(), timeout=45)
+    except asyncio.TimeoutError:
+        logger.warning("startup_tension_calculation 타임아웃(45초) — 서버 먼저 시작")
 
     yield
-
-    task.cancel()
     await close_redis()
     logger.info("WeWantPeace API shut down")
 
