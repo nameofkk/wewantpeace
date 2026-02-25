@@ -32,11 +32,11 @@ const SECTIONS_KO = [
   },
   {
     title: "제7조 (유료서비스 및 결제)",
-    content: `① Pro 구독: 월 4,900원 / Pro+ 구독: 월 9,900원 (VAT 포함)\n② 결제는 토스페이먼츠를 통한 정기결제 방식으로 진행됩니다.\n③ 구독 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 결제 관련 문의: krshin7@naver.com`,
+    content: `① Pro 구독: 월 4,900원 / Pro+ 구독: 월 9,900원 (VAT 포함)\n② 결제는 Google Play 또는 Apple App Store 인앱결제(IAP)로 처리됩니다.\n③ 구독 취소는 각 스토어(Google Play/App Store)에서 직접 진행하며, 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 결제 관련 문의: krshin7@naver.com`,
   },
   {
     title: "제8조 (책임제한)",
-    content: `① 천재지변, 불가항력에 의한 서비스 장애는 회사 책임에서 제외됩니다.\n② Firebase, Toss Payments 등 제3자 서비스 장애는 회사 책임에서 제외됩니다.\n③ 이용자 귀책으로 발생한 손해는 회사가 책임지지 않습니다.`,
+    content: `① 천재지변, 불가항력에 의한 서비스 장애는 회사 책임에서 제외됩니다.\n② Firebase, Google Play, Apple App Store 등 제3자 서비스 장애는 회사 책임에서 제외됩니다.\n③ 이용자 귀책으로 발생한 손해는 회사가 책임지지 않습니다.`,
   },
   {
     title: "제9조 (분쟁해결)",
@@ -75,11 +75,11 @@ const SECTIONS_EN = [
   },
   {
     title: "Article 7 (Paid Services and Payment)",
-    content: `① Pro subscription: ₩4,900/month / Pro+ subscription: ₩9,900/month (VAT included)\n② Payment is processed via Toss Payments as a recurring charge.\n③ Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Payment inquiries: krshin7@naver.com`,
+    content: `① Pro subscription: ₩4,900/month / Pro+ subscription: ₩9,900/month (VAT included)\n② Payment is processed via Google Play or Apple App Store in-app purchase (IAP).\n③ Cancellation must be done through the respective store (Google Play/App Store). Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Payment inquiries: krshin7@naver.com`,
   },
   {
     title: "Article 8 (Limitation of Liability)",
-    content: `① Service disruptions caused by natural disasters or force majeure are excluded from Company liability.\n② Service disruptions of third-party services such as Firebase or Toss Payments are excluded from Company liability.\n③ The Company is not liable for damages caused by the user's own actions.`,
+    content: `① Service disruptions caused by natural disasters or force majeure are excluded from Company liability.\n② Service disruptions of third-party services such as Firebase, Google Play, or Apple App Store are excluded from Company liability.\n③ The Company is not liable for damages caused by the user's own actions.`,
   },
   {
     title: "Article 9 (Dispute Resolution)",

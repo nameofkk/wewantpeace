@@ -84,6 +84,7 @@ class Settings(BaseSettings):
 
     # Google Play Billing
     google_play_service_account_key_path: str = ""
+    google_rtdn_webhook_token: str = ""  # Pub/Sub push URL의 ?token= 파라미터 검증용
 
     # Apple StoreKit / App Store Server API
     apple_issuer_id: str = ""

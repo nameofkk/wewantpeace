@@ -20,7 +20,7 @@ const SECTIONS_KO = [
   },
   {
     title: "4. 개인정보 제3자 제공",
-    content: `• Firebase (Google Inc.): 인증 서비스 제공 목적\n• Toss Payments (주식회사 토스페이먼츠): 결제 처리 목적\n• 법령에 따른 수사기관 요청 시 제공 가능`,
+    content: `• Firebase (Google Inc.): 인증 서비스 제공 목적\n• Google Play / Apple App Store: 인앱결제(IAP) 처리 목적\n• 법령에 따른 수사기관 요청 시 제공 가능`,
   },
   {
     title: "5. 개인정보 처리 위탁",
@@ -63,7 +63,7 @@ const SECTIONS_EN = [
   },
   {
     title: "4. Third-Party Provision of Personal Information",
-    content: `• Firebase (Google Inc.): for authentication services\n• Toss Payments: for payment processing\n• May be provided to law enforcement agencies upon lawful request`,
+    content: `• Firebase (Google Inc.): for authentication services\n• Google Play / Apple App Store: for in-app purchase (IAP) processing\n• May be provided to law enforcement agencies upon lawful request`,
   },
   {
     title: "5. Entrustment of Personal Information Processing",
