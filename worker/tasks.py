@@ -253,7 +253,6 @@ def process_raw_event(self, raw_event_id: str):
                                 redis=redis,
                             )
                             if is_spike and not cluster.is_spike:
-                                from datetime import datetime, timezone
                                 cluster.is_spike = True
                                 cluster.spike_at = datetime.now(timezone.utc)
                         except Exception as e:
