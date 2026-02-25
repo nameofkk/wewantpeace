@@ -149,11 +149,11 @@
 }
 .alert-pulse-critical {
   --pulse-color: rgba(239,68,68,0.35);
-  animation: alert-border-pulse 2s ease-in-out infinite;
+  animation: slide-up 0.35s ease forwards, alert-border-pulse 2s ease-in-out 0.35s infinite;
 }
 .alert-pulse-warning {
   --pulse-color: rgba(249,115,22,0.25);
-  animation: alert-border-pulse 2.5s ease-in-out infinite;
+  animation: slide-up 0.35s ease forwards, alert-border-pulse 2.5s ease-in-out 0.35s infinite;
 }
 
 /* 배너 프로그레스 바 축소 */
