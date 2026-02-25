@@ -16,23 +16,18 @@ def run_async(coro):
     """동기 Celery 태스크에서 비동기 코드 실행 헬퍼.
 
     Celery fork 워커에서 매 태스크마다 새 이벤트 루프를 생성한다.
-    asyncpg 커넥션 풀이 이전 루프에 바인딩된 연결을 재사용하려 하면
-    'Future attached to a different loop' 오류가 발생하므로,
-    루프를 닫기 전에 engine.dispose()로 풀 연결을 먼저 정리한다.
+    루프를 매번 닫지 않고 스레드-로컬에 캐싱하여 재사용한다.
+    이렇게 하면 asyncpg 커넥션 풀이 동일 루프에 바인딩되어
+    'Event loop is closed' / 'Future attached to a different loop' 오류를 방지한다.
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        return loop.run_until_complete(coro)
-    finally:
-        # 커넥션 풀 정리: loop 닫기 전 필수 (asyncpg Future loop 충돌 방지)
-        try:
-            from backend.app.core.database import engine
-            loop.run_until_complete(engine.dispose())
-        except Exception:
-            pass
-        loop.close()
-        asyncio.set_event_loop(None)
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("closed")
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 
 @app.task(
