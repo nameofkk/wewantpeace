@@ -15,8 +15,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
     const isOnboardingPage = window.location.pathname === "/onboarding";
+    const isAdminPage = window.location.pathname.startsWith("/admin");
 
-    if (!done && !isOnboardingPage) {
+    if (!done && !isOnboardingPage && !isAdminPage) {
       router.replace("/onboarding");
     } else {
       setChecked(true);

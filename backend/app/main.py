@@ -25,6 +25,33 @@ init_sentry()
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 
+async def _bootstrap_admin():
+    """ADMIN_EMAILS 환경변수에 지정된 이메일의 role을 admin으로 승격."""
+    admin_emails_str = os.environ.get("ADMIN_EMAILS", "")
+    if not admin_emails_str:
+        return
+    emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+    if not emails:
+        return
+
+    from backend.app.core.database import AsyncSessionLocal
+    from sqlalchemy import select, update
+    from backend.app.models.user import User
+
+    try:
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                result = await db.execute(
+                    select(User).where(User.email.in_(emails), User.role != "admin")
+                )
+                users = result.scalars().all()
+                for u in users:
+                    u.role = "admin"
+                    logger.info("admin 승격: %s", u.email)
+    except Exception as e:
+        logger.error("bootstrap_admin 실패: %s", e)
+
+
 async def _startup_tension_calculation():
     """백엔드 기동 시 긴장도·트렌딩 즉시 계산 (백그라운드).
 
@@ -60,6 +87,9 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.upload_dir, exist_ok=True)
     init_firebase()
     logger.info("WeWantPeace API starting up", env=settings.debug)
+
+    # 어드민 이메일 자동 승격 (ADMIN_EMAILS 환경변수)
+    await _bootstrap_admin()
 
     # 백그라운드로 긴장도·트렌딩 즉시 계산 (배포 후 빈 데이터 방지)
     task = asyncio.create_task(_startup_tension_calculation())

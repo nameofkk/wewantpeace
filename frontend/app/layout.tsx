@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { BottomNav } from "@/components/ui/bottom-nav";
 import { OnboardingGuard } from "@/components/ui/onboarding-guard";
-import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
-import { NewEventBanner } from "@/components/ui/new-event-banner";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://wewantpeace.fly.dev";
 
@@ -65,10 +62,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background antialiased">
         <Providers>
           <OnboardingGuard>
-            <NewEventBanner />
-            <main className="pb-[60px]">{children}</main>
-            <BottomNav />
-            <PWAInstallPrompt />
+            {children}
           </OnboardingGuard>
         </Providers>
       </body>
