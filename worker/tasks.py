@@ -82,9 +82,11 @@ def collect_rss(self):
 
     async def _run():
         from worker.collector.rss_collector import RSSCollector
+        from backend.app.core.redis import get_redis
         async with AsyncSessionLocal() as db:
             collector = RSSCollector()
-            results = await collector.collect_all(db)
+            redis = get_redis()
+            results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
                 await db.flush()   # ID 생성을 위해 flush 먼저

@@ -9,6 +9,7 @@ feedparser 기반으로 source_channels.feed_url에서 항목 수집.
 """
 import asyncio
 import hashlib
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -335,7 +336,7 @@ class RSSCollector:
         # (asyncio.gather로 동시 실행 시 "Session is already flushing" 방지)
         return result
 
-    async def collect_all(self, db: AsyncSession) -> list[RSSCollectResult]:
+    async def collect_all(self, db: AsyncSession, redis=None) -> list[RSSCollectResult]:
         """
         모든 활성 RSS 소스에서 수집.
         Semaphore(5)로 동시 HTTP 요청 수 제한.
@@ -358,13 +359,53 @@ class RSSCollector:
         results = []
         for ch in channels:
             async with sem:
-                result = await self.collect_feed(ch, db)
-                logger.info(
-                    "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
-                    ch.display_name,
-                    result.collected,
-                    result.skipped,
-                    result.errors,
-                )
-                results.append(result)
+                try:
+                    result = await self.collect_feed(ch, db)
+                    logger.info(
+                        "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
+                        ch.display_name,
+                        result.collected,
+                        result.skipped,
+                        result.errors,
+                    )
+                    results.append(result)
+                    # Redis에 채널별 수집 상태 저장
+                    status = "error" if result.errors else "ok"
+                    await self._save_collect_status(
+                        redis, ch.id, status, result.collected, result.skipped,
+                        "; ".join(result.errors),
+                    )
+                except Exception as e:
+                    logger.error("RSS 채널 %s 수집 오류: %s", ch.display_name, e)
+                    results.append(
+                        RSSCollectResult(
+                            feed_url=ch.feed_url or "",
+                            display_name=ch.display_name,
+                            errors=[str(e)],
+                        )
+                    )
+                    await self._save_collect_status(
+                        redis, ch.id, "error", 0, 0, str(e),
+                    )
         return results
+
+    @staticmethod
+    async def _save_collect_status(
+        redis, channel_id: int, status: str,
+        collected: int, skipped: int, error: str = "",
+    ):
+        """Redis에 채널별 수집 상태 저장 (TTL 1시간)."""
+        if redis is None:
+            return
+        try:
+            key = f"collect:status:{channel_id}"
+            value = json.dumps({
+                "status": status,
+                "collected": collected,
+                "skipped": skipped,
+                "error": error,
+                "last_collected_at": datetime.now(timezone.utc).isoformat(),
+            })
+            await redis.set(key, value, ex=3600)
+        except Exception as e:
+            logger.warning("Redis 수집 상태 저장 실패 (channel=%s): %s", channel_id, e)

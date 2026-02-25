@@ -11,21 +11,58 @@ from worker.collector.telegram_collector import TelegramCollector
 from worker.collector.rss_collector import RSSCollector, _compute_guid, _extract_text
 
 
+def _make_telethon_message(
+    msg_id=1001,
+    text="BREAKING: Multiple explosions reported in Kyiv. Air defense systems activated.",
+    channel_id=1234567890,
+    views=15000,
+    forwards=500,
+    replies_count=100,
+    has_media=False,
+    date=None,
+):
+    """Telethon Message mock 생성 헬퍼."""
+    from telethon.tl.types import Message as TelethonMessage
+
+    msg = MagicMock(spec=TelethonMessage)
+    msg.id = msg_id
+    msg.text = text
+    msg.message = text
+    msg.date = date or datetime(2024, 2, 22, 0, 0, 0, tzinfo=timezone.utc)
+    msg.views = views
+    msg.forwards = forwards
+    msg.media = MagicMock() if has_media else None
+
+    replies_mock = MagicMock()
+    replies_mock.replies = replies_count
+    msg.replies = replies_mock
+
+    peer_id_mock = MagicMock()
+    peer_id_mock.channel_id = channel_id
+    # chat_id 속성이 없도록 설정
+    if hasattr(peer_id_mock, "chat_id"):
+        del peer_id_mock.chat_id
+    msg.peer_id = peer_id_mock
+
+    return msg
+
+
 # ─── TelegramCollector 단위 테스트 ──────────────────────────────────────────
 
 class TestTelegramCollectorParsing:
     """_parse_message() 테스트 (DB 불필요)."""
 
     def setup_method(self):
-        self.collector = TelegramCollector(bot_token="test-token")
+        self.collector = TelegramCollector()
         self.channel = MagicMock(spec=SourceChannel)
         self.channel.id = 1
         self.channel.channel_id = -1001234567890
         self.channel.tier = "B"
 
-    def test_parse_normal_message(self, sample_telegram_update):
+    def test_parse_normal_message(self):
         """정상 텍스트 메시지 파싱."""
-        result = self.collector._parse_message(sample_telegram_update, self.channel)
+        msg = _make_telethon_message()
+        result = self.collector._parse_message(msg, self.channel)
         assert result is not None
         assert result["source_type"] == "telegram"
         assert "explosions" in result["raw_text"].lower()
@@ -35,84 +72,76 @@ class TestTelegramCollectorParsing:
 
     def test_parse_media_only_message(self):
         """미디어만 있고 텍스트 없는 메시지 → None 반환."""
-        update = {
-            "update_id": 100,
-            "channel_post": {
-                "message_id": 1002,
-                "chat": {"id": -1001234567890},
-                "date": 1708560000,
-                "photo": [{"file_id": "abc", "width": 1920, "height": 1080}],
-                # text 없음
-            },
-        }
-        result = self.collector._parse_message(update, self.channel)
+        msg = _make_telethon_message(msg_id=1002, text="", has_media=True)
+        result = self.collector._parse_message(msg, self.channel)
         assert result is None
 
     def test_parse_empty_text_message(self):
         """텍스트가 10자 미만인 메시지 → None 반환."""
-        update = {
-            "update_id": 101,
-            "channel_post": {
-                "message_id": 1003,
-                "chat": {"id": -1001234567890},
-                "date": 1708560000,
-                "text": "OK",  # 너무 짧음
-            },
-        }
-        result = self.collector._parse_message(update, self.channel)
+        msg = _make_telethon_message(msg_id=1003, text="OK")
+        result = self.collector._parse_message(msg, self.channel)
         assert result is None
 
-    def test_parse_caption_message(self):
-        """사진 + caption 메시지 → caption을 텍스트로 사용."""
-        update = {
-            "update_id": 102,
-            "channel_post": {
-                "message_id": 1004,
-                "chat": {"id": -1001234567890},
-                "date": 1708560000,
-                "photo": [{"file_id": "xyz"}],
-                "caption": "Drone footage shows damage to Kyiv bridge infrastructure. Multiple impacts visible.",
-            },
-        }
-        result = self.collector._parse_message(update, self.channel)
+    def test_parse_has_media_flag(self):
+        """미디어가 있는 메시지 → has_media=True."""
+        msg = _make_telethon_message(
+            msg_id=1004,
+            text="Drone footage shows damage to Kyiv bridge infrastructure. Multiple impacts visible.",
+            has_media=True,
+        )
+        result = self.collector._parse_message(msg, self.channel)
         assert result is not None
         assert "Kyiv" in result["raw_text"]
         assert result["raw_metadata"]["has_media"] is True
 
-    def test_parse_no_message_in_update(self):
-        """메시지가 없는 update → None 반환."""
-        update = {"update_id": 103}
-        result = self.collector._parse_message(update, self.channel)
-        assert result is None
-
-    def test_external_id_format(self, sample_telegram_update):
-        """external_id = {chat_id}_{message_id} 형식 확인."""
-        result = self.collector._parse_message(sample_telegram_update, self.channel)
+    def test_external_id_format(self):
+        """external_id = -100{channel_id}_{message_id} 형식 확인."""
+        msg = _make_telethon_message()
+        result = self.collector._parse_message(msg, self.channel)
         assert result is not None
         assert result["external_id"] == "-1001234567890_1001"
+
+    def test_parse_replies_count(self):
+        """replies 수가 메타데이터에 포함되는지 확인."""
+        msg = _make_telethon_message(replies_count=42)
+        result = self.collector._parse_message(msg, self.channel)
+        assert result is not None
+        assert result["raw_metadata"]["replies"] == 42
+
+    def test_parse_no_replies(self):
+        """replies가 None일 때 0으로 처리."""
+        msg = _make_telethon_message()
+        msg.replies = None
+        result = self.collector._parse_message(msg, self.channel)
+        assert result is not None
+        assert result["raw_metadata"]["replies"] == 0
 
 
 class TestTelegramCollectorIntegration:
     """collect_channel() DB 연동 통합 테스트."""
 
     @pytest.mark.asyncio
-    async def test_collect_and_save(self, db, sample_source_channel_data, sample_telegram_update):
+    async def test_collect_and_save(self, db, sample_source_channel_data, redis_mock):
         """정상 메시지 수집 → raw_events 저장 확인."""
         from sqlalchemy import select
 
-        # 채널 생성
         channel = SourceChannel(**sample_source_channel_data)
         channel.channel_id = -1001234567890
+        channel.username = "TestOSINT"
         db.add(channel)
         await db.flush()
 
-        collector = TelegramCollector(bot_token="test-token")
-        result = await collector.collect_channel(channel, db, [sample_telegram_update])
+        msg = _make_telethon_message()
+
+        mock_client = AsyncMock()
+        mock_client.get_messages = AsyncMock(return_value=[msg])
+
+        collector = TelegramCollector()
+        result = await collector.collect_channel(channel, db, mock_client, redis_mock)
 
         assert result.collected == 1
         assert result.skipped == 0
 
-        # DB 확인
         events = await db.execute(
             select(RawEvent).where(RawEvent.source_type == "telegram")
         )
@@ -121,36 +150,44 @@ class TestTelegramCollectorIntegration:
         assert "explosions" in raw_events[0].raw_text.lower()
 
     @pytest.mark.asyncio
-    async def test_duplicate_message_skipped(self, db, sample_source_channel_data, sample_telegram_update):
+    async def test_duplicate_message_skipped(self, db, sample_source_channel_data, redis_mock):
         """같은 메시지 두 번 수집 시 두 번째는 건너뜀."""
         channel = SourceChannel(**sample_source_channel_data)
         channel.channel_id = -1001234567890
+        channel.username = "TestOSINT"
         db.add(channel)
         await db.flush()
 
-        collector = TelegramCollector(bot_token="test-token")
+        msg = _make_telethon_message()
 
-        # 첫 번째 수집
-        result1 = await collector.collect_channel(channel, db, [sample_telegram_update])
+        mock_client = AsyncMock()
+        mock_client.get_messages = AsyncMock(return_value=[msg])
+
+        collector = TelegramCollector()
+
+        result1 = await collector.collect_channel(channel, db, mock_client, redis_mock)
         assert result1.collected == 1
 
-        # 두 번째 수집 (동일 메시지)
-        result2 = await collector.collect_channel(channel, db, [sample_telegram_update])
+        result2 = await collector.collect_channel(channel, db, mock_client, redis_mock)
         assert result2.collected == 0
         assert result2.skipped == 1
 
     @pytest.mark.asyncio
-    async def test_different_channel_message_skipped(self, db, sample_source_channel_data, sample_telegram_update):
-        """다른 채널(channel_id 불일치) 메시지는 건너뜀."""
+    async def test_no_username_returns_error(self, db, sample_source_channel_data, redis_mock):
+        """username 없는 채널 → 에러 반환."""
         channel = SourceChannel(**sample_source_channel_data)
-        channel.channel_id = -9999999999  # 다른 채널 ID
+        channel.channel_id = -1001234567890
+        channel.username = None
         db.add(channel)
         await db.flush()
 
-        collector = TelegramCollector(bot_token="test-token")
-        result = await collector.collect_channel(channel, db, [sample_telegram_update])
+        mock_client = AsyncMock()
+        collector = TelegramCollector()
+        result = await collector.collect_channel(channel, db, mock_client, redis_mock)
 
         assert result.collected == 0
+        assert len(result.errors) > 0
+        assert "username" in result.errors[0]
 
 
 # ─── RSSCollector 단위 테스트 ────────────────────────────────────────────────

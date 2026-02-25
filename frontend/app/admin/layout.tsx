@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Layers, Activity, FileText,
-  Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut,
+  Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/admin/users", icon: Users, labelKey: "admin_users" as const },
   { href: "/admin/clusters", icon: Layers, labelKey: "admin_clusters" as const },
   { href: "/admin/tension", icon: Activity, labelKey: "admin_tension" as const },
+  { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" as const },
   { href: "/admin/events", icon: FileText, labelKey: "admin_events" as const },
   { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" as const },
   { href: "/admin/settings", icon: Settings, labelKey: "admin_settings" as const },

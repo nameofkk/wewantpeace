@@ -20,6 +20,7 @@ from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.raw_event import RawEvent
+from backend.app.models.source_channel import SourceChannel
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -709,3 +710,108 @@ async def push_stats(
         "total_tokens": total_tokens,
         "platforms": platforms,
     }
+
+
+# ── 소스 채널 관리 ─────────────────────────────────────────────────────────
+
+class SourcePatch(BaseModel):
+    is_active: Optional[bool] = None
+    tier: Optional[str] = None
+    base_confidence: Optional[float] = None
+
+
+@router.get("/sources")
+async def list_sources(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    source_type: Optional[str] = Query(None),
+    tier: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """소스 채널 목록 + Redis 수집 상태."""
+    import json as _json
+
+    q = select(SourceChannel)
+    if source_type:
+        q = q.where(SourceChannel.source_type == source_type)
+    if tier:
+        q = q.where(SourceChannel.tier == tier)
+    if is_active is not None:
+        q = q.where(SourceChannel.is_active == is_active)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(SourceChannel.id).offset((page - 1) * limit).limit(limit)
+    result = await db.execute(q)
+    channels = result.scalars().all()
+
+    # Redis에서 채널별 수집 상태 일괄 조회
+    collect_statuses: dict[int, dict] = {}
+    try:
+        redis = get_redis()
+        keys = [f"collect:status:{ch.id}" for ch in channels]
+        if keys:
+            values = await redis.mget(keys)
+            for ch, val in zip(channels, values):
+                if val:
+                    collect_statuses[ch.id] = _json.loads(val)
+    except Exception:
+        pass
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": ch.id,
+                "channel_id": ch.channel_id,
+                "username": ch.username,
+                "display_name": ch.display_name,
+                "source_type": ch.source_type,
+                "tier": ch.tier,
+                "base_confidence": round(ch.base_confidence, 2),
+                "language": ch.language,
+                "feed_url": ch.feed_url,
+                "is_active": ch.is_active,
+                "created_at": ch.created_at.isoformat(),
+                "collect_status": collect_statuses.get(ch.id),
+            }
+            for ch in channels
+        ],
+    }
+
+
+@router.patch("/sources/{source_id}")
+async def update_source(
+    source_id: int,
+    body: SourcePatch,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """소스 채널 활성/비활성, 등급, 신뢰도 수정."""
+    result = await db.execute(
+        select(SourceChannel).where(SourceChannel.id == source_id)
+    )
+    channel = result.scalar_one_or_none()
+    if not channel:
+        raise HTTPException(404)
+
+    changes = {}
+    if body.is_active is not None:
+        channel.is_active = body.is_active
+        changes["is_active"] = body.is_active
+    if body.tier is not None:
+        if body.tier not in ("A", "B", "C", "D"):
+            raise HTTPException(422, detail="tier must be A, B, C, or D")
+        channel.tier = body.tier
+        changes["tier"] = body.tier
+    if body.base_confidence is not None:
+        if not (0.0 <= body.base_confidence <= 1.0):
+            raise HTTPException(422, detail="base_confidence must be 0.0~1.0")
+        channel.base_confidence = body.base_confidence
+        changes["base_confidence"] = body.base_confidence
+
+    channel.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await _log_action(db, admin, "update_source", "source_channel", str(source_id), changes)
+    return {"status": "ok"}

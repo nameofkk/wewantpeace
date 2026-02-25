@@ -505,6 +505,24 @@ export const translations = {
     admin_proplus_price: "Pro+ 가격",
     admin_notice_banner: "공지 배너",
 
+    // admin sources
+    admin_sources: "소스 채널",
+    admin_sources_title: "소스 채널 관리",
+    admin_sources_subtitle: "수집 채널의 활성 상태, 등급, 수집 현황을 관리합니다",
+    admin_source_name: "채널명",
+    admin_source_type: "유형",
+    admin_source_tier: "등급",
+    admin_source_language: "언어",
+    admin_source_confidence: "신뢰도",
+    admin_source_last_collected: "최근수집",
+    admin_source_error: "오류",
+    admin_source_active_toggle: "활성",
+    admin_source_status_ok: "정상",
+    admin_source_status_error: "오류",
+    admin_source_status_idle: "미수신",
+    admin_source_all_types: "전체 유형",
+    admin_source_all_tiers: "전체 등급",
+
     // upgrade
     upgrade_title: "플랜 선택",
     upgrade_subtitle: "세계정세를 더 깊이 파악하세요",
@@ -1020,6 +1038,24 @@ export const translations = {
     admin_pro_price: "Pro Price",
     admin_proplus_price: "Pro+ Price",
     admin_notice_banner: "Notice Banner",
+
+    // admin sources
+    admin_sources: "Sources",
+    admin_sources_title: "Source Channels",
+    admin_sources_subtitle: "Manage collector channels, tiers, and collection status",
+    admin_source_name: "Channel",
+    admin_source_type: "Type",
+    admin_source_tier: "Tier",
+    admin_source_language: "Lang",
+    admin_source_confidence: "Confidence",
+    admin_source_last_collected: "Last Collected",
+    admin_source_error: "Error",
+    admin_source_active_toggle: "Active",
+    admin_source_status_ok: "OK",
+    admin_source_status_error: "Error",
+    admin_source_status_idle: "Idle",
+    admin_source_all_types: "All Types",
+    admin_source_all_tiers: "All Tiers",
 
     // upgrade
     upgrade_title: "Choose Your Plan",

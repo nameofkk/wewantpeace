@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
+os.environ.setdefault("TELEGRAM_API_ID", "12345")
+os.environ.setdefault("TELEGRAM_API_HASH", "test-api-hash")
 
 import pytest
 import pytest_asyncio
@@ -93,23 +95,35 @@ def sample_source_channel_data():
 
 
 @pytest.fixture
-def sample_telegram_update():
-    """Telegram getUpdates 응답 샘플."""
-    return {
-        "update_id": 123456789,
-        "channel_post": {
-            "message_id": 1001,
-            "chat": {
-                "id": -1001234567890,
-                "type": "channel",
-                "title": "Test Channel",
-            },
-            "date": 1708560000,
-            "text": "BREAKING: Multiple explosions reported in Kyiv. Air defense systems activated. Unconfirmed reports of missile strikes.",
-            "views": 15000,
-            "forwards": 500,
-        },
-    }
+def sample_telegram_message():
+    """Telethon Message mock 객체."""
+    from unittest.mock import MagicMock
+    from datetime import datetime, timezone
+
+    msg = MagicMock()
+    msg.id = 1001
+    msg.text = "BREAKING: Multiple explosions reported in Kyiv. Air defense systems activated. Unconfirmed reports of missile strikes."
+    msg.message = msg.text
+    msg.date = datetime(2024, 2, 22, 0, 0, 0, tzinfo=timezone.utc)
+    msg.views = 15000
+    msg.forwards = 500
+    msg.media = None
+
+    # replies mock
+    replies_mock = MagicMock()
+    replies_mock.replies = 100
+    msg.replies = replies_mock
+
+    # peer_id mock (PeerChannel)
+    peer_id_mock = MagicMock()
+    peer_id_mock.channel_id = 1234567890
+    del peer_id_mock.chat_id  # hasattr(peer_id, 'chat_id') → False
+    msg.peer_id = peer_id_mock
+
+    # isinstance(msg, Message) 체크를 위해 __class__ 설정
+    msg.__class__ = type("Message", (), {})
+
+    return msg
 
 
 @pytest.fixture
