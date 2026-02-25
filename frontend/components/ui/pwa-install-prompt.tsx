@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { Download, X } from "lucide-react";
 
+const DISMISS_KEY = "pwa_install_dismissed";
+const DISMISS_HOURS = 24;
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -13,9 +16,13 @@ export function PWAInstallPrompt() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // 이미 설치됐거나 사용자가 닫은 경우 표시 안 함
-    const dismissed = localStorage.getItem("pwa_install_dismissed");
-    if (dismissed) return;
+    // 24시간 내 닫은 적 있으면 무시
+    const dismissed = localStorage.getItem(DISMISS_KEY);
+    if (dismissed) {
+      const dismissedAt = parseInt(dismissed, 10);
+      if (Date.now() - dismissedAt < DISMISS_HOURS * 60 * 60 * 1000) return;
+      localStorage.removeItem(DISMISS_KEY);
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -39,7 +46,7 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setVisible(false);
-    localStorage.setItem("pwa_install_dismissed", "1");
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
   };
 
   if (!visible) return null;
