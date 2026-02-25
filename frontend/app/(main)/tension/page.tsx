@@ -512,7 +512,7 @@ export default function TensionPage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const [viewMode, setViewMode] = useState<"mine" | "all">("mine");
+  const [viewMode, setViewMode] = useState<"mine" | "all">("all");
 
   const targetCountries = viewMode === "all"
     ? ALL_MONITORED_COUNTRIES
@@ -529,6 +529,22 @@ export default function TensionPage() {
   );
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
   const [spinning, setSpinning] = useState(false);
+
+  // hydrate 후 관심지역이 있으면 "mine" 탭으로 전환
+  const [autoSwitched, setAutoSwitched] = useState(false);
+  useEffect(() => {
+    if (hydrated && myCountries.length > 0 && !autoSwitched) {
+      setViewMode("mine");
+      setAutoSwitched(true);
+    }
+  }, [hydrated, myCountries.length, autoSwitched]);
+
+  // 관심지역 탭에서 데이터 없으면 전체 탭으로 fallback
+  useEffect(() => {
+    if (tensions && tensions.length === 0 && !isLoading && viewMode === "mine") {
+      setViewMode("all");
+    }
+  }, [tensions, isLoading, viewMode]);
 
   // 빈 배열이면 10초 후 자동 refetch (서버 시작 직후 데이터 아직 준비 안 된 경우)
   useEffect(() => {
