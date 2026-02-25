@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, X, Zap, Shield, Star, ArrowLeft, Download, Smartphone } from "lucide-react";
+import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
@@ -78,48 +78,18 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
 const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // TODO: 실제 ID
 
-const PLANS = [
-  {
-    id: "free",     name: "Free",  icon: null,
-    priceKRW: 0,
-    gradient: "",
-    border: "border-border",
-    badge: null,
-    taglineKo: "핵심 기능 무료",
-    taglineEn: "Core features, free",
-  },
-  {
-    id: "pro",      name: "Pro",   icon: Shield,
-    priceKRW: 4900,
-    gradient: "from-blue-600 to-primary",
-    border: "border-primary",
-    badge: { ko: "인기", en: "Popular" },
-    taglineKo: "전문 분석가를 위한 도구",
-    taglineEn: "Tools for serious analysts",
-  },
-  {
-    id: "pro_plus", name: "Pro+",  icon: Star,
-    priceKRW: 9900,
-    gradient: "from-purple-600 to-pink-500",
-    border: "border-purple-500",
-    badge: { ko: "최고", en: "Best" },
-    taglineKo: "API + 전체 기능",
-    taglineEn: "Full features + API",
-  },
-] as const;
-
 function FeatureValue({
   val, planId, lang,
 }: { val: boolean | string; planId: string; lang: string }) {
   if (val === true) {
-    const color = planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-primary" : "text-green-500";
+    const color = planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-green-500";
     return <Check className={cn("h-4 w-4 mx-auto", color)} />;
   }
   if (val === false) return <X className="h-4 w-4 mx-auto text-muted-foreground/30" />;
   return (
     <span className={cn(
       "text-[11px] font-medium",
-      planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-primary" : "text-muted-foreground"
+      planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-muted-foreground"
     )}>
       {val}
     </span>
@@ -128,7 +98,6 @@ function FeatureValue({
 
 /** 웹에서 "앱에서 구독하세요" 안내 UI */
 function AppInstallPrompt({ lang }: { lang: string }) {
-  const isMobile = isMobileBrowser();
   const isAndroid = isAndroidBrowser();
   const isIOS = isIOSBrowser();
 
@@ -191,7 +160,7 @@ export default function UpgradePage() {
   const lang = useAppStore((s) => s.lang);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [highlighted, setHighlighted] = useState<"pro" | "pro_plus">("pro");
+  const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
   const [platform, setPlatform] = useState<AppPlatform>("web");
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -213,7 +182,6 @@ export default function UpgradePage() {
       } else if (platform === "ios-app") {
         await handleIOSPurchase(planId);
       }
-      // web에서는 버튼이 안 보이므로 도달하지 않음
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || t(lang, "upgrade_payment_error"));
@@ -228,9 +196,8 @@ export default function UpgradePage() {
     if (!productId) throw new Error("Invalid plan");
 
     const purchaseToken = await purchaseSubscription(productId);
-    if (!purchaseToken) return; // 사용자 취소
+    if (!purchaseToken) return;
 
-    // 백엔드 검증
     const token = await user!.getIdToken();
     const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
       method: "POST",
@@ -246,7 +213,6 @@ export default function UpgradePage() {
       throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
     }
 
-    // 성공 → 리로드
     window.location.href = "/settings";
   }
 
@@ -256,9 +222,8 @@ export default function UpgradePage() {
     if (!productId) throw new Error("Invalid plan");
 
     const result = await purchaseViaStoreKit(productId);
-    if (!result) return; // 사용자 취소
+    if (!result) return;
 
-    // 백엔드 검증
     const token = await user!.getIdToken();
     const res = await fetch(`${API_BASE}/subscriptions/store/apple/verify`, {
       method: "POST",
@@ -283,23 +248,90 @@ export default function UpgradePage() {
     <div className="min-h-screen bg-background">
       <style>{`
         @keyframes fadeSlideUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes glowPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.3); }
-          50%       { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
         }
-        @keyframes glowPulsePurple {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.3); }
-          50%       { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-4px); }
         }
-        .plan-card { animation: fadeSlideUp 0.4s ease both; }
-        .plan-card:nth-child(1) { animation-delay: 0.05s; }
-        .plan-card:nth-child(2) { animation-delay: 0.15s; }
-        .plan-card:nth-child(3) { animation-delay: 0.25s; }
-        .glow-pro     { animation: glowPulse 2.5s ease-in-out infinite; }
-        .glow-proplus { animation: glowPulsePurple 2.5s ease-in-out infinite; }
+        @keyframes borderGlow {
+          0%, 100% { opacity: 0.6; }
+          50%      { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.92); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        .card-enter { animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1) both; }
+        .card-enter-1 { animation-delay: 0.08s; }
+        .card-enter-2 { animation-delay: 0.18s; }
+        .card-enter-3 { animation-delay: 0.28s; }
+        .shimmer-text {
+          background: linear-gradient(90deg, currentColor 40%, rgba(255,255,255,0.8) 50%, currentColor 60%);
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s ease-in-out infinite;
+        }
+        .shimmer-border {
+          position: relative;
+          overflow: hidden;
+        }
+        .shimmer-border::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: inherit;
+          padding: 2px;
+          background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+          background-size: 300% 300%;
+          animation: shimmer 4s ease infinite;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          pointer-events: none;
+        }
+        .glow-blue {
+          box-shadow: 0 0 20px rgba(59,130,246,0.15), 0 0 60px rgba(59,130,246,0.05);
+        }
+        .glow-purple {
+          box-shadow: 0 0 20px rgba(168,85,247,0.15), 0 0 60px rgba(168,85,247,0.05);
+        }
+        .glass-card {
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        .gradient-border-pro {
+          border-image: linear-gradient(135deg, #3b82f6, #06b6d4, #3b82f6) 1;
+        }
+        .btn-shine {
+          position: relative;
+          overflow: hidden;
+        }
+        .btn-shine::after {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -60%;
+          width: 40%;
+          height: 200%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+          transform: skewX(-15deg);
+          animation: btnShine 3s ease-in-out infinite;
+        }
+        @keyframes btnShine {
+          0% { left: -60%; }
+          20% { left: 120%; }
+          100% { left: 120%; }
+        }
+        .badge-float {
+          animation: float 2.5s ease-in-out infinite;
+        }
       `}</style>
 
       {/* 헤더 */}
@@ -313,11 +345,17 @@ export default function UpgradePage() {
       <div className="mx-auto max-w-lg px-4 py-8">
 
         {/* 타이틀 */}
-        <div className="text-center mb-8" style={{ animation: "fadeSlideUp 0.3s ease both" }}>
-          <h2 className="text-2xl font-bold">
+        <div className="text-center mb-10" style={{ animation: "fadeSlideUp 0.4s ease both" }}>
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 mb-4">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold text-primary">
+              {lang === "ko" ? "더 강력한 분석 도구" : "More powerful analytics"}
+            </span>
+          </div>
+          <h2 className="text-2xl font-black tracking-tight">
             {lang === "ko" ? "당신에게 맞는 플랜" : "Choose Your Plan"}
           </h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">{t(lang, "upgrade_subtitle")}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t(lang, "upgrade_subtitle")}</p>
         </div>
 
         {error && (
@@ -333,138 +371,220 @@ export default function UpgradePage() {
           </div>
         )}
 
-        {/* ── 플랜 카드 3개 ── */}
-        <div className="space-y-4">
-          {PLANS.map((plan) => {
-            const isPro = plan.id === "pro";
-            const isProPlus = plan.id === "pro_plus";
-            const isHighlighted = highlighted === plan.id;
-            const Icon = plan.icon;
+        {/* ── 플랜 카드 ── */}
+        <div className="space-y-5">
 
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "plan-card relative rounded-2xl border-2 bg-card p-5 cursor-pointer transition-all duration-200",
-                  plan.border,
-                  isPro && isHighlighted && "glow-pro",
-                  isProPlus && isHighlighted && "glow-proplus",
-                  !isHighlighted && "opacity-90 scale-[0.99]",
-                  isHighlighted && "scale-[1.01]"
-                )}
-                onClick={() => { if (isPro) setHighlighted("pro"); if (isProPlus) setHighlighted("pro_plus"); }}
-              >
-                {/* 배지 */}
-                {plan.badge && (
-                  <span className={cn(
-                    "absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold text-white",
-                    isPro ? "bg-primary" : "bg-purple-500"
-                  )}>
-                    {lang === "ko" ? plan.badge.ko : plan.badge.en}
-                  </span>
-                )}
+          {/* Free 카드 — 심플하게 */}
+          <div className="card-enter card-enter-1 rounded-2xl border border-border/60 bg-card/50 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-muted/80 flex items-center justify-center">
+                  <span className="text-lg">🌐</span>
+                </div>
+                <div>
+                  <p className="text-base font-bold text-muted-foreground">Free</p>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    {lang === "ko" ? "핵심 기능 무료" : "Core features, free"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-lg font-bold text-muted-foreground">
+                {lang === "ko" ? "무료" : "Free"}
+              </p>
+            </div>
+            <div className="mt-3 w-full rounded-xl py-2 text-xs font-semibold text-center bg-secondary/50 text-muted-foreground">
+              {t(lang, "upgrade_current_plan")}
+            </div>
+          </div>
 
-                <div className="flex items-start justify-between gap-3">
-                  {/* 플랜 이름 + 설명 */}
-                  <div className="flex items-center gap-2.5">
-                    {Icon && (
-                      <div className={cn(
-                        "h-9 w-9 rounded-xl flex items-center justify-center text-white bg-gradient-to-br",
-                        plan.gradient
-                      )}>
-                        <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" />
-                      </div>
-                    )}
-                    {!Icon && (
-                      <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center">
-                        <span className="text-base">🌐</span>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-base font-bold">{plan.name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {lang === "ko" ? plan.taglineKo : plan.taglineEn}
-                      </p>
-                    </div>
+          {/* Pro 카드 — 블루 글로시 */}
+          <div
+            className={cn(
+              "card-enter card-enter-2 relative rounded-2xl p-[2px] cursor-pointer transition-all duration-300",
+              selected === "pro"
+                ? "glow-blue bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-600"
+                : "bg-border/40 hover:bg-gradient-to-br hover:from-blue-500/50 hover:via-cyan-400/50 hover:to-blue-600/50"
+            )}
+            onClick={() => setSelected("pro")}
+          >
+            {/* 인기 배지 */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 badge-float">
+              <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 px-4 py-1 shadow-lg shadow-blue-500/25">
+                <Zap className="h-3 w-3 text-white" />
+                <span className="text-[11px] font-bold text-white">
+                  {lang === "ko" ? "인기" : "Popular"}
+                </span>
+              </div>
+            </div>
+
+            <div className={cn(
+              "rounded-[14px] bg-card p-5 shimmer-border glass-card transition-all duration-300",
+              selected === "pro" && "bg-gradient-to-br from-blue-950/40 via-card to-cyan-950/20"
+            )}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <Shield className="h-5 w-5 text-white" />
                   </div>
-
-                  {/* 가격 */}
-                  <div className="text-right shrink-0">
-                    <p className={cn(
-                      "text-xl font-black",
-                      isPro ? "text-primary" : isProPlus ? "text-purple-400" : "text-muted-foreground"
-                    )}>
-                      {plan.priceKRW === 0 ? (lang === "ko" ? "무료" : "Free") : `₩${plan.priceKRW.toLocaleString("ko-KR")}`}
+                  <div>
+                    <p className="text-lg font-black">Pro</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {lang === "ko" ? "전문 분석가를 위한 도구" : "Tools for serious analysts"}
                     </p>
-                    {plan.priceKRW > 0 && (
-                      <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
-                    )}
                   </div>
                 </div>
-
-                {/* 핵심 기능 요약 (프리 제외) */}
-                {plan.id !== "free" && (
-                  <div className={cn(
-                    "mt-4 rounded-xl px-3 py-2.5 text-[11px] space-y-1",
-                    isPro ? "bg-primary/8 border border-primary/20" : "bg-purple-500/8 border border-purple-500/20"
-                  )}>
-                    {plan.id === "pro" && (
-                      <>
-                        <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "🗺️ 실시간 글로벌 이슈 지도 잠금 해제" : "🗺️ Real-time global issue map"}</p>
-                        <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "관심 국가 최대 5개 · 속보 알림" : "Up to 5 countries · Fast alerts"}</p>
-                        <p className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-primary" />{lang === "ko" ? "KScore 필터 · KScore/긴장도 30일 히스토리" : "KScore filter · 30-day KScore & tension history"}</p>
-                      </>
-                    )}
-                    {plan.id === "pro_plus" && (
-                      <>
-                        <p className="flex items-center gap-1.5"><Star className="h-3 w-3 text-purple-400" />{lang === "ko" ? "Pro 모든 기능 포함 (지도 포함)" : "Everything in Pro (map included)"}</p>
-                        <p className="flex items-center gap-1.5"><Star className="h-3 w-3 text-purple-400" />{lang === "ko" ? "무제한 국가 + KScore 0.5 ~ 4.0" : "Unlimited countries + KScore 0.5~4.0"}</p>
-                        <p className="flex items-center gap-1.5"><Star className="h-3 w-3 text-purple-400" />{lang === "ko" ? "KScore/긴장도 90일 전체 히스토리" : "Full 90-day KScore & tension history"}</p>
-                      </>
-                    )}
+                <div className="text-right shrink-0">
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-xs text-blue-400 font-medium">₩</span>
+                    <span className={cn(
+                      "text-2xl font-black text-blue-400",
+                      selected === "pro" && "shimmer-text"
+                    )}>4,900</span>
                   </div>
-                )}
-
-                {/* 구독 버튼 */}
-                {!isWeb ? (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleSubscribe(plan.id); }}
-                    disabled={plan.id === "free" || loading === plan.id}
-                    className={cn(
-                      "mt-4 w-full rounded-xl py-2.5 text-sm font-bold transition-all duration-150",
-                      plan.id === "free"
-                        ? "bg-secondary text-muted-foreground cursor-default"
-                        : isPro
-                          ? "bg-gradient-to-r from-blue-600 to-primary text-white hover:opacity-90 active:scale-[0.98]"
-                          : "bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 active:scale-[0.98]",
-                      "disabled:opacity-50"
-                    )}
-                  >
-                    {loading === plan.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                        {t(lang, "upgrade_processing")}
-                      </span>
-                    ) : plan.id === "free"
-                      ? t(lang, "upgrade_current_plan")
-                      : t(lang, "upgrade_subscribe")}
-                  </button>
-                ) : (
-                  /* 웹에서는 비활성 버튼 표시 (프리 제외) */
-                  <div className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-center bg-secondary text-muted-foreground">
-                    {plan.id === "free"
-                      ? t(lang, "upgrade_current_plan")
-                      : t(lang, "store_subscribe_in_app")}
-                  </div>
-                )}
+                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
+                </div>
               </div>
-            );
-          })}
+
+              {/* 핵심 기능 */}
+              <div className="mt-4 space-y-2.5">
+                {[
+                  lang === "ko" ? "실시간 글로벌 이슈 지도" : "Real-time global issue map",
+                  lang === "ko" ? "관심 국가 5개 + 속보 알림" : "5 countries + Breaking alerts",
+                  lang === "ko" ? "KScore 필터 + 30일 히스토리" : "KScore filter + 30-day history",
+                ].map((text, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <div className="h-5 w-5 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
+                      <Check className="h-3 w-3 text-blue-400" />
+                    </div>
+                    <span className="text-xs text-foreground/80">{text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 구독 버튼 */}
+              {!isWeb ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
+                  disabled={loading === "pro"}
+                  className={cn(
+                    "btn-shine mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                    "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+                    "hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5",
+                    "active:scale-[0.98] active:shadow-none",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {loading === "pro" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      {t(lang, "upgrade_processing")}
+                    </span>
+                  ) : t(lang, "upgrade_subscribe")}
+                </button>
+              ) : (
+                <div className="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {t(lang, "store_subscribe_in_app")}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pro+ 카드 — 퍼플 프리미엄 */}
+          <div
+            className={cn(
+              "card-enter card-enter-3 relative rounded-2xl p-[2px] cursor-pointer transition-all duration-300",
+              selected === "pro_plus"
+                ? "glow-purple bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600"
+                : "bg-border/40 hover:bg-gradient-to-br hover:from-purple-500/50 hover:via-pink-500/50 hover:to-purple-600/50"
+            )}
+            onClick={() => setSelected("pro_plus")}
+          >
+            {/* 최고 배지 */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 badge-float">
+              <div className="flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-1 shadow-lg shadow-purple-500/25">
+                <Crown className="h-3 w-3 text-white" />
+                <span className="text-[11px] font-bold text-white">
+                  {lang === "ko" ? "최고" : "Best"}
+                </span>
+              </div>
+            </div>
+
+            <div className={cn(
+              "rounded-[14px] bg-card p-5 shimmer-border glass-card transition-all duration-300",
+              selected === "pro_plus" && "bg-gradient-to-br from-purple-950/40 via-card to-pink-950/20"
+            )}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                    <Star className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-black">Pro+</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {lang === "ko" ? "전체 기능 잠금 해제" : "Unlock everything"}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-xs text-purple-400 font-medium">₩</span>
+                    <span className={cn(
+                      "text-2xl font-black text-purple-400",
+                      selected === "pro_plus" && "shimmer-text"
+                    )}>9,900</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
+                </div>
+              </div>
+
+              {/* 핵심 기능 */}
+              <div className="mt-4 space-y-2.5">
+                {[
+                  lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
+                  lang === "ko" ? "무제한 국가 + KScore 0.5~4.0" : "Unlimited countries + KScore 0.5~4.0",
+                  lang === "ko" ? "90일 전체 히스토리" : "Full 90-day history",
+                ].map((text, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <div className="h-5 w-5 rounded-full bg-purple-500/15 flex items-center justify-center shrink-0">
+                      <Check className="h-3 w-3 text-purple-400" />
+                    </div>
+                    <span className="text-xs text-foreground/80">{text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 구독 버튼 */}
+              {!isWeb ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSubscribe("pro_plus"); }}
+                  disabled={loading === "pro_plus"}
+                  className={cn(
+                    "btn-shine mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                    "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+                    "hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5",
+                    "active:scale-[0.98] active:shadow-none",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {loading === "pro_plus" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      {t(lang, "upgrade_processing")}
+                    </span>
+                  ) : t(lang, "upgrade_subscribe")}
+                </button>
+              ) : (
+                <div className="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-center bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  {t(lang, "store_subscribe_in_app")}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── 상세 비교 표 ── */}
-        <div className="mt-10" style={{ animation: "fadeSlideUp 0.5s ease 0.3s both" }}>
-          <h3 className="text-sm font-bold mb-4 text-center text-muted-foreground uppercase tracking-wider">
+        <div className="mt-12" style={{ animation: "fadeSlideUp 0.5s ease 0.4s both" }}>
+          <h3 className="text-xs font-bold mb-4 text-center text-muted-foreground uppercase tracking-widest">
             {lang === "ko" ? "플랜 상세 비교" : "Detailed Comparison"}
           </h3>
           <div className="rounded-2xl border border-border overflow-hidden">
@@ -472,7 +592,7 @@ export default function UpgradePage() {
             <div className="grid grid-cols-4 bg-muted/30 text-[11px] font-bold">
               <div className="p-3 text-muted-foreground">{lang === "ko" ? "기능" : "Feature"}</div>
               <div className="p-3 text-center text-muted-foreground">Free</div>
-              <div className="p-3 text-center text-primary">Pro</div>
+              <div className="p-3 text-center text-blue-400">Pro</div>
               <div className="p-3 text-center text-purple-400">Pro+</div>
             </div>
             {/* 행 */}
@@ -499,7 +619,7 @@ export default function UpgradePage() {
         </div>
 
         {/* 푸터 */}
-        <div className="mt-8 text-center text-[11px] text-muted-foreground space-y-1">
+        <div className="mt-8 text-center text-[11px] text-muted-foreground space-y-1 pb-4">
           <p style={{ wordBreak: "keep-all", lineHeight: "1.7" }}>
             {lang === "ko"
               ? "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능"
