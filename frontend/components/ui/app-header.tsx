@@ -3,12 +3,25 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUnreadCount } from "@/lib/api";
 
 export function AppHeader() {
   const [hidden, setHidden] = useState(false);
   const [tapped, setTapped] = useState(false);
   const lastY = useRef(0);
+
+  // 로그인 여부 확인
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => {
+    const hasAuth =
+      !!localStorage.getItem("dev_uid") || !!localStorage.getItem("firebase_token");
+    setIsLoggedIn(hasAuth);
+  }, []);
+
+  const { data: unreadData } = useUnreadCount(isLoggedIn);
+  const unread = unreadData?.unread ?? 0;
 
   useEffect(() => {
     const onScroll = () => {
@@ -41,7 +54,11 @@ export function AppHeader() {
           hidden ? "-translate-y-full" : "translate-y-0"
         )}
       >
-        <div className="flex items-center justify-center h-[52px]">
+        <div className="flex items-center justify-between h-[52px] px-4">
+          {/* 좌측 여백 (벨 아이콘과 대칭) */}
+          <div className="w-9" />
+
+          {/* 중앙 로고 */}
           <Link
             href="/home"
             onClick={handleTap}
@@ -76,6 +93,20 @@ export function AppHeader() {
               WeWantPeace
             </span>
           </Link>
+
+          {/* 우측 벨 아이콘 */}
+          {isLoggedIn ? (
+            <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center">
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </Link>
+          ) : (
+            <div className="w-9" />
+          )}
         </div>
       </header>
 

@@ -642,7 +642,7 @@ export default function MapPage() {
                 lineHeight: "1.5",
               }}
             >
-              {lang === "ko" ? (<>더미 데이터 미리보기입니다.<br />실제 실시간 데이터는 프로 플랜에서 이용 가능해요.</>) : (<>This is sample data only.<br />Real-time data requires a Pro plan.</>)}
+              {lang === "ko" ? "더미 데이터 미리보기입니다. 실제 실시간 데이터는 프로 플랜에서 이용 가능해요." : "This is sample data only. Real-time data requires a Pro plan."}
             </span>
             <a
               href="/upgrade"

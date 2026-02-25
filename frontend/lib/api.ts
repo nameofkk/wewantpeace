@@ -235,6 +235,64 @@ export function useDeletePushToken() {
   });
 }
 
+// --- 알림 훅 ---
+export interface NotificationItem {
+  id: number;
+  type: string;       // "verified" | "spike"
+  cluster_id: string | null;
+  title: string;
+  body: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export function useNotifications(limit = 30, offset = 0) {
+  return useQuery({
+    queryKey: ["me", "notifications", limit, offset],
+    queryFn: () =>
+      apiFetch<NotificationItem[]>("/me/notifications", {
+        limit: String(limit),
+        offset: String(offset),
+      }),
+    retry: false,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+export function useUnreadCount(enabled = true) {
+  return useQuery({
+    queryKey: ["me", "notifications", "unread-count"],
+    queryFn: () => apiFetch<{ unread: number }>("/me/notifications/unread-count"),
+    enabled,
+    retry: false,
+    staleTime: 30 * 1000,
+    refetchInterval: enabled ? 60 * 1000 : false,
+  });
+}
+
+export function useMarkRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch(`/me/notifications/${id}/read`, undefined, { method: "PATCH" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me", "notifications"] });
+    },
+  });
+}
+
+export function useMarkAllRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch("/me/notifications/read-all", undefined, { method: "PATCH" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me", "notifications"] });
+    },
+  });
+}
+
 // --- 타입 ---
 export interface UserArea {
   id: number;

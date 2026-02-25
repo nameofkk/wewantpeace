@@ -417,6 +417,14 @@ export const translations = {
     chart_tooltip_score_unit: "점",
     chart_tooltip_percentile: "30일 백분위",
 
+    // 알림 페이지
+    notif_page_title: "알림",
+    notif_page_empty: "아직 알림이 없습니다",
+    notif_page_empty_sub: "이슈 발생 시 여기에 알림이 표시됩니다",
+    notif_mark_all_read: "모두 읽음",
+    notif_type_verified: "공식확인",
+    notif_type_spike: "속보",
+
     // upgrade
     upgrade_title: "플랜 선택",
     upgrade_subtitle: "세계정세를 더 깊이 파악하세요",
@@ -844,6 +852,14 @@ export const translations = {
     chart_no_data: "No history data available.",
     chart_tooltip_score_unit: " pts",
     chart_tooltip_percentile: "30d percentile",
+
+    // notifications page
+    notif_page_title: "Notifications",
+    notif_page_empty: "No notifications yet",
+    notif_page_empty_sub: "Notifications will appear here when issues are detected",
+    notif_mark_all_read: "Mark all read",
+    notif_type_verified: "Verified",
+    notif_type_spike: "Breaking",
 
     // upgrade
     upgrade_title: "Choose Your Plan",

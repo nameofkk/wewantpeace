@@ -5,6 +5,7 @@ from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.trending_keyword import TrendingKeyword
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
+from backend.app.models.notification import Notification
 
 __all__ = [
     "SourceChannel",
@@ -18,4 +19,5 @@ __all__ = [
     "UserArea",
     "UserPushToken",
     "UserPreference",
+    "Notification",
 ]

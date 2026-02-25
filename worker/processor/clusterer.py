@@ -140,18 +140,22 @@ def _cluster_key(event: "NormalizedEvent") -> str:
 async def assign_cluster(
     event: NormalizedEvent,
     db: AsyncSession,
-) -> IssueCluster | None:
+) -> tuple[IssueCluster | None, bool]:
     """
     NormalizedEvent를 60분 윈도우 내 같은 cluster_key의 IssueCluster에 할당.
     없으면 새 클러스터 생성.
 
-    severity < 20 또는 topic="unknown" + severity < 25이면 None 반환 (잡음 제거).
+    Returns:
+        (IssueCluster | None, just_verified: bool)
+        just_verified=True: 이번 업데이트로 is_verified가 False→True로 전환됨.
+
+    severity < 20 또는 topic="unknown" + severity < 25이면 (None, False) 반환 (잡음 제거).
     """
     # 잡음 필터: 연예·스포츠 등 낮은 severity 이벤트 제외
     if event.severity < 20:
-        return None
+        return None, False
     if event.topic == "unknown" and event.severity <= 25:
-        return None
+        return None, False
 
     geohash5 = event.geohash5 or "00000"
     key = _cluster_key(event)
@@ -235,4 +239,17 @@ async def assign_cluster(
         await db.flush()
 
     db.add(ClusterEvent(cluster_id=cluster.id, event_id=event.id))
-    return cluster
+
+    # is_verified 자동 판별: confidence >= 0.70 AND "A" 티어 소스 포함
+    just_verified = False
+    if not cluster.is_verified:
+        tiers = cluster.source_tiers or []
+        if cluster.confidence >= 0.70 and "A" in tiers:
+            cluster.is_verified = True
+            just_verified = True
+            logger.info(
+                "클러스터 자동 검증됨: %s (confidence=%.2f, tiers=%s)",
+                cluster.id, cluster.confidence, tiers,
+            )
+
+    return cluster, just_verified

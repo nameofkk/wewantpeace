@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, _PLAN_ORDER
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
+from backend.app.models.notification import Notification
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -364,6 +365,102 @@ async def delete_push_token(
             UserPushToken.user_id == current_user.id,
             UserPushToken.fcm_token == fcm_token,
         )
+    )
+    await db.flush()
+    return {"status": "ok"}
+
+
+# ── /me/notifications ────────────────────────────────────────────────────────
+
+class NotificationOut(BaseModel):
+    id: int
+    type: str
+    cluster_id: Optional[str]
+    title: str
+    body: str
+    is_read: bool
+    created_at: str
+
+
+def _notif_to_out(n: Notification) -> NotificationOut:
+    return NotificationOut(
+        id=n.id,
+        type=n.type,
+        cluster_id=str(n.cluster_id) if n.cluster_id else None,
+        title=n.title,
+        body=n.body,
+        is_read=n.is_read,
+        created_at=n.created_at.isoformat(),
+    )
+
+
+@router.get("/notifications", response_model=list[NotificationOut])
+async def list_notifications(
+    limit: int = 30,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+        .offset(offset)
+        .limit(min(limit, 100))
+    )
+    return [_notif_to_out(n) for n in result.scalars().all()]
+
+
+@router.get("/notifications/unread-count")
+async def unread_count(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(func.count())
+        .select_from(Notification)
+        .where(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False,
+        )
+    )
+    count = result.scalar() or 0
+    return {"unread": count}
+
+
+@router.patch("/notifications/{notif_id}/read")
+async def mark_read(
+    notif_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == notif_id,
+            Notification.user_id == current_user.id,
+        )
+    )
+    notif = result.scalar_one_or_none()
+    if not notif:
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    notif.is_read = True
+    await db.flush()
+    return {"status": "ok"}
+
+
+@router.patch("/notifications/read-all")
+async def mark_all_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import update
+    await db.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == current_user.id,
+            Notification.is_read == False,
+        )
+        .values(is_read=True)
     )
     await db.flush()
     return {"status": "ok"}

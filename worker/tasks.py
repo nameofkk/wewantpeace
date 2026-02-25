@@ -240,8 +240,9 @@ def process_raw_event(self, raw_event_id: str):
                 cluster_id = None
                 is_spike = False
 
+                just_verified = False
                 if not is_dup:
-                    cluster = await assign_cluster(ne, db)
+                    cluster, just_verified = await assign_cluster(ne, db)
                     if cluster is not None:
                         cluster_id = str(cluster.id)
 
@@ -267,6 +268,10 @@ def process_raw_event(self, raw_event_id: str):
         # 스파이크이면 알림 태스크 체이닝 (트랜잭션 밖에서)
         if is_spike and cluster_id:
             push_spike_alert.delay(cluster_id)
+
+        # 공식확인 전환 시 verified 알림 태스크 체이닝
+        if just_verified and cluster_id:
+            push_verified_alert.delay(cluster_id)
 
         return {
             "status": "ok",
@@ -377,7 +382,7 @@ def reprocess_orphans(self):
 
                 for ev in orphans:
                     try:
-                        cluster = await assign_cluster(ev, db)
+                        cluster, _ = await assign_cluster(ev, db)
                         if cluster:
                             reassigned += 1
                             # 스파이크 재평가
@@ -468,6 +473,17 @@ def push_spike_alert(self, cluster_id: str):
                     db=db,
                     redis=redis,
                 )
+
+                # 인앱 알림 저장
+                from worker.push.push_service import save_in_app_notifications
+                await save_in_app_notifications(
+                    cluster_id=cluster_id,
+                    cluster_title=cluster.title_ko or cluster.title,
+                    country_code=cluster.country_code,
+                    notif_type="spike",
+                    db=db,
+                )
+
                 logger.info("push_spike_alert 완료: %s", result)
                 return result
 
@@ -475,6 +491,63 @@ def push_spike_alert(self, cluster_id: str):
         return run_async(_run())
     except Exception as exc:
         logger.error("push_spike_alert 오류 [%s]: %s", cluster_id, exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.push_verified_alert",
+    queue="process",
+    bind=True,
+    max_retries=2,
+)
+def push_verified_alert(self, cluster_id: str):
+    """공식확인(verified) 전환 알림 발송."""
+
+    async def _run():
+        import uuid
+        from sqlalchemy import select
+        from backend.app.models.issue_cluster import IssueCluster
+        from worker.push.push_service import send_verified_alert, save_in_app_notifications
+        from backend.app.core.redis import get_redis
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                result = await db.execute(
+                    select(IssueCluster).where(IssueCluster.id == uuid.UUID(cluster_id))
+                )
+                cluster = result.scalar_one_or_none()
+                if not cluster:
+                    logger.warning("push_verified_alert: cluster 없음 %s", cluster_id)
+                    return {"status": "not_found"}
+
+                redis = get_redis()
+                result = await send_verified_alert(
+                    cluster_id=cluster_id,
+                    cluster_title=cluster.title_ko or cluster.title,
+                    country_code=cluster.country_code,
+                    severity=cluster.severity,
+                    kscore=cluster.kscore,
+                    cluster_topic=cluster.topic,
+                    db=db,
+                    redis=redis,
+                )
+
+                # 인앱 알림 저장
+                await save_in_app_notifications(
+                    cluster_id=cluster_id,
+                    cluster_title=cluster.title_ko or cluster.title,
+                    country_code=cluster.country_code,
+                    notif_type="verified",
+                    db=db,
+                )
+
+                logger.info("push_verified_alert 완료: %s", result)
+                return result
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("push_verified_alert 오류 [%s]: %s", cluster_id, exc)
         raise self.retry(exc=exc)
 
 
