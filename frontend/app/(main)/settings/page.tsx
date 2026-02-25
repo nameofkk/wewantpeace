@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken } from "@/lib/api";
-import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken } from "@/lib/fcm";
+import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
 import { ALL_COUNTRIES, getCountryName, getRegionName } from "@/lib/countries";
 import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -133,7 +133,7 @@ export default function SettingsPage() {
   }, [firebaseUser, areas, myCountries.length]);
 
   const [showPicker, setShowPicker] = useState(false);
-  const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied">("idle");
+  const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied" | "unsupported">("idle");
   const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태
 
   // 알림 설정 로컬 상태
@@ -272,15 +272,20 @@ export default function SettingsPage() {
   }
 
   async function handleEnableNotifications() {
-    setNotifStatus("loading");
-    const token = await requestAndGetFCMToken();
-    if (!token) {
-      // 권한이 "denied"인 경우와 단순 실패 구분
-      const perm = typeof window !== "undefined" ? Notification.permission : "default";
-      setNotifStatus(perm === "denied" ? "denied" : "idle");
+    // 인앱브라우저 등 푸시 미지원 환경 감지
+    if (!isPushSupported()) {
+      setNotifStatus("unsupported");
       return;
     }
+    setNotifStatus("loading");
     try {
+      const token = await requestAndGetFCMToken();
+      if (!token) {
+        const perm = typeof window !== "undefined" && "Notification" in window
+          ? Notification.permission : "default";
+        setNotifStatus(perm === "denied" ? "denied" : "idle");
+        return;
+      }
       await registerToken.mutateAsync({ fcm_token: token, platform: "web" });
       setNotifStatus("done");
     } catch {
@@ -622,6 +627,8 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {hasFCMToken
                       ? (lang === "ko" ? "이슈 발생 시 즉시 알림을 받습니다" : "You'll get instant alerts for new issues")
+                      : notifStatus === "unsupported"
+                      ? (lang === "ko" ? "이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome/Safari에서 열어주세요" : "Push not supported in this browser. Open in Chrome/Safari")
                       : notifStatus === "denied"
                       ? (lang === "ko" ? "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요" : "Blocked — allow in your browser settings")
                       : (lang === "ko" ? "중요 이슈 발생 시 즉시 알림 수신" : "Get instant alerts for critical events")
@@ -645,10 +652,10 @@ export default function SettingsPage() {
                 ) : (
                   <button
                     onClick={handleEnableNotifications}
-                    disabled={notifStatus === "loading" || notifStatus === "denied"}
+                    disabled={notifStatus === "loading" || notifStatus === "denied" || notifStatus === "unsupported"}
                     className={cn(
                       "shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                      notifStatus === "denied"
+                      (notifStatus === "denied" || notifStatus === "unsupported")
                         ? "border-border text-muted-foreground opacity-50 cursor-not-allowed"
                         : "border-primary/40 text-primary hover:bg-primary/10"
                     )}
