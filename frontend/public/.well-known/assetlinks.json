@@ -5,8 +5,7 @@
       "namespace": "android_app",
       "package_name": "com.wewantpeace.app",
       "sha256_cert_fingerprints": [
-        "TODO:INSERT_LOCAL_SIGNING_KEY_SHA256",
-        "TODO:INSERT_PLAY_APP_SIGNING_KEY_SHA256"
+        "19:87:BC:0A:9B:0C:23:5F:3C:A1:4F:D0:7E:F4:DE:96:0F:CE:18:70:A5:B8:61:1E:F8:45:25:62:43:F2:0B:32"
       ]
     }
   }

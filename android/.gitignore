@@ -1,0 +1,21 @@
+# Build outputs
+app/build/
+build/
+.gradle/
+
+# Node modules (bubblewrap CLI)
+node_modules/
+package-lock.json
+package.json
+
+# Bubblewrap cache
+.bubblewrap-cache/
+twa-output/
+
+# Signing key (NEVER commit)
+signing-key.jks
+*.keystore
+
+# Store icon (downloaded during build)
+store_icon.png
+manifest-checksum.txt
