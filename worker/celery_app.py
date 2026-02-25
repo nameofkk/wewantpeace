@@ -42,12 +42,12 @@ app.conf.beat_schedule = {
     },
     "calc-tension": {
         "task": "worker.tasks.calculate_tension",
-        "schedule": crontab(minute="*/15"),  # 15분마다
+        "schedule": crontab(minute="*/5"),  # 5분마다
         "options": {"queue": "process"},
     },
     "calc-trending": {
         "task": "worker.tasks.calculate_trending",
-        "schedule": crontab(minute="*/15"),  # 15분마다
+        "schedule": crontab(minute="*/5"),  # 5분마다
         "options": {"queue": "process"},
     },
     "reprocess-orphans": {
