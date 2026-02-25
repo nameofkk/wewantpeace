@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { LogIn, Globe } from "lucide-react";
+import { useState, useEffect } from "react";
+import { LogIn, Globe, Download } from "lucide-react";
 import { useAppStore } from "@/lib/store";
+import { isInAppBrowser, isStandalone } from "@/lib/browser-detect";
 
 const FEATURES = [
   {
@@ -23,9 +25,29 @@ const FEATURES = [
   },
 ];
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { lang } = useAppStore();
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [inApp, setInApp] = useState(false);
+  const [standalone, setStandalone] = useState(false);
+
+  useEffect(() => {
+    setInApp(isInAppBrowser());
+    setStandalone(isStandalone());
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
 
   function handleLogin() {
     localStorage.setItem("onboarding_done", "true");
@@ -35,6 +57,20 @@ export default function OnboardingPage() {
   function handleGuest() {
     localStorage.setItem("onboarding_done", "true");
     router.push("/home");
+  }
+
+  async function handleInstallApp() {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+      setInstallPrompt(null);
+    }
+  }
+
+  function handleOpenExternal() {
+    // 인앱브라우저에서 외부 브라우저로 열기
+    const url = window.location.href;
+    window.open(url, "_system");
   }
 
   return (
@@ -125,6 +161,20 @@ export default function OnboardingPage() {
             {lang === "ko" ? "게스트로 시작" : "Continue as Guest"}
           </button>
         </div>
+
+        {/* 앱 설치 버튼 — standalone이면 숨김 */}
+        {!standalone && (installPrompt || inApp) && (
+          <button
+            onClick={installPrompt ? handleInstallApp : handleOpenExternal}
+            className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+            style={{ animation: "fadeSlideUp 0.5s ease-out 0.5s both" }}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {installPrompt
+              ? (lang === "ko" ? "앱으로 설치하면 실시간 알림 가능" : "Install app for real-time alerts")
+              : (lang === "ko" ? "브라우저에서 열기" : "Open in browser")}
+          </button>
+        )}
       </div>
 
       <style jsx global>{`

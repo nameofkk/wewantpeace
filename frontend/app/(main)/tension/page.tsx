@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
+import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
@@ -616,9 +616,9 @@ export default function TensionPage() {
           {t(lang, "tension_subtitle")}
         </p>
 
-        {/* 관심지역 / 전체 토글 탭 */}
+        {/* 글로벌 / 관심지역 토글 탭 (홈과 동일 구조) */}
         <div className="flex gap-0">
-          {(["mine", "all"] as const).map((mode) => (
+          {(["all", "mine"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
@@ -629,10 +629,10 @@ export default function TensionPage() {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              {mode === "mine" ? (
-                <><MapPin className="h-3.5 w-3.5" />{t(lang, "tension_tab_mine")}</>
+              {mode === "all" ? (
+                <><Globe className="h-3.5 w-3.5" />{t(lang, "tension_tab_all")}</>
               ) : (
-                <><Activity className="h-3.5 w-3.5" />{t(lang, "tension_tab_all")}</>
+                <><MapPin className="h-3.5 w-3.5" />{t(lang, "tension_tab_mine")}</>
               )}
             </button>
           ))}

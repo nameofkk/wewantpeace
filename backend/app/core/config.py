@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_origins(cls, v):
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("["):
+                import json
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [item.strip() for item in parsed]
+                except (json.JSONDecodeError, TypeError):
+                    pass
             return [item.strip() for item in v.split(",")]
         return v
 

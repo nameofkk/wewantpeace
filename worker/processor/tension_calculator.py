@@ -331,6 +331,33 @@ async def calculate_country_tension(
     percentile = await _get_percentile_30d(country_code, raw_score, db)
     level = _tension_level(percentile, raw_score)
 
+    # ── 레벨 변화 감지 → Redis 알림 기록 ──
+    prev_result = await db.execute(
+        select(TensionIndex.tension_level)
+        .where(TensionIndex.country_code == country_code)
+        .order_by(TensionIndex.time.desc())
+        .limit(1)
+    )
+    prev_row = prev_result.first()
+    prev_level = prev_row[0] if prev_row else None
+
+    if prev_level is not None and level > prev_level:
+        try:
+            from backend.app.core.redis import get_redis
+            redis = get_redis()
+            alert_value = f"{prev_level}:{level}:{raw_score}:{now.isoformat()}"
+            await redis.set(
+                f"tension:alert:{country_code}",
+                alert_value,
+                ex=300,  # 5분 TTL
+            )
+            logger.info(
+                "긴장도 레벨 상승 알림: %s %d→%d (%.1f점)",
+                country_code, prev_level, level, raw_score,
+            )
+        except Exception as e:
+            logger.warning("긴장도 알림 Redis 저장 실패: %s", e)
+
     # TOP5 원인 이슈
     top5 = sorted(current_clusters, key=lambda c: c.severity * c.confidence, reverse=True)[:5]
 

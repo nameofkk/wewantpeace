@@ -191,8 +191,8 @@ export const translations = {
     tension_rank_below: "평소보다 낮음",
 
     // 긴장도 페이지 추가
-    tension_tab_mine: "관심지역만",
-    tension_tab_all: "전체 지역",
+    tension_tab_mine: "관심지역",
+    tension_tab_all: "글로벌",
     tension_no_monitored: "관심지역이 없습니다",
     tension_no_monitored_sub: "설정에서 국가를 추가하면 해당 국가의 긴장도를 표시합니다",
     tension_go_settings: "관심지역 설정하기",
@@ -671,7 +671,7 @@ export const translations = {
 
     // tension page extra
     tension_tab_mine: "My Regions",
-    tension_tab_all: "All Regions",
+    tension_tab_all: "Global",
     tension_no_monitored: "No monitored regions",
     tension_no_monitored_sub: "Add countries in Settings to track their tension levels",
     tension_go_settings: "Set Up Regions",

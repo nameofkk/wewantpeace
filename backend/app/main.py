@@ -138,6 +138,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+logger.info("CORS allowed_origins: %s", settings.allowed_origins)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,

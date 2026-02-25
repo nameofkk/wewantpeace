@@ -1,6 +1,6 @@
 {
   "packageId": "com.wewantpeace.app",
-  "host": "wewantpeace.fly.dev",
+  "host": "www.wewantpeace.live",
   "name": "WeWantPeace",
   "launcherName": "WeWantPeace",
   "display": "standalone",
@@ -13,9 +13,9 @@
   "backgroundColor": "#1a1a2e",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://wewantpeace.fly.dev/icons/icon-512.png",
-  "maskableIconUrl": "https://wewantpeace.fly.dev/icons/icon-512.png",
-  "monochromeIconUrl": "https://wewantpeace.fly.dev/icons/icon-96.png",
+  "iconUrl": "https://www.wewantpeace.live/icons/icon-512.png",
+  "maskableIconUrl": "https://www.wewantpeace.live/icons/icon-512.png",
+  "monochromeIconUrl": "https://www.wewantpeace.live/icons/icon-96.png",
   "appVersion": "1",
   "appVersionName": "1.0.0",
   "shortcuts": [
@@ -33,7 +33,7 @@
     }
   ],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://wewantpeace.fly.dev/manifest.json",
+  "webManifestUrl": "https://www.wewantpeace.live/manifest.json",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": { "enabled": false },
@@ -43,7 +43,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://wewantpeace.fly.dev/",
+  "fullScopeUrl": "https://www.wewantpeace.live/",
   "minSdkVersion": 19,
   "rotationEnabled": false,
   "signingKey": {

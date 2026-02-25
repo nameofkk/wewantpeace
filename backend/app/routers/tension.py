@@ -1,6 +1,7 @@
 """
 GET /tension/mine              — 관심지역 긴장도 + 원인 TOP5
 GET /tension/country/{code}    — 국가별 최신 긴장도 + 히스토리
+GET /tension/peek              — 긴장도 레벨 변화 인앱 알림용 폴링
 """
 from __future__ import annotations
 
@@ -52,6 +53,14 @@ class TensionHistoryPoint(BaseModel):
     raw_score: float
     tension_level: int
     percentile_30d: float
+
+
+class TensionPeekItem(BaseModel):
+    country_code: str
+    tension_level: int
+    prev_level: int
+    raw_score: float
+    change_type: str  # "level_up"
 
 
 
@@ -191,6 +200,71 @@ DEFAULT_COUNTRIES = [
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
+
+@router.get("/peek", response_model=list[TensionPeekItem])
+async def peek_tension(
+    since: Optional[str] = Query(None, description="ISO timestamp — 이 시각 이후 알림만 반환"),
+):
+    """
+    긴장도 레벨 변화 인앱 알림용 폴링.
+    Redis에서 tension:alert:* 키를 스캔하여 since 이후 레벨 상승 건만 반환.
+    최대 3건, 레벨 상승폭 큰 순 정렬.
+    """
+    import re as _re
+    from backend.app.core.redis import get_redis
+
+    since_dt: Optional[datetime] = None
+    if since:
+        try:
+            s = _re.sub(r'\.\d+', '', since.replace("Z", "+00:00"))
+            since_dt = datetime.fromisoformat(s)
+        except ValueError:
+            since_dt = datetime.now(timezone.utc) - timedelta(minutes=5)
+
+    redis = get_redis()
+    items: list[TensionPeekItem] = []
+
+    cursor = "0"
+    while True:
+        cursor, keys = await redis.scan(cursor=cursor, match="tension:alert:*", count=100)
+        for key in keys:
+            val = await redis.get(key)
+            if not val:
+                continue
+            # 형식: "{prev_level}:{new_level}:{raw_score}:{iso_timestamp}"
+            parts = val.split(":", 3)
+            if len(parts) < 4:
+                continue
+            prev_level = int(parts[0])
+            new_level = int(parts[1])
+            raw_score = float(parts[2])
+            alert_time_str = parts[3]
+
+            # since 필터
+            if since_dt:
+                try:
+                    alert_time = datetime.fromisoformat(alert_time_str)
+                    if alert_time <= since_dt:
+                        continue
+                except ValueError:
+                    continue
+
+            country_code = key.split(":")[-1]
+            items.append(TensionPeekItem(
+                country_code=country_code,
+                tension_level=new_level,
+                prev_level=prev_level,
+                raw_score=round(raw_score, 1),
+                change_type="level_up",
+            ))
+
+        if cursor == "0" or cursor == 0:
+            break
+
+    # 레벨 상승폭 큰 순 정렬, 최대 3건
+    items.sort(key=lambda x: x.tension_level - x.prev_level, reverse=True)
+    return items[:3]
+
 
 @router.get("/mine", response_model=list[TensionOut])
 async def tension_mine(

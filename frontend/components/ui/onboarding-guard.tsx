@@ -17,6 +17,15 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     const isOnboardingPage = window.location.pathname === "/onboarding";
     const isAdminPage = window.location.pathname.startsWith("/admin");
 
+    // 로그인 상태면 온보딩 자동 완료 처리 (이중 리다이렉트 방지)
+    const isLoggedIn =
+      !!localStorage.getItem("dev_uid") || !!localStorage.getItem("firebase_token");
+    if (!done && isLoggedIn) {
+      localStorage.setItem("onboarding_done", "true");
+      setChecked(true);
+      return;
+    }
+
     if (!done && !isOnboardingPage && !isAdminPage) {
       router.replace("/onboarding");
     } else {

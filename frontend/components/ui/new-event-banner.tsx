@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X, ExternalLink } from "lucide-react";
+import { Bell, X, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { cn, TOPIC_LABELS } from "@/lib/utils";
+import { COUNTRY_MAP, getFlag } from "@/lib/countries";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const POLL_INTERVAL = 60_000;
@@ -18,6 +19,19 @@ interface PeekItem {
   cluster_ids: string[];
   is_spike: boolean;
 }
+
+interface TensionPeekItem {
+  country_code: string;
+  tension_level: number;
+  prev_level: number;
+  raw_score: number;
+  change_type: string;
+}
+
+// 배너 표시 우선순위 타입
+type BannerData =
+  | { type: "tension"; data: TensionPeekItem }
+  | { type: "event"; data: PeekItem };
 
 const TOPIC_ACCENT: Record<string, string> = {
   terror:    "bg-red-500",
@@ -47,6 +61,27 @@ const TOPIC_DOT: Record<string, string> = {
   unknown:   "bg-slate-400",
 };
 
+const TENSION_LEVEL_LABELS: Record<number, string> = {
+  0: "안정",
+  1: "주의",
+  2: "경계",
+  3: "위기",
+};
+
+const TENSION_ACCENT: Record<number, string> = {
+  0: "bg-emerald-500",
+  1: "bg-yellow-500",
+  2: "bg-orange-500",
+  3: "bg-red-500",
+};
+
+const TENSION_DOT: Record<number, string> = {
+  0: "bg-emerald-400",
+  1: "bg-yellow-400",
+  2: "bg-orange-400",
+  3: "bg-red-400",
+};
+
 // cluster_id 기반 중복 추적 (row id가 매번 바뀌는 문제 방지)
 function getSeenClusters(): Set<string> {
   try {
@@ -65,18 +100,40 @@ function markSeenCluster(clusterId: string) {
   } catch {}
 }
 
+// 긴장도 배너 중복 방지
+function getSeenTensions(): Set<string> {
+  try {
+    const raw = sessionStorage.getItem("banner_seen_tensions");
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function markSeenTension(key: string) {
+  try {
+    const seen = getSeenTensions();
+    seen.add(key);
+    sessionStorage.setItem("banner_seen_tensions", JSON.stringify([...seen].slice(-50)));
+  } catch {}
+}
+
 export function NewEventBanner() {
-  const [item, setItem] = useState<PeekItem | null>(null);
+  const [banner, setBanner] = useState<BannerData | null>(null);
   const [visible, setVisible] = useState(false);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const dismiss = useCallback((target?: PeekItem | null) => {
-    const t = target ?? item;
-    const cid = t?.cluster_ids?.[0];
-    if (cid) markSeenCluster(cid);
+  const dismiss = useCallback(() => {
+    if (banner?.type === "event") {
+      const cid = banner.data.cluster_ids?.[0];
+      if (cid) markSeenCluster(cid);
+    } else if (banner?.type === "tension") {
+      const key = `${banner.data.country_code}:${banner.data.prev_level}:${banner.data.tension_level}`;
+      markSeenTension(key);
+    }
     setVisible(false);
     if (dismissTimer.current) clearTimeout(dismissTimer.current);
-  }, [item]);
+  }, [banner]);
 
   const poll = useCallback(async () => {
     try {
@@ -85,6 +142,27 @@ export function NewEventBanner() {
         new Date(Date.now() - 3 * 60_000).toISOString();
       sessionStorage.setItem("banner_last_peek", new Date().toISOString());
 
+      // 긴장도 peek 먼저 체크 (우선순위 높음)
+      try {
+        const tensionRes = await fetch(
+          `${API_BASE}/tension/peek?since=${encodeURIComponent(since)}`
+        );
+        if (tensionRes.ok) {
+          const tensionData: TensionPeekItem[] = await tensionRes.json();
+          const seenTensions = getSeenTensions();
+          const newTension = tensionData.find((t) => {
+            const key = `${t.country_code}:${t.prev_level}:${t.tension_level}`;
+            return !seenTensions.has(key);
+          });
+          if (newTension) {
+            setBanner({ type: "tension", data: newTension });
+            setVisible(true);
+            return; // 긴장도 배너 우선 표시
+          }
+        }
+      } catch {}
+
+      // 이슈 배너
       const res = await fetch(
         `${API_BASE}/trending/peek?min_kscore=1&since=${encodeURIComponent(since)}`
       );
@@ -92,10 +170,9 @@ export function NewEventBanner() {
 
       const data: PeekItem[] = await res.json();
       const seen = getSeenClusters();
-      // cluster_id 기반 중복 체크 (row id는 워커 실행마다 바뀌므로 신뢰 불가)
       const newItem = data.find((d) => d.cluster_ids?.[0] && !seen.has(d.cluster_ids[0]));
       if (newItem) {
-        setItem(newItem);
+        setBanner({ type: "event", data: newItem });
         setVisible(true);
       }
     } catch {}
@@ -109,11 +186,87 @@ export function NewEventBanner() {
   }, [poll]);
 
   useEffect(() => {
-    if (!visible || !item) return;
-    dismissTimer.current = setTimeout(() => dismiss(item), AUTO_DISMISS_MS);
+    if (!visible || !banner) return;
+    dismissTimer.current = setTimeout(dismiss, AUTO_DISMISS_MS);
     return () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); };
-  }, [visible, item, dismiss]);
+  }, [visible, banner, dismiss]);
 
+  // 긴장도 배너 렌더링
+  if (banner?.type === "tension") {
+    const t = banner.data;
+    const accent = TENSION_ACCENT[t.tension_level] ?? "bg-slate-500";
+    const dot = TENSION_DOT[t.tension_level] ?? "bg-slate-400";
+    const countryName = COUNTRY_MAP[t.country_code]?.name ?? t.country_code;
+    const flag = getFlag(t.country_code);
+    const prevLabel = TENSION_LEVEL_LABELS[t.prev_level] ?? "?";
+    const newLabel = TENSION_LEVEL_LABELS[t.tension_level] ?? "?";
+
+    return (
+      <div
+        className={cn(
+          "fixed top-0 left-0 right-0 z-[200] transition-transform duration-300 ease-out",
+          visible ? "translate-y-0" : "-translate-y-full"
+        )}
+        aria-live="polite"
+        role="alert"
+      >
+        <div className="relative flex items-stretch bg-card/95 backdrop-blur-md border-b border-border shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+          <div className={cn("w-1 shrink-0 rounded-r-full my-2", accent)} />
+
+          <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0 max-w-2xl mx-auto">
+            <div className="shrink-0 relative">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className={cn("absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full", dot)} />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  긴장도 상승
+                </span>
+                <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
+                  {t.raw_score.toFixed(1)}점
+                </span>
+              </div>
+              <p className="text-sm font-medium text-foreground truncate">
+                {flag} {countryName} {prevLabel}→{newLabel} ({t.raw_score.toFixed(1)}점)
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href="/tension"
+                onClick={dismiss}
+                className="flex items-center gap-1 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors"
+              >
+                보기
+                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+              </Link>
+              <button
+                onClick={dismiss}
+                className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                aria-label="닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {visible && (
+          <div className="h-[2px] bg-border">
+            <div
+              className={cn("h-full origin-left", accent, "opacity-60")}
+              style={{ animation: `shrink-x ${AUTO_DISMISS_MS}ms linear forwards` }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 이슈 배너 렌더링 (기존)
+  const item = banner?.type === "event" ? banner.data : null;
   const clusterId = item?.cluster_ids[0];
   const topic = item?.topic ?? "unknown";
   const topicLabel = TOPIC_LABELS[topic] ?? topic;
@@ -168,7 +321,7 @@ export function NewEventBanner() {
             {clusterId && (
               <Link
                 href={`/issues/${clusterId}`}
-                onClick={() => dismiss(item)}
+                onClick={dismiss}
                 className="flex items-center gap-1 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors"
               >
                 보기
@@ -176,7 +329,7 @@ export function NewEventBanner() {
               </Link>
             )}
             <button
-              onClick={() => dismiss(item)}
+              onClick={dismiss}
               className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               aria-label="닫기"
             >

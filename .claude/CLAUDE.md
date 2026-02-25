@@ -14,8 +14,9 @@ git push
 - 커밋 메시지: 한국어 OK, 작업 내용 한 줄 요약
 
 ## 배포 정보
+- Domain: `https://www.wewantpeace.live`
 - Backend: `https://backend-production-3af7.up.railway.app`
-- Frontend: `https://frontend-production-f0dd.up.railway.app`
+- Frontend: `https://frontend-production-f0dd.up.railway.app` (커스텀 도메인: `www.wewantpeace.live`)
 - Railway project: `proud-purpose` (ID: `8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed`)
 - DB: Supabase `smxitufpgfuzepldglfo` (ap-northeast-2)
 
