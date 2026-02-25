@@ -59,9 +59,12 @@ async def _startup_tension_calculation():
     FastAPI 프로세스 안에서 실행되므로 이벤트 루프 문제가 없다.
     """
     import asyncio
-    await asyncio.sleep(5)  # DB 연결 안정화 대기
+    import traceback
+    await asyncio.sleep(3)  # DB 연결 안정화 대기
 
     from backend.app.core.database import AsyncSessionLocal
+
+    logger.info("startup_tension_calculation 시작...")
     try:
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -69,8 +72,9 @@ async def _startup_tension_calculation():
                 results = await calculate_all_tensions(db)
                 logger.info("startup_tension_calculation 완료: %d개국", len(results))
     except Exception as e:
-        logger.error("startup_tension_calculation 실패: %s", e)
+        logger.error("startup_tension_calculation 실패: %s\n%s", e, traceback.format_exc())
 
+    logger.info("startup_trending_calculation 시작...")
     try:
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -78,7 +82,7 @@ async def _startup_tension_calculation():
                 results = await calculate_global_trending(db)
                 logger.info("startup_trending_calculation 완료: %d개", len(results))
     except Exception as e:
-        logger.error("startup_trending_calculation 실패: %s", e)
+        logger.error("startup_trending_calculation 실패: %s\n%s", e, traceback.format_exc())
 
 
 @asynccontextmanager

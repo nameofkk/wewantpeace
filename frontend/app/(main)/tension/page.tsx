@@ -704,6 +704,18 @@ export default function TensionPage() {
               <button onClick={() => refetch()} className="mt-3 text-xs text-primary hover:underline">
                 {t(lang, "tension_retry")}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    await fetch(`${API}/tension/recalculate`, { method: "POST" });
+                    setTimeout(() => refetch(), 1500);
+                  } catch {}
+                }}
+                className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                {t(lang, "tension_recalc")}
+              </button>
             </div>
           )}
 
@@ -711,7 +723,22 @@ export default function TensionPage() {
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Radio className="h-10 w-10 text-muted-foreground mb-3 animate-pulse" />
               <p className="text-sm font-medium">{t(lang, "tension_no_data_empty")}</p>
-              <p className="text-sm text-muted-foreground">{t(lang, "tension_no_data_sub")}</p>
+              <p className="text-sm text-muted-foreground mb-4">{t(lang, "tension_no_data_sub")}</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    const res = await fetch(`${API}/tension/recalculate`, { method: "POST" });
+                    if (res.ok) {
+                      setTimeout(() => refetch(), 1000);
+                    }
+                  } catch {}
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t(lang, "tension_recalc")}
+              </button>
             </div>
           )}
 

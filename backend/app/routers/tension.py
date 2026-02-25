@@ -241,3 +241,24 @@ async def tension_history(
         )
         for r in rows
     ]
+
+
+@router.post("/recalculate")
+async def tension_recalculate(
+    db: AsyncSession = Depends(get_db),
+):
+    """긴장도 즉시 재계산 (tension_index 비어있을 때 수동 트리거용)."""
+    import logging
+    _logger = logging.getLogger(__name__)
+
+    from backend.app.core.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as calc_db:
+            async with calc_db.begin():
+                from worker.processor.tension_calculator import calculate_all_tensions
+                results = await calculate_all_tensions(calc_db)
+                _logger.info("tension_recalculate 완료: %d개국", len(results))
+                return {"status": "ok", "countries": len(results)}
+    except Exception as e:
+        _logger.error("tension_recalculate 실패: %s", e)
+        raise HTTPException(500, detail=str(e))

@@ -198,6 +198,9 @@ export const translations = {
     tension_go_settings: "관심지역 설정하기",
     tension_no_data_empty: "아직 긴장도 데이터가 없습니다.",
     tension_no_data_sub: "이벤트가 수집되면 자동으로 계산됩니다.",
+    tension_recalc: "수동 계산",
+    tension_recalc_done: "계산 완료! 새로고침합니다.",
+    tension_recalc_fail: "계산 실패. 잠시 후 다시 시도해주세요.",
     tension_load_error: "긴장도 데이터를 불러올 수 없습니다.",
     tension_retry: "다시 시도",
 
@@ -597,6 +600,9 @@ export const translations = {
     tension_go_settings: "Set Up Regions",
     tension_no_data_empty: "No tension data yet.",
     tension_no_data_sub: "Data will appear as events are collected.",
+    tension_recalc: "Calculate Now",
+    tension_recalc_done: "Done! Refreshing...",
+    tension_recalc_fail: "Failed. Please try again later.",
     tension_load_error: "Failed to load tension data.",
     tension_retry: "Retry",
 
