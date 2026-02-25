@@ -311,14 +311,21 @@ async def peek_trending(
 
     result = await db.execute(
         sa_text("""
-            SELECT DISTINCT ON (normalized_kw)
-                id, keyword, keyword_ko, kscore, topic, country_codes,
-                cluster_ids, scope, calculated_at, event_count, severity, is_spike
-            FROM trending_keywords
-            WHERE scope = 'global'
-              AND kscore >= :min_kscore
-              AND calculated_at > :since
-            ORDER BY normalized_kw, kscore DESC
+            SELECT DISTINCT ON (t.normalized_kw)
+                t.id, t.keyword, t.keyword_ko, t.kscore, t.topic, t.country_codes,
+                t.cluster_ids, t.scope, t.calculated_at, t.event_count, t.severity, t.is_spike
+            FROM trending_keywords t
+            WHERE t.scope = 'global'
+              AND t.kscore >= :min_kscore
+              AND t.calculated_at > :since
+              AND NOT EXISTS (
+                  SELECT 1 FROM trending_keywords prev
+                  WHERE prev.normalized_kw = t.normalized_kw
+                    AND prev.scope = 'global'
+                    AND prev.calculated_at <= :since
+                    AND prev.calculated_at > :since - interval '48 hours'
+              )
+            ORDER BY t.normalized_kw, t.kscore DESC
         """),
         {"min_kscore": min_kscore, "since": since_dt},
     )
