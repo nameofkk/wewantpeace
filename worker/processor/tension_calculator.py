@@ -44,6 +44,13 @@ logger = logging.getLogger(__name__)
 
 # 긴장도 인접 관계 (같은 분쟁 지역 내 spillover)
 NEIGHBOR_MAP: dict[str, list[str]] = {
+    # 주요국
+    "US": ["MX", "CU", "CO"],
+    "GB": ["FR", "DE"],
+    "FR": ["DE", "GB", "DZ", "ML"],
+    "DE": ["FR", "GB"],
+    "JP": ["KR", "CN", "KP", "TW"],
+    "AU": ["ID", "PH"],
     # 유럽·코카서스
     "UA": ["RU", "BY", "MD"],
     "RU": ["UA", "BY", "GE", "AZ", "KZ"],
@@ -362,6 +369,8 @@ async def calculate_country_tension(
 
 # 모니터링 대상 국가 목록 (프론트엔드 ALL_MONITORED_COUNTRIES와 동기화)
 MONITORED_COUNTRIES = [
+    # 주요국
+    "US", "GB", "FR", "DE", "JP", "AU",
     # 유럽·코카서스
     "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
     # 중동

@@ -111,6 +111,12 @@ export const ALL_COUNTRIES: CountryInfo[] = [
 
   // ── 북미 ──────────────────────────────────────────────────────
   { code: "US", name: "미국",            flag: "🇺🇸", region: "북미" },
+
+  // ── 서유럽·오세아니아 (주요국) ────────────────────────────────
+  { code: "GB", name: "영국",            flag: "🇬🇧", region: "유럽" },
+  { code: "FR", name: "프랑스",          flag: "🇫🇷", region: "유럽" },
+  { code: "DE", name: "독일",            flag: "🇩🇪", region: "유럽" },
+  { code: "AU", name: "호주",            flag: "🇦🇺", region: "오세아니아" },
 ];
 
 export const COUNTRY_MAP = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c]));
@@ -118,7 +124,7 @@ export const COUNTRY_MAP = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, 
 const REGION_EN: Record<string, string> = {
   "유럽": "Europe", "중동": "Middle East", "동아시아": "East Asia",
   "동남아": "Southeast Asia", "남아시아": "South Asia", "중앙아시아": "Central Asia",
-  "아프리카": "Africa", "남미": "South America", "중미": "Central America", "북미": "North America",
+  "아프리카": "Africa", "남미": "South America", "중미": "Central America", "북미": "North America", "오세아니아": "Oceania",
 };
 
 /** 언어에 맞는 국가명 반환. 영어는 Intl.DisplayNames API 사용 */
@@ -147,6 +153,8 @@ export function getFlag(code: string): string {
 
 /** 긴장도 계산 대상 전체 국가 (분쟁·갈등·지정학적 위험 기준) */
 export const ALL_MONITORED_COUNTRIES = [
+  // 주요국
+  "US", "GB", "FR", "DE", "JP", "AU",
   // 유럽·코카서스
   "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
   // 중동

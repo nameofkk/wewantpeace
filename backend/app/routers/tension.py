@@ -170,6 +170,8 @@ def _tension_to_out(t: TensionIndex, top5: list[ClusterSummary]) -> TensionOut:
 # ── 기본 모니터링 국가 ─────────────────────────────────────────────────────────
 
 DEFAULT_COUNTRIES = [
+    # 주요국
+    "US", "GB", "FR", "DE", "JP", "AU",
     # 유럽·코카서스
     "UA", "RU", "BY", "MD", "RS", "GE", "AM", "AZ",
     # 중동
