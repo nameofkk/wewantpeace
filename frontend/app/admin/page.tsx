@@ -15,19 +15,6 @@ import Link from "next/link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-async function adminFetch<T>(path: string): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("firebase_token") : null;
-  const devUid =
-    typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (devUid) headers["X-Dev-UID"] = devUid;
-  else if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${API_BASE}${path}`, { headers });
-  if (!res.ok) throw new Error(`Admin API error: ${res.status}`);
-  return res.json();
-}
-
 interface AdminStats {
   total_users: number;
   new_today: number;
@@ -47,15 +34,27 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const { lang } = useAppStore();
 
+  const fetchWithToken = async <T,>(path: string): Promise<T> => {
+    if (!user) throw new Error("Unauthorized");
+    const token = await user.getIdToken();
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Admin API error: ${res.status}`);
+    return res.json();
+  };
+
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["admin-stats"],
-    queryFn: () => adminFetch("/admin/stats"),
+    queryFn: () => fetchWithToken("/admin/stats"),
+    enabled: !!user,
     refetchInterval: 60_000,
   });
 
   const { data: dailyCounts } = useQuery<{ date: string; count: number }[]>({
     queryKey: ["admin-events-daily"],
-    queryFn: () => adminFetch("/admin/events/daily-counts?days=7"),
+    queryFn: () => fetchWithToken("/admin/events/daily-counts?days=7"),
+    enabled: !!user,
     refetchInterval: 5 * 60_000,
   });
 
@@ -63,7 +62,8 @@ export default function AdminDashboard() {
     { country_code: string; raw_score: number; tension_level: number }[]
   >({
     queryKey: ["admin-tension-all"],
-    queryFn: () => adminFetch("/admin/tension"),
+    queryFn: () => fetchWithToken("/admin/tension"),
+    enabled: !!user,
     refetchInterval: 5 * 60_000,
   });
 
