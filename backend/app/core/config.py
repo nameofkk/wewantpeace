@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_api_id: int = 0
     telegram_api_hash: str = ""
+    telegram_session: str = ""
 
     # Firebase / FCM
     fcm_project_id: str = ""

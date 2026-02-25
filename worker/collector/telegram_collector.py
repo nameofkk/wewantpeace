@@ -40,22 +40,24 @@ class TelegramCollector:
     def __init__(self):
         self.api_id = settings.telegram_api_id
         self.api_hash = settings.telegram_api_hash
-        self.bot_token = settings.telegram_bot_token
+        self.session_str = settings.telegram_session
         self._client: TelegramClient | None = None
 
     async def _get_client(self) -> TelegramClient:
-        """StringSession + bot_token으로 Telethon 클라이언트 연결."""
+        """StringSession(유저 계정)으로 Telethon 클라이언트 연결."""
         if self._client is not None and self._client.is_connected():
             return self._client
 
         self._client = TelegramClient(
-            StringSession(""),
+            StringSession(self.session_str),
             self.api_id,
             self.api_hash,
             connection_retries=3,
             retry_delay=1,
         )
-        await self._client.start(bot_token=self.bot_token)
+        await self._client.connect()
+        if not await self._client.is_user_authorized():
+            raise RuntimeError("Telegram 세션이 유효하지 않습니다. TELEGRAM_SESSION을 재생성하세요.")
         return self._client
 
     async def _disconnect(self):
@@ -207,19 +209,19 @@ class TelegramCollector:
 
     async def collect_all(self, db: AsyncSession, redis=None) -> list[CollectResult]:
         """
-        1. 설정 검증 (api_id, api_hash, bot_token)
+        1. 설정 검증 (api_id, api_hash, session)
         2. 활성 telegram 채널 조회
         3. Telethon 클라이언트 연결
         4. 채널별 순차 수집
         5. finally: disconnect
         """
         # 설정 검증
-        if not self.api_id or not self.api_hash or not self.bot_token:
+        if not self.api_id or not self.api_hash or not self.session_str:
             logger.warning(
-                "Telegram MTProto 설정 미완료 (api_id=%s, api_hash=%s, bot_token=%s) - 수집 건너뜀",
+                "Telegram MTProto 설정 미완료 (api_id=%s, api_hash=%s, session=%s) - 수집 건너뜀",
                 bool(self.api_id),
                 bool(self.api_hash),
-                bool(self.bot_token),
+                bool(self.session_str),
             )
             return []
 
