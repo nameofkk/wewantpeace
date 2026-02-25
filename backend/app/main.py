@@ -26,28 +26,42 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 
 async def _bootstrap_admin():
-    """ADMIN_EMAILS 환경변수에 지정된 이메일의 role을 admin으로 승격."""
-    admin_emails_str = os.environ.get("ADMIN_EMAILS", "")
-    if not admin_emails_str:
-        return
-    emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
-    if not emails:
-        return
+    """어드민 자동 부트스트랩.
 
+    1) ADMIN_EMAILS 환경변수가 있으면 해당 이메일을 admin 승격
+    2) DB에 admin이 한 명도 없으면 가장 먼저 가입한 유저를 admin 승격
+    """
     from backend.app.core.database import AsyncSessionLocal
-    from sqlalchemy import select, update
+    from sqlalchemy import select, func
     from backend.app.models.user import User
 
     try:
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                result = await db.execute(
-                    select(User).where(User.email.in_(emails), User.role != "admin")
-                )
-                users = result.scalars().all()
-                for u in users:
-                    u.role = "admin"
-                    logger.info("admin 승격: %s", u.email)
+                # 1) ADMIN_EMAILS 환경변수 처리
+                admin_emails_str = os.environ.get("ADMIN_EMAILS", "")
+                if admin_emails_str:
+                    emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+                    if emails:
+                        result = await db.execute(
+                            select(User).where(User.email.in_(emails), User.role != "admin")
+                        )
+                        for u in result.scalars().all():
+                            u.role = "admin"
+                            logger.info("admin 승격 (env): %s", u.email)
+
+                # 2) admin이 아무도 없으면 첫 번째 유저 자동 승격
+                admin_count = (await db.execute(
+                    select(func.count()).select_from(User).where(User.role == "admin")
+                )).scalar() or 0
+
+                if admin_count == 0:
+                    first_user = (await db.execute(
+                        select(User).where(User.status == "active").order_by(User.created_at.asc()).limit(1)
+                    )).scalar_one_or_none()
+                    if first_user:
+                        first_user.role = "admin"
+                        logger.info("admin 자동 부트스트랩: %s (첫 번째 유저)", first_user.email)
     except Exception as e:
         logger.error("bootstrap_admin 실패: %s", e)
 
