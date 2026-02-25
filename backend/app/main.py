@@ -108,6 +108,20 @@ async def lifespan(app: FastAPI):
     # 어드민 이메일 자동 승격 (ADMIN_EMAILS 환경변수)
     await _bootstrap_admin()
 
+    # 누락 인덱스 자동 생성
+    try:
+        from backend.app.core.database import AsyncSessionLocal
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as db:
+            await db.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_trending_kw_scope_nkw_calcat "
+                "ON trending_keywords (scope, normalized_kw, calculated_at)"
+            ))
+            await db.commit()
+            logger.info("인덱스 ix_trending_kw_scope_nkw_calcat 확인/생성 완료")
+    except Exception as e:
+        logger.warning("인덱스 생성 실패 (무시): %s", e)
+
     # 긴장도·트렌딩 계산을 백그라운드로 실행 (서버 즉시 시작, 완료 추적)
     app.state.tension_ready = False
 
