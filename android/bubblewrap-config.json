@@ -37,7 +37,7 @@
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": { "enabled": false },
-    "playBilling": { "enabled": false }
+    "playBilling": { "enabled": true }
   },
   "alphaDependencies": { "enabled": false },
   "enableSiteSettingsShortcut": true,

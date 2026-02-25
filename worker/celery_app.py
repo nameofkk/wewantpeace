@@ -60,6 +60,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=2),  # 매일 새벽 2시 UTC
         "options": {"queue": "process"},
     },
+    "sync-store-subscriptions": {
+        "task": "worker.tasks.sync_store_subscriptions",
+        "schedule": crontab(minute=0, hour="*/4"),  # 4시간마다
+        "options": {"queue": "process"},
+    },
 }
 
 

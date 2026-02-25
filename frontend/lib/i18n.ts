@@ -536,6 +536,17 @@ export const translations = {
     upgrade_payment_failed: "결제 준비 실패",
     upgrade_payment_error: "결제 처리 중 오류가 발생했습니다.",
     upgrade_footer: "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능",
+
+    // store (IAP)
+    store_subscribe_in_app: "구독은 앱에서만 가능합니다",
+    store_download_android: "Google Play에서 다운로드",
+    store_download_ios: "App Store에서 다운로드",
+    store_manage_google: "Google Play에서 구독 관리",
+    store_manage_apple: "App Store에서 구독 관리",
+    store_already_subscribed: "이미 앱에서 구독하셨나요?",
+    store_login_to_sync: "앱에 로그인하면 자동 적용됩니다",
+    store_cancel_in_store: "구독 취소는 스토어에서 직접 해주세요",
+    store_subscribe_in_app_desc: "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요",
   },
   en: {
     // bottom nav
@@ -1070,6 +1081,17 @@ export const translations = {
     upgrade_payment_failed: "Payment preparation failed",
     upgrade_payment_error: "An error occurred during payment processing.",
     upgrade_footer: "Cancel anytime",
+
+    // store (IAP)
+    store_subscribe_in_app: "Subscriptions are only available in the app",
+    store_download_android: "Download on Google Play",
+    store_download_ios: "Download on App Store",
+    store_manage_google: "Manage subscription on Google Play",
+    store_manage_apple: "Manage subscription on App Store",
+    store_already_subscribed: "Already subscribed in the app?",
+    store_login_to_sync: "Log in to the app to sync",
+    store_cancel_in_store: "Please cancel your subscription in the store",
+    store_subscribe_in_app_desc: "Install the WeWantPeace app and subscribe to Pro/Pro+",
   },
 } as const;
 

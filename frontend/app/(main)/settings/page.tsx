@@ -11,6 +11,7 @@ import { ALL_COUNTRIES, getCountryName, getRegionName } from "@/lib/countries";
 import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 
 // ── 국가 선택 패널 ─────────────────────────────────────────────────────────
 function CountryPickerPanel({
@@ -153,6 +154,22 @@ export default function SettingsPage() {
   const [profileSuccess, setProfileSuccess] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // 구독 정보 조회
+  const [subPlatform, setSubPlatform] = useState<string>("web");
+  useEffect(() => {
+    if (!firebaseUser) return;
+    firebaseUser.getIdToken().then((token) => {
+      fetch(`${API_BASE}/subscriptions/my`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.platform) setSubPlatform(d.platform);
+        })
+        .catch(() => {});
+    });
+  }, [firebaseUser, API_BASE]);
 
   async function handleSignOut() {
     await signOut();
@@ -901,6 +918,30 @@ export default function SettingsPage() {
               <p className="mt-3 text-center text-xs text-green-400 font-medium">
                 ✓ {t(lang, "settings_plan_active")}
               </p>
+            )}
+
+            {/* 스토어 구독 관리 링크 */}
+            {plan !== "free" && subPlatform === "android" && (
+              <a
+                href="https://play.google.com/store/account/subscriptions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-primary hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {t(lang, "store_manage_google")}
+              </a>
+            )}
+            {plan !== "free" && subPlatform === "ios" && (
+              <a
+                href="https://apps.apple.com/account/subscriptions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-primary hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {t(lang, "store_manage_apple")}
+              </a>
             )}
           </div>
         </section>

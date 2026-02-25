@@ -548,6 +548,124 @@ def push_verified_alert(self, cluster_id: str):
 
 
 @app.task(
+    name="worker.tasks.sync_store_subscriptions",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def sync_store_subscriptions(self):
+    """
+    스토어 구독 상태 동기화 (4시간마다).
+    Webhook 누락 대비: Google/Apple API로 직접 구독 상태를 재확인.
+    """
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.subscription import Subscription
+        from backend.app.models.user import User
+
+        now = datetime.now(timezone.utc)
+        synced = 0
+        errors = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 활성/유예 상태의 스토어 구독 조회
+                result = await db.execute(
+                    select(Subscription).where(
+                        Subscription.platform.in_(["android", "ios"]),
+                        Subscription.status.in_(["active", "grace_period", "billing_retry"]),
+                    )
+                )
+                subs = result.scalars().all()
+                logger.info("sync_store_subscriptions: %d개 스토어 구독 동기화 시작", len(subs))
+
+                for sub in subs:
+                    try:
+                        if sub.platform == "android" and sub.store_original_transaction_id:
+                            from backend.app.services.google_play_billing import verify_subscription
+                            verify_result = await verify_subscription(
+                                "com.wewantpeace.app",
+                                sub.store_original_transaction_id,
+                            )
+                            if verify_result.get("valid"):
+                                # 만료 시간 업데이트
+                                expiry = verify_result.get("expiry_time", "")
+                                if expiry:
+                                    try:
+                                        sub.expires_at = datetime.fromisoformat(
+                                            expiry.replace("Z", "+00:00")
+                                        )
+                                    except (ValueError, AttributeError):
+                                        pass
+                                sub.auto_renewing = verify_result.get("auto_renewing", False)
+                                state = verify_result.get("state", "")
+                                if state == "SUBSCRIPTION_STATE_EXPIRED":
+                                    sub.status = "expired"
+                                    sub.auto_renewing = False
+                                elif state == "SUBSCRIPTION_STATE_IN_GRACE_PERIOD":
+                                    sub.status = "grace_period"
+                                elif state == "SUBSCRIPTION_STATE_ON_HOLD":
+                                    sub.status = "billing_retry"
+                                else:
+                                    sub.status = "active"
+                            else:
+                                # 검증 실패 → 만료 처리
+                                sub.status = "expired"
+                                sub.auto_renewing = False
+
+                        elif sub.platform == "ios" and sub.store_original_transaction_id:
+                            from backend.app.services.apple_storekit import get_subscription_statuses
+                            status_result = await get_subscription_statuses(
+                                sub.store_original_transaction_id,
+                            )
+                            if status_result.get("valid"):
+                                raw = status_result.get("raw", {})
+                                # 구독 그룹에서 상태 추출
+                                sub_groups = raw.get("data", [])
+                                if sub_groups:
+                                    last_txn = sub_groups[0].get("lastTransactions", [])
+                                    if last_txn:
+                                        status_val = last_txn[0].get("status", 0)
+                                        if status_val == 1:  # Active
+                                            sub.status = "active"
+                                        elif status_val == 2:  # Expired
+                                            sub.status = "expired"
+                                            sub.auto_renewing = False
+                                        elif status_val == 3:  # Billing retry
+                                            sub.status = "billing_retry"
+                                        elif status_val == 4:  # Grace period
+                                            sub.status = "grace_period"
+                                        elif status_val == 5:  # Revoked
+                                            sub.status = "expired"
+                                            sub.auto_renewing = False
+
+                        sub.updated_at = now
+                        synced += 1
+
+                        # 만료된 구독의 사용자 플랜 다운그레이드
+                        if sub.status in ("expired",) and (not sub.expires_at or sub.expires_at <= now):
+                            user_result = await db.execute(
+                                select(User).where(User.id == sub.user_id)
+                            )
+                            user = user_result.scalar_one_or_none()
+                            if user and user.plan != "free":
+                                user.plan = "free"
+
+                    except Exception as e:
+                        logger.warning("sync_store_subscriptions 오류 [%s]: %s", sub.id, e)
+                        errors += 1
+
+        logger.info("sync_store_subscriptions 완료: synced=%d, errors=%d", synced, errors)
+        return {"status": "ok", "synced": synced, "errors": errors}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("sync_store_subscriptions 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.expire_subscriptions",
     queue="process",
     bind=True,

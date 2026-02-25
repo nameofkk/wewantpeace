@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Check, X, Zap, Shield, Star, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, X, Zap, Shield, Star, ArrowLeft, Download, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
 import Link from "next/link";
 
 interface Feature {
@@ -63,6 +64,20 @@ const FEATURES: Feature[] = [
   },
 ];
 
+const GOOGLE_PRODUCT_IDS: Record<string, string> = {
+  pro: "com.wewantpeace.pro_monthly",
+  pro_plus: "com.wewantpeace.proplus_monthly",
+};
+
+const APPLE_PRODUCT_IDS: Record<string, string> = {
+  pro: "com.wewantpeace.pro.monthly",
+  pro_plus: "com.wewantpeace.proplus.monthly",
+};
+
+// 스토어 링크 (등록 후 실제 URL로 교체)
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
+const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // TODO: 실제 ID
+
 const PLANS = [
   {
     id: "free",     name: "Free",  icon: null,
@@ -111,39 +126,94 @@ function FeatureValue({
   );
 }
 
+/** 웹에서 "앱에서 구독하세요" 안내 UI */
+function AppInstallPrompt({ lang }: { lang: string }) {
+  const isMobile = isMobileBrowser();
+  const isAndroid = isAndroidBrowser();
+  const isIOS = isIOSBrowser();
+
+  return (
+    <div className="rounded-2xl border-2 border-primary/30 bg-card p-6 text-center space-y-4">
+      <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mx-auto">
+        <Smartphone className="h-7 w-7 text-primary" />
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold">
+          {t(lang, "store_subscribe_in_app")}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {lang === "ko"
+            ? "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요"
+            : "Install the WeWantPeace app and subscribe to Pro/Pro+"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {(!isIOS) && (
+          <a
+            href={PLAY_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-green-500 py-3 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+          >
+            <Download className="h-4 w-4" />
+            {t(lang, "store_download_android")}
+          </a>
+        )}
+        {(!isAndroid) && (
+          <a
+            href={APP_STORE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 py-3 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+          >
+            <Download className="h-4 w-4" />
+            {t(lang, "store_download_ios")}
+          </a>
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-border">
+        <p className="text-xs text-muted-foreground">
+          {t(lang, "store_already_subscribed")}
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {t(lang, "store_login_to_sync")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function UpgradePage() {
   const { user } = useAuth();
   const lang = useAppStore((s) => s.lang);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<"pro" | "pro_plus">("pro");
+  const [platform, setPlatform] = useState<AppPlatform>("web");
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  useEffect(() => {
+    setPlatform(detectPlatform());
+  }, []);
 
   async function handleSubscribe(planId: string) {
     if (planId === "free") return;
     if (!user) { window.location.href = "/login"; return; }
+
     setLoading(planId);
     setError(null);
+
     try {
-      const token = await user.getIdToken();
-      const res = await fetch(`${API_BASE}/subscriptions/toss/ready?plan=${planId}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(t(lang, "upgrade_payment_failed"));
-      const data = await res.json();
-      const { loadTossPayments } = await import("@tosspayments/payment-sdk");
-      const tossKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
-      if (!tossKey) {
-        throw new Error(lang === "ko" ? "결제 시스템이 준비 중입니다. 잠시 후 다시 시도해주세요." : "Payment system is not configured. Please try again later.");
+      if (platform === "android-twa") {
+        await handleAndroidPurchase(planId);
+      } else if (platform === "ios-app") {
+        await handleIOSPurchase(planId);
       }
-      const toss = await loadTossPayments(tossKey);
-      await toss.requestBillingAuth("카드", {
-        customerKey: data.customer_key,
-        successUrl: `${window.location.origin}/upgrade/success?plan=${planId}`,
-        failUrl: `${window.location.origin}/upgrade/fail`,
-      });
+      // web에서는 버튼이 안 보이므로 도달하지 않음
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || t(lang, "upgrade_payment_error"));
@@ -152,12 +222,62 @@ export default function UpgradePage() {
     }
   }
 
-  function formatPrice(krw: number): string {
-    if (krw === 0) return lang === "ko" ? "무료" : "Free";
-    const formatted = krw.toLocaleString("ko-KR");
-    if (lang === "ko") return `₩${formatted}/월`;
-    return `₩${formatted}/mo`;
+  async function handleAndroidPurchase(planId: string) {
+    const { purchaseSubscription } = await import("@/lib/play-billing");
+    const productId = GOOGLE_PRODUCT_IDS[planId];
+    if (!productId) throw new Error("Invalid plan");
+
+    const purchaseToken = await purchaseSubscription(productId);
+    if (!purchaseToken) return; // 사용자 취소
+
+    // 백엔드 검증
+    const token = await user!.getIdToken();
+    const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+    }
+
+    // 성공 → 리로드
+    window.location.href = "/settings";
   }
+
+  async function handleIOSPurchase(planId: string) {
+    const { purchaseViaStoreKit } = await import("@/lib/ios-storekit");
+    const productId = APPLE_PRODUCT_IDS[planId];
+    if (!productId) throw new Error("Invalid plan");
+
+    const result = await purchaseViaStoreKit(productId);
+    if (!result) return; // 사용자 취소
+
+    // 백엔드 검증
+    const token = await user!.getIdToken();
+    const res = await fetch(`${API_BASE}/subscriptions/store/apple/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ transaction_id: result.transactionId, product_id: productId }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+    }
+
+    window.location.href = "/settings";
+  }
+
+  const isWeb = platform === "web";
 
   return (
     <div className="min-h-screen bg-background">
@@ -203,6 +323,13 @@ export default function UpgradePage() {
         {error && (
           <div className="mb-6 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive text-center">
             {error}
+          </div>
+        )}
+
+        {/* 웹 브라우저: 앱 설치 유도 */}
+        {isWeb && (
+          <div className="mb-8" style={{ animation: "fadeSlideUp 0.35s ease both" }}>
+            <AppInstallPrompt lang={lang} />
           </div>
         )}
 
@@ -299,28 +426,37 @@ export default function UpgradePage() {
                 )}
 
                 {/* 구독 버튼 */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleSubscribe(plan.id); }}
-                  disabled={plan.id === "free" || loading === plan.id}
-                  className={cn(
-                    "mt-4 w-full rounded-xl py-2.5 text-sm font-bold transition-all duration-150",
-                    plan.id === "free"
-                      ? "bg-secondary text-muted-foreground cursor-default"
-                      : isPro
-                        ? "bg-gradient-to-r from-blue-600 to-primary text-white hover:opacity-90 active:scale-[0.98]"
-                        : "bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 active:scale-[0.98]",
-                    "disabled:opacity-50"
-                  )}
-                >
-                  {loading === plan.id ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      {t(lang, "upgrade_processing")}
-                    </span>
-                  ) : plan.id === "free"
-                    ? t(lang, "upgrade_current_plan")
-                    : t(lang, "upgrade_subscribe")}
-                </button>
+                {!isWeb ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleSubscribe(plan.id); }}
+                    disabled={plan.id === "free" || loading === plan.id}
+                    className={cn(
+                      "mt-4 w-full rounded-xl py-2.5 text-sm font-bold transition-all duration-150",
+                      plan.id === "free"
+                        ? "bg-secondary text-muted-foreground cursor-default"
+                        : isPro
+                          ? "bg-gradient-to-r from-blue-600 to-primary text-white hover:opacity-90 active:scale-[0.98]"
+                          : "bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90 active:scale-[0.98]",
+                      "disabled:opacity-50"
+                    )}
+                  >
+                    {loading === plan.id ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        {t(lang, "upgrade_processing")}
+                      </span>
+                    ) : plan.id === "free"
+                      ? t(lang, "upgrade_current_plan")
+                      : t(lang, "upgrade_subscribe")}
+                  </button>
+                ) : (
+                  /* 웹에서는 비활성 버튼 표시 (프리 제외) */
+                  <div className="mt-4 w-full rounded-xl py-2.5 text-sm font-bold text-center bg-secondary text-muted-foreground">
+                    {plan.id === "free"
+                      ? t(lang, "upgrade_current_plan")
+                      : t(lang, "store_subscribe_in_app")}
+                  </div>
+                )}
               </div>
             );
           })}

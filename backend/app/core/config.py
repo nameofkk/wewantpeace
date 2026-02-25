@@ -82,5 +82,15 @@ class Settings(BaseSettings):
     tension_calc_interval: int = 900       # 15분 (초)
     trending_calc_interval: int = 900      # 15분 (초)
 
+    # Google Play Billing
+    google_play_service_account_key_path: str = ""
+
+    # Apple StoreKit / App Store Server API
+    apple_issuer_id: str = ""
+    apple_key_id: str = ""
+    apple_private_key_path: str = ""
+    apple_bundle_id: str = "com.wewantpeace.app"
+    apple_environment: str = "Sandbox"  # "Production" when live
+
 
 settings = Settings()

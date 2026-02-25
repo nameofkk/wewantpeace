@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wewantpeace.app",
+      "sha256_cert_fingerprints": [
+        "TODO:INSERT_LOCAL_SIGNING_KEY_SHA256",
+        "TODO:INSERT_PLAY_APP_SIGNING_KEY_SHA256"
+      ]
+    }
+  }
+]
