@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Flag, CheckCircle, X, Loader2, ExternalLink } from "lucide-react";
+import { Flag, CheckCircle, X, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
+import { useAdminToast } from "@/components/ui/admin-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -24,16 +27,29 @@ const STATUS_COLORS: Record<string, string> = {
   dismissed: "bg-secondary text-muted-foreground",
 };
 
-const TARGET_LABELS: Record<string, string> = {
-  post: "게시글",
-  comment: "댓글",
-  user: "회원",
-};
-
 export default function AdminReportsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const lang = useAppStore((s) => s.lang);
+  const { toast } = useAdminToast();
   const [statusFilter, setStatusFilter] = useState<"pending" | "all">("pending");
+
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+
+  const getTargetLabel = (type: string) => {
+    const map: Record<string, string> = {
+      post: t(lang, "admin_report_target_post"),
+      comment: t(lang, "admin_report_target_comment"),
+      user: t(lang, "admin_report_target_user"),
+    };
+    return map[type] ?? type;
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === "pending") return t(lang, "admin_report_pending");
+    if (status === "resolved") return t(lang, "admin_report_resolved");
+    return t(lang, "admin_report_dismissed");
+  };
 
   const { data: reports = [], isLoading } = useQuery<Report[]>({
     queryKey: ["admin-reports", statusFilter],
@@ -45,7 +61,7 @@ export default function AdminReportsPage() {
       const res = await fetch(`${API_BASE}/admin/reports?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("신고 목록 로드 실패");
+      if (!res.ok) throw new Error("Failed to load reports");
       return res.json();
     },
     enabled: !!user,
@@ -61,18 +77,22 @@ export default function AdminReportsPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("처리 실패");
+      if (!res.ok) throw new Error("Failed to update report");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-reports"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      toast(t(lang, "admin_toast_updated"), "success");
+    },
+    onError: () => toast(t(lang, "admin_toast_error"), "error"),
   });
 
   return (
-    <div className="p-8">
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">신고 관리</h1>
+          <h1 className="text-2xl font-bold">{t(lang, "admin_reports_title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {reports.filter((r) => r.status === "pending").length}건 처리 대기
+            {t(lang, "admin_reports_subtitle", { n: reports.filter((r) => r.status === "pending").length })}
           </p>
         </div>
 
@@ -88,20 +108,29 @@ export default function AdminReportsPage() {
                   : "border-border text-muted-foreground"
               )}
             >
-              {s === "pending" ? "처리 대기" : "전체"}
+              {s === "pending" ? t(lang, "admin_report_pending") : t(lang, "admin_all")}
             </button>
           ))}
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse space-y-3">
+              <div className="flex gap-2">
+                <div className="h-5 w-24 rounded-full bg-secondary" />
+                <div className="h-5 w-12 rounded-full bg-secondary" />
+              </div>
+              <div className="h-4 w-3/4 rounded bg-secondary" />
+              <div className="h-3 w-32 rounded bg-secondary" />
+            </div>
+          ))}
         </div>
       ) : reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Flag className="h-10 w-10 mb-3" />
-          <p className="text-sm">처리할 신고가 없습니다.</p>
+          <p className="text-sm">{t(lang, "admin_reports_empty")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -114,20 +143,20 @@ export default function AdminReportsPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs font-medium bg-secondary rounded-full px-2 py-0.5">
-                      {TARGET_LABELS[report.target_type]} #{report.target_id.slice(0, 8)}...
+                      {getTargetLabel(report.target_type)} #{report.target_id.slice(0, 8)}...
                     </span>
                     <span className={cn("text-[10px] rounded-full px-2 py-0.5 font-medium", STATUS_COLORS[report.status])}>
-                      {report.status === "pending" ? "대기" : report.status === "resolved" ? "처리됨" : "기각됨"}
+                      {getStatusLabel(report.status)}
                     </span>
                   </div>
                   <p className="text-sm">
-                    <span className="font-medium">{report.reporter_nickname || "익명"}</span>
+                    <span className="font-medium">{report.reporter_nickname || t(lang, "admin_report_anonymous")}</span>
                     {" — "}
                     <span className="text-muted-foreground">{report.reason}</span>
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-[11px] text-muted-foreground">
-                      {new Date(report.created_at).toLocaleString("ko-KR")}
+                      {new Date(report.created_at).toLocaleString(locale)}
                     </p>
                     {report.target_type === "post" && (
                       <a
@@ -137,7 +166,7 @@ export default function AdminReportsPage() {
                         className="flex items-center gap-1 text-[11px] text-primary hover:underline"
                       >
                         <ExternalLink className="h-3 w-3" />
-                        원문 보기
+                        {t(lang, "admin_report_view_original")}
                       </a>
                     )}
                   </div>
@@ -151,7 +180,7 @@ export default function AdminReportsPage() {
                       className="flex items-center gap-1 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs text-green-400 hover:bg-green-500/20"
                     >
                       <CheckCircle className="h-3 w-3" />
-                      처리
+                      {t(lang, "admin_report_resolve")}
                     </button>
                     <button
                       onClick={() => reviewMutation.mutate({ reportId: report.id, action: "dismiss" })}
@@ -159,7 +188,7 @@ export default function AdminReportsPage() {
                       className="flex items-center gap-1 rounded-lg bg-secondary px-3 py-1.5 text-xs text-muted-foreground hover:bg-border"
                     >
                       <X className="h-3 w-3" />
-                      기각
+                      {t(lang, "admin_report_dismiss")}
                     </button>
                   </div>
                 )}

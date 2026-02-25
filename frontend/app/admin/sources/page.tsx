@@ -5,8 +5,9 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAdminToast } from "@/components/ui/admin-toast";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -50,6 +51,7 @@ export default function AdminSourcesPage() {
   const { user } = useAuth();
   const { lang } = useAppStore();
   const queryClient = useQueryClient();
+  const { toast } = useAdminToast();
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
@@ -84,7 +86,11 @@ export default function AdminSourcesPage() {
       });
       if (!res.ok) throw new Error("Update failed");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-sources"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-sources"] });
+      toast(t(lang, "admin_toast_updated"), "success");
+    },
+    onError: () => toast(t(lang, "admin_toast_error"), "error"),
   });
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
@@ -132,116 +138,218 @@ export default function AdminSourcesPage() {
         </span>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <>
+          {/* Desktop skeleton */}
+          <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+            <div className="bg-secondary/50 h-10" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex gap-4 p-3 border-t border-border animate-pulse">
+                <div className="h-4 w-6 rounded bg-secondary" />
+                <div className="h-4 w-36 rounded bg-secondary" />
+                <div className="h-4 w-16 rounded bg-secondary" />
+                <div className="h-4 w-8 rounded bg-secondary" />
+                <div className="h-4 w-8 rounded bg-secondary" />
+                <div className="h-4 w-12 rounded bg-secondary" />
+              </div>
+            ))}
+          </div>
+          {/* Mobile skeleton */}
+          <div className="md:hidden space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse space-y-3">
+                <div className="flex justify-between"><div className="h-4 w-36 rounded bg-secondary" /><div className="h-5 w-9 rounded-full bg-secondary" /></div>
+                <div className="flex gap-2"><div className="h-5 w-16 rounded bg-secondary" /><div className="h-5 w-8 rounded bg-secondary" /></div>
+                <div className="h-3 w-24 rounded bg-secondary" />
+              </div>
+            ))}
+          </div>
+        </>
       ) : !data?.items.length ? (
         <div className="flex flex-col items-center py-16 text-muted-foreground">
           <Radio className="h-10 w-10 mb-3" />
           <p className="text-sm">{t(lang, "admin_no_data")}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-secondary/50">
-              <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_status")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_name")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_type")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_tier")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_language")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_confidence")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_last_collected")}</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_error")}</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_source_active_toggle")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {data.items.map((ch) => {
-                const cs = ch.collect_status;
-                return (
-                  <tr key={ch.id} className={cn("hover:bg-secondary/20", !ch.is_active && "opacity-50")}>
-                    {/* 상태 dot */}
-                    <td className="px-3 py-3 text-center text-base">
-                      <StatusDot status={ch.is_active ? cs : null} />
-                    </td>
-                    {/* 채널명 */}
-                    <td className="px-3 py-3 max-w-[200px]">
-                      <p className="text-sm font-medium truncate">{ch.display_name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-xl border border-border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_status")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_name")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_type")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_tier")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_language")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_confidence")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_last_collected")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_error")}</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_source_active_toggle")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.items.map((ch) => {
+                  const cs = ch.collect_status;
+                  return (
+                    <tr key={ch.id} className={cn("hover:bg-secondary/20", !ch.is_active && "opacity-50")}>
+                      {/* 상태 dot */}
+                      <td className="px-3 py-3 text-center text-base">
+                        <StatusDot status={ch.is_active ? cs : null} />
+                      </td>
+                      {/* 채널명 */}
+                      <td className="px-3 py-3 max-w-[200px]">
+                        <p className="text-sm font-medium truncate">{ch.display_name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {ch.source_type === "telegram" ? `@${ch.username}` : ch.feed_url}
+                        </p>
+                      </td>
+                      {/* 유형 */}
+                      <td className="px-3 py-3">
+                        <span className={cn(
+                          "text-xs rounded-full px-2 py-0.5 font-medium",
+                          ch.source_type === "telegram" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
+                        )}>
+                          {ch.source_type}
+                        </span>
+                      </td>
+                      {/* 등급 (드롭다운) */}
+                      <td className="px-3 py-3">
+                        <select
+                          value={ch.tier}
+                          onChange={(e) => patchMutation.mutate({ id: ch.id, body: { tier: e.target.value } })}
+                          className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", TIER_COLORS[ch.tier] ?? "")}
+                        >
+                          {["A", "B", "C", "D"].map((tier) => (
+                            <option key={tier} value={tier}>{tier}</option>
+                          ))}
+                        </select>
+                      </td>
+                      {/* 언어 */}
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{ch.language ?? "—"}</td>
+                      {/* 신뢰도 (인라인 편집) */}
+                      <td className="px-3 py-3">
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={ch.base_confidence}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val >= 0 && val <= 1) {
+                              patchMutation.mutate({ id: ch.id, body: { base_confidence: val } });
+                            }
+                          }}
+                          className="w-16 rounded border border-border bg-background px-2 py-0.5 text-xs tabular-nums outline-none focus:border-primary"
+                        />
+                      </td>
+                      {/* 최근 수집 */}
+                      <td className="px-3 py-3 text-xs text-muted-foreground">
+                        {cs?.last_collected_at
+                          ? new Date(cs.last_collected_at).toLocaleString(locale, {
+                              month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                            })
+                          : "—"
+                        }
+                        {cs && cs.status === "ok" && (
+                          <span className="ml-1 text-green-400 text-[10px]">({cs.collected}/{cs.skipped})</span>
+                        )}
+                      </td>
+                      {/* 오류 */}
+                      <td className="px-3 py-3 max-w-[150px]">
+                        {cs?.error ? (
+                          <p className="text-[10px] text-red-400 truncate" title={cs.error}>{cs.error}</p>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      {/* 활성 토글 */}
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          onClick={() => patchMutation.mutate({ id: ch.id, body: { is_active: !ch.is_active } })}
+                          className={cn(
+                            "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                            ch.is_active ? "bg-primary" : "bg-secondary"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform",
+                              ch.is_active ? "translate-x-[18px]" : "translate-x-[3px]"
+                            )}
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile card layout */}
+          <div className="md:hidden space-y-3">
+            {data.items.map((ch) => {
+              const cs = ch.collect_status;
+              return (
+                <div key={ch.id} className={cn("rounded-xl border border-border bg-card p-4", !ch.is_active && "opacity-50")}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={ch.is_active ? cs : null} />
+                        <p className="text-sm font-medium truncate">{ch.display_name}</p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">
                         {ch.source_type === "telegram" ? `@${ch.username}` : ch.feed_url}
                       </p>
-                    </td>
-                    {/* 유형 */}
-                    <td className="px-3 py-3">
-                      <span className={cn(
-                        "text-xs rounded-full px-2 py-0.5 font-medium",
-                        ch.source_type === "telegram" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
-                      )}>
-                        {ch.source_type}
-                      </span>
-                    </td>
-                    {/* 등급 (드롭다운) */}
-                    <td className="px-3 py-3">
-                      <select
-                        value={ch.tier}
-                        onChange={(e) => patchMutation.mutate({ id: ch.id, body: { tier: e.target.value } })}
-                        className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", TIER_COLORS[ch.tier] ?? "")}
-                      >
-                        {["A", "B", "C", "D"].map((tier) => (
-                          <option key={tier} value={tier}>{tier}</option>
-                        ))}
-                      </select>
-                    </td>
-                    {/* 언어 */}
-                    <td className="px-3 py-3 text-xs text-muted-foreground">{ch.language ?? "—"}</td>
-                    {/* 신뢰도 */}
-                    <td className="px-3 py-3 text-xs tabular-nums">{ch.base_confidence.toFixed(2)}</td>
-                    {/* 최근 수집 */}
-                    <td className="px-3 py-3 text-xs text-muted-foreground">
-                      {cs?.last_collected_at
-                        ? new Date(cs.last_collected_at).toLocaleString(locale, {
-                            month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                          })
-                        : "—"
-                      }
-                      {cs && cs.status === "ok" && (
-                        <span className="ml-1 text-green-400 text-[10px]">({cs.collected}/{cs.skipped})</span>
-                      )}
-                    </td>
-                    {/* 오류 */}
-                    <td className="px-3 py-3 max-w-[150px]">
-                      {cs?.error ? (
-                        <p className="text-[10px] text-red-400 truncate" title={cs.error}>{cs.error}</p>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    {/* 활성 토글 */}
-                    <td className="px-3 py-3 text-right">
-                      <button
-                        onClick={() => patchMutation.mutate({ id: ch.id, body: { is_active: !ch.is_active } })}
-                        className={cn(
-                          "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                          ch.is_active ? "bg-primary" : "bg-secondary"
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform",
-                            ch.is_active ? "translate-x-[18px]" : "translate-x-[3px]"
-                          )}
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <button
+                      onClick={() => patchMutation.mutate({ id: ch.id, body: { is_active: !ch.is_active } })}
+                      className={cn("relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0", ch.is_active ? "bg-primary" : "bg-secondary")}
+                    >
+                      <span className={cn("inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform", ch.is_active ? "translate-x-[18px]" : "translate-x-[3px]")} />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className={cn("text-xs rounded-full px-2 py-0.5 font-medium", ch.source_type === "telegram" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400")}>{ch.source_type}</span>
+                    <select
+                      value={ch.tier}
+                      onChange={(e) => patchMutation.mutate({ id: ch.id, body: { tier: e.target.value } })}
+                      className={cn("rounded px-2 py-0.5 text-xs font-medium border-0 outline-none cursor-pointer", TIER_COLORS[ch.tier] ?? "")}
+                    >
+                      {["A","B","C","D"].map((tier) => (<option key={tier} value={tier}>{tier}</option>))}
+                    </select>
+                    <span className="text-xs text-muted-foreground">{ch.language ?? "—"}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">{t(lang, "admin_confidence")}</span>
+                      <input
+                        type="number"
+                        min={0} max={1} step={0.05}
+                        value={ch.base_confidence}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val >= 0 && val <= 1) patchMutation.mutate({ id: ch.id, body: { base_confidence: val } });
+                        }}
+                        className="mt-0.5 w-full rounded border border-border bg-background px-2 py-0.5 text-xs tabular-nums outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{t(lang, "admin_source_last_collected")}</span>
+                      <p className="mt-0.5 tabular-nums">
+                        {cs?.last_collected_at ? new Date(cs.last_collected_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {cs?.error && <p className="mt-2 text-[10px] text-red-400 truncate">{cs.error}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Pagination */}

@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Save, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
+import { useAppStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
+import { useAdminToast } from "@/components/ui/admin-toast";
+import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -15,8 +19,29 @@ interface ServiceSettings {
   pro_plus_price: number;
 }
 
+function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      className={cn(
+        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+        value ? "bg-primary" : "bg-secondary"
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block h-4 w-4 rounded-full bg-white transition-transform",
+          value ? "translate-x-[24px]" : "translate-x-[4px]"
+        )}
+      />
+    </button>
+  );
+}
+
 export default function AdminSettingsPage() {
   const { user } = useAuth();
+  const lang = useAppStore((s) => s.lang);
+  const { toast } = useAdminToast();
   const [settings, setSettings] = useState<ServiceSettings>({
     maintenance_mode: false,
     allow_signup: true,
@@ -24,7 +49,6 @@ export default function AdminSettingsPage() {
     pro_price: 4900,
     pro_plus_price: 9900,
   });
-  const [saved, setSaved] = useState(false);
 
   const { data, isLoading } = useQuery<ServiceSettings>({
     queryKey: ["admin-settings"],
@@ -34,7 +58,7 @@ export default function AdminSettingsPage() {
       const res = await fetch(`${API_BASE}/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("설정 로드 실패");
+      if (!res.ok) throw new Error("Failed to load settings");
       return res.json();
     },
     enabled: !!user,
@@ -53,39 +77,44 @@ export default function AdminSettingsPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(settings),
       });
-      if (!res.ok) throw new Error("저장 실패");
+      if (!res.ok) throw new Error("Save failed");
     },
     onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      toast(t(lang, "admin_toast_saved"), "success");
     },
+    onError: () => toast(t(lang, "admin_toast_error"), "error"),
   });
-
-  function ToggleButton({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-    return (
-      <button onClick={() => onChange(!value)} className="focus:outline-none">
-        {value
-          ? <ToggleRight className="h-7 w-7 text-primary" />
-          : <ToggleLeft className="h-7 w-7 text-muted-foreground" />
-        }
-      </button>
-    );
-  }
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="max-w-2xl space-y-4">
+        <div className="flex justify-between items-center mb-6">
+          <div className="animate-pulse space-y-2">
+            <div className="h-7 w-32 rounded bg-secondary" />
+            <div className="h-4 w-48 rounded bg-secondary" />
+          </div>
+        </div>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
+            <div className="flex justify-between items-center">
+              <div className="space-y-2">
+                <div className="h-4 w-24 rounded bg-secondary" />
+                <div className="h-3 w-48 rounded bg-secondary" />
+              </div>
+              <div className="h-6 w-11 rounded-full bg-secondary" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="max-w-2xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">서비스 설정</h1>
-          <p className="text-sm text-muted-foreground mt-1">운영 설정을 변경합니다</p>
+          <h1 className="text-2xl font-bold">{t(lang, "admin_settings_title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t(lang, "admin_settings_subtitle")}</p>
         </div>
         <button
           onClick={() => saveMutation.mutate()}
@@ -94,64 +123,62 @@ export default function AdminSettingsPage() {
         >
           {saveMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
-          ) : saved ? (
-            "저장됨 ✓"
           ) : (
             <>
               <Save className="h-4 w-4" />
-              저장
+              {t(lang, "admin_save")}
             </>
           )}
         </button>
       </div>
 
       <div className="space-y-4">
-        {/* 점검 모드 */}
+        {/* Maintenance Mode */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">점검 모드</p>
-              <p className="text-sm text-muted-foreground mt-0.5">활성화 시 관리자 외 서비스 접근 불가</p>
+              <p className="font-medium">{t(lang, "admin_maintenance_mode")}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{t(lang, "admin_maintenance_desc")}</p>
             </div>
-            <ToggleButton
+            <ToggleSwitch
               value={settings.maintenance_mode}
               onChange={(v) => setSettings((s) => ({ ...s, maintenance_mode: v }))}
             />
           </div>
         </div>
 
-        {/* 회원가입 허용 */}
+        {/* Signup */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">신규 회원가입</p>
-              <p className="text-sm text-muted-foreground mt-0.5">비활성화 시 새 계정 생성 차단</p>
+              <p className="font-medium">{t(lang, "admin_signup_label")}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{t(lang, "admin_signup_desc")}</p>
             </div>
-            <ToggleButton
+            <ToggleSwitch
               value={settings.allow_signup}
               onChange={(v) => setSettings((s) => ({ ...s, allow_signup: v }))}
             />
           </div>
         </div>
 
-        {/* 공지 배너 */}
+        {/* Notice Banner */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="font-medium mb-2">공지 배너</p>
+          <p className="font-medium mb-2">{t(lang, "admin_notice_banner")}</p>
           <textarea
             value={settings.notice_banner}
             onChange={(e) => setSettings((s) => ({ ...s, notice_banner: e.target.value }))}
-            placeholder="공지 메시지 (비워두면 배너 숨김)"
+            placeholder={t(lang, "admin_notice_placeholder")}
             rows={3}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary resize-none"
           />
         </div>
 
-        {/* 요금 설정 */}
+        {/* Pricing */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="font-medium mb-3">요금 설정 (원)</p>
+          <p className="font-medium mb-3">{t(lang, "admin_pricing_label")}</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground">Pro 월정액</label>
+              <label className="text-xs text-muted-foreground">{t(lang, "admin_pricing_pro")}</label>
               <input
                 type="number"
                 value={settings.pro_price}
@@ -160,7 +187,7 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Pro+ 월정액</label>
+              <label className="text-xs text-muted-foreground">{t(lang, "admin_pricing_proplus")}</label>
               <input
                 type="number"
                 value={settings.pro_plus_price}
@@ -170,7 +197,7 @@ export default function AdminSettingsPage() {
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            ※ 요금 변경은 다음 결제 주기부터 적용됩니다. 기존 구독자에게 미리 공지하세요.
+            {t(lang, "admin_pricing_note")}
           </p>
         </div>
       </div>

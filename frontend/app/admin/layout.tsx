@@ -6,7 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Layers, Activity, FileText,
   Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
+  CreditCard, MessageSquare,
 } from "lucide-react";
+import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -22,6 +24,8 @@ const NAV_ITEMS = [
   { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" as const },
   { href: "/admin/events", icon: FileText, labelKey: "admin_events" as const },
   { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" as const },
+  { href: "/admin/subscriptions", icon: CreditCard, labelKey: "admin_subscriptions" as const },
+  { href: "/admin/posts", icon: MessageSquare, labelKey: "admin_posts" as const },
   { href: "/admin/settings", icon: Settings, labelKey: "admin_settings" as const },
 ];
 
@@ -166,7 +170,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <button onClick={() => setMobileOpen(true)} className="p-1 text-muted-foreground">
           <Menu className="h-5 w-5" />
         </button>
-        <span className="text-sm font-bold text-primary">Admin</span>
+        <span className="text-sm font-bold text-primary">
+          {(() => {
+            const nav = NAV_ITEMS.find((n) => n.exact ? pathname === n.href : pathname.startsWith(n.href + "/") || pathname === n.href);
+            return nav ? t(lang, nav.labelKey) : t(lang, "admin_title");
+          })()}
+        </span>
         <Link href="/" className="p-1 text-muted-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
@@ -184,7 +193,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main content */}
       <main className="flex-1 overflow-auto pt-12 md:pt-0">
-        <div className="p-4 md:p-6 max-w-7xl">{children}</div>
+        <AdminToastProvider>
+          <div className="p-4 md:p-6 max-w-7xl">{children}</div>
+        </AdminToastProvider>
       </main>
     </div>
   );

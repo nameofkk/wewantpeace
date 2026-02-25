@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getCountryName } from "@/lib/countries";
+import Link from "next/link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -76,6 +77,7 @@ export default function AdminDashboard() {
       icon: Users,
       color: "text-blue-400",
       bg: "bg-blue-500/10",
+      href: "/admin/users",
     },
     {
       label: t(lang, "admin_active_clusters"),
@@ -83,6 +85,7 @@ export default function AdminDashboard() {
       icon: Layers,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10",
+      href: "/admin/clusters",
     },
     {
       label: t(lang, "admin_events_today"),
@@ -90,6 +93,7 @@ export default function AdminDashboard() {
       icon: FileText,
       color: "text-cyan-400",
       bg: "bg-cyan-500/10",
+      href: "/admin/events",
     },
     {
       label: t(lang, "admin_crisis_countries"),
@@ -97,6 +101,7 @@ export default function AdminDashboard() {
       icon: AlertTriangle,
       color: stats?.crisis_countries ? "text-red-400" : "text-muted-foreground",
       bg: stats?.crisis_countries ? "bg-red-500/10" : "bg-secondary",
+      href: "/admin/tension",
     },
     {
       label: t(lang, "admin_pending_reports"),
@@ -104,6 +109,7 @@ export default function AdminDashboard() {
       icon: Flag,
       color: (stats?.pending_reports ?? 0) > 0 ? "text-orange-400" : "text-muted-foreground",
       bg: (stats?.pending_reports ?? 0) > 0 ? "bg-orange-500/10" : "bg-secondary",
+      href: "/admin/reports",
     },
     {
       label: t(lang, "admin_active_subs"),
@@ -112,6 +118,15 @@ export default function AdminDashboard() {
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
+      href: "/admin/subscriptions",
+    },
+    {
+      label: t(lang, "admin_push_tokens"),
+      value: stats?.push_tokens ?? 0,
+      icon: Bell,
+      color: "text-amber-400",
+      bg: "bg-amber-500/10",
+      href: "#",
     },
   ];
 
@@ -120,14 +135,14 @@ export default function AdminDashboard() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold">{t(lang, "admin_dashboard")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {lang === "ko" ? "서비스 현황 요약" : "Service overview"}
+          {t(lang, "admin_overview")}
         </p>
       </div>
 
       {/* KPI Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {[...Array(7)].map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-5 animate-pulse">
               <div className="h-4 w-24 rounded bg-secondary mb-3" />
               <div className="h-8 w-16 rounded bg-secondary" />
@@ -135,9 +150,13 @@ export default function AdminDashboard() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {kpiCards.map((card) => (
-            <div key={card.label} className="rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors">
+            <Link
+              key={card.label}
+              href={card.href}
+              className="rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors"
+            >
               <div className="flex items-center gap-3 mb-3">
                 <div className={cn("rounded-lg p-2", card.bg)}>
                   <card.icon className={cn("h-4 w-4", card.color)} />
@@ -148,7 +167,7 @@ export default function AdminDashboard() {
               {card.sub && (
                 <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
               )}
-            </div>
+            </Link>
           ))}
         </div>
       )}
