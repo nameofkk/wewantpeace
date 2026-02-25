@@ -113,6 +113,71 @@ class TelegramCollector:
             "collected_at": datetime.now(timezone.utc),
         }
 
+    async def _resolve_entity(
+        self,
+        channel: SourceChannel,
+        client: TelegramClient,
+        db: AsyncSession,
+    ):
+        """
+        채널 엔티티 해석 + channel_id/username 자동 동기화.
+
+        우선순위: channel_id(영구) > username(가변)
+        성공 시 DB에 channel_id와 최신 username을 자동 저장.
+        """
+        entity = None
+
+        # 1) channel_id가 있으면 우선 사용 (영구 불변)
+        if channel.channel_id:
+            try:
+                entity = await client.get_entity(channel.channel_id)
+            except Exception as e:
+                logger.warning(
+                    "channel_id %s로 엔티티 해석 실패 (%s), username fallback",
+                    channel.channel_id, e,
+                )
+
+        # 2) channel_id 실패 또는 없으면 username으로 시도
+        if entity is None and channel.username:
+            try:
+                entity = await client.get_entity(channel.username)
+            except Exception as e:
+                logger.error(
+                    "채널 %s (username=%s) 엔티티 해석 실패: %s",
+                    channel.display_name, channel.username, e,
+                )
+                return None
+
+        if entity is None:
+            return None
+
+        # 3) DB에 channel_id / username 자동 동기화
+        resolved_id = getattr(entity, "id", None)
+        resolved_username = getattr(entity, "username", None)
+        updated = False
+
+        if resolved_id and channel.channel_id != resolved_id:
+            logger.info(
+                "채널 %s channel_id 자동 저장: %s",
+                channel.display_name, resolved_id,
+            )
+            channel.channel_id = resolved_id
+            updated = True
+
+        if resolved_username and channel.username != resolved_username:
+            logger.info(
+                "채널 %s username 자동 갱신: %s → %s",
+                channel.display_name, channel.username, resolved_username,
+            )
+            channel.username = resolved_username
+            updated = True
+
+        if updated:
+            db.add(channel)
+            await db.flush()
+
+        return entity
+
     async def collect_channel(
         self,
         channel: SourceChannel,
@@ -129,38 +194,53 @@ class TelegramCollector:
             display_name=channel.display_name,
         )
 
-        username = channel.username
-        if not username:
-            result.errors.append("username 미설정")
+        if not channel.username and not channel.channel_id:
+            result.errors.append("username/channel_id 미설정")
             return result
 
-        # Redis에서 마지막 수집 메시지 ID 복원
-        redis_key = f"telegram:last_msg_id:{username}"
+        # 채널 엔티티 해석 (channel_id 우선, username fallback, 자동 동기화)
+        entity = await self._resolve_entity(channel, client, db)
+        if entity is None:
+            result.errors.append("채널 엔티티 해석 실패")
+            return result
+
+        # Redis 키는 channel_id 기반 (영구 불변)으로 사용
+        stable_key = str(channel.channel_id) if channel.channel_id else channel.username
+        redis_key = f"telegram:last_msg_id:{stable_key}"
         last_msg_id = 0
         if redis is not None:
             try:
                 saved_id = await redis.get(redis_key)
                 if saved_id:
                     last_msg_id = int(saved_id)
+                # username 기반 이전 키에서 마이그레이션
+                if not saved_id and channel.channel_id and channel.username:
+                    old_key = f"telegram:last_msg_id:{channel.username}"
+                    old_val = await redis.get(old_key)
+                    if old_val:
+                        last_msg_id = int(old_val)
+                        await redis.set(redis_key, old_val, ex=604800)
+                        await redis.delete(old_key)
+                        logger.info("Redis 키 마이그레이션: %s → %s", old_key, redis_key)
             except Exception as e:
-                logger.warning("Redis last_msg_id 로드 실패 (%s): %s", username, e)
+                logger.warning("Redis last_msg_id 로드 실패 (%s): %s", stable_key, e)
 
-        # Telethon으로 메시지 조회
+        # Telethon으로 메시지 조회 (entity 직접 사용)
         try:
             messages = await asyncio.wait_for(
-                client.get_messages(username, limit=50, min_id=last_msg_id),
+                client.get_messages(entity, limit=50, min_id=last_msg_id),
                 timeout=30,
             )
         except FloodWaitError as e:
-            logger.warning("FloodWait %d초 - %s 건너뜀", e.seconds, username)
+            logger.warning("FloodWait %d초 - %s 건너뜀", e.seconds, channel.display_name)
             result.errors.append(f"FloodWait {e.seconds}s")
             return result
         except asyncio.TimeoutError:
-            logger.warning("Timeout - %s 메시지 조회 30초 초과", username)
+            logger.warning("Timeout - %s 메시지 조회 30초 초과", channel.display_name)
             result.errors.append("Timeout 30s")
             return result
         except Exception as e:
-            logger.error("채널 %s 메시지 조회 오류: %s", username, e)
+            logger.error("채널 %s 메시지 조회 오류: %s", channel.display_name, e)
             result.errors.append(str(e))
             return result
 
@@ -203,7 +283,7 @@ class TelegramCollector:
             try:
                 await redis.set(redis_key, str(max_msg_id), ex=604800)
             except Exception as e:
-                logger.warning("Redis last_msg_id 저장 실패 (%s): %s", username, e)
+                logger.warning("Redis last_msg_id 저장 실패 (%s): %s", stable_key, e)
 
         return result
 
