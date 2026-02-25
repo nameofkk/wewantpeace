@@ -240,15 +240,51 @@ def _parse_datetime(entry: dict[str, Any]) -> datetime:
 class RSSCollector:
     """RSS/Atom 피드 파서."""
 
+    # 연속 에러 N회 초과 시 자동 비활성화
+    MAX_CONSECUTIVE_ERRORS = 10
+
+    async def _track_error(self, redis, source: SourceChannel, db: AsyncSession, error_msg: str):
+        """연속 에러 카운트 추적. MAX_CONSECUTIVE_ERRORS 초과 시 자동 비활성화."""
+        if redis is None:
+            return
+        err_key = f"rss:consecutive_errors:{source.id}"
+        try:
+            count = await redis.incr(err_key)
+            await redis.expire(err_key, 86400 * 7)  # 7일 TTL
+            if count >= self.MAX_CONSECUTIVE_ERRORS:
+                source.is_active = False
+                db.add(source)
+                await db.flush()
+                await redis.delete(err_key)
+                logger.warning(
+                    "RSS 피드 자동 비활성화: %s (%s) — 연속 %d회 에러",
+                    source.display_name, source.feed_url, count,
+                )
+        except Exception as e:
+            logger.warning("Redis 에러 카운트 실패 (%s): %s", source.display_name, e)
+
+    async def _reset_error_count(self, redis, source: SourceChannel):
+        """수집 성공 시 연속 에러 카운트 초기화."""
+        if redis is None:
+            return
+        try:
+            await redis.delete(f"rss:consecutive_errors:{source.id}")
+        except Exception:
+            pass
+
     async def collect_feed(
         self,
         source: SourceChannel,
         db: AsyncSession,
+        redis=None,
     ) -> RSSCollectResult:
         """
         source.feed_url에서 RSS를 파싱하여 raw_events에 저장.
         - feedparser는 asyncio.to_thread()로 블로킹 해소
         - 스팸·품질 필터 적용
+        - URL 리다이렉트 감지 시 feed_url 자동 갱신
+        - 404/410 시 자동 비활성화
+        - 연속 에러 10회 시 자동 비활성화
         """
         result = RSSCollectResult(
             feed_url=source.feed_url or "",
@@ -267,14 +303,44 @@ class RSSCollector:
             )
         except asyncio.TimeoutError:
             result.errors.append(f"피드 타임아웃 (30s): {source.feed_url}")
+            await self._track_error(redis, source, db, "timeout")
             return result
         except Exception as e:
             result.errors.append(f"피드 파싱 오류: {e}")
+            await self._track_error(redis, source, db, str(e))
             return result
+
+        # HTTP 상태 확인: 404/410 → 자동 비활성화
+        http_status = getattr(parsed, "status", 200)
+        if http_status in (404, 410):
+            source.is_active = False
+            db.add(source)
+            await db.flush()
+            logger.warning(
+                "RSS 피드 자동 비활성화 (HTTP %d): %s (%s)",
+                http_status, source.display_name, source.feed_url,
+            )
+            result.errors.append(f"HTTP {http_status} — 자동 비활성화")
+            return result
+
+        # URL 리다이렉트 감지: 최종 URL이 다르면 feed_url 자동 갱신
+        final_url = getattr(parsed, "href", None)
+        if final_url and final_url != source.feed_url and parsed.entries:
+            logger.info(
+                "RSS 피드 URL 자동 갱신: %s — %s → %s",
+                source.display_name, source.feed_url, final_url,
+            )
+            source.feed_url = final_url
+            db.add(source)
+            await db.flush()
 
         if parsed.bozo and not parsed.entries:
             result.errors.append(f"피드 오류: {parsed.bozo_exception}")
+            await self._track_error(redis, source, db, str(parsed.bozo_exception))
             return result
+
+        # 정상 수집 도달 → 에러 카운트 초기화
+        await self._reset_error_count(redis, source)
 
         for entry in parsed.entries:
             guid = _compute_guid(entry)
@@ -360,7 +426,7 @@ class RSSCollector:
         for ch in channels:
             async with sem:
                 try:
-                    result = await self.collect_feed(ch, db)
+                    result = await self.collect_feed(ch, db, redis=redis)
                     logger.info(
                         "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
                         ch.display_name,
