@@ -159,6 +159,7 @@ async def list_users(
                 "id": str(u.id),
                 "email": u.email,
                 "nickname": u.nickname,
+                "display_name": u.display_name,
                 "plan": u.plan,
                 "status": u.status,
                 "role": u.role,

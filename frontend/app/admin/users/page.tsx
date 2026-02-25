@@ -16,6 +16,7 @@ interface AdminUser {
   id: string;
   email: string | null;
   nickname: string | null;
+  display_name: string | null;
   plan: string;
   role: string;
   status: string;
@@ -206,7 +207,7 @@ export default function AdminUsersPage() {
                   <tr key={u.id} className="hover:bg-secondary/20 cursor-pointer" onClick={() => setDrawerUserId(u.id)}>
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium">{u.nickname || t(lang, "admin_no_name")}</p>
+                        <p className="font-medium">{u.nickname || u.display_name || t(lang, "admin_no_name")}</p>
                         <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
                       </div>
                     </td>
@@ -266,7 +267,7 @@ export default function AdminUsersPage() {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <p className="font-medium text-sm">{u.nickname || t(lang, "admin_no_name")}</p>
+                    <p className="font-medium text-sm">{u.nickname || u.display_name || t(lang, "admin_no_name")}</p>
                     <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
                   </div>
                   <span className={cn("text-xs font-medium", STATUS_BADGE[u.status])}>{u.status}</span>
