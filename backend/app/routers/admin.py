@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, and_, cast, Date, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, get_db
+from backend.app.core.auth import get_current_user, get_db, require_admin
 from backend.app.core.redis import get_redis
 from backend.app.models.user import User, UserPushToken
 from backend.app.models.community import Post, Report, AdminLog
@@ -25,12 +25,6 @@ from backend.app.models.source_channel import SourceChannel
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 ADMIN_SETTINGS_KEY = "admin:settings:v1"
-
-
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
-        raise HTTPException(403, detail="관리자만 접근 가능합니다.")
-    return current_user
 
 
 async def _log_action(
