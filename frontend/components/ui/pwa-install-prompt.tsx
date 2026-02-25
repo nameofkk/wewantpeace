@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
+import { useAppStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
 
 const DISMISS_KEY = "pwa_install_dismissed";
 const DISMISS_HOURS = 24;
@@ -12,22 +14,27 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+function isDismissed() {
+  const dismissed = localStorage.getItem(DISMISS_KEY);
+  if (!dismissed) return false;
+  const dismissedAt = parseInt(dismissed, 10);
+  if (Date.now() - dismissedAt < DISMISS_HOURS * 60 * 60 * 1000) return true;
+  localStorage.removeItem(DISMISS_KEY);
+  return false;
+}
+
 export function PWAInstallPrompt() {
   const pathname = usePathname();
+  const lang = useAppStore((s) => s.lang);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // 24시간 내 닫은 적 있으면 무시
-    const dismissed = localStorage.getItem(DISMISS_KEY);
-    if (dismissed) {
-      const dismissedAt = parseInt(dismissed, 10);
-      if (Date.now() - dismissedAt < DISMISS_HOURS * 60 * 60 * 1000) return;
-      localStorage.removeItem(DISMISS_KEY);
-    }
+    if (isDismissed()) return;
 
     const handler = (e: Event) => {
       e.preventDefault();
+      if (isDismissed()) return;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setVisible(true);
     };
@@ -36,7 +43,7 @@ export function PWAInstallPrompt() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  const handleInstall = async () => {
+  const handleInstall = useCallback(async () => {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
@@ -44,12 +51,12 @@ export function PWAInstallPrompt() {
       setVisible(false);
       setDeferredPrompt(null);
     }
-  };
+  }, [deferredPrompt]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     setVisible(false);
     localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  };
+  }, []);
 
   if (!visible || pathname === "/upgrade") return null;
 
@@ -59,16 +66,16 @@ export function PWAInstallPrompt() {
         <Download className="h-5 w-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold">앱으로 설치하기</p>
+        <p className="text-sm font-semibold">{t(lang, "pwa_install_title")}</p>
         <p className="text-[11px] text-muted-foreground truncate">
-          홈 화면에 추가하면 더 빠르게 실행됩니다
+          {t(lang, "pwa_install_desc")}
         </p>
       </div>
       <button
         onClick={handleInstall}
         className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
       >
-        설치
+        {t(lang, "pwa_install_btn")}
       </button>
       <button
         onClick={handleDismiss}

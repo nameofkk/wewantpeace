@@ -636,6 +636,11 @@ export const translations = {
     store_login_to_sync: "앱에 로그인하면 자동 적용됩니다",
     store_cancel_in_store: "구독 취소는 스토어에서 직접 해주세요",
     store_subscribe_in_app_desc: "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요",
+
+    // PWA 설치 배너
+    pwa_install_title: "WeWantPeace 앱 설치",
+    pwa_install_desc: "실시간 알림과 빠른 접근을 위해 설치하세요",
+    pwa_install_btn: "설치",
   },
   en: {
     // bottom nav
@@ -1270,6 +1275,11 @@ export const translations = {
     store_login_to_sync: "Log in to the app to sync",
     store_cancel_in_store: "Please cancel your subscription in the store",
     store_subscribe_in_app_desc: "Install the WeWantPeace app and subscribe to Pro/Pro+",
+
+    // PWA install banner
+    pwa_install_title: "Install WeWantPeace App",
+    pwa_install_desc: "Install for real-time alerts and quick access",
+    pwa_install_btn: "Install",
   },
 } as const;
 
