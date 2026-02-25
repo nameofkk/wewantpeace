@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 실시간 세계정세 모니터링",
+    title: "WeWantPeace — 세계정세 모니터링",
     description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
     images: [
       {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace — 실시간 세계정세 모니터링",
+    title: "WeWantPeace — 세계정세 모니터링",
     description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
     images: ["/icons/og-image.png"],
   },
