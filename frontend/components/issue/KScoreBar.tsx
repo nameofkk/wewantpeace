@@ -1,31 +1,32 @@
 "use client";
 
 interface KScoreBarProps {
-  kscore: number;   // 0 ~ 5 (이론적 최대값)
+  kscore: number;   // 0 ~ 10 스케일
   showLabel?: boolean;
   className?: string;
 }
 
-const KSCORE_MAX = 5.0;  // 바 100% 기준값
+const KSCORE_MAX = 10.0;  // 바 100% 기준값
 
 function kscoreColor(k: number): string {
-  if (k >= 3.0) return "from-red-500 to-red-400";
-  if (k >= 2.0) return "from-orange-500 to-orange-400";
-  if (k >= 1.0) return "from-yellow-500 to-yellow-400";
+  if (k >= 7.0) return "from-red-500 to-red-400";
+  if (k >= 5.0) return "from-orange-500 to-orange-400";
+  if (k >= 3.0) return "from-yellow-500 to-yellow-400";
   return "from-green-500 to-green-400";
 }
 
-function kscoreLabel(k: number): string {
-  if (k >= 3.0) return "매우 높음";
-  if (k >= 2.0) return "높음";
-  if (k >= 1.0) return "보통";
-  return "낮음";
+function kscoreLabel(k: number, rounded: number): string {
+  if (rounded >= 7.0) return "위기";
+  if (rounded >= 5.0) return "경계";
+  if (rounded >= 3.0) return "주의";
+  return "정상";
 }
 
 export function KScoreBar({ kscore, showLabel = true, className = "" }: KScoreBarProps) {
+  const rounded = Math.round(kscore * 10) / 10;
   const pct = Math.min(100, Math.round((kscore / KSCORE_MAX) * 100));
-  const gradient = kscoreColor(kscore);
-  const label = kscoreLabel(kscore);
+  const gradient = kscoreColor(rounded);
+  const label = kscoreLabel(kscore, rounded);
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
@@ -39,7 +40,7 @@ export function KScoreBar({ kscore, showLabel = true, className = "" }: KScoreBa
         />
       </div>
       <span className="text-[10px] font-medium text-right w-16 shrink-0 text-muted-foreground">
-        {kscore.toFixed(2)} <span className="text-foreground">{label}</span>
+        {rounded.toFixed(1)} <span className="text-foreground">{label}</span>
       </span>
     </div>
   );

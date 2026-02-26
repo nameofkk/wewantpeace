@@ -43,6 +43,31 @@ function kscoreAccent(kscore?: number): string {
   return "border-l-green-600";
 }
 
+// KScore 상태 뱃지 — 색상 + 라벨 (0-10 스케일)
+function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg: string; text: string; glow: string } {
+  const k = roundKScore(kscore);
+  if (k >= 7.0) return {
+    label: lang === "ko" ? "위기" : "Crisis",
+    bg: "bg-red-500/15", text: "text-red-400",
+    glow: "shadow-red-500/20 shadow-lg",
+  };
+  if (k >= 5.0) return {
+    label: lang === "ko" ? "경계" : "Alert",
+    bg: "bg-orange-500/15", text: "text-orange-400",
+    glow: "shadow-orange-500/15 shadow-md",
+  };
+  if (k >= 3.0) return {
+    label: lang === "ko" ? "주의" : "Watch",
+    bg: "bg-yellow-500/10", text: "text-yellow-400",
+    glow: "",
+  };
+  return {
+    label: lang === "ko" ? "정상" : "Normal",
+    bg: "bg-green-500/10", text: "text-green-500",
+    glow: "",
+  };
+}
+
 interface TrendingItem {
   id: number;
   keyword: string;
@@ -278,7 +303,10 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const lang = useAppStore((s) => s.lang);
   const [showHistory, setShowHistory] = useState(false);
   const topic = item.topic ?? "unknown";
-  const isCritical = roundKScore(item.kscore) >= 7.0;
+  const k = roundKScore(item.kscore);
+  const isCritical = k >= 7.0;
+  const isAlert = k >= 5.0;
+  const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
   const displayTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
@@ -289,16 +317,29 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   return (
     <div
       className={cn(
-        "card-enter rounded-xl border-l-4 border border-border bg-card p-4",
+        "card-enter rounded-xl border-l-4 border border-border bg-card p-4 relative overflow-hidden",
         "transition-all hover:bg-card/80",
         clusterId && "cursor-pointer",
         kscoreAccent(item.kscore),
-        isCritical && "shadow-red-900/20 shadow-md"
+        badge.glow,
+        isCritical && "kscore-crisis-pulse",
       )}
       style={{ animationDelay: `${delay}ms` }}
       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
     >
-      <div className="flex items-start gap-3">
+      {/* 배경 글로우 (경계/위기만) */}
+      {isAlert && (
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: isCritical
+              ? "linear-gradient(135deg, rgba(239,68,68,0.06) 0%, transparent 60%)"
+              : "linear-gradient(135deg, rgba(249,115,22,0.04) 0%, transparent 60%)",
+          }}
+        />
+      )}
+
+      <div className="flex items-start gap-3 relative">
         {/* 순위 — 1위는 특별 강조 */}
         <div className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
@@ -309,6 +350,14 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {/* KScore 상태 뱃지 */}
+            <span className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none",
+              badge.bg, badge.text,
+              isCritical && "animate-pulse",
+            )}>
+              {badge.label}
+            </span>
             {isNew(item.first_event_at) && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-400 leading-none">
                 NEW
@@ -341,13 +390,10 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
         {/* KScore 뱃지 */}
         <div className="shrink-0 flex flex-col items-end gap-0.5">
           <span className={cn(
-            "text-sm font-bold tabular-nums",
-            roundKScore(item.kscore) >= 7.0 ? "text-red-400" :
-            roundKScore(item.kscore) >= 5.0 ? "text-orange-400" :
-            roundKScore(item.kscore) >= 3.0 ? "text-yellow-400" :
-            "text-muted-foreground"
+            "text-lg font-bold tabular-nums",
+            badge.text,
           )}>
-            {roundKScore(item.kscore).toFixed(1)}
+            {k.toFixed(1)}
           </span>
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
             KScore
@@ -357,7 +403,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
       </div>
 
       {clusterId && (
-        <div className="flex items-center justify-end mt-2 gap-1 text-[10px] text-primary/70">
+        <div className="flex items-center justify-end mt-2 gap-1 text-[10px] text-primary/70 relative">
           <span>{t(lang, "home_view_detail")}</span>
           <ChevronRight className="h-3 w-3" />
         </div>
@@ -366,7 +412,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
       {clusterId && (
         <button
           onClick={(e) => { e.stopPropagation(); setShowHistory((v) => !v); }}
-          className="mt-3 w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="mt-3 w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1 relative"
         >
           {showHistory
             ? <><ChevronUp className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 접기" : "Hide KScore history"}</>
@@ -376,7 +422,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
       )}
 
       {showHistory && clusterId && (
-        <div onClick={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()} className="relative">
           <KScoreHistorySection clusterId={clusterId} userPlan={userPlan} lang={lang} />
         </div>
       )}

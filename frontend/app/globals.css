@@ -124,6 +124,15 @@
   animation: slide-up 0.35s ease forwards;
 }
 
+/* ── KScore 위기 카드 펄스 ───────────────────────────── */
+@keyframes crisis-border {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
+  50%      { border-color: rgba(239, 68, 68, 0.6); }
+}
+.kscore-crisis-pulse {
+  animation: crisis-border 2s ease-in-out infinite;
+}
+
 /* ── LIVE 글로우 ─────────────────────────────────────── */
 @keyframes live-glow {
   0%, 100% { opacity: 1; }

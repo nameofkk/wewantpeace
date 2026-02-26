@@ -730,7 +730,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 2. KScore 슬라이더 */}
-            <div className="p-4">
+            <div className={cn("p-4", !hasFCMToken && "opacity-50 pointer-events-none")}>
               <div className="flex items-center justify-between mb-1">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_kscore_title")}</p>
@@ -740,7 +740,11 @@ export default function SettingsPage() {
                   {kscoreValue.toFixed(1)}
                 </span>
               </div>
-              {plan === "free" ? (
+              {!hasFCMToken ? (
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  {t(lang, "settings_push_off_hint")}
+                </p>
+              ) : plan === "free" ? (
                 <div className="mt-2 flex items-center gap-2">
                   <div className="flex-1 h-2 rounded-full bg-muted" />
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
@@ -769,24 +773,26 @@ export default function SettingsPage() {
             </div>
 
             {/* 3. 토픽 필터 (Pro / Pro+) */}
-            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-70 pointer-events-none")}>
+            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-50 pointer-events-none")}>
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_topics_title")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "notif_topics_desc")}</p>
                 </div>
                 {plan === "free" && (
-                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors">
+                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
                     Pro →
                   </a>
                 )}
               </div>
-              {plan === "free" && (
-                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
+              {!hasFCMToken ? (
+                <p className="mt-1 text-[10px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
+              ) : plan === "free" ? (
+                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
                   <span>🔓</span>
                   <span>{t(lang, "settings_unlock_topics")}</span>
                 </a>
-              )}
+              ) : null}
               {plan !== "free" ? (
                 <>
                   <div className="flex gap-3 mb-2">
@@ -844,14 +850,14 @@ export default function SettingsPage() {
             </div>
 
             {/* 4. 방해금지 시간 (Pro / Pro+) */}
-            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-60 pointer-events-none")}>
+            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-50 pointer-events-none")}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_quiet_title")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_desc")}</p>
                 </div>
-                {plan === "free" ? (
-                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors">
+                {!hasFCMToken ? null : plan === "free" ? (
+                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
                     Pro →
                   </a>
                 ) : (
@@ -877,13 +883,15 @@ export default function SettingsPage() {
                   </button>
                 )}
               </div>
-              {plan === "free" && (
-                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
+              {!hasFCMToken ? (
+                <p className="mt-2 text-[10px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
+              ) : plan === "free" ? (
+                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
                   <span>🔓</span>
                   <span>{t(lang, "settings_unlock_quiet")}</span>
                 </a>
-              )}
-              {plan !== "free" && quietEnabled && (
+              ) : null}
+              {plan !== "free" && hasFCMToken && quietEnabled && (
                 <div className="flex items-center gap-2 mt-3">
                   <div className="flex-1 flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_from")}</span>

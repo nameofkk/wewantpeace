@@ -42,7 +42,7 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "KScore 필터 조정",   labelEn: "KScore threshold filter",
-    free: "고정 (1.0)",           pro: "1.0 ~ 4.0",               proplus: "0.5 ~ 4.0",
+    free: "고정 (3.0)",           pro: "3.0 ~ 10.0",              proplus: "1.5 ~ 10.0",
   },
   {
     labelKo: "토픽 필터",          labelEn: "Topic filter",
@@ -608,7 +608,7 @@ export default function UpgradePage() {
               <div className="mt-4 space-y-2.5">
                 {[
                   lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
-                  lang === "ko" ? "무제한 국가 + KScore 0.5~4.0" : "Unlimited countries + KScore 0.5~4.0",
+                  lang === "ko" ? "무제한 국가 + KScore 1.5~10.0" : "Unlimited countries + KScore 1.5~10.0",
                   lang === "ko" ? "90일 전체 히스토리" : "Full 90-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">

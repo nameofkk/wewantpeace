@@ -28,28 +28,28 @@ interface TrendingRow {
 }
 
 const KSCORE_COLORS = [
-  "bg-green-500/20 text-green-400 border-green-500/50",    // < 1.0
-  "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 1.0 ~ 2.0
-  "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 2.0 ~ 3.0
-  "bg-red-500/20 text-red-200 border-red-500/90",           // >= 3.0
+  "bg-green-500/20 text-green-400 border-green-500/50",    // < 3.0
+  "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 3.0 ~ 5.0
+  "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 5.0 ~ 7.0
+  "bg-red-500/20 text-red-200 border-red-500/90",           // >= 7.0
 ];
 
 function kscoreColorIdx(k: number): number {
-  if (k >= 3.0) return 3;
-  if (k >= 2.0) return 2;
-  if (k >= 1.0) return 1;
+  if (k >= 7.0) return 3;
+  if (k >= 5.0) return 2;
+  if (k >= 3.0) return 1;
   return 0;
 }
 
 function kscoreBarColor(k: number): string {
-  if (k >= 3.0) return "bg-red-500";
-  if (k >= 2.0) return "bg-orange-500";
-  if (k >= 1.0) return "bg-yellow-500";
+  if (k >= 7.0) return "bg-red-500";
+  if (k >= 5.0) return "bg-orange-500";
+  if (k >= 3.0) return "bg-yellow-500";
   return "bg-green-500";
 }
 
-const KSCORE_LABELS_KO = ["낮음", "보통", "높음", "위험"];
-const KSCORE_LABELS_EN = ["Low", "Mid", "High", "Critical"];
+const KSCORE_LABELS_KO = ["정상", "주의", "경계", "위기"];
+const KSCORE_LABELS_EN = ["Normal", "Watch", "Alert", "Crisis"];
 
 const TOPIC_COLORS: Record<string, string> = {
   military: "bg-red-500/20 text-red-300",
@@ -345,8 +345,8 @@ export default function AdminKScorePage() {
                 <div key={row.id} className={cn(
                   "rounded-xl border border-border bg-card p-4",
                   row.is_expired && "opacity-50",
-                  row.kscore >= 3.0 && "bg-red-500/[0.06]",
-                  row.kscore >= 2.0 && row.kscore < 3.0 && "bg-orange-500/[0.03]",
+                  row.kscore >= 7.0 && "bg-red-500/[0.06]",
+                  row.kscore >= 5.0 && row.kscore < 7.0 && "bg-orange-500/[0.03]",
                 )}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
