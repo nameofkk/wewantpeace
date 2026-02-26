@@ -23,6 +23,9 @@ from backend.app.models.raw_event import RawEvent
 
 logger = logging.getLogger(__name__)
 
+# 연속 resolve 실패 N회 초과 시 자동 비활성화 (15분 주기 × 20 = 5시간)
+_MAX_RESOLVE_FAILURES = 20
+
 
 @dataclass
 class CollectResult:
@@ -113,17 +116,50 @@ class TelegramCollector:
             "collected_at": datetime.now(timezone.utc),
         }
 
+    async def _get_fail_count(self, redis, channel_id: int) -> int:
+        """Redis에서 연속 resolve 실패 횟수 조회."""
+        if redis is None:
+            return 0
+        try:
+            val = await redis.get(f"telegram:resolve_fails:{channel_id}")
+            return int(val) if val else 0
+        except Exception:
+            return 0
+
+    async def _increment_fail_count(self, redis, channel_id: int) -> int:
+        """연속 실패 횟수 증가. 반환값: 증가 후 횟수."""
+        if redis is None:
+            return 0
+        try:
+            key = f"telegram:resolve_fails:{channel_id}"
+            count = await redis.incr(key)
+            await redis.expire(key, 86400)  # 24시간 TTL
+            return count
+        except Exception:
+            return 0
+
+    async def _reset_fail_count(self, redis, channel_id: int):
+        """resolve 성공 시 실패 횟수 리셋."""
+        if redis is None:
+            return
+        try:
+            await redis.delete(f"telegram:resolve_fails:{channel_id}")
+        except Exception:
+            pass
+
     async def _resolve_entity(
         self,
         channel: SourceChannel,
         client: TelegramClient,
         db: AsyncSession,
+        redis=None,
     ):
         """
         채널 엔티티 해석 + channel_id/username 자동 동기화.
 
         우선순위: channel_id(영구) > username(가변)
         성공 시 DB에 channel_id와 최신 username을 자동 저장.
+        연속 실패 시 자동 비활성화.
         """
         entity = None
 
@@ -149,12 +185,30 @@ class TelegramCollector:
                     "채널 %s (username=%s) 엔티티 해석 실패: %s",
                     channel.display_name, channel.username, e,
                 )
-                return None
 
+        # 3) 둘 다 실패 → 연속 실패 카운트 증가, 임계치 초과 시 자동 비활성화
         if entity is None:
+            fail_count = await self._increment_fail_count(redis, channel.id)
+            if fail_count >= _MAX_RESOLVE_FAILURES:
+                logger.warning(
+                    "채널 %s resolve 연속 %d회 실패 → 자동 비활성화 (channel_id=%s, username=%s)",
+                    channel.display_name, fail_count, channel.channel_id, channel.username,
+                )
+                channel.is_active = False
+                db.add(channel)
+                await db.flush()
+            else:
+                logger.warning(
+                    "채널 %s resolve 실패 (%d/%d) — channel_id=%s, username=%s",
+                    channel.display_name, fail_count, _MAX_RESOLVE_FAILURES,
+                    channel.channel_id, channel.username,
+                )
             return None
 
-        # 3) DB에 channel_id / username 자동 동기화
+        # resolve 성공 → 실패 카운트 리셋
+        await self._reset_fail_count(redis, channel.id)
+
+        # 4) DB에 channel_id / username 자동 동기화
         resolved_id = getattr(entity, "id", None)
         resolved_username = getattr(entity, "username", None)
         updated = False
@@ -167,11 +221,18 @@ class TelegramCollector:
             channel.channel_id = resolved_id
             updated = True
 
-        if resolved_username and channel.username != resolved_username:
-            logger.info(
-                "채널 %s username 자동 갱신: %s → %s",
-                channel.display_name, channel.username, resolved_username,
-            )
+        # username 변경 감지 (삭제된 경우도 포함)
+        if resolved_username != channel.username:
+            if resolved_username:
+                logger.info(
+                    "채널 %s username 자동 갱신: %s → %s",
+                    channel.display_name, channel.username, resolved_username,
+                )
+            else:
+                logger.warning(
+                    "채널 %s username 삭제 감지 (기존: %s) — channel_id=%s로 수집 지속",
+                    channel.display_name, channel.username, channel.channel_id,
+                )
             channel.username = resolved_username
             updated = True
 
@@ -202,7 +263,7 @@ class TelegramCollector:
             return result
 
         # 채널 엔티티 해석 (channel_id 우선, username fallback, 자동 동기화)
-        entity = await self._resolve_entity(channel, client, db)
+        entity = await self._resolve_entity(channel, client, db, redis)
         if entity is None:
             result.errors.append("채널 엔티티 해석 실패")
             return result
