@@ -383,17 +383,16 @@ export default function MapPage() {
       markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
       markersRef.current = [];
 
-      // 클러스터 그룹핑: zoom에 따라 분기
+      // 클러스터 그룹핑: 모든 줌에서 국가별 고정 좌표(COUNTRY_CENTERS) 사용
       let displayClusters: Cluster[];
       try {
+        const byCountry = groupClustersByCountry(clusters);
         if (mapZoom < 4) {
-          // 저배율: 국가별 1개 마커 (고정 좌표) → 인접 국가 pixel proximity 합치기
-          const byCountry = groupClustersByCountry(clusters);
+          // 저배율: 인접 국가 마커를 pixel proximity로 추가 합치기
           displayClusters = groupByPixelProximity(byCountry, currentMap, 40);
         } else {
-          // 중·고배율: 개별 클러스터 표시, 근접 시만 합침
-          const valid = clusters.filter((c) => c.lat != null && c.lon != null);
-          displayClusters = groupByPixelProximity(valid, currentMap, 30);
+          // 중·고배율: 국가별 마커 그대로 (고정 좌표, 분할됨)
+          displayClusters = byCountry;
         }
       } catch {
         displayClusters = clusters.filter((c) => c.lat != null && c.lon != null);
