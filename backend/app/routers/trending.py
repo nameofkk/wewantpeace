@@ -96,7 +96,7 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
 
     if raw_rows:
         # kscore 내림차순 정렬 후 상위 20개
-        sorted_rows = sorted(raw_rows, key=lambda r: r["kscore"], reverse=True)[:20]
+        sorted_rows = sorted(raw_rows, key=lambda r: r["kscore"], reverse=True)[:30]
 
         # 클러스터 first_event_at 배치 조회
         import uuid as uuid_mod
@@ -194,10 +194,10 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
         ))
 
     scored.sort(key=lambda x: x.kscore, reverse=True)
-    return scored[:20]
+    return scored[:30]
 
 
-_MINE_COUNTRIES = ["UA", "PS", "IL", "IR", "KP", "TW", "SY", "MM"]
+_MINE_COUNTRIES = ["UA", "PS", "IL", "IR", "KP", "KR", "TW", "SY", "MM"]
 
 
 @router.get("/mine", response_model=list[TrendingItem])

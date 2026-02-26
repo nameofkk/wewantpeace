@@ -170,15 +170,25 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
         )
     )
 
-    # issue_clusters.kscore 업데이트 — 상위 20개만 아닌 전체 scored 클러스터 갱신
-    # (트렌딩 20위 밖 클러스터도 상세 페이지에서 KScore 0.0 고정 방지)
+    # issue_clusters.kscore 업데이트:
+    # 1) scored 클러스터: 계산된 kscore 반영
+    # 2) 평가했지만 KSCORE_MIN 미달 클러스터: kscore=0 리셋
+    #    (이전에 높았다가 떨어진 클러스터가 stale 값을 유지하는 버그 방지)
     from sqlalchemy import update as sql_update
-    for item in scored:  # top → scored (전체)
+    scored_ids = {uuid_lib.UUID(item["cluster_id"]) for item in scored}
+    for item in scored:
         await db.execute(
             sql_update(IssueCluster)
             .where(IssueCluster.id == uuid_lib.UUID(item["cluster_id"]))
             .values(kscore=item["kscore"])
         )
+    for c in clusters:
+        if c.id not in scored_ids:
+            await db.execute(
+                sql_update(IssueCluster)
+                .where(IssueCluster.id == c.id)
+                .values(kscore=0.0)
+            )
 
     logger.info("트렌딩 계산 완료: 클러스터 %d개 → scored %d개 (top %d개)", len(clusters), len(scored), len(top))
     return top

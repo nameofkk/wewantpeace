@@ -75,7 +75,8 @@ function getTopicLabel(topic: string, lang: Lang): string {
 }
 
 function repScore(c: Cluster): number {
-  return c.severity + c.kscore * 10;
+  // KScore 우선, severity 동점 처리 — 홈 트렌딩(kscore 내림차순)과 동일 기준
+  return c.kscore * 1000 + c.severity;
 }
 
 function groupByPixelProximity(clusters: Cluster[], map: any, threshold: number): Cluster[] {
@@ -198,7 +199,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-lg p-2" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-          <p className="text-lg font-bold" style={{ color }}>{cluster.kscore.toFixed(1)}</p>
+          <p className="text-lg font-bold" style={{ color }}>{cluster.kscore.toFixed(2)}</p>
           <p className="flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground">
             KScore
             <InfoTooltip direction="up" text={t(lang, "map_popup_kscore_tooltip")} />
