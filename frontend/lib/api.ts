@@ -154,6 +154,8 @@ export function useMe() {
     queryKey: ["me"],
     queryFn: () => apiFetch("/me"),
     retry: false,
+    staleTime: 30 * 1000,
+    refetchOnMount: "always",
   });
 }
 

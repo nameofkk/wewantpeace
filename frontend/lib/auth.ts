@@ -9,7 +9,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   User as FirebaseUser,
 } from "firebase/auth";
 import { useState, useEffect, useCallback } from "react";
@@ -83,6 +83,7 @@ export async function createEmailUser(email: string, password: string): Promise<
 // 로그아웃
 export async function signOut(): Promise<void> {
   const auth = getFirebaseAuth();
+  localStorage.removeItem("firebase_token");
   if (!auth) return;
   await firebaseSignOut(auth);
 }
@@ -111,8 +112,14 @@ export function useAuth() {
       setLoading(false);
       return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        const token = await u.getIdToken();
+        localStorage.setItem("firebase_token", token);
+      } else {
+        localStorage.removeItem("firebase_token");
+      }
       setLoading(false);
     });
     return () => unsubscribe();

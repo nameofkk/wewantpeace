@@ -24,7 +24,7 @@ export const translations = {
 
     // 긴장도 기본
     tension_title: "긴장도 지수",
-    tension_subtitle: "국가별 긴장도를 점수와 30일 추이로 한눈에 파악하세요",
+    tension_subtitle: "국가별 긴장도를 점수와 일별 추이로 한눈에 파악하세요",
     tension_crisis: "위기",
     tension_warning: "경계",
     tension_updated: "갱신",
@@ -280,6 +280,12 @@ export const translations = {
     login_already_have: "이미 계정이 있으신가요?",
     login_login_link: "로그인",
     login_error_not_allowed: "이메일 회원가입이 현재 비활성화되어 있습니다. Google 로그인을 이용해주세요.",
+    login_error_email_in_use: "이미 가입된 이메일입니다.",
+    login_error_pw_short: "비밀번호는 8자 이상이어야 합니다.",
+    login_error_pw_mismatch: "비밀번호가 일치하지 않습니다.",
+    login_error_underage: "만 14세 미만은 가입할 수 없습니다.",
+    login_pw_ok: "사용 가능한 비밀번호입니다.",
+    login_pw_match: "비밀번호가 일치합니다.",
 
     // 토픽
     topic_conflict: "분쟁",
@@ -706,7 +712,7 @@ export const translations = {
 
     // tension
     tension_title: "Tension Index",
-    tension_subtitle: "Monitor country-level tension scores and 30-day trends",
+    tension_subtitle: "Monitor country-level tension scores and daily trends",
     tension_crisis: "Crisis",
     tension_warning: "Warning",
     tension_updated: "updated",
@@ -962,6 +968,12 @@ export const translations = {
     login_already_have: "Already have an account?",
     login_login_link: "Log In",
     login_error_not_allowed: "Email signup is currently unavailable. Please use Google Sign-In.",
+    login_error_email_in_use: "This email is already registered.",
+    login_error_pw_short: "Password must be at least 8 characters.",
+    login_error_pw_mismatch: "Passwords do not match.",
+    login_error_underage: "You must be at least 14 years old to register.",
+    login_pw_ok: "Password meets requirements.",
+    login_pw_match: "Passwords match.",
 
     // topics
     topic_conflict: "Conflict",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,7 +10,9 @@ import {
   signInWithGoogle,
   signInWithEmail,
   createEmailUser,
+  getFirebaseAuth,
 } from "@/lib/auth";
+import { fetchSignInMethodsForEmail } from "firebase/auth";
 import type { User as FirebaseUser } from "firebase/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -47,8 +49,73 @@ export default function LoginPage() {
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
 
+  // 실시간 검증 상태
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [pwValid, setPwValid] = useState<boolean | null>(null);
+  const [pwMatch, setPwMatch] = useState<boolean | null>(null);
+  const [birthYearError, setBirthYearError] = useState<string | null>(null);
+
+  // Debounce refs
+  const nickDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 이메일 중복 확인 (debounced)
+  const checkEmailExists = useCallback(async (email: string) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailStatus("idle");
+      return;
+    }
+    setEmailStatus("checking");
+    try {
+      const auth = getFirebaseAuth();
+      if (!auth) { setEmailStatus("idle"); return; }
+      const methods = await fetchSignInMethodsForEmail(auth, email);
+      setEmailStatus(methods.length > 0 ? "taken" : "available");
+    } catch {
+      setEmailStatus("idle");
+    }
+  }, []);
+
+  function handleRegEmailChange(email: string) {
+    setRegEmail(email);
+    setEmailStatus("idle");
+    if (emailDebounce.current) clearTimeout(emailDebounce.current);
+    emailDebounce.current = setTimeout(() => checkEmailExists(email), 600);
+  }
+
+  // 비밀번호 실시간 검증
+  function handleRegPasswordChange(pw: string) {
+    setRegPassword(pw);
+    setPwValid(pw.length >= 8);
+    if (regPasswordConfirm) setPwMatch(pw === regPasswordConfirm);
+  }
+
+  function handleRegPasswordConfirmChange(pw: string) {
+    setRegPasswordConfirm(pw);
+    setPwMatch(pw.length > 0 ? regPassword === pw : null);
+  }
+
+  // 생년도 실시간 검증
+  function handleBirthYearChange(val: string) {
+    setBirthYear(val);
+    const year = parseInt(val);
+    if (!val || isNaN(year)) {
+      setBirthYearError(null);
+    } else if (year > MAX_BIRTH_YEAR) {
+      setBirthYearError(t(lang, "login_error_underage"));
+    } else if (year < MIN_BIRTH_YEAR) {
+      setBirthYearError(lang === "en" ? "Invalid birth year." : "유효하지 않은 생년도입니다.");
+    } else {
+      setBirthYearError(null);
+    }
+  }
+
+  // 닉네임 중복 확인 (debounced, 자동)
   async function checkNickname(name: string) {
-    if (!name || name.length < 2) return;
+    if (!name || name.length < 2) {
+      setNicknameAvailable(null);
+      return;
+    }
     setNicknameChecking(true);
     try {
       const res = await fetch(`${API_BASE}/auth/check-nickname?nickname=${encodeURIComponent(name)}`);
@@ -60,6 +127,23 @@ export default function LoginPage() {
       setNicknameChecking(false);
     }
   }
+
+  function handleNicknameChange(name: string) {
+    setNickname(name);
+    setNicknameAvailable(null);
+    if (nickDebounce.current) clearTimeout(nickDebounce.current);
+    if (name.length >= 2) {
+      nickDebounce.current = setTimeout(() => checkNickname(name), 500);
+    }
+  }
+
+  // cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (nickDebounce.current) clearTimeout(nickDebounce.current);
+      if (emailDebounce.current) clearTimeout(emailDebounce.current);
+    };
+  }, []);
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -234,6 +318,9 @@ export default function LoginPage() {
       const err = e as { code?: string; message?: string };
       if (err.code === "auth/operation-not-allowed") {
         setError(t(lang, "login_error_not_allowed"));
+      } else if (err.code === "auth/email-already-in-use") {
+        setError(t(lang, "login_error_email_in_use"));
+        setEmailStatus("taken");
       } else {
         setError(err.message || (lang === "en" ? "Registration failed." : "회원가입에 실패했습니다."));
       }
@@ -241,6 +328,14 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  // 이메일 회원가입 버튼 비활성화 조건
+  const registerDisabled = loading
+    || nicknameAvailable === false
+    || emailStatus === "taken"
+    || pwValid === false
+    || pwMatch === false
+    || !!birthYearError;
 
   const termsItems = [
     { key: "terms" as const, label: t(lang, "login_terms_label"), required: true, href: "/terms" as string | null, value: agreedTerms, setter: setAgreedTerms },
@@ -353,26 +448,29 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type="text" value={nickname}
-                onChange={(e) => { setNickname(e.target.value); setNicknameAvailable(null); }}
-                onBlur={() => checkNickname(nickname)}
+                onChange={(e) => handleNicknameChange(e.target.value)}
                 placeholder={t(lang, "login_nickname_placeholder")} required
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary pr-24"
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
               />
-              <button type="button" onClick={() => checkNickname(nickname)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary hover:underline">
-                {nicknameChecking ? <Loader2 className="h-3 w-3 animate-spin" /> : t(lang, "login_nickname_check")}
-              </button>
+              {nicknameChecking && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
             {nicknameAvailable === true && <p className="mt-1 text-xs text-green-500">{t(lang, "login_nickname_available")}</p>}
             {nicknameAvailable === false && <p className="mt-1 text-xs text-destructive">{t(lang, "login_nickname_taken")}</p>}
           </div>
 
-          <input
-            type="number" value={birthYear} onChange={(e) => setBirthYear(e.target.value)}
-            placeholder={t(lang, "login_birth_year_placeholder")}
-            min={MIN_BIRTH_YEAR} max={MAX_BIRTH_YEAR} required
-            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-          />
+          <div>
+            <input
+              type="number" value={birthYear} onChange={(e) => handleBirthYearChange(e.target.value)}
+              placeholder={t(lang, "login_birth_year_placeholder")}
+              min={MIN_BIRTH_YEAR} max={MAX_BIRTH_YEAR} required
+              className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
+                birthYearError ? "border-destructive" : "border-border"
+              )}
+            />
+            {birthYearError && <p className="mt-1 text-xs text-destructive">{birthYearError}</p>}
+          </div>
 
           <div className="rounded-lg border border-border p-4 space-y-3">
             <p className="text-xs font-medium text-muted-foreground">{t(lang, "login_terms_section")}</p>
@@ -405,48 +503,74 @@ export default function LoginPage() {
         </form>
       ) : (
         <form onSubmit={handleRegister} className="space-y-3">
-          <input
-            type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)}
-            placeholder={t(lang, "login_email_placeholder")} required
-            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-          />
-          <input
-            type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)}
-            placeholder={t(lang, "login_password_min")} minLength={8} required
-            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-          />
-          <input
-            type="password" value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)}
-            placeholder={t(lang, "login_password_confirm")} required
-            className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
-              regPasswordConfirm && regPassword !== regPasswordConfirm ? "border-destructive" : "border-border"
-            )}
-          />
+          {/* 이메일 */}
+          <div>
+            <input
+              type="email" value={regEmail} onChange={(e) => handleRegEmailChange(e.target.value)}
+              placeholder={t(lang, "login_email_placeholder")} required
+              className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
+                emailStatus === "taken" ? "border-destructive" : "border-border"
+              )}
+            />
+            {emailStatus === "checking" && <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />{lang === "en" ? "Checking..." : "확인 중..."}</p>}
+            {emailStatus === "taken" && <p className="mt-1 text-xs text-destructive">{t(lang, "login_error_email_in_use")}</p>}
+          </div>
 
+          {/* 비밀번호 */}
+          <div>
+            <input
+              type="password" value={regPassword} onChange={(e) => handleRegPasswordChange(e.target.value)}
+              placeholder={t(lang, "login_password_min")} minLength={8} required
+              className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
+                regPassword && !pwValid ? "border-destructive" : "border-border"
+              )}
+            />
+            {regPassword && pwValid === false && <p className="mt-1 text-xs text-destructive">{t(lang, "login_error_pw_short")}</p>}
+            {regPassword && pwValid === true && <p className="mt-1 text-xs text-green-500">{t(lang, "login_pw_ok")}</p>}
+          </div>
+
+          {/* 비밀번호 확인 */}
+          <div>
+            <input
+              type="password" value={regPasswordConfirm} onChange={(e) => handleRegPasswordConfirmChange(e.target.value)}
+              placeholder={t(lang, "login_password_confirm")} required
+              className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
+                regPasswordConfirm && pwMatch === false ? "border-destructive" : "border-border"
+              )}
+            />
+            {regPasswordConfirm && pwMatch === false && <p className="mt-1 text-xs text-destructive">{t(lang, "login_error_pw_mismatch")}</p>}
+            {regPasswordConfirm && pwMatch === true && <p className="mt-1 text-xs text-green-500">{t(lang, "login_pw_match")}</p>}
+          </div>
+
+          {/* 닉네임 (자동 중복확인) */}
           <div>
             <div className="relative">
               <input
                 type="text" value={nickname}
-                onChange={(e) => { setNickname(e.target.value); setNicknameAvailable(null); }}
-                onBlur={() => checkNickname(nickname)}
+                onChange={(e) => handleNicknameChange(e.target.value)}
                 placeholder={t(lang, "login_nickname_placeholder")} required
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary pr-24"
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
               />
-              <button type="button" onClick={() => checkNickname(nickname)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-primary hover:underline">
-                {nicknameChecking ? <Loader2 className="h-3 w-3 animate-spin" /> : t(lang, "login_nickname_check")}
-              </button>
+              {nicknameChecking && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </div>
             {nicknameAvailable === true && <p className="mt-1 text-xs text-green-500">{t(lang, "login_nickname_available")}</p>}
             {nicknameAvailable === false && <p className="mt-1 text-xs text-destructive">{t(lang, "login_nickname_taken")}</p>}
           </div>
 
-          <input
-            type="number" value={birthYear} onChange={(e) => setBirthYear(e.target.value)}
-            placeholder={t(lang, "login_birth_year_placeholder")}
-            min={MIN_BIRTH_YEAR} max={MAX_BIRTH_YEAR} required
-            className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-          />
+          {/* 생년도 */}
+          <div>
+            <input
+              type="number" value={birthYear} onChange={(e) => handleBirthYearChange(e.target.value)}
+              placeholder={t(lang, "login_birth_year_placeholder")}
+              min={MIN_BIRTH_YEAR} max={MAX_BIRTH_YEAR} required
+              className={cn("w-full rounded-lg border bg-background px-4 py-3 text-sm outline-none focus:border-primary",
+                birthYearError ? "border-destructive" : "border-border"
+              )}
+            />
+            {birthYearError && <p className="mt-1 text-xs text-destructive">{birthYearError}</p>}
+          </div>
 
           <div className="rounded-lg border border-border p-4 space-y-3">
             <p className="text-xs font-medium text-muted-foreground">{t(lang, "login_terms_section")}</p>
@@ -466,7 +590,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <button type="submit" disabled={loading || nicknameAvailable === false}
+          <button type="submit" disabled={registerDisabled}
             className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {t(lang, "login_register_submit")}
