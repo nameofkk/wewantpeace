@@ -305,6 +305,8 @@ export default function MapPage() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [mapZoom, setMapZoom] = useState(1.5);
+  // 줌 레벨 <4 여부만 추적 — 이 경계를 넘을 때만 마커 재생성 (줌마다 재생성 방지)
+  const [isCountryZoom, setIsCountryZoom] = useState(true);
   const { mapViewport, setMapViewport, lang, userPlan } = useAppStore();
   const { data: me, isLoading: meLoading } = useMe();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
@@ -342,7 +344,7 @@ export default function MapPage() {
       if (!document.getElementById("maplibre-css")) {
         const link = document.createElement("link");
         link.id = "maplibre-css"; link.rel = "stylesheet";
-        link.href = "https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css";
+        link.href = "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css";
         document.head.appendChild(link);
       }
       const map = new maplibregl.Map({
@@ -362,6 +364,7 @@ export default function MapPage() {
         const zoom = map.getZoom();
         setMapViewport({ longitude: center.lng, latitude: center.lat, zoom });
         setMapZoom(zoom);
+        setIsCountryZoom(zoom < 4);
       });
       map.on("click", () => setSelectedCluster(null));
       map.on("load", () => { mapRef.current = map; setIsMapReady(true); });
@@ -387,7 +390,7 @@ export default function MapPage() {
       const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
       let displayClusters: Cluster[];
       try {
-        const countryGrouped = mapZoom < 4 ? groupClustersByCountry(withCoords) : withCoords;
+        const countryGrouped = isCountryZoom ? groupClustersByCountry(withCoords) : withCoords;
         displayClusters = groupByPixelProximity(countryGrouped, currentMap, 40);
       } catch {
         displayClusters = withCoords;
@@ -403,7 +406,10 @@ export default function MapPage() {
         const size = Math.max(28, Math.min(56, 22 + Math.sqrt(sizeBase) * 4));
         const color = getKScoreColor(cluster.kscore);
         const markerEl = document.createElement("div");
-        markerEl.style.cssText = `width:${size}px;height:${size}px;position:relative;`;
+        // position:relative 사용 금지 — maplibre-gl이 .maplibregl-marker에
+        // position:absolute를 적용하는데, inline position:relative가 이를 덮어써서
+        // 마커들이 normal flow에 남아 줌 시 위치가 틀어짐
+        markerEl.style.cssText = `width:${size}px;height:${size}px;`;
         const innerEl = document.createElement("div");
         innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s, box-shadow 0.15s;opacity:1;position:relative;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
@@ -419,7 +425,7 @@ export default function MapPage() {
           setSelectedCluster(cluster);  // 미리보기에서도 팝업은 열림
         });
         try {
-          const marker = new maplibregl.Marker({ element: markerEl, anchor: "center" }).setLngLat([cluster.lon, cluster.lat]).addTo(m);
+          const marker = new maplibregl.Marker({ element: markerEl, anchor: "center", offset: [0, 0] }).setLngLat([cluster.lon, cluster.lat]).addTo(m);
           markersRef.current.push(marker);
         } catch { /* noop */ }
       });
@@ -438,7 +444,7 @@ export default function MapPage() {
     } else {
       import("maplibre-gl").then((ml) => { maplibreRef.current = ml; doRender(ml); });
     }
-  }, [clusters, isMapReady, mapZoom]);
+  }, [clusters, isMapReady, isCountryZoom]);
 
   useEffect(() => { renderMarkers(); }, [renderMarkers]);
 
