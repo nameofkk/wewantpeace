@@ -45,9 +45,9 @@ async def get_db():
             raise
 
 
-def _verify_firebase_token(token: str) -> Optional[str]:
+def _verify_firebase_token(token: str) -> Optional[dict]:
     """
-    Firebase ID Token 검증 → firebase_uid 반환.
+    Firebase ID Token 검증 → {"uid": str, "email": str|None} 반환.
 
     DISABLE_AUTH=true: 서명 검증 없이 JWT 페이로드만 디코딩 (개발용)
     프로덕션: firebase_admin.auth.verify_id_token() 사용
@@ -65,7 +65,7 @@ def _verify_firebase_token(token: str) -> Optional[str]:
             payload = json.loads(base64.urlsafe_b64decode(payload_b64))
             # Firebase ID Token: 'user_id' 또는 'sub' 필드에 UID
             uid = payload.get('user_id') or payload.get('sub')
-            return uid if uid else None
+            return {"uid": uid, "email": payload.get("email")} if uid else None
         except Exception as e:
             logger.warning("DISABLE_AUTH JWT 디코드 실패: %s", e)
             return None
@@ -74,7 +74,7 @@ def _verify_firebase_token(token: str) -> Optional[str]:
     try:
         import firebase_admin.auth as fb_auth
         decoded = fb_auth.verify_id_token(token)
-        return decoded["uid"]
+        return {"uid": decoded["uid"], "email": decoded.get("email")}
     except ImportError:
         logger.warning("firebase_admin SDK 없음 - auth 비활성")
         return None
@@ -83,7 +83,7 @@ def _verify_firebase_token(token: str) -> Optional[str]:
         return None
 
 
-async def _get_or_create_user(firebase_uid: str, db: AsyncSession) -> User:
+async def _get_or_create_user(firebase_uid: str, db: AsyncSession, email: Optional[str] = None) -> User:
     """firebase_uid로 User 조회, 없으면 생성."""
     result = await db.execute(
         select(User).where(User.firebase_uid == firebase_uid)
@@ -94,13 +94,17 @@ async def _get_or_create_user(firebase_uid: str, db: AsyncSession) -> User:
         # DISABLE_AUTH 개발 환경에서 "dev-admin" UID는 자동으로 admin 역할 부여
         role = "admin" if (DISABLE_AUTH and firebase_uid == "dev-admin") else "user"
         nickname = "개발자어드민" if firebase_uid == "dev-admin" else None
-        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname)
+        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname, email=email)
         db.add(user)
         await db.flush()
 
         # 기본 preferences 생성
         pref = UserPreference(user_id=user.id)
         db.add(pref)
+        await db.flush()
+    elif email and not user.email:
+        # 기존 사용자인데 email이 없으면 업데이트
+        user.email = email
         await db.flush()
 
     return user
@@ -119,17 +123,21 @@ async def get_current_user(
     2. Authorization: Bearer <token> → Firebase 검증
     """
     firebase_uid: Optional[str] = None
+    firebase_email: Optional[str] = None
 
     if DISABLE_AUTH and x_dev_uid:
         firebase_uid = x_dev_uid
     elif authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
-        firebase_uid = _verify_firebase_token(token)
+        token_info = _verify_firebase_token(token)
+        if token_info:
+            firebase_uid = token_info["uid"]
+            firebase_email = token_info.get("email")
 
     if not firebase_uid:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
-    user = await _get_or_create_user(firebase_uid, db)
+    user = await _get_or_create_user(firebase_uid, db, email=firebase_email)
     return user
 
 

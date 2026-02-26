@@ -23,8 +23,8 @@ from backend.app.models.terms import UserConsent
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-CURRENT_TERMS_VERSION = "1.0"
-CURRENT_PRIVACY_VERSION = "1.0"
+CURRENT_TERMS_VERSION = "2.0"
+CURRENT_PRIVACY_VERSION = "2.0"
 CURRENT_YEAR = 2026
 
 
@@ -38,6 +38,7 @@ class RegisterBody(BaseModel):
     agreed_privacy: bool
     marketing_agreed: bool = False
     display_name: Optional[str] = None
+    email: Optional[str] = None
 
     @field_validator("nickname")
     @classmethod
@@ -116,23 +117,30 @@ async def register(
         raise HTTPException(400, detail="만 14세 미만은 가입이 불가능합니다.")
 
     # Firebase 토큰 검증
-    firebase_uid = _verify_firebase_token(body.firebase_token)
-    if not firebase_uid:
+    token_info = _verify_firebase_token(body.firebase_token)
+    if not token_info:
         raise HTTPException(401, detail="유효하지 않은 Firebase 토큰입니다.")
+    firebase_uid = token_info["uid"]
+    token_email = token_info.get("email")
 
     # 닉네임 중복 확인
     existing = await db.execute(select(User).where(User.nickname == body.nickname))
     if existing.scalar_one_or_none():
         raise HTTPException(409, detail="이미 사용 중인 닉네임입니다.")
 
+    # 이메일: body에서 명시적으로 전달된 값 > 토큰에서 추출된 값
+    user_email = body.email or token_email
+
     # 사용자 생성 또는 조회
-    user = await _get_or_create_user(firebase_uid, db)
+    user = await _get_or_create_user(firebase_uid, db, email=user_email)
 
     # 프로필 업데이트
     now = datetime.now(timezone.utc)
     user.nickname = body.nickname
     user.birth_year = body.birth_year
     user.display_name = body.display_name or body.nickname
+    if user_email:
+        user.email = user_email
     user.agreed_terms_at = now
     user.agreed_privacy_at = now
     if body.marketing_agreed:
@@ -212,12 +220,25 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """회원 탈퇴: 개인정보 익명화."""
+    """회원 탈퇴: 개인정보 익명화 + Firebase 사용자 삭제."""
     uid_prefix = str(current_user.id)[:8]
+    firebase_uid = current_user.firebase_uid
+
     current_user.email = f"deleted_{uid_prefix}@deleted.invalid"
     current_user.nickname = None
     current_user.display_name = None
     current_user.bio = None
     current_user.profile_image_url = None
+    current_user.birth_year = None
+    current_user.marketing_agreed_at = None
+    current_user.agreed_terms_at = None
+    current_user.agreed_privacy_at = None
     current_user.status = "deleted"
     await db.flush()
+
+    # Firebase에서도 사용자 삭제 시도 (실패해도 무시)
+    try:
+        import firebase_admin.auth as fb_auth
+        fb_auth.delete_user(firebase_uid)
+    except Exception:
+        pass

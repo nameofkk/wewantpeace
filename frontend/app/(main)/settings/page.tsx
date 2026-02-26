@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, BellOff, MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2 } from "lucide-react";
+import { Bell, BellOff, MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -153,6 +153,10 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
+  // 회원 탈퇴
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // 구독 정보 조회
   const [subPlatform, setSubPlatform] = useState<string>("web");
   useEffect(() => {
@@ -172,6 +176,30 @@ export default function SettingsPage() {
   async function handleSignOut() {
     await signOut();
     router.push("/login");
+  }
+
+  async function handleDeleteAccount() {
+    if (!firebaseUser) return;
+    setDeleteLoading(true);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/auth/account`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error("Failed");
+      }
+      await signOut();
+      localStorage.clear();
+      alert(t(lang, "settings_delete_success"));
+      router.push("/login");
+    } catch {
+      alert(lang === "en" ? "Failed to delete account." : "탈퇴 처리에 실패했습니다.");
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
+    }
   }
 
   function openProfileEdit() {
@@ -1007,6 +1035,39 @@ export default function SettingsPage() {
               <span>{t(lang, "settings_privacy")}</span>
               <span className="text-xs">→</span>
             </a>
+            {firebaseUser && (
+              <>
+                {showDeleteConfirm ? (
+                  <div className="p-4 space-y-3 border-t border-border">
+                    <p className="text-sm text-destructive whitespace-pre-line">{t(lang, "settings_delete_confirm")}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDeleteAccount}
+                        disabled={deleteLoading}
+                        className="flex-1 rounded-lg bg-destructive py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        {deleteLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {t(lang, "settings_delete_account")}
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground"
+                      >
+                        {t(lang, "settings_cancel")}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 w-full text-left border-t border-border"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {t(lang, "settings_delete_account")}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </section>
       </div>

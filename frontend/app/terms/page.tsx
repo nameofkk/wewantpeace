@@ -21,11 +21,11 @@ const SECTIONS_KO = [
   },
   {
     title: "제4조 (이용계약 체결)",
-    content: `① 서비스 이용은 만 14세 이상만 가능합니다.\n② 이용자는 회원가입 시 본 약관 및 개인정보처리방침에 동의해야 합니다.\n③ 허위 정보 제공 시 이용이 제한될 수 있습니다.`,
+    content: `① 서비스 이용은 만 14세 이상만 가능합니다.\n② 이용자는 회원가입 시 본 약관 및 개인정보처리방침에 동의해야 합니다.\n③ 허위 정보 제공 시 이용이 제한될 수 있습니다.\n④ 회원은 언제든 서비스 내 설정에서 회원 탈퇴를 할 수 있습니다.`,
   },
   {
     title: "제5조 (회원 의무 및 금지행위)",
-    content: `회원은 다음 행위를 해서는 안 됩니다:\n① 타인의 계정 도용 또는 허위 정보 등록\n② 허위 뉴스, 선동적 콘텐츠 게시\n③ 스팸, 광고성 게시물 반복 게시\n④ 저작권 침해 콘텐츠 게시\n⑤ 혐오 발언, 명예훼손 발언\n⑥ 서비스 해킹 또는 비정상적 접근 시도\n⑦ 다중 계정 생성 및 어뷰징`,
+    content: `① 회원 인증은 Firebase Authentication(Google 소셜 로그인 포함)을 통해 이루어집니다.\n② 회원은 다음 행위를 해서는 안 됩니다:\n  1) 타인의 계정 도용 또는 허위 정보 등록\n  2) 허위 뉴스, 선동적 콘텐츠 게시\n  3) 스팸, 광고성 게시물 반복 게시\n  4) 저작권 침해 콘텐츠 게시\n  5) 혐오 발언, 명예훼손 발언\n  6) 서비스 해킹 또는 비정상적 접근 시도\n  7) 다중 계정 생성 및 어뷰징`,
   },
   {
     title: "제6조 (서비스 제공자 의무)",
@@ -47,6 +47,14 @@ const SECTIONS_KO = [
     title: "제10조 (준거법 및 관할)",
     content: `본 약관은 대한민국 법률을 준거법으로 하며, 분쟁 시 서울중앙지방법원을 전속 관할로 합니다.`,
   },
+  {
+    title: "제11조 (회원 탈퇴 및 계정 삭제)",
+    content: `① 회원은 설정 > 계정에서 언제든 회원 탈퇴를 할 수 있습니다.\n② 탈퇴 즉시 개인정보(이메일, 닉네임, 생년도 등)는 익명화 또는 삭제됩니다.\n③ 구독 중인 유료서비스(Pro/Pro+)는 Google Play 또는 App Store에서 별도로 취소해야 합니다. 탈퇴만으로는 구독이 자동 해지되지 않습니다.\n④ 관련 법령에 따른 보관 의무가 있는 데이터(결제 기록 등)는 해당 기간 동안 보관 후 파기합니다.\n⑤ 탈퇴 후 동일 계정(Firebase UID)으로 재가입할 수 없습니다.`,
+  },
+  {
+    title: "제12조 (미성년자 보호)",
+    content: `① 만 14세 미만의 아동은 본 서비스에 가입할 수 없습니다.\n② 회원가입 시 생년도를 확인하여 만 14세 미만인 경우 가입이 거부됩니다.\n③ 만 14세 미만 아동의 개인정보가 수집된 사실을 인지한 경우, 해당 정보를 즉시 삭제합니다.`,
+  },
 ];
 
 const SECTIONS_EN = [
@@ -64,11 +72,11 @@ const SECTIONS_EN = [
   },
   {
     title: "Article 4 (Service Agreement)",
-    content: `① The Service is available only to users aged 14 and above.\n② Users must agree to these Terms and the Privacy Policy when registering.\n③ Providing false information may result in restricted access.`,
+    content: `① The Service is available only to users aged 14 and above.\n② Users must agree to these Terms and the Privacy Policy when registering.\n③ Providing false information may result in restricted access.\n④ Members may withdraw from the Service at any time through the Settings menu.`,
   },
   {
     title: "Article 5 (Member Obligations and Prohibited Conduct)",
-    content: `Members must not:\n① Steal another person's account or register false information\n② Post fake news or inflammatory content\n③ Repeatedly post spam or promotional material\n④ Post content that infringes copyright\n⑤ Make hateful or defamatory statements\n⑥ Attempt to hack or access the Service abnormally\n⑦ Create multiple accounts or engage in abusive behavior`,
+    content: `① Member authentication is performed through Firebase Authentication (including Google social login).\n② Members must not:\n  1) Steal another person's account or register false information\n  2) Post fake news or inflammatory content\n  3) Repeatedly post spam or promotional material\n  4) Post content that infringes copyright\n  5) Make hateful or defamatory statements\n  6) Attempt to hack or access the Service abnormally\n  7) Create multiple accounts or engage in abusive behavior`,
   },
   {
     title: "Article 6 (Company Obligations)",
@@ -89,6 +97,14 @@ const SECTIONS_EN = [
   {
     title: "Article 10 (Governing Law and Jurisdiction)",
     content: `These Terms are governed by the laws of the Republic of Korea. Disputes shall be subject to the exclusive jurisdiction of the Seoul Central District Court.`,
+  },
+  {
+    title: "Article 11 (Account Deletion and Withdrawal)",
+    content: `① Members may delete their account at any time through Settings > Account.\n② Upon deletion, personal information (email, nickname, birth year, etc.) is immediately anonymized or deleted.\n③ Active paid subscriptions (Pro/Pro+) must be canceled separately through Google Play or App Store. Account deletion alone does not cancel subscriptions.\n④ Data subject to legal retention requirements (e.g., payment records) will be retained for the required period and then destroyed.\n⑤ After deletion, re-registration with the same account (Firebase UID) is not possible.`,
+  },
+  {
+    title: "Article 12 (Protection of Minors)",
+    content: `① Children under the age of 14 may not register for this Service.\n② Birth year is verified during registration, and registration is denied for users under 14.\n③ If we become aware that personal information of a child under 14 has been collected, it will be deleted immediately.`,
   },
 ];
 

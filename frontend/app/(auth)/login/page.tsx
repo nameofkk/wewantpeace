@@ -121,6 +121,7 @@ export default function LoginPage() {
           agreed_privacy: agreedPrivacy,
           marketing_agreed: agreedMarketing,
           display_name: googleUser.displayName || undefined,
+          email: googleUser.email || undefined,
         }),
       });
       if (!res.ok) {
@@ -214,6 +215,7 @@ export default function LoginPage() {
           agreed_terms: agreedTerms,
           agreed_privacy: agreedPrivacy,
           marketing_agreed: agreedMarketing,
+          email: regEmail,
         }),
       });
 
@@ -229,8 +231,12 @@ export default function LoginPage() {
       localStorage.setItem("onboarding_done", "true");
       router.push("/home");
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message || (lang === "en" ? "Registration failed." : "회원가입에 실패했습니다."));
+      const err = e as { code?: string; message?: string };
+      if (err.code === "auth/operation-not-allowed") {
+        setError(t(lang, "login_error_not_allowed"));
+      } else {
+        setError(err.message || (lang === "en" ? "Registration failed." : "회원가입에 실패했습니다."));
+      }
     } finally {
       setLoading(false);
     }

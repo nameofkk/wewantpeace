@@ -279,6 +279,7 @@ export const translations = {
     login_back_link_text: "다른 계정으로 시도하려면",
     login_already_have: "이미 계정이 있으신가요?",
     login_login_link: "로그인",
+    login_error_not_allowed: "이메일 회원가입이 현재 비활성화되어 있습니다. Google 로그인을 이용해주세요.",
 
     // 토픽
     topic_conflict: "분쟁",
@@ -381,15 +382,20 @@ export const translations = {
     my_posts_empty_link: "첫 게시글 작성하기",
     my_posts_delete_confirm: "게시글을 삭제하시겠습니까?",
 
+    // 회원 탈퇴
+    settings_delete_account: "회원 탈퇴",
+    settings_delete_confirm: "정말 탈퇴하시겠습니까?\n모든 데이터가 삭제되며 복구할 수 없습니다.",
+    settings_delete_success: "탈퇴가 완료되었습니다.",
+
     // 약관 / 개인정보
     terms_title: "이용약관",
-    terms_date: "시행일: 2025년 1월 1일 · 버전 1.0",
+    terms_date: "시행일: 2026년 2월 26일 · 버전 2.0",
     terms_addendum: "부칙",
-    terms_addendum_text: "본 약관은 2025년 1월 1일부터 시행합니다.",
+    terms_addendum_text: "본 약관은 2026년 2월 26일부터 시행합니다.",
     terms_contact: "문의",
     terms_privacy_link: "개인정보처리방침",
     privacy_title: "개인정보처리방침",
-    privacy_date: "시행일: 2025년 1월 1일 · 버전 1.0",
+    privacy_date: "시행일: 2026년 2월 26일 · 버전 2.0",
     privacy_compliance: "WeWantPeace는 개인정보보호법, 정보통신망 이용촉진 및 정보보호 등에 관한 법률을 준수합니다.",
     privacy_contact: "문의",
     privacy_terms_link: "이용약관",
@@ -955,6 +961,7 @@ export const translations = {
     login_back_link_text: "Want to use a different account?",
     login_already_have: "Already have an account?",
     login_login_link: "Log In",
+    login_error_not_allowed: "Email signup is currently unavailable. Please use Google Sign-In.",
 
     // topics
     topic_conflict: "Conflict",
@@ -1057,15 +1064,20 @@ export const translations = {
     my_posts_empty_link: "Write your first post",
     my_posts_delete_confirm: "Delete this post?",
 
+    // account deletion
+    settings_delete_account: "Delete Account",
+    settings_delete_confirm: "Are you sure?\nAll data will be deleted and cannot be recovered.",
+    settings_delete_success: "Account deleted successfully.",
+
     // terms / privacy
     terms_title: "Terms of Service",
-    terms_date: "Effective: January 1, 2025 · Version 1.0",
+    terms_date: "Effective: February 26, 2026 · Version 2.0",
     terms_addendum: "Addendum",
-    terms_addendum_text: "These Terms take effect on January 1, 2025.",
+    terms_addendum_text: "These Terms take effect on February 26, 2026.",
     terms_contact: "Contact",
     terms_privacy_link: "Privacy Policy",
     privacy_title: "Privacy Policy",
-    privacy_date: "Effective: January 1, 2025 · Version 1.0",
+    privacy_date: "Effective: February 26, 2026 · Version 2.0",
     privacy_compliance: "WeWantPeace complies with the Personal Information Protection Act and the Act on Promotion of Information and Communications Network Utilization and Information Protection.",
     privacy_contact: "Contact",
     privacy_terms_link: "Terms of Service",
