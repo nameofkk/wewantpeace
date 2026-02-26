@@ -64,6 +64,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
       REDIS_URL: redis://redis:6379/0
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,6 +84,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
       REDIS_URL: redis://redis:6379/0
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,6 +104,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://wwp:${DB_PASSWORD:-wwplocal}@postgres/wewantpeace
       REDIS_URL: redis://redis:6379/0
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       redis:
         condition: service_healthy
