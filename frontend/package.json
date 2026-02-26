@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "granite dev",
-    "build": "granite build",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "ait deploy"
+    "deploy": "ait deploy",
+    "build:toss": "sh build-toss.sh",
+    "deploy:toss": "ait deploy"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^1.14.0",
@@ -19,6 +21,7 @@
     "@radix-ui/react-toast": "^1.1.5",
     "@tanstack/react-query": "^5.40.0",
     "@tanstack/react-query-devtools": "^5.40.0",
+    "@toss/tds-mobile": "^2.2.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",

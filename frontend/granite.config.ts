@@ -16,5 +16,5 @@ export default defineConfig({
     },
   },
   permissions: [],
-  outdir: '.next',
+  outdir: '.next-toss',
 });
