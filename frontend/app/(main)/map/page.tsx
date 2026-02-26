@@ -287,9 +287,9 @@ export default function MapPage() {
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [mapZoom, setMapZoom] = useState(1.5);
   const { mapViewport, setMapViewport, lang, userPlan } = useAppStore();
-  const { data: me } = useMe();
+  const { data: me, isLoading: meLoading } = useMe();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
-  const isLocked = plan === "free";
+  const isLocked = !meLoading && plan === "free";
   const [showPreview, setShowPreview] = useState(false);
   const showPreviewRef = useRef(false);  // 클릭 핸들러에서 최신 값 참조
 
@@ -382,12 +382,12 @@ export default function MapPage() {
         const size = Math.max(28, Math.min(56, 22 + Math.sqrt(sizeBase) * 4));
         const color = getKScoreColor(cluster.kscore);
         const markerEl = document.createElement("div");
-        markerEl.style.cssText = `width:${size}px;height:${size}px;`;
+        markerEl.style.cssText = `width:${size}px;height:${size}px;position:relative;`;
         const innerEl = document.createElement("div");
-        innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s, box-shadow 0.15s;opacity:1;`;
+        innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s, box-shadow 0.15s;opacity:1;position:relative;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter" + (cluster.is_spike ? " marker-spike" : "");
+          innerEl.className = "marker-enter marker-pulse" + (cluster.is_spike ? " marker-spike" : "");
         });
         innerEl.textContent = count > 99 ? "99+" : String(count);
         markerEl.appendChild(innerEl);

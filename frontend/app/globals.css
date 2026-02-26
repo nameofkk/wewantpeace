@@ -75,6 +75,30 @@
   animation: spike-ring 1.4s ease-out infinite;
 }
 
+/* 모든 마커 파동 효과 */
+@keyframes marker-pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.marker-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: marker-pulse-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+.marker-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: marker-pulse-ring 2s ease-out 1s infinite;
+  pointer-events: none;
+}
+
 /* ── 뉴스 티커 ──────────────────────────────────────── */
 @keyframes ticker-scroll {
   0%   { transform: translateX(0); }
@@ -84,7 +108,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 90s linear infinite;
+  animation: ticker-scroll 180s linear infinite;
 }
 .ticker-track:hover {
   animation-play-state: paused;

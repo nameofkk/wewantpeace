@@ -153,7 +153,9 @@ async def list_clusters(
     - severity_min: 최소 심각도 (0~100)
     """
     stmt = select(IssueCluster).where(
-        IssueCluster.severity >= severity_min
+        IssueCluster.severity >= severity_min,
+        IssueCluster.lat.isnot(None),
+        IssueCluster.lon.isnot(None),
     ).order_by(IssueCluster.last_event_at.desc()).limit(limit)
 
     if topic:
