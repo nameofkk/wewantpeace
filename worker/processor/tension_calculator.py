@@ -190,7 +190,9 @@ def _calc_accel_score(
     """
     volume = min(1.0, current_events / float(VOLUME_SATURATION))
     if prev_cluster_count == 0:
-        accel = min(1.0, current_cluster_count / float(ACCEL_BASELINE))
+        # 이전 데이터 없음: 현재 클러스터가 있어도 "급증"이라 볼 수 없음
+        # 볼륨만 반영, 가속도는 0 (비교 대상 없으므로)
+        accel = 0.0
     else:
         ratio = (current_cluster_count - prev_cluster_count) / max(prev_cluster_count, 1)
         accel = min(1.0, max(0.0, ratio))
@@ -247,8 +249,10 @@ async def _get_percentile_30d(
     if len(unique) <= 1:
         return min(100.0, raw_score)
 
-    below = sum(1 for h in historical if h < raw_score)
-    return round(below / len(historical) * 100.0, 1)
+    # midrank percentile: 동점(±0.5) 절반 반영 → 값이 비슷할 때 0% 방지
+    below = sum(1 for h in historical if h < raw_score - 0.5)
+    equal = sum(1 for h in historical if abs(h - raw_score) <= 0.5)
+    return round((below + 0.5 * equal) / len(historical) * 100.0, 1)
 
 
 async def calculate_country_tension(
