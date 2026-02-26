@@ -137,11 +137,11 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     scored.sort(key=lambda x: x["kscore"], reverse=True)
     top = scored[:TRENDING_LIMIT]
 
-    # trending_keywords 테이블 갱신: scored 전체를 저장하여 모든 클러스터의 KScore 히스토리 보존
-    # (기존: top 30만 저장 → top 30 밖 클러스터는 히스토리 없음 문제 해결)
+    # trending_keywords 테이블: 상위 TRENDING_LIMIT(30)개만 저장하여 DB bloat 방지
+    # issue_clusters.kscore는 전체 scored에서 갱신 (아래 별도 처리)
     valid_until = now + timedelta(minutes=VALID_MINUTES)
 
-    for item in scored:
+    for item in top:
         kw = TrendingKeyword(
             keyword=item["keyword"],
             keyword_ko=item.get("keyword_ko"),

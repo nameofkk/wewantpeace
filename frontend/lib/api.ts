@@ -41,7 +41,7 @@ export function useGlobalTrending() {
     queryKey: ["trending", "global"],
     queryFn: () => apiFetch("/trending/global"),
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 15 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,  // Celery beat=5min과 동기화
   });
 }
 
@@ -73,7 +73,7 @@ export function useMineTrending(countries?: string[] | null) {
     queryFn: () => apiFetch("/trending/mine", param ? { countries: param } : undefined),
     enabled: countries !== null,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 15 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,  // Celery beat=5min과 동기화
   });
 }
 

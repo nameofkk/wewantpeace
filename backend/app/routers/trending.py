@@ -224,7 +224,7 @@ async def mine_trending(
         if pref:
             user_min_severity = pref.min_severity
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
 
     result = await db.execute(
         select(IssueCluster)

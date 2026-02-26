@@ -6,6 +6,7 @@ EventClusterer: 60분 윈도우 기반 이슈 클러스터링.
 """
 import logging
 from datetime import datetime, timezone, timedelta
+from functools import lru_cache
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.normalized_event import NormalizedEvent
@@ -84,6 +85,16 @@ _COUNTRY_NAMES_KO: dict[str, str] = {
 }
 
 
+@lru_cache(maxsize=512)
+def _translate_cached(text: str) -> str | None:
+    """번역 결과 캐시 (동일 텍스트 중복 번역 방지)."""
+    try:
+        from deep_translator import GoogleTranslator
+        return GoogleTranslator(source="en", target="ko").translate(text[:200])
+    except Exception:
+        return None
+
+
 def _make_cluster_title_ko(
     title: str,
     topic: str,
@@ -94,12 +105,9 @@ def _make_cluster_title_ko(
     형식: "[국가] 유형 · 번역된 핵심 제목"
     예: "[미국] 폭력·테러 · 트럼프 클럽 총기 용의자 사살"
     """
-    try:
-        from deep_translator import GoogleTranslator
-        title_ko = GoogleTranslator(source="en", target="ko").translate(title[:200])
-    except Exception as e:
-        logger.debug("한국어 번역 실패: %s", e)
-        title_ko = None
+    title_ko = _translate_cached(title)
+    if title_ko is None:
+        logger.debug("한국어 번역 실패: %s", title[:50])
 
     topic_label = _TOPIC_LABELS_KO.get(topic, "이슈")
     country_name = _COUNTRY_NAMES_KO.get(country_code or "", "") if country_code else ""
@@ -259,21 +267,30 @@ async def assign_cluster(
 
     db.add(ClusterEvent(cluster_id=cluster.id, event_id=event.id))
 
-    # is_verified 자동 판별: confidence >= 0.70 AND "A" 티어 소스 포함
+    # is_verified 양방향 자동 판별: confidence 하락 시 해제
+    # confidence >= 0.70 AND "A" 티어 소스 포함
     # severity ≥ 75인 경우 independent_sources ≥ 2도 필요 (고위험 이벤트 검증 강화)
+    tiers = cluster.source_tiers or []
+    sources_ok = True
+    if cluster.severity >= 75:
+        sources_ok = (cluster.independent_sources or 1) >= 2
+    should_verify = cluster.confidence >= 0.70 and "A" in tiers and sources_ok
+
     just_verified = False
-    if not cluster.is_verified:
-        tiers = cluster.source_tiers or []
-        sources_ok = True
-        if cluster.severity >= 75:
-            sources_ok = (cluster.independent_sources or 1) >= 2
-        if cluster.confidence >= 0.70 and "A" in tiers and sources_ok:
-            cluster.is_verified = True
-            just_verified = True
-            logger.info(
-                "클러스터 자동 검증됨: %s (confidence=%.2f, tiers=%s, sources=%d)",
-                cluster.id, cluster.confidence, tiers,
-                cluster.independent_sources or 1,
-            )
+    if should_verify and not cluster.is_verified:
+        cluster.is_verified = True
+        just_verified = True
+        logger.info(
+            "클러스터 자동 검증됨: %s (confidence=%.2f, tiers=%s, sources=%d)",
+            cluster.id, cluster.confidence, tiers,
+            cluster.independent_sources or 1,
+        )
+    elif not should_verify and cluster.is_verified:
+        cluster.is_verified = False
+        logger.info(
+            "클러스터 검증 해제됨: %s (confidence=%.2f, tiers=%s, sources=%d)",
+            cluster.id, cluster.confidence, tiers,
+            cluster.independent_sources or 1,
+        )
 
     return cluster, just_verified

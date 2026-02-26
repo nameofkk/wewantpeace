@@ -7,7 +7,7 @@ import { useAppStore } from "@/lib/store";
 import { useClusters, useMe } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
-import { getFlag, getCountryName } from "@/lib/countries";
+import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
 
 // ── 실시간 경과 시간 훅 ───────────────────────────────────────────────────
 function useElapsed(isoString?: string, lang: Lang = "ko") {
@@ -121,14 +121,18 @@ function groupClustersByCountry(clusters: Cluster[]): Cluster[] {
     }
   }
   const result: Cluster[] = [];
-  byCountry.forEach((group) => {
-    // 좌표가 있는 클러스터 중 가장 높은 kscore를 가진 것을 대표로 사용
-    const withCoords = group.filter((c) => c.lat != null && c.lon != null);
-    if (withCoords.length === 0) return; // 좌표 있는 클러스터 없으면 skip
-    const lead = withCoords.reduce((a, b) => (a.kscore > b.kscore ? a : b));
+  byCountry.forEach((group, cc) => {
+    const lead = group.reduce((a, b) => (a.kscore > b.kscore ? a : b));
     const totalEvents = group.reduce((s, c) => s + c.event_count, 0);
+    // 고정 좌표 사용: COUNTRY_CENTERS 우선, 없으면 lead 클러스터 좌표 fallback
+    const center = COUNTRY_CENTERS[cc];
+    const lat = center?.lat ?? lead.lat;
+    const lon = center?.lon ?? lead.lon;
+    if (lat == null || lon == null) return; // 좌표 없으면 skip
     result.push({
       ...lead,
+      lat,
+      lon,
       event_count: lead.event_count,
       grouped_total_events: totalEvents,
       severity: Math.max(...group.map((c) => c.severity)),
@@ -379,17 +383,17 @@ export default function MapPage() {
       markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
       markersRef.current = [];
 
-      // 클러스터 그룹핑: 항상 국가별 그룹핑 기본 → 저배율에서만 인접 국가 합치기
+      // 클러스터 그룹핑: zoom에 따라 분기
       let displayClusters: Cluster[];
       try {
-        // 1단계: 모든 줌에서 국가별 1개 마커 (해당 국가 위치에 고정)
-        const byCountry = groupClustersByCountry(clusters);
         if (mapZoom < 4) {
-          // 저배율: 인접 국가 마커를 pixel proximity로 추가 합치기
+          // 저배율: 국가별 1개 마커 (고정 좌표) → 인접 국가 pixel proximity 합치기
+          const byCountry = groupClustersByCountry(clusters);
           displayClusters = groupByPixelProximity(byCountry, currentMap, 40);
         } else {
-          // 중·고배율: 국가별 마커 그대로 (위치 고정, 분할됨)
-          displayClusters = byCountry;
+          // 중·고배율: 개별 클러스터 표시, 근접 시만 합침
+          const valid = clusters.filter((c) => c.lat != null && c.lon != null);
+          displayClusters = groupByPixelProximity(valid, currentMap, 30);
         }
       } catch {
         displayClusters = clusters.filter((c) => c.lat != null && c.lon != null);

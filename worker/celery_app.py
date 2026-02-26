@@ -52,7 +52,7 @@ app.conf.beat_schedule = {
     },
     "reprocess-orphans": {
         "task": "worker.tasks.reprocess_orphans",
-        "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
+        "schedule": crontab(minute=0, hour="*/1"),  # 1시간마다
         "options": {"queue": "process"},
     },
     "expire-subscriptions": {
