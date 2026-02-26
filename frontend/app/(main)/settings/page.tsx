@@ -153,11 +153,10 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // 회원 탈퇴 (숨김 처리)
-  const [deleteStep, setDeleteStep] = useState(0); // 0: hidden, 1: button visible, 2: confirm dialog
+  // 회원 탈퇴
+  const [deleteStep, setDeleteStep] = useState(0); // 0: idle, 1: confirm dialog
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
-  const [versionTap, setVersionTap] = useState(0);
 
   // 구독 정보 조회
   const [subPlatform, setSubPlatform] = useState<string>("web");
@@ -192,6 +191,12 @@ export default function SettingsPage() {
       if (!res.ok && res.status !== 204) {
         throw new Error("Failed");
       }
+      // Firebase Auth에서도 사용자 삭제 (동일 이메일 재가입 가능하도록)
+      try {
+        await firebaseUser.delete();
+      } catch {
+        // reauthentication 필요 등 실패 시 signOut만 진행
+      }
       await signOut();
       localStorage.clear();
       alert(t(lang, "settings_delete_success"));
@@ -200,7 +205,7 @@ export default function SettingsPage() {
       alert(lang === "en" ? "Failed to delete account." : "탈퇴 처리에 실패했습니다.");
     } finally {
       setDeleteLoading(false);
-      setShowDeleteConfirm(false);
+      setDeleteStep(0);
     }
   }
 
@@ -1040,69 +1045,58 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* ── 버전 정보 (탈퇴 숨김 트리거) ────────────────────────── */}
+        {/* ── 하단: 탈퇴 + 버전 ────────────────────────────────── */}
         <section className="pb-8">
-          <p
-            className="text-center text-[10px] text-muted-foreground/30 select-none cursor-default"
-            onClick={() => {
-              if (!firebaseUser) return;
-              const next = versionTap + 1;
-              setVersionTap(next);
-              if (next >= 5 && deleteStep === 0) {
-                setDeleteStep(1);
-              }
-            }}
-          >
+          {firebaseUser && (
+            <p
+              className="text-center text-[10px] text-muted-foreground/30 mb-3 cursor-pointer hover:text-muted-foreground/50 transition-colors"
+              onClick={() => setDeleteStep(1)}
+            >
+              {t(lang, "settings_delete_account")}
+            </p>
+          )}
+          <p className="text-center text-[10px] text-muted-foreground/20 select-none">
             WeWantPeace v2.0
           </p>
 
-          {/* 탈퇴 버튼 — 버전 5회 탭 후 노출 */}
-          {firebaseUser && deleteStep >= 1 && (
-            <div className="mt-4 rounded-xl border border-border/40 bg-card overflow-hidden">
-              {deleteStep === 1 && (
-                <button
-                  onClick={() => setDeleteStep(2)}
-                  className="flex items-center gap-2 px-4 py-3 text-[12px] text-muted-foreground/50 hover:text-destructive/60 w-full text-left transition-colors"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {t(lang, "settings_delete_account")}
-                </button>
-              )}
-              {deleteStep === 2 && (
-                <div className="p-4 space-y-3">
-                  <p className="text-sm text-destructive whitespace-pre-line">{t(lang, "settings_delete_confirm")}</p>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground mb-1 block">
-                      {lang === "en"
-                        ? 'Type "delete" to confirm'
-                        : '"탈퇴합니다"를 입력해주세요'}
-                    </label>
-                    <input
-                      type="text"
-                      value={deleteInput}
-                      onChange={(e) => setDeleteInput(e.target.value)}
-                      placeholder={lang === "en" ? "delete" : "탈퇴합니다"}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-destructive"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={deleteLoading || (lang === "en" ? deleteInput !== "delete" : deleteInput !== "탈퇴합니다")}
-                      className="flex-1 rounded-lg bg-destructive py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                    >
-                      {deleteLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-                      {t(lang, "settings_delete_account")}
-                    </button>
-                    <button
-                      onClick={() => { setDeleteStep(0); setDeleteInput(""); setVersionTap(0); }}
-                      className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground"
-                    >
-                      {t(lang, "settings_cancel")}
-                    </button>
-                  </div>
+          {/* 탈퇴 확인 다이얼로그 */}
+          {firebaseUser && deleteStep === 1 && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => { setDeleteStep(0); setDeleteInput(""); }}>
+              <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                <p className="text-sm font-semibold text-destructive">{t(lang, "settings_delete_account")}</p>
+                <p className="text-[13px] text-muted-foreground whitespace-pre-line">{t(lang, "settings_delete_confirm")}</p>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">
+                    {lang === "en"
+                      ? 'Type "delete" to confirm'
+                      : '"탈퇴합니다"를 입력해주세요'}
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteInput}
+                    onChange={(e) => setDeleteInput(e.target.value)}
+                    placeholder={lang === "en" ? "delete" : "탈퇴합니다"}
+                    autoFocus
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-destructive"
+                  />
                 </div>
-              )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteLoading || (lang === "en" ? deleteInput !== "delete" : deleteInput !== "탈퇴합니다")}
+                    className="flex-1 rounded-lg bg-destructive py-2.5 text-sm font-medium text-destructive-foreground disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  >
+                    {deleteLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {t(lang, "settings_delete_account")}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteStep(0); setDeleteInput(""); }}
+                    className="flex-1 rounded-lg border border-border py-2.5 text-sm text-muted-foreground"
+                  >
+                    {t(lang, "settings_cancel")}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </section>
