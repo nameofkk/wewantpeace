@@ -112,23 +112,23 @@ function groupClustersByCountry(clusters: Cluster[]): Cluster[] {
   const byCountry = new Map<string, Cluster[]>();
   const noCode: Cluster[] = [];
   for (const c of clusters) {
+    if (c.lat == null || c.lon == null) continue; // 원본: 좌표 있는 것만 대상
     if (c.country_code) {
       const list = byCountry.get(c.country_code) ?? [];
       list.push(c);
       byCountry.set(c.country_code, list);
-    } else if (c.lat != null && c.lon != null) {
+    } else {
       noCode.push(c);
     }
   }
   const result: Cluster[] = [];
   byCountry.forEach((group, cc) => {
-    const lead = group.reduce((a, b) => (a.kscore > b.kscore ? a : b));
+    const lead = group.reduce((a, b) => (repScore(a) > repScore(b) ? a : b)); // 원본: repScore 기준
     const totalEvents = group.reduce((s, c) => s + c.event_count, 0);
-    // 고정 좌표 사용: COUNTRY_CENTERS 우선, 없으면 lead 클러스터 좌표 fallback
+    // COUNTRY_CENTERS 고정 좌표 우선, 없으면 lead 클러스터 좌표 fallback
     const center = COUNTRY_CENTERS[cc];
     const lat = center?.lat ?? lead.lat;
     const lon = center?.lon ?? lead.lon;
-    if (lat == null || lon == null) return; // 좌표 없으면 skip
     result.push({
       ...lead,
       lat,
@@ -383,19 +383,14 @@ export default function MapPage() {
       markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
       markersRef.current = [];
 
-      // 클러스터 그룹핑: 모든 줌에서 국가별 고정 좌표(COUNTRY_CENTERS) 사용
+      // 클러스터 그룹핑 — 원본 로직 복원
+      const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
       let displayClusters: Cluster[];
       try {
-        const byCountry = groupClustersByCountry(clusters);
-        if (mapZoom < 4) {
-          // 저배율: 인접 국가 마커를 pixel proximity로 추가 합치기
-          displayClusters = groupByPixelProximity(byCountry, currentMap, 40);
-        } else {
-          // 중·고배율: 국가별 마커 그대로 (고정 좌표, 분할됨)
-          displayClusters = byCountry;
-        }
+        const countryGrouped = mapZoom < 4 ? groupClustersByCountry(withCoords) : withCoords;
+        displayClusters = groupByPixelProximity(countryGrouped, currentMap, 40);
       } catch {
-        displayClusters = clusters.filter((c) => c.lat != null && c.lon != null);
+        displayClusters = withCoords;
       }
 
       // 마커 생성
