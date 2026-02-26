@@ -25,6 +25,9 @@ interface AdminStats {
   events_today: number;
   crisis_countries: number;
   push_tokens: number;
+  unclassified_rate: number;
+  translation_fail_rate: number;
+  geo_fail_rate: number;
 }
 
 const LEVEL_COLORS = ["#22c55e", "#eab308", "#f97316", "#ef4444"];
@@ -167,6 +170,45 @@ export default function AdminDashboard() {
                 <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
               )}
             </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Data Quality */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {[
+            {
+              label: lang === "ko" ? "미분류 비율" : "Unclassified",
+              value: `${stats.unclassified_rate}%`,
+              warn: stats.unclassified_rate > 15,
+            },
+            {
+              label: lang === "ko" ? "번역 실패율" : "Translation Fail",
+              value: `${stats.translation_fail_rate}%`,
+              warn: stats.translation_fail_rate > 10,
+            },
+            {
+              label: lang === "ko" ? "지오 실패율" : "Geo Fail",
+              value: `${stats.geo_fail_rate}%`,
+              warn: stats.geo_fail_rate > 20,
+            },
+          ].map((q) => (
+            <div
+              key={q.label}
+              className={cn(
+                "rounded-xl border bg-card p-4 text-center",
+                q.warn ? "border-orange-500/50" : "border-border"
+              )}
+            >
+              <p className="text-xs text-muted-foreground mb-1">{q.label}</p>
+              <p className={cn("text-2xl font-bold tabular-nums", q.warn ? "text-orange-400" : "text-foreground")}>
+                {q.value}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {lang === "ko" ? "최근 24시간" : "Last 24h"}
+              </p>
+            </div>
           ))}
         </div>
       )}

@@ -74,9 +74,20 @@ async def get_baseline(cluster_key: str, redis) -> float:
 async def update_baseline(cluster_key: str, c10: int, redis) -> float:
     """
     EWMA 기준선 업데이트: new_b = alpha * c10 + (1 - alpha) * old_b
+    관측 횟수 기반 동적 alpha:
+    - 관측 <5회: alpha=0.5 (빠른 적응)
+    - 관측 ≥5회: alpha=0.3 (안정화)
     """
     old_b = await get_baseline(cluster_key, redis)
-    new_b = EWMA_ALPHA * c10 + (1 - EWMA_ALPHA) * old_b
+
+    # 관측 횟수 카운터
+    obs_key = _key_obs_count(cluster_key)
+    obs_count = await redis.incr(obs_key)
+    if obs_count == 1:
+        await redis.expire(obs_key, 24 * 3600)  # 24시간 TTL
+
+    alpha = 0.5 if obs_count < 5 else EWMA_ALPHA
+    new_b = alpha * c10 + (1 - alpha) * old_b
     new_b = round(new_b, 3)
     await redis.setex(_key_ewma(cluster_key), 6 * 3600, str(new_b))
     return new_b
@@ -93,11 +104,35 @@ async def set_cooldown(cluster_id: str, redis):
     await redis.setex(_key_cooldown(cluster_id), COOLDOWN_SECONDS, "1")
 
 
+def _key_sources(cluster_id: str) -> str:
+    return f"spike:sources:{cluster_id}"
+
+
+MIN_UNIQUE_SOURCES = 2
+
+
+async def track_source(cluster_id: str, source_id: str, redis):
+    """10분 윈도우 내 소스 ID 추적."""
+    key = _key_sources(cluster_id)
+    await redis.sadd(key, source_id)
+    await redis.expire(key, 600)  # 10분 TTL
+
+
+async def get_unique_source_count(cluster_id: str, redis) -> int:
+    """10분 윈도우 내 고유 소스 수."""
+    return await redis.scard(_key_sources(cluster_id))
+
+
+def _key_obs_count(cluster_key: str) -> str:
+    return f"spike:obs_count:{cluster_key}"
+
+
 async def evaluate_spike(
     cluster_id: str,
     cluster_key: str,
     severity: int,
     redis,
+    source_id: str = "",
 ) -> bool:
     """
     스파이크 조건 평가.
@@ -106,6 +141,10 @@ async def evaluate_spike(
     # 쿨다운 확인
     if await is_in_cooldown(cluster_id, redis):
         return False
+
+    # 소스 추적
+    if source_id:
+        await track_source(cluster_id, source_id, redis)
 
     # 카운터 증가
     c1, c10 = await increment_event_counters(cluster_id, redis)
@@ -116,15 +155,19 @@ async def evaluate_spike(
 
     ratio = c10 / (b10 + 1)
 
+    # 소스 다양성 체크: 최소 2개 독립 소스 필요 (가짜 스파이크 방지)
+    unique_sources = await get_unique_source_count(cluster_id, redis)
+
     triggered = (
         (c1 >= C1_THRESHOLD or c10 >= C10_THRESHOLD)
         and ratio >= RATIO_THRESHOLD
         and severity >= SEVERITY_MIN
+        and unique_sources >= MIN_UNIQUE_SOURCES
     )
 
     logger.debug(
-        "spike_eval cluster=%s c1=%d c10=%d b10=%.2f ratio=%.2f sev=%d -> %s",
-        cluster_id, c1, c10, b10, ratio, severity, triggered,
+        "spike_eval cluster=%s c1=%d c10=%d b10=%.2f ratio=%.2f sev=%d sources=%d -> %s",
+        cluster_id, c1, c10, b10, ratio, severity, unique_sources, triggered,
     )
 
     if triggered:

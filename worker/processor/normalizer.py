@@ -437,6 +437,8 @@ class NormalizeResult:
     confidence: float
     dedup_key: str
     lang: str
+    translation_status: str  # ok | failed | skipped
+    geo_method: str  # keyword | none
     event_time: datetime
 
 
@@ -508,11 +510,11 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"(battle|fight|struggle) with (cancer|illness|disease|depression|disorder|addiction|bipolar|alzheimer|dementia|parkinson)",
     r"died (of|from|after) (cancer|illness|disease|heart|stroke|accident|surgery)",
     r"passed away (after|following|due)",
-    # 스포츠/경기 문맥
-    r"(match|game|tournament|championship|league|cup|race|heat) (battle|fight|clash|war)",
+    # 스포츠/경기 문맥 (더 엄격한 패턴)
+    r"(sports? match|championship game|tournament final|league match|cup final|race heat) (battle|fight|clash|war)",
     r"(box|boxing|mma|wrestling|ufc|wwe)",
-    # 엔터테인먼트/예술
-    r"(film|movie|series|show|episode|album|song|novel|book|play) (battle|fight|war|kills|killed)",
+    # 엔터테인먼트/예술 (더 엄격한 패턴)
+    r"(film|movie|tv series|documentary)\s+(about|titled|called).{0,30}(battle|fight|war)",
     r"(actor|actress|singer|musician|director|author|artist).{0,60}(dies|died|dead|pass)",
     r"(dies|died|dead).{0,60}(actor|actress|singer|musician|director|artist)",
     # 축제/카니발/전통 행사 — "오렌지 전투", "토마티나" 등
@@ -525,6 +527,99 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"carnival of ",   # 카니발 이벤트
     r"mardi gras",
 ]]
+
+
+# ── 다국어 토픽 키워드 (번역 실패 시 fallback) ─────────────────────────────
+_TOPIC_KEYWORDS_MULTILANG: dict[str, dict[str, list[str]]] = {
+    "ko": {
+        "conflict": ["전쟁", "공격", "미사일", "폭격", "공습", "전투", "군사", "포격", "드론", "사상자", "휴전"],
+        "terror": ["테러", "인질", "극단주의", "자폭", "암살", "총격", "납치"],
+        "coup": ["쿠데타", "정변", "계엄령", "군부", "탄핵"],
+        "sanctions": ["제재", "수출통제", "자산동결", "관세", "금수조치"],
+        "cyber": ["사이버", "해킹", "랜섬웨어", "디도스", "악성코드"],
+        "protest": ["시위", "집회", "시위대", "폭동", "봉기"],
+        "diplomacy": ["외교", "정상회담", "조약", "협상", "평화", "대통령", "총리"],
+        "disaster": ["지진", "홍수", "태풍", "화산", "쓰나미", "가뭄", "산사태"],
+        "health": ["전염병", "감염", "확진", "사망자", "격리", "백신", "코로나"],
+    },
+    "ar": {
+        "conflict": ["حرب", "هجوم", "صاروخ", "قصف", "غارة", "معركة", "عسكري", "قتلى", "وقف إطلاق النار"],
+        "terror": ["إرهاب", "رهينة", "تطرف", "انتحاري", "اغتيال"],
+        "coup": ["انقلاب", "أحكام عرفية"],
+        "sanctions": ["عقوبات", "حظر", "تعريفة"],
+        "diplomacy": ["دبلوماسي", "قمة", "معاهدة", "مفاوضات", "سلام", "رئيس"],
+        "disaster": ["زلزال", "فيضان", "إعصار", "بركان", "تسونامي", "جفاف"],
+        "health": ["وباء", "عدوى", "إصابات", "حجر صحي", "لقاح"],
+    },
+    "ru": {
+        "conflict": ["война", "атака", "ракета", "бомба", "обстрел", "военный", "наступление", "жертвы", "перемирие"],
+        "terror": ["террор", "заложник", "экстремизм", "взрыв", "убийство"],
+        "coup": ["переворот", "военное положение"],
+        "sanctions": ["санкции", "эмбарго", "тариф"],
+        "diplomacy": ["дипломат", "саммит", "переговоры", "мир", "президент"],
+        "disaster": ["землетрясение", "наводнение", "тайфун", "вулкан", "цунами", "засуха"],
+        "health": ["эпидемия", "инфекция", "заражение", "карантин", "вакцина"],
+    },
+    "zh": {
+        "conflict": ["战争", "攻击", "导弹", "轰炸", "空袭", "军事", "伤亡", "停火"],
+        "terror": ["恐怖", "人质", "极端", "自杀式", "暗杀"],
+        "coup": ["政变", "戒严"],
+        "sanctions": ["制裁", "禁运", "关税"],
+        "diplomacy": ["外交", "峰会", "条约", "谈判", "和平", "总统"],
+        "disaster": ["地震", "洪水", "台风", "火山", "海啸", "干旱"],
+        "health": ["疫情", "感染", "确诊", "隔离", "疫苗"],
+    },
+    "ja": {
+        "conflict": ["戦争", "攻撃", "ミサイル", "爆撃", "空爆", "軍事", "死傷者", "停戦"],
+        "terror": ["テロ", "人質", "過激派", "暗殺"],
+        "coup": ["クーデター", "戒厳令"],
+        "sanctions": ["制裁", "禁輸", "関税"],
+        "diplomacy": ["外交", "首脳会談", "条約", "交渉", "平和", "大統領"],
+        "disaster": ["地震", "洪水", "台風", "火山", "津波", "干ばつ"],
+        "health": ["感染症", "感染", "確認", "隔離", "ワクチン"],
+    },
+    "fr": {
+        "conflict": ["guerre", "attaque", "missile", "bombardement", "frappe", "militaire", "victimes", "cessez-le-feu"],
+        "terror": ["terrorisme", "otage", "extrémisme", "attentat", "assassinat"],
+        "coup": ["coup d'état", "loi martiale"],
+        "sanctions": ["sanctions", "embargo", "tarif"],
+        "diplomacy": ["diplomatie", "sommet", "traité", "négociation", "paix", "président"],
+        "disaster": ["séisme", "inondation", "ouragan", "volcan", "tsunami", "sécheresse"],
+        "health": ["épidémie", "infection", "cas confirmés", "quarantaine", "vaccin"],
+    },
+    "es": {
+        "conflict": ["guerra", "ataque", "misil", "bombardeo", "militar", "víctimas", "alto el fuego"],
+        "terror": ["terrorismo", "rehén", "extremismo", "atentado", "asesinato"],
+        "coup": ["golpe de estado", "ley marcial"],
+        "sanctions": ["sanciones", "embargo", "arancel"],
+        "diplomacy": ["diplomacia", "cumbre", "tratado", "negociación", "paz", "presidente"],
+        "disaster": ["terremoto", "inundación", "huracán", "volcán", "tsunami", "sequía"],
+        "health": ["epidemia", "infección", "casos confirmados", "cuarentena", "vacuna"],
+    },
+    "de": {
+        "conflict": ["Krieg", "Angriff", "Rakete", "Bombardierung", "Militär", "Opfer", "Waffenstillstand"],
+        "terror": ["Terrorismus", "Geisel", "Extremismus", "Anschlag", "Ermordung"],
+        "coup": ["Staatsstreich", "Kriegsrecht"],
+        "sanctions": ["Sanktionen", "Embargo", "Zoll"],
+        "diplomacy": ["Diplomatie", "Gipfel", "Vertrag", "Verhandlung", "Frieden", "Präsident"],
+        "disaster": ["Erdbeben", "Überschwemmung", "Hurrikan", "Vulkan", "Tsunami", "Dürre"],
+        "health": ["Epidemie", "Infektion", "bestätigte Fälle", "Quarantäne", "Impfstoff"],
+    },
+}
+
+
+def _classify_topic_multilang(text: str, lang: str) -> Optional[str]:
+    """번역 실패 시 원문 언어의 키워드로 토픽 분류 시도."""
+    lang_kws = _TOPIC_KEYWORDS_MULTILANG.get(lang)
+    if not lang_kws:
+        return None
+    text_lower = text.lower()
+    scores: dict[str, int] = {}
+    for topic, keywords in lang_kws.items():
+        hits = sum(1 for kw in keywords if kw in text_lower)
+        if hits >= 1:
+            scores[topic] = hits
+    return max(scores, key=lambda t: scores[t]) if scores else None
 
 
 def _has_non_military_context(text: str) -> bool:
@@ -582,33 +677,48 @@ def _calculate_severity(text: str, topic: str) -> int:
     base = TOPIC_BASE_SEVERITY.get(topic, 25)
     text_lower = text.lower()
 
-    # 키워드 보정
-    modifier = sum(delta for kw, delta in SEVERITY_UP if kw in text_lower)
-    modifier += sum(delta for kw, delta in SEVERITY_DOWN if kw in text_lower)
+    # 키워드 보정 (누적 상한 ±30)
+    keyword_delta = sum(delta for kw, delta in SEVERITY_UP if kw in text_lower)
+    keyword_delta += sum(delta for kw, delta in SEVERITY_DOWN if kw in text_lower)
+    keyword_delta = max(-30, min(30, keyword_delta))
 
-    # 사상자 수 기반 추가 보정
-    modifier += _casualty_bonus(text_lower)
+    # 사상자 수 기반 추가 보정 (별도 상한, _casualty_bonus 내부에서 max 30)
+    modifier = keyword_delta + _casualty_bonus(text_lower)
 
     return max(0, min(100, base + modifier))
 
 
-def _extract_geo(text: str) -> tuple[Optional[str], Optional[float], Optional[float]]:
+def _extract_geo(
+    text: str,
+    title: Optional[str] = None,
+) -> tuple[Optional[str], Optional[float], Optional[float]]:
     """
     국가 코드, 위도, 경도 반환.
 
-    단순 첫 매칭 대신 빈도 기반:
-    - 모든 매칭 키워드를 찾아 국가별 등장 횟수 집계
-    - 가장 많이 등장한 국가 선택 (동점이면 가장 긴 키워드 우선)
-    → "일본 언론이 트럼프 관세 기사 보도" 시 JP보다 US 키워드가 많으면 US 선택
+    빈도 기반 + 제목 3배 가중치:
+    - title에서 발견된 키워드는 weight × 3 (제목은 기사의 핵심 주제를 반영)
+    - body에서 여러 국가가 언급되어도 title 국가가 우선됨
     """
-    text_lower = text.lower()
     from collections import defaultdict
     country_hits: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
 
-    for kw in sorted(COUNTRY_MAP.keys(), key=len, reverse=True):
+    sorted_kws = sorted(COUNTRY_MAP.keys(), key=len, reverse=True)
+
+    # title 매칭 (3배 가중치)
+    if title:
+        title_lower = title.lower()
+        for kw in sorted_kws:
+            if kw in title_lower:
+                code, lat, lon = COUNTRY_MAP[kw]
+                count = title_lower.count(kw)
+                weight = count * len(kw) * 3  # 제목 3배 가중치
+                country_hits[code].append((weight, lat, lon))
+
+    # body(전체 텍스트) 매칭
+    text_lower = text.lower()
+    for kw in sorted_kws:
         if kw in text_lower:
             code, lat, lon = COUNTRY_MAP[kw]
-            # 키워드 등장 횟수 × 키워드 길이 가중치
             count = text_lower.count(kw)
             weight = count * len(kw)
             country_hits[code].append((weight, lat, lon))
@@ -634,9 +744,9 @@ def _make_geohash(lat: Optional[float], lon: Optional[float]) -> Optional[str]:
 
 
 def _make_dedup_key(text: str) -> str:
-    """정규화 텍스트의 MD5 지문."""
+    """정규화 텍스트의 MD5 지문 (단어 순서 유지)."""
     cleaned = re.sub(r"[^\w\s]", "", text.lower())
-    words = sorted(cleaned.split())[:60]
+    words = cleaned.split()[:60]
     return hashlib.md5(" ".join(words).encode("utf-8")).hexdigest()
 
 
@@ -648,9 +758,12 @@ def _make_title(text: str, max_len: int = 120) -> str:
 
 
 def _calculate_confidence(tier: str, severity: int) -> float:
+    """소스 tier 기반 confidence 계산.
+
+    severity ≥ 75일 때 confidence 자체를 깎지 않음 (실제 고위험 사건의
+    신뢰도를 왜곡하므로). auto-verify 조건에서 별도 처리.
+    """
     base = {"A": 0.85, "B": 0.70, "C": 0.55, "D": 0.35}.get(tier, 0.50)
-    if severity >= 75:
-        base = max(0.30, base - 0.05)
     return round(min(0.95, base), 2)
 
 
@@ -688,11 +801,27 @@ def normalize(
     lang = _detect_language(raw_text)
 
     # 비영어 텍스트는 영어로 번역하여 분류/지오 추출에 활용
+    if lang in ("en", "unknown"):
+        translation_status = "skipped"
+    else:
+        translation_status = "ok"  # 번역 시도
     text_for_analysis = _translate_to_english(raw_text, lang)
+    # 번역 실패 감지: 원문과 동일하면 실패로 판정 (영어가 아닌데 원문 그대로 반환)
+    if lang not in ("en", "unknown") and text_for_analysis == raw_text:
+        translation_status = "failed"
 
     topic = _classify_topic(text_for_analysis)
+
+    # C3: 번역 실패 시 원문 언어 키워드로 토픽 분류 재시도
+    if topic == "unknown" and lang not in ("en", "unknown"):
+        multilang_topic = _classify_topic_multilang(raw_text, lang)
+        if multilang_topic:
+            topic = multilang_topic
+
     severity = _calculate_severity(text_for_analysis, topic)
-    country_code, lat, lon = _extract_geo(text_for_analysis)
+    # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
+    _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
+    country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
     geohash5 = _make_geohash(lat, lon)
     confidence = _calculate_confidence(source_tier, severity)
     dedup_key = _make_dedup_key(raw_text)  # 원문 기반으로 중복 검사
@@ -716,6 +845,8 @@ def normalize(
         if m:
             entity_anchor = m.group(1)[:64]
 
+    geo_method = "keyword" if country_code else "none"
+
     return NormalizeResult(
         title=title,
         title_ko=title_ko,
@@ -731,5 +862,7 @@ def normalize(
         confidence=confidence,
         dedup_key=dedup_key,
         lang=lang,
+        translation_status=translation_status,
+        geo_method=geo_method,
         event_time=published_at if published_at is not None else collected_at,
     )

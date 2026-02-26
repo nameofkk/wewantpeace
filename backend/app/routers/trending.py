@@ -21,7 +21,7 @@ from backend.app.models.issue_cluster import IssueCluster
 router = APIRouter(prefix="/trending", tags=["trending"])
 
 _TRENDING_CACHE_KEY = "trending:global:v1"
-_TRENDING_CACHE_TTL = 15 * 60  # 15분
+_TRENDING_CACHE_TTL = 5 * 60  # 5분 (Celery beat 주기와 동기화)
 
 
 # ── Pydantic 스키마 ───────────────────────────────────────────────────────────

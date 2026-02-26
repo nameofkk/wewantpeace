@@ -1,7 +1,7 @@
 """
 TrendingEngine: KScore 기반 트렌딩 키워드 계산.
 
-KScore = 0.35*velocity + 0.15*quality + 0.35*severity_norm + 0.15*spread
+KScore = 0.25*velocity + 0.15*quality + 0.40*severity_norm + 0.20*spread
 포함 조건: KScore >= calibration.KSCORE_MIN
 
 결과를 trending_keywords 테이블에 UPSERT.
@@ -45,16 +45,17 @@ def _calc_kscore(
     """
     KScore 계산 (v2).
 
-    KScore = 0.35*velocity + 0.15*quality + 0.35*severity_norm + 0.15*spread
+    KScore = 0.25*velocity + 0.15*quality + 0.40*severity_norm + 0.20*spread
 
     velocity:
     - k10^VELOCITY_EXPONENT × spike_factor, 상한 VELOCITY_CAP
     - 소규모(1~10) 구간 변별력 유지, 대규모에서 cap에 수렴
     - k10=5: 3.09, k10=10: 5.01, k10=15: 6.0(cap)
 
-    가중치 조정:
-    - velocity 0.45→0.35 (속도), severity 0.25→0.35 (심각도)
-    - quality/spread 각 0.15 유지
+    가중치 조정 (v3):
+    - velocity 0.35→0.25 (속도 과지배 방지)
+    - severity 0.35→0.40 (심각도 우선)
+    - spread 0.15→0.20 (소스 다양성 강조)
 
     상수 변경 시: calibration.py 수정 후 이 함수는 자동 반영됨.
     """
@@ -76,10 +77,10 @@ def _calc_kscore(
     spread = min(1.0, independent_sources / float(SPREAD_SATURATION))
 
     kscore = (
-        0.35 * velocity
+        0.25 * velocity
         + 0.15 * quality
-        + 0.35 * severity_norm
-        + 0.15 * spread
+        + 0.40 * severity_norm
+        + 0.20 * spread
     )
     return round(kscore, 3)
 

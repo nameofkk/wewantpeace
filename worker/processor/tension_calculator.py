@@ -201,14 +201,18 @@ def _calc_spillover(
     country_code: str,
     all_clusters: dict[str, list[IssueCluster]],
 ) -> float:
-    """인접국 최대 severity → 0~1."""
+    """인접국 severity 가중 평균 × 0.7 → 0~1 (극단값 영향 완화)."""
     neighbors = NEIGHBOR_MAP.get(country_code, [])
-    max_sev = 0
+    neighbor_max_severities: list[int] = []
     for nb in neighbors:
-        for c in all_clusters.get(nb, []):
-            if c.severity > max_sev:
-                max_sev = c.severity
-    return max_sev / 100.0
+        nb_clusters = all_clusters.get(nb, [])
+        if nb_clusters:
+            nb_max = max(c.severity for c in nb_clusters)
+            neighbor_max_severities.append(nb_max)
+    if not neighbor_max_severities:
+        return 0.0
+    avg_sev = sum(neighbor_max_severities) / len(neighbor_max_severities)
+    return (avg_sev / 100.0) * 0.7
 
 
 async def _get_percentile_30d(
@@ -216,12 +220,12 @@ async def _get_percentile_30d(
     raw_score: float,
     db: AsyncSession,
 ) -> float:
-    """최근 30일 raw_score 분포에서 현재 값의 percentile.
+    """최근 14일 raw_score 분포에서 현재 값의 percentile.
 
     히스토리가 5개 미만이면 raw_score 자체를 반환 (워밍업 기간).
     충분한 히스토리(5개+)가 쌓이면 실제 percentile 계산.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     result = await db.execute(
         select(TensionIndex.raw_score)
         .where(
@@ -229,7 +233,7 @@ async def _get_percentile_30d(
             TensionIndex.time >= cutoff,
         )
         .order_by(TensionIndex.time.desc())
-        .limit(2880)  # 30일 × 96회/일 최대
+        .limit(1344)  # 14일 × 96회/일 최대
     )
     historical = [row[0] for row in result.fetchall()]
 

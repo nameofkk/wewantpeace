@@ -30,6 +30,8 @@ class NormalizedEvent(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     dedup_key: Mapped[str] = mapped_column(String(64), nullable=False)
     is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    translation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok | failed | skipped
+    geo_method: Mapped[str | None] = mapped_column(String(16), nullable=True)  # keyword | geocoder | fallback | none
     event_time: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),

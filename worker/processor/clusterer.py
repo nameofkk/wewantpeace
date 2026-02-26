@@ -20,7 +20,7 @@ MAX_EVENTS_UNKNOWN_GEO = 2
 
 # 제목 단어 최소 겹침 비율 — 이 미만이면 같은 키라도 새 클러스터 생성
 # (미국 폭풍 + 미국 총기 사건이 같은 US:disaster 버킷에 혼입되는 문제 방지)
-MIN_TITLE_OVERLAP = 0.15
+MIN_TITLE_OVERLAP = 0.30
 
 
 def _title_overlap(title_a: str, title_b: str) -> float:
@@ -241,15 +241,20 @@ async def assign_cluster(
     db.add(ClusterEvent(cluster_id=cluster.id, event_id=event.id))
 
     # is_verified 자동 판별: confidence >= 0.70 AND "A" 티어 소스 포함
+    # severity ≥ 75인 경우 independent_sources ≥ 2도 필요 (고위험 이벤트 검증 강화)
     just_verified = False
     if not cluster.is_verified:
         tiers = cluster.source_tiers or []
-        if cluster.confidence >= 0.70 and "A" in tiers:
+        sources_ok = True
+        if cluster.severity >= 75:
+            sources_ok = (cluster.independent_sources or 1) >= 2
+        if cluster.confidence >= 0.70 and "A" in tiers and sources_ok:
             cluster.is_verified = True
             just_verified = True
             logger.info(
-                "클러스터 자동 검증됨: %s (confidence=%.2f, tiers=%s)",
+                "클러스터 자동 검증됨: %s (confidence=%.2f, tiers=%s, sources=%d)",
                 cluster.id, cluster.confidence, tiers,
+                cluster.independent_sources or 1,
             )
 
     return cluster, just_verified

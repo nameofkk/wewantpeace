@@ -228,6 +228,8 @@ def process_raw_event(self, raw_event_id: str):
                     confidence=norm.confidence,
                     dedup_key=norm.dedup_key,
                     is_duplicate=is_dup,
+                    translation_status=norm.translation_status,
+                    geo_method=norm.geo_method,
                     event_time=norm.event_time,
                 )
                 db.add(ne)
@@ -246,11 +248,14 @@ def process_raw_event(self, raw_event_id: str):
                         # 스파이크 감지 (Redis 필요)
                         try:
                             redis = get_redis()
+                            # source_id: 소스 채널 ID (가짜 스파이크 방지용)
+                            _source_id = str(raw_event.source_channel_id) if raw_event.source_channel_id else ""
                             is_spike = await evaluate_spike(
                                 cluster_id=cluster_id,
                                 cluster_key=cluster.cluster_key,
                                 severity=cluster.severity,
                                 redis=redis,
+                                source_id=_source_id,
                             )
                             if is_spike and not cluster.is_spike:
                                 cluster.is_spike = True
@@ -389,6 +394,7 @@ def reprocess_orphans(self):
                                     cluster_key=cluster.cluster_key,
                                     severity=cluster.severity,
                                     redis=redis,
+                                    source_id="",
                                 )
                                 if is_spike and not cluster.is_spike:
                                     cluster.is_spike = True

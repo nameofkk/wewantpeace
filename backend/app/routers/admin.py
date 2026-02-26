@@ -96,6 +96,33 @@ async def get_stats(
         select(func.count()).select_from(UserPushToken)
     )).scalar() or 0
 
+    # ── 데이터 품질 KPI (최근 24시간) ──
+    cutoff_24h = now - timedelta(hours=24)
+
+    events_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h)
+    )).scalar() or 0
+
+    unclassified_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.topic == "unknown")
+    )).scalar() or 0
+
+    translation_fail_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.title_ko == None)
+    )).scalar() or 0
+
+    geo_fail_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.country_code == None)
+    )).scalar() or 0
+
+    unclassified_rate = round(unclassified_24h / max(1, events_24h) * 100, 1)
+    translation_fail_rate = round(translation_fail_24h / max(1, events_24h) * 100, 1)
+    geo_fail_rate = round(geo_fail_24h / max(1, events_24h) * 100, 1)
+
     return {
         "total_users": total_users,
         "new_today": new_today,
@@ -107,6 +134,10 @@ async def get_stats(
         "events_today": events_today,
         "crisis_countries": crisis_countries,
         "push_tokens": push_tokens,
+        # 데이터 품질
+        "unclassified_rate": unclassified_rate,
+        "translation_fail_rate": translation_fail_rate,
+        "geo_fail_rate": geo_fail_rate,
     }
 
 
