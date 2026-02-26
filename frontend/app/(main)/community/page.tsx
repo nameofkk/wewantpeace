@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
+import { API_BASE } from "@/lib/api";
 
 type PostType = "all" | "discussion" | "analysis" | "question";
 type SortBy = "latest" | "popular";
@@ -108,8 +109,6 @@ export default function CommunityPage() {
   const [activeType, setActiveType] = useState<PostType>("all");
   const [sortBy, setSortBy] = useState<SortBy>("latest");
   const [hotTopicsOpen, setHotTopicsOpen] = useState(true);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
   const { data: posts, isLoading, isError } = useQuery<Post[]>({
     queryKey: ["community-posts", activeType, sortBy],
     queryFn: async () => {

@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { API_BASE } from "@/lib/api";
 
 type PostType = "discussion" | "analysis" | "question";
 
@@ -36,8 +37,6 @@ export default function EditPostPage() {
   const [error, setError] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // 기존 데이터 로드
   useEffect(() => {

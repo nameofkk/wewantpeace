@@ -14,6 +14,7 @@ import {
 import type { User as FirebaseUser } from "firebase/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { API_BASE } from "@/lib/api";
 
 type Tab = "login" | "register" | "google-register";
 
@@ -45,8 +46,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   async function checkNickname(name: string) {
     if (!name || name.length < 2) return;

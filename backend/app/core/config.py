@@ -41,13 +41,18 @@ class Settings(BaseSettings):
     secret_key: str = "dev-secret-change-me-in-production"
 
     @model_validator(mode="after")
-    def warn_insecure_defaults(self) -> "Settings":
-        import logging
+    def enforce_secret_key(self) -> "Settings":
+        import logging, os
         _log = logging.getLogger(__name__)
         if self.secret_key == "dev-secret-change-me-in-production":
+            if not self.debug and os.getenv("RAILWAY_ENVIRONMENT"):
+                raise ValueError(
+                    "SECRET_KEY must be set in production. "
+                    "Add SECRET_KEY environment variable in Railway dashboard."
+                )
             _log.warning(
-                "⚠️  SECRET_KEY is using the default insecure value. "
-                "Set SECRET_KEY environment variable before deploying to production!"
+                "SECRET_KEY is using the default insecure value. "
+                "Set SECRET_KEY env var before deploying to production!"
             )
         return self
 

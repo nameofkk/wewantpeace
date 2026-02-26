@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { API_BASE } from "@/lib/api";
 
 type PostType = "discussion" | "analysis" | "question";
 
@@ -60,8 +61,6 @@ export default function NewPostPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // 이슈 목록 로드
   useEffect(() => {

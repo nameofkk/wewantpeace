@@ -5,8 +5,7 @@ import { Bell, X, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { cn, TOPIC_LABELS } from "@/lib/utils";
 import { COUNTRY_MAP, getFlag } from "@/lib/countries";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/api";
 const POLL_INTERVAL = 60_000;
 const AUTO_DISMISS_MS = 9_000;
 

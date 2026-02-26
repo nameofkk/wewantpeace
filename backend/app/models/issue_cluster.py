@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, SmallInteger, String, TIMESTAMP, Uuid
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, SmallInteger, String, TIMESTAMP, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 import uuid
 from backend.app.core.database import Base, StringArray
@@ -7,6 +7,11 @@ from backend.app.core.database import Base, StringArray
 
 class IssueCluster(Base):
     __tablename__ = "issue_clusters"
+    __table_args__ = (
+        Index("ix_clusters_country_severity", "country_code", "severity"),
+        Index("ix_clusters_topic_last_event", "topic", "last_event_at"),
+        Index("ix_clusters_country_last_event", "country_code", "last_event_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),

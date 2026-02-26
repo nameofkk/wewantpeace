@@ -5,9 +5,10 @@ import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sp
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
+import { t, type Lang } from "@/lib/i18n";
 import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
 import Link from "next/link";
+import { API_BASE } from "@/lib/api";
 
 interface Feature {
   labelKo: string;
@@ -80,7 +81,7 @@ const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // 
 
 function FeatureValue({
   val, planId, lang,
-}: { val: boolean | string; planId: string; lang: string }) {
+}: { val: boolean | string; planId: string; lang: Lang }) {
   if (val === true) {
     const color = planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-green-500";
     return <Check className={cn("h-4 w-4 mx-auto", color)} />;
@@ -97,7 +98,7 @@ function FeatureValue({
 }
 
 /** 웹에서 "앱에서 구독하세요" 안내 UI */
-function AppInstallPrompt({ lang }: { lang: string }) {
+function AppInstallPrompt({ lang }: { lang: Lang }) {
   const isAndroid = isAndroidBrowser();
   const isIOS = isIOSBrowser();
 
@@ -157,13 +158,11 @@ function AppInstallPrompt({ lang }: { lang: string }) {
 
 export default function UpgradePage() {
   const { user } = useAuth();
-  const lang = useAppStore((s) => s.lang);
+  const { lang } = useAppStore();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
   const [platform, setPlatform] = useState<AppPlatform>("web");
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
     setPlatform(detectPlatform());

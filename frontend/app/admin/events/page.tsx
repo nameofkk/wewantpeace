@@ -8,8 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFlag } from "@/lib/countries";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface EventItem {
   id: string;

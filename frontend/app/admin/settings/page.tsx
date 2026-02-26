@@ -8,8 +8,7 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface ServiceSettings {
   maintenance_mode: boolean;

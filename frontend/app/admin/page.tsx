@@ -12,8 +12,7 @@ import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getCountryName } from "@/lib/countries";
 import Link from "next/link";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface AdminStats {
   total_users: number;
@@ -225,7 +224,7 @@ export default function AdminDashboard() {
                     borderRadius: 8,
                     fontSize: 12,
                   }}
-                  formatter={(value: number) => [value.toFixed(1), lang === "ko" ? "긴장점수" : "Score"]}
+                  formatter={(value) => [(value as number).toFixed(1), lang === "ko" ? "긴장점수" : "Score"]}
                   labelFormatter={(v) => getCountryName(v, lang)}
                 />
                 <Bar dataKey="raw_score" radius={[0, 4, 4, 0]}>

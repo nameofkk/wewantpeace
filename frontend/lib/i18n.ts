@@ -424,6 +424,26 @@ export const translations = {
     notif_kscore_high: "높음",
     notif_area_hint: "Verified / Fast 알림은 관심지역별로 설정할 수 있어요 ↑",
 
+    // settings - notification inline strings
+    settings_push_title: "푸시 알림",
+    settings_push_desc_enabled: "이슈 발생 시 즉시 알림을 받습니다",
+    settings_push_desc_unsupported: "이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome/Safari에서 열어주세요",
+    settings_push_desc_denied: "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요",
+    settings_push_desc_default: "중요 이슈 발생 시 즉시 알림 수신",
+    settings_push_enable: "알림 활성화",
+    settings_push_disable: "알림 비활성화",
+    settings_verified_on: "공식 확인 이슈 알림 켜짐",
+    settings_verified_off: "공식 확인 이슈 알림 꺼짐",
+    settings_verified_info: "AP, Reuters 등 공신력 있는 소스로 확인된 이슈만 알려드려요.",
+    settings_fast_pro_only: "속보 알림 (Pro 전용)",
+    settings_fast_on: "미확인 속보 알림 켜짐",
+    settings_fast_off: "미확인 속보 알림 꺼짐",
+    settings_fast_info: "확인 전 속보도 즉시 알려드려요. 더 빠르지만 오탐이 있을 수 있어요.",
+    settings_alert_loading: "알림 설정 로딩중...",
+    settings_unlock_topics: "Pro 플랜으로 토픽 필터를 잠금 해제하세요",
+    settings_unlock_quiet: "Pro 플랜으로 방해금지 시간을 설정하세요",
+    settings_unlock_pro: "Pro에서 열리는 기능",
+
     // plan section (settings)
     settings_plan_proplus: "Pro+ 플랜",
     settings_plan_proplus_desc: "무제한 지역 · 실시간 지도 · API 접근 · 모든 기능",
@@ -1078,6 +1098,26 @@ export const translations = {
     notif_kscore_low: "Low",
     notif_kscore_high: "High",
     notif_area_hint: "Verified / Fast alerts can be configured per region above ↑",
+
+    // settings - notification inline strings
+    settings_push_title: "Push Notifications",
+    settings_push_desc_enabled: "You'll get instant alerts for new issues",
+    settings_push_desc_unsupported: "Push not supported in this browser. Open in Chrome/Safari",
+    settings_push_desc_denied: "Blocked — allow in your browser settings",
+    settings_push_desc_default: "Get instant alerts for critical events",
+    settings_push_enable: "Enable",
+    settings_push_disable: "Disable",
+    settings_verified_on: "Verified alerts on",
+    settings_verified_off: "Verified alerts off",
+    settings_verified_info: "Notifies you only for issues confirmed by trusted sources like AP, Reuters.",
+    settings_fast_pro_only: "Fast alerts (Pro only)",
+    settings_fast_on: "Fast alerts on",
+    settings_fast_off: "Fast alerts off",
+    settings_fast_info: "Alerts you before official confirmation. Faster, but may include false positives.",
+    settings_alert_loading: "Loading alert settings...",
+    settings_unlock_topics: "Unlock topic filter with Pro plan",
+    settings_unlock_quiet: "Set quiet hours with Pro plan",
+    settings_unlock_pro: "Unlock with Pro",
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ Plan",

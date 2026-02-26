@@ -8,8 +8,7 @@ import { useAdminToast } from "@/components/ui/admin-toast";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Loader2, Trash2, Ban, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface UserDetail {
   id: string;

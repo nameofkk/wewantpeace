@@ -9,8 +9,7 @@ import { Search, Ban, CheckCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import UserDetailDrawer from "@/components/admin/UserDetailDrawer";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface AdminUser {
   id: string;

@@ -7,8 +7,7 @@ import { t } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface SubscriptionItem {
   id: string;

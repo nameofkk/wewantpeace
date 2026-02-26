@@ -8,8 +8,7 @@ import { COUNTRY_MAP } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/api";
 
 interface ClusterOut {
   id: string;

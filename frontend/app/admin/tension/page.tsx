@@ -9,8 +9,7 @@ import { Activity, RefreshCw, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCountryName, getFlag } from "@/lib/countries";
 import { useAdminToast } from "@/components/ui/admin-toast";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 interface TensionRow {
   country_code: string;

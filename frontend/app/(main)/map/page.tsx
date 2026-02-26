@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map } from "lucide-react";
+import { Layers, AlertTriangle, RefreshCw, Radio, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useClusters, useMe } from "@/lib/api";

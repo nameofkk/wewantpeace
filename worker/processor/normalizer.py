@@ -461,7 +461,7 @@ def _translate_to_english(text: str, lang: str) -> str:
         translated = GoogleTranslator(source="auto", target="en").translate(chunk)
         return translated or text
     except Exception as e:
-        logger.debug("번역 실패 (%s→en): %s", lang, e)
+        logger.warning("번역 실패 (%s→en, %d자): %s", lang, len(text), e)
         return text
 
 
@@ -473,7 +473,7 @@ def _translate_to_korean(text: str) -> Optional[str]:
         result = GoogleTranslator(source="en", target="ko").translate(chunk)
         return result or None
     except Exception as e:
-        logger.debug("한국어 번역 실패: %s", e)
+        logger.warning("한국어 번역 실패 (%d자): %s", len(text), e)
         return None
 
 

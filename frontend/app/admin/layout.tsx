@@ -13,8 +13,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useAuth, signOut } from "@/lib/auth";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_BASE } from "@/lib/admin-utils";
 
 const NAV_ITEMS = [
   { href: "/admin", icon: LayoutDashboard, labelKey: "admin_dashboard" as const, exact: true },

@@ -5,7 +5,7 @@ import { Bell, BellOff, MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogI
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
-import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken } from "@/lib/api";
+import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
 import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
 import { ALL_COUNTRIES, getCountryName, getRegionName } from "@/lib/countries";
 import { useAuth, signOut } from "@/lib/auth";
@@ -152,8 +152,6 @@ export default function SettingsPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // 구독 정보 조회
   const [subPlatform, setSubPlatform] = useState<string>("web");
@@ -473,8 +471,8 @@ export default function SettingsPage() {
                                     </button>
                                     <span className={cn("text-[11px]", area.notify_verified ? "text-green-400" : "text-muted-foreground")}>
                                       {area.notify_verified
-                                        ? (lang === "ko" ? "공식 확인 이슈 알림 켜짐" : "Verified alerts on")
-                                        : (lang === "ko" ? "공식 확인 이슈 알림 꺼짐" : "Verified alerts off")}
+                                        ? (t(lang, "settings_verified_on"))
+                                        : (t(lang, "settings_verified_off"))}
                                     </span>
                                     <button
                                       onClick={() => setOpenInfo(openInfo === `verified-${code}` ? null : `verified-${code}`)}
@@ -485,9 +483,7 @@ export default function SettingsPage() {
                                   </div>
                                   {openInfo === `verified-${code}` && (
                                     <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
-                                      {lang === "ko"
-                                        ? "AP, Reuters 등 공신력 있는 소스로 확인된 이슈만 알려드려요."
-                                        : "Notifies you only for issues confirmed by trusted sources like AP, Reuters."}
+                                      {t(lang, "settings_verified_info")}
                                     </p>
                                   )}
                                 </div>
@@ -515,10 +511,10 @@ export default function SettingsPage() {
                                         : area.notify_fast ? "text-orange-400" : "text-muted-foreground"
                                     )}>
                                       {plan === "free"
-                                        ? (lang === "ko" ? "속보 알림 (Pro 전용)" : "Fast alerts (Pro only)")
+                                        ? (t(lang, "settings_fast_pro_only"))
                                         : area.notify_fast
-                                        ? (lang === "ko" ? "미확인 속보 알림 켜짐" : "Fast alerts on")
-                                        : (lang === "ko" ? "미확인 속보 알림 꺼짐" : "Fast alerts off")}
+                                        ? (t(lang, "settings_fast_on"))
+                                        : (t(lang, "settings_fast_off"))}
                                     </span>
                                     <button
                                       onClick={() => setOpenInfo(openInfo === `fast-${code}` ? null : `fast-${code}`)}
@@ -529,9 +525,7 @@ export default function SettingsPage() {
                                   </div>
                                   {openInfo === `fast-${code}` && (
                                     <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
-                                      {lang === "ko"
-                                        ? "확인 전 속보도 즉시 알려드려요. 더 빠르지만 오탐이 있을 수 있어요."
-                                        : "Alerts you before official confirmation. Faster, but may include false positives."}
+                                      {t(lang, "settings_fast_info")}
                                     </p>
                                   )}
                                 </div>
@@ -539,7 +533,7 @@ export default function SettingsPage() {
                             ) : (
                               <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
-                                {lang === "ko" ? "알림 설정 로딩중..." : "Loading alert settings..."}
+                                {t(lang, "settings_alert_loading")}
                               </div>
                             )}
                           </div>
@@ -639,16 +633,16 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {lang === "ko" ? "푸시 알림" : "Push Notifications"}
+                    {t(lang, "settings_push_title")}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {hasFCMToken
-                      ? (lang === "ko" ? "이슈 발생 시 즉시 알림을 받습니다" : "You'll get instant alerts for new issues")
+                      ? t(lang, "settings_push_desc_enabled")
                       : notifStatus === "unsupported"
-                      ? (lang === "ko" ? "이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome/Safari에서 열어주세요" : "Push not supported in this browser. Open in Chrome/Safari")
+                      ? t(lang, "settings_push_desc_unsupported")
                       : notifStatus === "denied"
-                      ? (lang === "ko" ? "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요" : "Blocked — allow in your browser settings")
-                      : (lang === "ko" ? "중요 이슈 발생 시 즉시 알림 수신" : "Get instant alerts for critical events")
+                      ? t(lang, "settings_push_desc_denied")
+                      : t(lang, "settings_push_desc_default")
                     }
                   </p>
                 </div>
@@ -664,7 +658,7 @@ export default function SettingsPage() {
                     ) : (
                       <Bell className="h-3.5 w-3.5" />
                     )}
-                    {lang === "ko" ? "알림 비활성화" : "Disable"}
+                    {t(lang, "settings_push_disable")}
                   </button>
                 ) : (
                   <button
@@ -682,7 +676,7 @@ export default function SettingsPage() {
                     ) : (
                       <BellOff className="h-3.5 w-3.5" />
                     )}
-                    {lang === "ko" ? "알림 활성화" : "Enable"}
+                    {t(lang, "settings_push_enable")}
                   </button>
                 )}
               </div>
@@ -743,7 +737,7 @@ export default function SettingsPage() {
               {plan === "free" && (
                 <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
                   <span>🔓</span>
-                  <span>{lang === "ko" ? "Pro 플랜으로 토픽 필터를 잠금 해제하세요" : "Unlock topic filter with Pro plan"}</span>
+                  <span>{t(lang, "settings_unlock_topics")}</span>
                 </a>
               )}
               {plan !== "free" ? (
@@ -818,7 +812,7 @@ export default function SettingsPage() {
               {plan === "free" && (
                 <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary">
                   <span>🔓</span>
-                  <span>{lang === "ko" ? "Pro 플랜으로 방해금지 시간을 설정하세요" : "Set quiet hours with Pro plan"}</span>
+                  <span>{t(lang, "settings_unlock_quiet")}</span>
                 </a>
               )}
               {plan !== "free" && (
@@ -885,7 +879,7 @@ export default function SettingsPage() {
             {plan === "free" && (
               <div className="mt-3 space-y-1.5">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  {lang === "ko" ? "Pro에서 열리는 기능" : "Unlock with Pro"}
+                  {t(lang, "settings_unlock_pro")}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
