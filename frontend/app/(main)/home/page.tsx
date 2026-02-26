@@ -317,24 +317,33 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   return (
     <div
       className={cn(
-        "card-enter rounded-xl border-l-4 border border-border bg-card p-4 relative overflow-hidden",
+        "card-enter rounded-xl border-l-4 border border-border bg-card p-4 relative",
         "transition-all hover:bg-card/80",
         clusterId && "cursor-pointer",
         kscoreAccent(item.kscore),
         badge.glow,
-        isCritical && "kscore-crisis-pulse",
+        isCritical && "kscore-crisis-pulse card-tremor",
+        isAlert && !isCritical && "card-glow-pulse",
       )}
       style={{ animationDelay: `${delay}ms` }}
       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
     >
+      {/* 외부 퍼지는 글로우 링 (경계/위기만) */}
+      {isAlert && (
+        <div className={cn(
+          "absolute -inset-[1px] rounded-xl pointer-events-none",
+          isCritical ? "card-outer-pulse-red" : "card-outer-pulse-orange",
+        )} />
+      )}
+
       {/* 배경 글로우 (경계/위기만) */}
       {isAlert && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 rounded-xl pointer-events-none"
           style={{
             background: isCritical
-              ? "linear-gradient(135deg, rgba(239,68,68,0.06) 0%, transparent 60%)"
-              : "linear-gradient(135deg, rgba(249,115,22,0.04) 0%, transparent 60%)",
+              ? "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, transparent 60%)"
+              : "linear-gradient(135deg, rgba(249,115,22,0.05) 0%, transparent 60%)",
           }}
         />
       )}
@@ -352,19 +361,19 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* KScore 상태 뱃지 */}
             <span className={cn(
-              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none",
+              "inline-flex items-center h-5 rounded-full px-2 text-[10px] font-bold leading-none",
               badge.bg, badge.text,
               isCritical && "animate-pulse",
             )}>
               {badge.label}
             </span>
             {isNew(item.first_event_at) && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-400 leading-none">
+              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-blue-500/20 px-1.5 text-[9px] font-bold text-blue-400 leading-none">
                 NEW
                 <InfoTooltip direction="down" text={t(lang, "signal_new_tooltip")} />
               </span>
             )}
-            <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium", TOPIC_COLORS[topic])}>
+            <span className={cn("inline-flex items-center h-5 gap-0.5 rounded-full px-2 text-[10px] font-medium leading-none", TOPIC_COLORS[topic])}>
               {topicLabel}
               <InfoTooltip direction="down" text={t(lang, (`topic_${topic}_tooltip`) as Parameters<typeof t>[1]) || topicLabel} />
             </span>

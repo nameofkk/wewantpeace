@@ -151,8 +151,7 @@ export default function SettingsPage() {
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("23:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
-  const [notifSaving, setNotifSaving] = useState(false);
-  const [notifSaved, setNotifSaved] = useState(false);
+  // notifSaving/notifSaved 제거 — 자동 저장
 
   // 프로필 편집
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -315,27 +314,30 @@ export default function SettingsPage() {
   };
 
   async function saveNotifPatch(patch: Parameters<typeof patchPrefs.mutate>[0]) {
-    setNotifSaving(true);
-    setNotifSaved(false);
     try {
       await patchPrefs.mutateAsync(patch);
-      setNotifSaved(true);
-      setTimeout(() => setNotifSaved(false), 2000);
-    } finally {
-      setNotifSaving(false);
-    }
+    } catch {}
   }
 
   function handleSaveKscore() {
     saveNotifPatch({ min_kscore: kscoreValue });
   }
 
-  function handleSaveTopics() {
-    saveNotifPatch({ topics: selectedTopics });
+  function handleToggleTopic(topic: string) {
+    const next = selectedTopics.includes(topic)
+      ? selectedTopics.filter((t) => t !== topic)
+      : [...selectedTopics, topic];
+    setSelectedTopics(next);
+    saveNotifPatch({ topics: next });
   }
 
-  function handleSaveQuietHours() {
-    saveNotifPatch({ quiet_hours_start: quietStart, quiet_hours_end: quietEnd });
+  function handleSetAllTopics(topics: string[]) {
+    setSelectedTopics(topics);
+    saveNotifPatch({ topics });
+  }
+
+  function handleSaveQuietHours(start: string, end: string) {
+    saveNotifPatch({ quiet_hours_start: start, quiet_hours_end: end });
   }
 
   // 국가 코드 → 이름+플래그
@@ -797,14 +799,14 @@ export default function SettingsPage() {
                 <>
                   <div className="flex gap-3 mb-2">
                     <button
-                      onClick={() => setSelectedTopics(TOPICS)}
+                      onClick={() => handleSetAllTopics(TOPICS)}
                       className="text-[10px] text-primary hover:underline"
                     >
                       {t(lang, "notif_topics_all")}
                     </button>
                     <span className="text-[10px] text-muted-foreground">·</span>
                     <button
-                      onClick={() => setSelectedTopics([])}
+                      onClick={() => handleSetAllTopics([])}
                       className="text-[10px] text-muted-foreground hover:underline"
                     >
                       {t(lang, "notif_topics_none")}
@@ -814,11 +816,7 @@ export default function SettingsPage() {
                     {TOPICS.map((topic) => (
                       <button
                         key={topic}
-                        onClick={() =>
-                          setSelectedTopics((prev) =>
-                            prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
-                          )
-                        }
+                        onClick={() => handleToggleTopic(topic)}
                         className={cn(
                           "rounded-lg border px-2 py-1.5 text-xs transition-colors",
                           selectedTopics.includes(topic)
@@ -830,13 +828,6 @@ export default function SettingsPage() {
                       </button>
                     ))}
                   </div>
-                  <button
-                    onClick={handleSaveTopics}
-                    disabled={notifSaving}
-                    className="mt-3 text-[10px] text-primary hover:underline"
-                  >
-                    {notifSaving ? t(lang, "notif_saving") : notifSaved ? t(lang, "notif_saved") : t(lang, "notif_quiet_save")}
-                  </button>
                 </>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-1">
@@ -898,7 +889,10 @@ export default function SettingsPage() {
                     <input
                       type="time"
                       value={quietStart}
-                      onChange={(e) => { setQuietStart(e.target.value); }}
+                      onChange={(e) => {
+                        setQuietStart(e.target.value);
+                        handleSaveQuietHours(e.target.value, quietEnd);
+                      }}
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
                     />
                   </div>
@@ -908,17 +902,13 @@ export default function SettingsPage() {
                     <input
                       type="time"
                       value={quietEnd}
-                      onChange={(e) => { setQuietEnd(e.target.value); }}
+                      onChange={(e) => {
+                        setQuietEnd(e.target.value);
+                        handleSaveQuietHours(quietStart, e.target.value);
+                      }}
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
                     />
                   </div>
-                  <button
-                    onClick={handleSaveQuietHours}
-                    disabled={notifSaving}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white whitespace-nowrap"
-                  >
-                    {notifSaving ? "..." : t(lang, "notif_quiet_save")}
-                  </button>
                 </div>
               )}
             </div>
