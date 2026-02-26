@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Ban, CheckCircle, Users } from "lucide-react";
+import { Search, Ban, CheckCircle, Users, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import UserDetailDrawer from "@/components/admin/UserDetailDrawer";
@@ -42,18 +42,23 @@ export default function AdminUsersPage() {
   const { toast } = useAdminToast();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [tab, setTab] = useState<"active" | "deleted">("active");
   const [statusFilter, setStatusFilter] = useState("");
   const [planFilter, setPlanFilter] = useState("");
   const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
 
+  // 탭에 따라 status 결정: active 탭은 statusFilter 또는 전체(deleted 제외), deleted 탭은 고정 "deleted"
+  const effectiveStatus = tab === "deleted" ? "deleted" : statusFilter;
+
   const { data, isLoading } = useQuery<{ users: AdminUser[]; total: number }>({
-    queryKey: ["admin-users", page, search, statusFilter, planFilter],
+    queryKey: ["admin-users", tab, page, search, effectiveStatus, planFilter],
     queryFn: async () => {
       if (!user) throw new Error("Unauthorized");
       const token = await user.getIdToken();
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (search) params.append("search", search);
-      if (statusFilter) params.append("status", statusFilter);
+      if (effectiveStatus) params.append("status", effectiveStatus);
+      if (tab === "active" && !statusFilter) params.append("exclude_status", "deleted");
       if (planFilter) params.append("plan", planFilter);
       const res = await fetch(`${API_BASE}/admin/users?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -127,29 +132,54 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg bg-secondary p-1 mb-4">
+        <button
+          onClick={() => { setTab("active"); setPage(1); setStatusFilter(""); }}
+          className={cn(
+            "flex items-center gap-1.5 flex-1 py-2 rounded-md text-sm font-medium transition-colors",
+            tab === "active" ? "bg-background text-foreground shadow" : "text-muted-foreground"
+          )}
         >
-          <option value="">{t(lang, "admin_status")}: {t(lang, "admin_all")}</option>
-          <option value="active">{t(lang, "admin_active")}</option>
-          <option value="suspended">{t(lang, "admin_suspend")}</option>
-          <option value="deleted">{t(lang, "admin_delete")}</option>
-        </select>
-        <select
-          value={planFilter}
-          onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"
+          <Users className="h-3.5 w-3.5" />
+          {t(lang, "admin_tab_active_users")}
+        </button>
+        <button
+          onClick={() => { setTab("deleted"); setPage(1); setStatusFilter(""); setPlanFilter(""); }}
+          className={cn(
+            "flex items-center gap-1.5 flex-1 py-2 rounded-md text-sm font-medium transition-colors",
+            tab === "deleted" ? "bg-background text-foreground shadow" : "text-muted-foreground"
+          )}
         >
-          <option value="">{t(lang, "admin_user_plan")}: {t(lang, "admin_all")}</option>
-          <option value="free">Free</option>
-          <option value="pro">Pro</option>
-          <option value="pro_plus">Pro+</option>
-        </select>
+          <UserX className="h-3.5 w-3.5" />
+          {t(lang, "admin_tab_deleted_users")}
+        </button>
       </div>
+
+      {/* Filters (active 탭에서만) */}
+      {tab === "active" && (
+        <div className="flex flex-wrap gap-3 mb-4">
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"
+          >
+            <option value="">{t(lang, "admin_status")}: {t(lang, "admin_all")}</option>
+            <option value="active">{t(lang, "admin_active")}</option>
+            <option value="suspended">{t(lang, "admin_suspend")}</option>
+          </select>
+          <select
+            value={planFilter}
+            onChange={(e) => { setPlanFilter(e.target.value); setPage(1); }}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"
+          >
+            <option value="">{t(lang, "admin_user_plan")}: {t(lang, "admin_all")}</option>
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="pro_plus">Pro+</option>
+          </select>
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -183,12 +213,72 @@ export default function AdminUsersPage() {
         </>
       ) : !data?.users?.length ? (
         <div className="flex flex-col items-center py-16 text-muted-foreground">
-          <Users className="h-10 w-10 mb-3" />
+          {tab === "deleted" ? <UserX className="h-10 w-10 mb-3" /> : <Users className="h-10 w-10 mb-3" />}
           <p className="text-sm">{t(lang, "admin_no_data")}</p>
         </div>
+      ) : tab === "deleted" ? (
+        <>
+          {/* Deleted — Desktop table */}
+          <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">ID</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_nickname")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_plan")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_joined")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {data.users.map((u) => (
+                  <tr key={u.id} className="hover:bg-secondary/20 cursor-pointer opacity-60" onClick={() => setDrawerUserId(u.id)}>
+                    <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{u.id.slice(0, 8)}</td>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium line-through text-muted-foreground">{u.nickname || u.display_name || t(lang, "admin_no_name")}</p>
+                        <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", PLAN_BADGE[u.plan] || "bg-secondary")}>
+                        {u.plan.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {new Date(u.created_at).toLocaleDateString(locale)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Deleted — Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {data.users.map((u) => (
+              <div
+                key={u.id}
+                className="rounded-xl border border-border bg-card p-4 cursor-pointer active:bg-secondary/20 opacity-60"
+                onClick={() => setDrawerUserId(u.id)}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="font-medium text-sm line-through text-muted-foreground">{u.nickname || u.display_name || t(lang, "admin_no_name")}</p>
+                    <p className="text-xs text-muted-foreground">{u.email || "—"}</p>
+                  </div>
+                  <span className="text-xs font-medium text-muted-foreground">deleted</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground font-mono">{u.id.slice(0, 8)}</span>
+                  <p className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString(locale)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
         <>
-          {/* Desktop table */}
+          {/* Active — Desktop table */}
           <div className="hidden md:block rounded-xl border border-border overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-secondary/50">
@@ -256,7 +346,7 @@ export default function AdminUsersPage() {
             </table>
           </div>
 
-          {/* Mobile cards */}
+          {/* Active — Mobile cards */}
           <div className="md:hidden space-y-3">
             {data.users.map((u) => (
               <div

@@ -158,6 +158,7 @@ async def list_users(
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    exclude_status: Optional[str] = Query(None),
     plan: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -167,6 +168,8 @@ async def list_users(
         filters.append((User.email.ilike(f"%{search}%")) | (User.nickname.ilike(f"%{search}%")))
     if status:
         filters.append(User.status == status)
+    if exclude_status:
+        filters.append(User.status != exclude_status)
     if plan:
         filters.append(User.plan == plan)
 
