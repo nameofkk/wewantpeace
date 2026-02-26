@@ -301,23 +301,21 @@ export default function MapPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState(() => new Date().toISOString());
 
-  // 잠금 상태일 때는 즉시 mock 데이터 로드 (API 응답 대기 없이)
+  // 잠금 상태(Free)일 때는 mock 데이터 로드
   useEffect(() => {
     if (isLocked) {
       fetch("/mock-clusters.json").then((r) => r.json()).then(setClusters).catch(() => {});
     }
   }, [isLocked]);
 
-  // 비잠금 상태에서는 API 데이터 → 없으면 mock 폴백
+  // Pro/Pro+: 실제 API 데이터만 사용 (mock 폴백 없음)
   useEffect(() => {
     if (isLocked) return;
-    if (apiClusters && Array.isArray(apiClusters) && (apiClusters as Cluster[]).length > 0) {
+    if (apiClusters && Array.isArray(apiClusters)) {
       setClusters(apiClusters as Cluster[]);
       setLastFetchedAt(new Date().toISOString());
-    } else if (isError || (apiClusters !== undefined && Array.isArray(apiClusters) && apiClusters.length === 0)) {
-      fetch("/mock-clusters.json").then((r) => r.json()).then(setClusters).catch(() => {});
     }
-  }, [apiClusters, isError, isLocked]);
+  }, [apiClusters, isLocked]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -520,6 +518,52 @@ export default function MapPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 rounded-full bg-background/90 px-4 py-2 text-[11px] text-muted-foreground border border-border backdrop-blur-sm flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
           {t(lang, "map_data_loading")}
+        </div>
+      )}
+
+      {/* ── Pro/Pro+ 데이터 없음 안내 ─────────────────────────────── */}
+      {!isLocked && !isLoading && isMapReady && clusters.length === 0 && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 rounded-xl bg-background/95 px-6 py-5 border border-border backdrop-blur-sm text-center max-w-[280px]">
+          <Layers className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
+          <p className="text-sm font-medium mb-1">
+            {lang === "ko" ? "현재 표시할 이슈가 없습니다" : "No issues to display"}
+          </p>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            {lang === "ko"
+              ? "데이터가 수집되면 자동으로 표시됩니다"
+              : "Issues will appear automatically when detected"}
+          </p>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="rounded-lg border border-border px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 mx-auto"
+          >
+            <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
+            {lang === "ko" ? "새로고침" : "Refresh"}
+          </button>
+        </div>
+      )}
+
+      {/* ── API 오류 안내 ─────────────────────────────────────────── */}
+      {!isLocked && isError && isMapReady && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 rounded-xl bg-background/95 px-6 py-5 border border-red-500/30 backdrop-blur-sm text-center max-w-[280px]">
+          <AlertTriangle className="h-8 w-8 text-red-400/70 mx-auto mb-3" />
+          <p className="text-sm font-medium mb-1">
+            {lang === "ko" ? "데이터를 불러오지 못했습니다" : "Failed to load data"}
+          </p>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            {lang === "ko"
+              ? "잠시 후 다시 시도해 주세요"
+              : "Please try again in a moment"}
+          </p>
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground flex items-center gap-1.5 mx-auto"
+          >
+            <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
+            {lang === "ko" ? "다시 시도" : "Retry"}
+          </button>
         </div>
       )}
 

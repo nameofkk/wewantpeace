@@ -237,7 +237,7 @@ export default function SettingsPage() {
     ? myCountries.length < PRO_COUNTRY_LIMIT
     : myCountries.length < FREE_COUNTRY_LIMIT;
 
-  const TOPICS = ["conflict", "terror", "coup", "sanctions", "cyber", "protest"];
+  const TOPICS = ["conflict", "terror", "coup", "sanctions", "cyber", "protest", "diplomacy", "maritime", "disaster", "health"];
   const TOPIC_LABELS: Record<string, { ko: string; en: string }> = {
     conflict: { ko: "분쟁", en: "Conflict" },
     terror: { ko: "테러", en: "Terror" },
@@ -245,6 +245,10 @@ export default function SettingsPage() {
     sanctions: { ko: "제재", en: "Sanctions" },
     cyber: { ko: "사이버", en: "Cyber" },
     protest: { ko: "시위", en: "Protest" },
+    diplomacy: { ko: "외교", en: "Diplomacy" },
+    maritime: { ko: "해양", en: "Maritime" },
+    disaster: { ko: "재난·재해", en: "Disaster" },
+    health: { ko: "감염병·보건", en: "Health" },
   };
 
   async function saveNotifPatch(patch: Parameters<typeof patchPrefs.mutate>[0]) {
@@ -757,7 +761,7 @@ export default function SettingsPage() {
                       {t(lang, "notif_topics_none")}
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                     {TOPICS.map((topic) => (
                       <button
                         key={topic}
@@ -786,9 +790,9 @@ export default function SettingsPage() {
                   </button>
                 </>
               ) : (
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-1">
                   {TOPICS.map((topic) => (
-                    <span key={topic} className="rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground">
+                    <span key={topic} className="rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground text-center">
                       {TOPIC_LABELS[topic]?.[lang === "ko" ? "ko" : "en"] ?? topic}
                     </span>
                   ))}

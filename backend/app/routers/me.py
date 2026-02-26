@@ -287,14 +287,25 @@ async def update_preferences(
         min_allowed = 1.0 if plan_lower == "free" else (0.5 if plan_lower == "pro_plus" else 1.0)
         pref.min_kscore = max(min_allowed, min(body.min_kscore, 5.0))
     if body.topics is not None:
+        # 토픽 필터는 Pro 이상만 허용
+        if body.topics and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "토픽 필터는 Pro 플랜 전용입니다."},
+            )
         pref.topics = body.topics
     if body.timezone is not None:
         pref.timezone = body.timezone
-    # quiet_hours: "" = 해제, "HH:MM" = 설정
+    # quiet_hours: "" = 해제, "HH:MM" = 설정 (Pro 이상만 허용)
     if body.quiet_hours_start is not None:
         from datetime import time as dt_time
         if body.quiet_hours_start == "":
             pref.quiet_hours_start = None
+        elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "방해금지 시간은 Pro 플랜 전용입니다."},
+            )
         else:
             try:
                 parts = body.quiet_hours_start.split(":")
@@ -308,6 +319,11 @@ async def update_preferences(
         from datetime import time as dt_time
         if body.quiet_hours_end == "":
             pref.quiet_hours_end = None
+        elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "방해금지 시간은 Pro 플랜 전용입니다."},
+            )
         else:
             try:
                 parts = body.quiet_hours_end.split(":")
