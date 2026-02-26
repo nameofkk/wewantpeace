@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1a1a2e",
+  themeColor: "#0f1729",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -73,16 +73,16 @@ export default function RootLayout({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "#1a1a2e",
+            background: "#0f1729",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo-eye.png"
             alt=""
-            width={160}
+            width={184}
             height={80}
-            style={{ height: 80, width: 160, objectFit: "contain" }}
+            style={{ height: 80, width: "auto", objectFit: "contain" }}
           />
           <p
             style={{

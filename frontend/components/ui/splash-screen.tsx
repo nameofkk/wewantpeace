@@ -28,7 +28,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#1a1a2e] ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0f1729] ${
         visible ? "" : "splash-fade-out"
       }`}
     >
@@ -36,9 +36,9 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         <Image
           src="/logo-eye.png"
           alt="WeWantPeace"
-          width={160}
+          width={184}
           height={80}
-          className="h-20 w-40"
+          className="h-20 w-auto"
           priority
         />
       </div>
