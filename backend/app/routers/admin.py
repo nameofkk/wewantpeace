@@ -21,6 +21,7 @@ from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.raw_event import RawEvent
 from backend.app.models.source_channel import SourceChannel
+from backend.app.models.trending_keyword import TrendingKeyword
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -718,6 +719,60 @@ async def admin_tension_recalculate(
     except Exception as e:
         _logger.error("admin_tension_recalculate 실패: %s", e, exc_info=True)
         raise HTTPException(500, detail="긴장도 재계산 중 오류가 발생했습니다.")
+
+
+@router.get("/trending")
+async def admin_trending_list(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """현재 활성 트렌딩 키워드 전체 목록 (KScore 내림차순)."""
+    from sqlalchemy import text as sa_text
+
+    result = await db.execute(
+        sa_text("""
+            SELECT DISTINCT ON (kw.normalized_kw)
+                kw.id, kw.keyword, kw.keyword_ko, kw.kscore, kw.topic,
+                kw.country_codes, kw.cluster_ids, kw.event_count,
+                kw.severity, kw.is_spike, kw.calculated_at, kw.valid_until,
+                COALESCE(ic.independent_sources, 1) AS independent_sources,
+                COALESCE(ic.confidence, 0) AS confidence
+            FROM trending_keywords kw
+            LEFT JOIN issue_clusters ic ON ic.id = (kw.cluster_ids)[1]
+            WHERE kw.scope = 'global'
+            ORDER BY kw.normalized_kw, kw.kscore DESC
+        """)
+    )
+    rows = result.mappings().all()
+    sorted_rows = sorted(rows, key=lambda r: float(r["kscore"]), reverse=True)
+
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "id": r["id"],
+            "keyword": r["keyword"],
+            "keyword_ko": r["keyword_ko"],
+            "kscore": round(float(r["kscore"]), 2),
+            "topic": r["topic"],
+            "country_codes": r["country_codes"] or [],
+            "event_count": r["event_count"] or 0,
+            "severity": r["severity"] or 0,
+            "is_spike": bool(r["is_spike"]),
+            "independent_sources": int(r["independent_sources"] or 1),
+            "confidence": round(float(r["confidence"] or 0), 3),
+            "calculated_at": (
+                r["calculated_at"].isoformat()
+                if hasattr(r["calculated_at"], "isoformat")
+                else str(r["calculated_at"])
+            ),
+            "is_expired": (
+                r["valid_until"] < now
+                if hasattr(r["valid_until"], "__lt__")
+                else False
+            ),
+        }
+        for r in sorted_rows
+    ]
 
 
 @router.post("/trending/recalculate")
