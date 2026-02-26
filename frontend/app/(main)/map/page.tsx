@@ -383,9 +383,13 @@ export default function MapPage() {
       const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
       let displayClusters: Cluster[];
       try {
-        // zoom < 4: 국가별 그룹핑 (좌표 없는 클러스터도 카운트에 포함)
-        const countryGrouped = mapZoom < 4 ? groupClustersByCountry(clusters) : withCoords;
-        displayClusters = groupByPixelProximity(countryGrouped, currentMap, 40);
+        if (mapZoom < 4) {
+          // 저배율: 국가별 1개 마커만 — pixel proximity 하면 인접국이 병합되어 바다에 찍힘
+          displayClusters = groupClustersByCountry(clusters);
+        } else {
+          // 고배율: 좌표 있는 것만 → pixel 근접 그룹핑
+          displayClusters = groupByPixelProximity(withCoords, currentMap, 40);
+        }
       } catch {
         displayClusters = withCoords;
       }

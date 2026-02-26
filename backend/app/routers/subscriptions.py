@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db
@@ -61,10 +61,17 @@ async def get_my_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "grace_period"]),
+            or_(
+                Subscription.status.in_(["active", "grace_period"]),
+                and_(
+                    Subscription.status == "cancelled",
+                    Subscription.expires_at > now,
+                ),
+            ),
         ).order_by(Subscription.created_at.desc()).limit(1)
     )
     sub = result.scalar_one_or_none()
@@ -80,6 +87,7 @@ async def get_my_subscription(
         "started_at": sub.started_at.isoformat(),
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "next_billing_at": sub.next_billing_at.isoformat() if sub.next_billing_at else None,
+        "cancelled_at": sub.cancelled_at.isoformat() if sub.cancelled_at else None,
     }
 
 

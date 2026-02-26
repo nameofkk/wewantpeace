@@ -12,7 +12,7 @@ function kscoreColor(k: number): string {
   if (k >= 3.0) return "from-red-500 to-red-400";
   if (k >= 2.0) return "from-orange-500 to-orange-400";
   if (k >= 1.0) return "from-yellow-500 to-yellow-400";
-  return "from-blue-500 to-blue-400";
+  return "from-green-500 to-green-400";
 }
 
 function kscoreLabel(k: number): string {

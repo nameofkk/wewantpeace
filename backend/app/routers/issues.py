@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, or_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import AsyncSessionLocal
@@ -152,13 +152,8 @@ async def list_clusters(
     - country_code: 국가 코드 필터
     - severity_min: 최소 심각도 (0~100)
     """
-    # lat/lon 있거나, country_code가 있으면 fallback 좌표 제공 가능
     stmt = select(IssueCluster).where(
         IssueCluster.severity >= severity_min,
-        or_(
-            IssueCluster.lat.isnot(None),
-            IssueCluster.country_code.isnot(None),
-        ),
     ).order_by(IssueCluster.last_event_at.desc()).limit(limit)
 
     if topic:
