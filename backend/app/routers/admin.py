@@ -729,9 +729,10 @@ async def admin_trending_list(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """현재 활성 트렌딩 키워드 전체 목록 (KScore 내림차순)."""
+    """현재 활성 트렌딩 키워드 전체 목록 (최신 calculated_at 기준)."""
     from sqlalchemy import text as sa_text
 
+    cutoff48 = datetime.now(timezone.utc) - timedelta(hours=48)
     result = await db.execute(
         sa_text("""
             SELECT DISTINCT ON (kw.normalized_kw)
@@ -743,8 +744,10 @@ async def admin_trending_list(
             FROM trending_keywords kw
             LEFT JOIN issue_clusters ic ON ic.id = (kw.cluster_ids)[1]
             WHERE kw.scope = 'global'
-            ORDER BY kw.normalized_kw, kw.kscore DESC
-        """)
+              AND kw.calculated_at >= :cutoff
+            ORDER BY kw.normalized_kw, kw.calculated_at DESC
+        """),
+        {"cutoff": cutoff48},
     )
     rows = result.mappings().all()
     sorted_rows = sorted(rows, key=lambda r: float(r["kscore"]), reverse=True)
