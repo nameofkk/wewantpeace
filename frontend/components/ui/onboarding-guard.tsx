@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { SplashScreen } from "./splash-screen";
 
 /**
  * 온보딩 완료 여부를 localStorage로 체크하여
  * 미완료 시 /onboarding으로 리다이렉트.
- * 마운트 시 1회만 체크 — pathname 의존성 제거로 네비게이션 시 BottomNav 사라짐 버그 수정.
+ * 스플래시 화면을 오버레이로 표시하여 children은 항상 렌더링 (데이터 prefetch 가능).
  */
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [checked, setChecked] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const mountTime = useRef(Date.now());
 
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
@@ -28,12 +33,26 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
     if (!done && !isOnboardingPage && !isAdminPage) {
       router.replace("/onboarding");
-    } else {
-      setChecked(true);
     }
+    setChecked(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 마운트 시 1회만 실행
 
-  if (!checked) return null;
-  return <>{children}</>;
+  // 온보딩 체크 + auth 로딩 완료 시 최소 800ms 보장 후 스플래시 해제
+  useEffect(() => {
+    if (!checked || authLoading) return;
+
+    const elapsed = Date.now() - mountTime.current;
+    const remaining = Math.max(0, 800 - elapsed);
+
+    const timer = setTimeout(() => setSplashVisible(false), remaining);
+    return () => clearTimeout(timer);
+  }, [checked, authLoading]);
+
+  return (
+    <>
+      <SplashScreen visible={splashVisible} />
+      {children}
+    </>
+  );
 }

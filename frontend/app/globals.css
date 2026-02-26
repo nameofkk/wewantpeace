@@ -162,3 +162,29 @@
   to   { transform: scaleX(0); }
 }
 
+/* ── 스플래시 화면 ────────────────────────────────── */
+@keyframes splash-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+.splash-breathe {
+  animation: splash-breathe 2s ease-in-out infinite;
+}
+
+@keyframes splash-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.02); }
+}
+.splash-fade-out {
+  animation: splash-fade-out 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes splash-dots {
+  0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+  40%           { opacity: 1;   transform: scale(1); }
+}
+.splash-dot {
+  animation: splash-dots 1.2s ease-in-out infinite;
+}
+

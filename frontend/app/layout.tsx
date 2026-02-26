@@ -62,6 +62,40 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-screen bg-background antialiased">
+        {/* 인라인 스플래시: JS 번들 로드 전 빈 화면 방지 (React 하이드레이션 후 제거됨) */}
+        <div
+          id="__splash"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#1a1a2e",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-eye.png"
+            alt=""
+            width={160}
+            height={80}
+            style={{ height: 80, width: 160, objectFit: "contain" }}
+          />
+          <p
+            style={{
+              marginTop: 12,
+              fontSize: 20,
+              fontWeight: 900,
+              letterSpacing: "-0.025em",
+              color: "hsl(210 40% 98%)",
+            }}
+          >
+            WeWantPeace
+          </p>
+        </div>
         <Providers>
           <OnboardingGuard>
             {children}
