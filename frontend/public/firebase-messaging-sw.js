@@ -5,20 +5,17 @@
 importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js");
 
-// 환경변수는 SW에서 접근 불가 → next.config.js에서 PUBLIC 변수 주입 또는 하드코딩
-// 실제 배포 시에는 /api/fcm-config 엔드포인트로 동적 주입 가능
 firebase.initializeApp({
-  apiKey: self.__FIREBASE_API_KEY__ || "",
-  authDomain: self.__FIREBASE_AUTH_DOMAIN__ || "",
-  projectId: self.__FIREBASE_PROJECT_ID__ || "wewantpeace",
-  storageBucket: self.__FIREBASE_STORAGE_BUCKET__ || "",
-  messagingSenderId: self.__FIREBASE_MESSAGING_SENDER_ID__ || "",
-  appId: self.__FIREBASE_APP_ID__ || "",
+  apiKey: "AIzaSyBlJf58F_C9hkIry1eEV185-S1EQZmt2ps",
+  authDomain: "wewantpeace-14660.firebaseapp.com",
+  projectId: "wewantpeace-14660",
+  storageBucket: "wewantpeace-14660.firebasestorage.app",
+  messagingSenderId: "736999139205",
+  appId: "1:736999139205:web:50b36428d7a3fc25e806ec",
 });
 
 const messaging = firebase.messaging();
 
-// 백그라운드 메시지 처리
 messaging.onBackgroundMessage((payload) => {
   console.log("[FCM SW] 백그라운드 메시지:", payload);
 
@@ -38,10 +35,8 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// 알림 클릭 처리
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
   if (event.action === "dismiss") return;
 
   const url = event.notification.data?.url || "/";
