@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "granite dev",
+    "build": "granite build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy": "ait deploy"
   },
   "dependencies": {
+    "@apps-in-toss/web-framework": "^1.14.0",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-progress": "^1.0.3",
@@ -28,8 +30,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^3.7.0",
-    "tailwind-merge": "^2.3.0",
     "sharp": "^0.33.4",
+    "tailwind-merge": "^2.3.0",
     "zustand": "^4.5.2"
   },
   "devDependencies": {
