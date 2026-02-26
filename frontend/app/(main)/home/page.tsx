@@ -322,7 +322,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
         clusterId && "cursor-pointer",
         kscoreAccent(item.kscore),
         badge.glow,
-        isCritical && "kscore-crisis-pulse card-tremor",
+        isCritical && "kscore-crisis-pulse",
         isAlert && !isCritical && "card-glow-pulse",
       )}
       style={{ animationDelay: `${delay}ms` }}

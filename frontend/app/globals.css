@@ -124,34 +124,22 @@
   animation: slide-up 0.35s ease forwards;
 }
 
-/* ── KScore 위기 카드 펄스 ───────────────────────────── */
+/* ── KScore 위기 카드 펄스 (slide-up 포함 — card-enter 덮어쓰기 방지) ── */
 @keyframes crisis-border {
   0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
   50%      { border-color: rgba(239, 68, 68, 0.6); }
 }
 .kscore-crisis-pulse {
-  animation: crisis-border 2s ease-in-out infinite;
+  animation: slide-up 0.35s ease forwards, crisis-border 2s ease-in-out 0.35s infinite;
 }
 
-/* ── 위기 카드 미세 떨림 ─────────────────────────────── */
-@keyframes tremor {
-  0%, 100% { transform: translate(0, 0); }
-  20%      { transform: translate(-0.3px, 0.3px); }
-  40%      { transform: translate(0.3px, -0.3px); }
-  60%      { transform: translate(-0.3px, -0.2px); }
-  80%      { transform: translate(0.2px, 0.3px); }
-}
-.card-tremor {
-  animation: crisis-border 2s ease-in-out infinite, tremor 0.5s ease-in-out infinite;
-}
-
-/* ── 경계 카드 글로우 호흡 ───────────────────────────── */
+/* ── 경계 카드 글로우 호흡 (slide-up 포함) ────────────── */
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
   50%      { box-shadow: 0 0 16px 2px rgba(249, 115, 22, 0.12); }
 }
 .card-glow-pulse {
-  animation: glow-pulse 2.5s ease-in-out infinite;
+  animation: slide-up 0.35s ease forwards, glow-pulse 2.5s ease-in-out 0.35s infinite;
 }
 
 /* ── 카드 외부 퍼지는 링 (위기) ──────────────────────── */
