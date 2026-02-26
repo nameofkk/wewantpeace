@@ -148,8 +148,9 @@ export default function SettingsPage() {
   // 알림 설정 로컬 상태
   const [kscoreValue, setKscoreValue] = useState(1.0);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [quietStart, setQuietStart] = useState("");
-  const [quietEnd, setQuietEnd] = useState("");
+  const [quietEnabled, setQuietEnabled] = useState(false);
+  const [quietStart, setQuietStart] = useState("23:00");
+  const [quietEnd, setQuietEnd] = useState("07:00");
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifSaved, setNotifSaved] = useState(false);
 
@@ -277,8 +278,10 @@ export default function SettingsPage() {
     if (prefs) {
       setKscoreValue(prefs.min_kscore ?? 1.0);
       setSelectedTopics(prefs.topics ?? []);
-      setQuietStart(prefs.quiet_hours_start ?? "");
-      setQuietEnd(prefs.quiet_hours_end ?? "");
+      const hasQuiet = !!(prefs.quiet_hours_start && prefs.quiet_hours_end);
+      setQuietEnabled(hasQuiet);
+      setQuietStart(prefs.quiet_hours_start || "23:00");
+      setQuietEnd(prefs.quiet_hours_end || "07:00");
     }
   }, [prefs]);
 
@@ -842,15 +845,36 @@ export default function SettingsPage() {
 
             {/* 4. 방해금지 시간 (Pro / Pro+) */}
             <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-60 pointer-events-none")}>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_quiet_title")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_desc")}</p>
                 </div>
-                {plan === "free" && (
+                {plan === "free" ? (
                   <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors">
                     Pro →
                   </a>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const next = !quietEnabled;
+                      setQuietEnabled(next);
+                      if (next) {
+                        saveNotifPatch({ quiet_hours_start: quietStart || "23:00", quiet_hours_end: quietEnd || "07:00" });
+                      } else {
+                        saveNotifPatch({ quiet_hours_start: "", quiet_hours_end: "" });
+                      }
+                    }}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                      quietEnabled ? "bg-primary" : "bg-secondary"
+                    )}
+                  >
+                    <span className={cn(
+                      "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform",
+                      quietEnabled ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </button>
                 )}
               </div>
               {plan === "free" && (
@@ -859,14 +883,14 @@ export default function SettingsPage() {
                   <span>{t(lang, "settings_unlock_quiet")}</span>
                 </a>
               )}
-              {plan !== "free" && (
-                <div className="flex items-center gap-2 mt-1">
+              {plan !== "free" && quietEnabled && (
+                <div className="flex items-center gap-2 mt-3">
                   <div className="flex-1 flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_from")}</span>
                     <input
                       type="time"
                       value={quietStart}
-                      onChange={(e) => setQuietStart(e.target.value)}
+                      onChange={(e) => { setQuietStart(e.target.value); }}
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
                     />
                   </div>
@@ -876,7 +900,7 @@ export default function SettingsPage() {
                     <input
                       type="time"
                       value={quietEnd}
-                      onChange={(e) => setQuietEnd(e.target.value)}
+                      onChange={(e) => { setQuietEnd(e.target.value); }}
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
                     />
                   </div>

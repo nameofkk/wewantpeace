@@ -120,7 +120,7 @@ export const translations = {
     settings_plan_pro_desc: "관심지역 5개 · 실시간 지도 · Fast 알림 가능",
     settings_plan_free_desc: "관심지역 {n}개 · 지도 잠금 · Fast 알림 불가",
     settings_upgrade_btn: "Pro로 업그레이드",
-    settings_plan_change: "플랜 변경 / 취소",
+    settings_plan_change: "플랜 변경하기",
     settings_profile_edit: "계정 정보 수정",
     settings_my_posts: "내가 쓴 글 보기",
     settings_terms: "이용약관",
@@ -466,7 +466,6 @@ export const translations = {
     settings_plan_next_billing: "다음 결제 예정일",
     settings_plan_expires: "만료 예정일",
     settings_plan_not_renewing: "자동 갱신이 해제되어 있습니다",
-    settings_plan_change: "플랜 변경하기",
     settings_pro_limit: "Pro 플랜은 최대 {n}개 국가까지 설정 가능합니다.",
 
     // chart
@@ -817,7 +816,7 @@ export const translations = {
     settings_plan_pro_desc: "5 regions · Real-time map · Fast alerts enabled",
     settings_plan_free_desc: "{n} regions · Map locked · No Fast alerts",
     settings_upgrade_btn: "Upgrade to Pro",
-    settings_plan_change: "Change / Cancel Plan",
+    settings_plan_change: "Change Plan",
     settings_profile_edit: "Edit Profile",
     settings_my_posts: "My Posts",
     settings_terms: "Terms of Service",
@@ -1163,7 +1162,6 @@ export const translations = {
     settings_plan_next_billing: "Next billing date",
     settings_plan_expires: "Expires on",
     settings_plan_not_renewing: "Auto-renewal is off",
-    settings_plan_change: "Change Plan",
     settings_pro_limit: "Pro plan allows up to {n} countries.",
 
     // chart
