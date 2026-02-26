@@ -137,13 +137,11 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     scored.sort(key=lambda x: x["kscore"], reverse=True)
     top = scored[:TRENDING_LIMIT]
 
-    # trending_keywords 테이블 갱신: 먼저 새 레코드 삽입 후 기존 삭제 (빈 window 방지)
-    # NOTE: on_conflict_do_update(UPSERT) 사용을 위해서는 TrendingKeyword 모델에
-    # normalized_kw + scope UniqueConstraint가 필요합니다. 현재 미적용 상태이므로
-    # INSERT 후 DELETE 순서로 처리하여 API 응답 빈 구간을 최소화합니다.
+    # trending_keywords 테이블 갱신: scored 전체를 저장하여 모든 클러스터의 KScore 히스토리 보존
+    # (기존: top 30만 저장 → top 30 밖 클러스터는 히스토리 없음 문제 해결)
     valid_until = now + timedelta(minutes=VALID_MINUTES)
 
-    for item in top:
+    for item in scored:
         kw = TrendingKeyword(
             keyword=item["keyword"],
             keyword_ko=item.get("keyword_ko"),
@@ -182,7 +180,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             .values(kscore=item["kscore"])
         )
 
-    logger.info("트렌딩 계산 완료: 클러스터 %d개 → 트렌딩 %d개", len(clusters), len(top))
+    logger.info("트렌딩 계산 완료: 클러스터 %d개 → scored %d개 (top %d개)", len(clusters), len(scored), len(top))
     return top
 
 
