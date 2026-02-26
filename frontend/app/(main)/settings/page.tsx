@@ -153,9 +153,11 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
-  // 회원 탈퇴
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // 회원 탈퇴 (숨김 처리)
+  const [deleteStep, setDeleteStep] = useState(0); // 0: hidden, 1: button visible, 2: confirm dialog
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [versionTap, setVersionTap] = useState(0);
 
   // 구독 정보 조회
   const [subPlatform, setSubPlatform] = useState<string>("web");
@@ -1023,52 +1025,86 @@ export default function SettingsPage() {
                 <span className="text-muted-foreground text-xs">→</span>
               </button>
             )}
-            <a href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+            <a href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_my_posts")}</span>
-              <span className="text-xs">→</span>
+              <span className="text-muted-foreground text-xs">→</span>
             </a>
-            <a href="/terms" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+            <a href="/terms" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_terms")}</span>
-              <span className="text-xs">→</span>
+              <span className="text-muted-foreground text-xs">→</span>
             </a>
-            <a href="/privacy" className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:bg-secondary/50">
+            <a href="/privacy" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_privacy")}</span>
-              <span className="text-xs">→</span>
+              <span className="text-muted-foreground text-xs">→</span>
             </a>
-            {firebaseUser && (
-              <>
-                {showDeleteConfirm ? (
-                  <div className="p-4 space-y-3 border-t border-border">
-                    <p className="text-sm text-destructive whitespace-pre-line">{t(lang, "settings_delete_confirm")}</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleDeleteAccount}
-                        disabled={deleteLoading}
-                        className="flex-1 rounded-lg bg-destructive py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        {deleteLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-                        {t(lang, "settings_delete_account")}
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground"
-                      >
-                        {t(lang, "settings_cancel")}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="flex items-center gap-2 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 w-full text-left border-t border-border"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {t(lang, "settings_delete_account")}
-                  </button>
-                )}
-              </>
-            )}
           </div>
+        </section>
+
+        {/* ── 버전 정보 (탈퇴 숨김 트리거) ────────────────────────── */}
+        <section className="pb-8">
+          <p
+            className="text-center text-[10px] text-muted-foreground/30 select-none cursor-default"
+            onClick={() => {
+              if (!firebaseUser) return;
+              const next = versionTap + 1;
+              setVersionTap(next);
+              if (next >= 5 && deleteStep === 0) {
+                setDeleteStep(1);
+              }
+            }}
+          >
+            WeWantPeace v2.0
+          </p>
+
+          {/* 탈퇴 버튼 — 버전 5회 탭 후 노출 */}
+          {firebaseUser && deleteStep >= 1 && (
+            <div className="mt-4 rounded-xl border border-border/40 bg-card overflow-hidden">
+              {deleteStep === 1 && (
+                <button
+                  onClick={() => setDeleteStep(2)}
+                  className="flex items-center gap-2 px-4 py-3 text-[12px] text-muted-foreground/50 hover:text-destructive/60 w-full text-left transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {t(lang, "settings_delete_account")}
+                </button>
+              )}
+              {deleteStep === 2 && (
+                <div className="p-4 space-y-3">
+                  <p className="text-sm text-destructive whitespace-pre-line">{t(lang, "settings_delete_confirm")}</p>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">
+                      {lang === "en"
+                        ? 'Type "delete" to confirm'
+                        : '"탈퇴합니다"를 입력해주세요'}
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteInput}
+                      onChange={(e) => setDeleteInput(e.target.value)}
+                      placeholder={lang === "en" ? "delete" : "탈퇴합니다"}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-destructive"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleteLoading || (lang === "en" ? deleteInput !== "delete" : deleteInput !== "탈퇴합니다")}
+                      className="flex-1 rounded-lg bg-destructive py-2 text-sm font-medium text-destructive-foreground disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                    >
+                      {deleteLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {t(lang, "settings_delete_account")}
+                    </button>
+                    <button
+                      onClick={() => { setDeleteStep(0); setDeleteInput(""); setVersionTap(0); }}
+                      className="flex-1 rounded-lg border border-border py-2 text-sm text-muted-foreground"
+                    >
+                      {t(lang, "settings_cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>
