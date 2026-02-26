@@ -353,7 +353,7 @@ export default function MapPage() {
       map.scrollZoom.setZoomRate(1 / 50);
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-      map.on("move", () => {
+      map.on("moveend", () => {
         const center = map.getCenter();
         const zoom = map.getZoom();
         setMapViewport({ longitude: center.lng, latitude: center.lat, zoom });
@@ -379,19 +379,20 @@ export default function MapPage() {
       markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
       markersRef.current = [];
 
-      // 클러스터 그룹핑 (실패하면 원본 사용)
-      const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
+      // 클러스터 그룹핑: 항상 국가별 그룹핑 기본 → 저배율에서만 인접 국가 합치기
       let displayClusters: Cluster[];
       try {
+        // 1단계: 모든 줌에서 국가별 1개 마커 (해당 국가 위치에 고정)
+        const byCountry = groupClustersByCountry(clusters);
         if (mapZoom < 4) {
-          // 저배율: 국가별 1개 마커만 — pixel proximity 하면 인접국이 병합되어 바다에 찍힘
-          displayClusters = groupClustersByCountry(clusters);
+          // 저배율: 인접 국가 마커를 pixel proximity로 추가 합치기
+          displayClusters = groupByPixelProximity(byCountry, currentMap, 40);
         } else {
-          // 고배율: 좌표 있는 것만 → pixel 근접 그룹핑
-          displayClusters = groupByPixelProximity(withCoords, currentMap, 40);
+          // 중·고배율: 국가별 마커 그대로 (위치 고정, 분할됨)
+          displayClusters = byCountry;
         }
       } catch {
-        displayClusters = withCoords;
+        displayClusters = clusters.filter((c) => c.lat != null && c.lon != null);
       }
 
       // 마커 생성

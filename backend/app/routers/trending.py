@@ -72,9 +72,11 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
 
     now = datetime.now(timezone.utc)
 
-    # 1. trending_keywords 테이블에서 키워드별 최고 KScore 행 조회
-    # DISTINCT ON (normalized_kw): 각 키워드의 최고 KScore 행만 선택 → 중복 제거
+    # 1. trending_keywords 테이블에서 키워드별 최신 KScore 행 조회
+    # DISTINCT ON (normalized_kw): 각 키워드의 최신 계산 행만 선택 → 중복 제거
+    # 48시간 윈도우: 오래된 만료 이슈가 계속 표시되는 버그 방지
     from sqlalchemy import text as sa_text
+    cutoff48 = now - timedelta(hours=48)
     distinct_result = await db.execute(
         sa_text("""
             SELECT DISTINCT ON (kw.normalized_kw)
@@ -85,8 +87,10 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
             FROM trending_keywords kw
             LEFT JOIN issue_clusters ic ON ic.id = (kw.cluster_ids)[1]
             WHERE kw.scope = 'global'
-            ORDER BY kw.normalized_kw, kw.kscore DESC
-        """)
+              AND kw.calculated_at >= :cutoff
+            ORDER BY kw.normalized_kw, kw.calculated_at DESC
+        """),
+        {"cutoff": cutoff48},
     )
     raw_rows = distinct_result.mappings().all()
 
