@@ -140,11 +140,10 @@ def _send_fcm_multicast(tokens: list[str], title: str, body: str, data: dict) ->
             total_success += response.success_count
             logger.info("FCM 배치[%d~%d]: %d/%d 성공", i, i + len(batch), response.success_count, len(batch))
         except ImportError:
-            logger.info(
-                "FCM (mock): tokens=%d title=%r body=%r",
-                len(batch), title, body,
+            logger.warning(
+                "FCM 미설치 (firebase_admin 없음): tokens=%d 미발송 title=%r",
+                len(batch), title,
             )
-            total_success += len(batch)  # mock 성공
         except Exception as e:
             logger.error("FCM 발송 오류 (배치 %d): %s", i // FCM_BATCH_SIZE, e)
     return total_success

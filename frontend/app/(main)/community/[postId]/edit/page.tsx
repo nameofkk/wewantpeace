@@ -7,14 +7,16 @@ import { ChevronLeft, Loader2, X, AlertCircle, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAppStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
 
 type PostType = "discussion" | "analysis" | "question";
 
-const POST_TYPES: { id: PostType; label: string }[] = [
-  { id: "discussion", label: "토론" },
-  { id: "analysis", label: "분석" },
-  { id: "question", label: "질문" },
-];
+const POST_TYPE_KEYS = {
+  discussion: "community_type_discussion",
+  analysis: "community_type_analysis",
+  question: "community_type_question",
+} as const;
 
 const MAX_IMAGES = 5;
 
@@ -23,6 +25,7 @@ export default function EditPostPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const { lang } = useAppStore();
 
   const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
@@ -47,9 +50,9 @@ export default function EditPostPage() {
         if (data.content) setContent(data.content);
         if (data.images) setImageUrls(data.images);
       })
-      .catch(() => setError("게시글을 불러올 수 없습니다."))
+      .catch(() => setError(t(lang, "community_load_error")))
       .finally(() => setFetching(false));
-  }, [postId, API_BASE]);
+  }, [postId, API_BASE, lang]);
 
   async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
@@ -73,7 +76,7 @@ export default function EditPostPage() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || "업로드 실패");
+          throw new Error(err.detail || t(lang, "community_edit_upload_fail"));
         }
         const data = await res.json();
         uploaded.push(data.url);
@@ -81,7 +84,7 @@ export default function EditPostPage() {
       setImageUrls((prev) => [...prev, ...uploaded]);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setError(err.message || "이미지 업로드 중 오류가 발생했습니다.");
+      setError(err.message || t(lang, "community_edit_upload_error"));
     } finally {
       setImageUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -102,8 +105,8 @@ export default function EditPostPage() {
     setError(null);
 
     if (!user) { router.push("/login"); return; }
-    if (title.trim().length < 5) { setError("제목은 5자 이상 입력해주세요."); return; }
-    if (content.trim().length < 10) { setError("내용은 10자 이상 입력해주세요."); return; }
+    if (title.trim().length < 5) { setError(t(lang, "community_edit_title_min")); return; }
+    if (content.trim().length < 10) { setError(t(lang, "community_edit_content_min")); return; }
 
     setLoading(true);
     try {
@@ -129,7 +132,7 @@ export default function EditPostPage() {
           ? detail.map((d: { msg: string }) => d.msg).join(", ")
           : typeof detail === "string"
           ? detail
-          : "수정에 실패했습니다.";
+          : t(lang, "community_edit_fail");
         throw new Error(msg);
       }
 
@@ -139,7 +142,7 @@ export default function EditPostPage() {
       router.replace(`/community/${postId}`);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setError(err.message || "수정 중 오류가 발생했습니다.");
+      setError(err.message || t(lang, "community_edit_error"));
     } finally {
       setLoading(false);
     }
@@ -162,14 +165,14 @@ export default function EditPostPage() {
         <Link href={`/community/${postId}`} className="text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-base font-bold flex-1">게시글 수정</h1>
+        <h1 className="text-base font-bold flex-1">{t(lang, "community_edit_title")}</h1>
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
           className="rounded-full bg-primary px-4 py-1.5 text-sm font-bold text-primary-foreground disabled:opacity-40 flex items-center gap-1"
         >
           {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-          저장
+          {t(lang, "community_edit_save")}
         </button>
       </div>
 
@@ -183,19 +186,19 @@ export default function EditPostPage() {
 
         {/* 게시글 유형 */}
         <div className="flex gap-2">
-          {POST_TYPES.map((t) => (
+          {(["discussion", "analysis", "question"] as const).map((type) => (
             <button
-              key={t.id}
+              key={type}
               type="button"
-              onClick={() => setPostType(t.id)}
+              onClick={() => setPostType(type)}
               className={cn(
                 "flex-1 rounded-xl border py-2 text-xs font-medium transition-colors",
-                postType === t.id
+                postType === type
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground"
               )}
             >
-              {t.label}
+              {t(lang, POST_TYPE_KEYS[type])}
             </button>
           ))}
         </div>
@@ -206,7 +209,7 @@ export default function EditPostPage() {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="제목을 입력하세요 (5자 이상)"
+            placeholder={t(lang, "community_edit_title_placeholder")}
             maxLength={200}
             className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary"
           />
@@ -218,7 +221,7 @@ export default function EditPostPage() {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="내용을 입력하세요 (10자 이상)"
+            placeholder={t(lang, "community_edit_content_placeholder")}
             rows={10}
             className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
           />
@@ -228,7 +231,8 @@ export default function EditPostPage() {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              사진 <span className="text-muted-foreground/60">(최대 {MAX_IMAGES}장)</span>
+              {t(lang, "community_edit_photo")}{" "}
+              <span className="text-muted-foreground/60">({t(lang, "community_edit_photo_max", { n: MAX_IMAGES })})</span>
             </label>
             <span className="text-[10px] text-muted-foreground">{imageUrls.length}/{MAX_IMAGES}</span>
           </div>
@@ -240,7 +244,7 @@ export default function EditPostPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={url.startsWith("http") ? url : `${API_BASE}${url}`}
-                    alt={`이미지 ${idx + 1}`}
+                    alt={`${t(lang, "community_edit_photo")} ${idx + 1}`}
                     className="w-full h-full object-cover"
                   />
                   <button
@@ -272,7 +276,7 @@ export default function EditPostPage() {
                 className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-3 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors disabled:opacity-50 w-full"
               >
                 {imageUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                {imageUploading ? "업로드 중..." : "사진 추가"}
+                {imageUploading ? t(lang, "community_edit_uploading") : t(lang, "community_edit_add_photo")}
               </button>
             </>
           )}

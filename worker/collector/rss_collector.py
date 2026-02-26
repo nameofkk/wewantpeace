@@ -14,7 +14,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import feedparser
 from sqlalchemy import select
@@ -223,8 +223,8 @@ def _extract_text(entry: dict[str, Any]) -> str:
     return content
 
 
-def _parse_datetime(entry: dict[str, Any]) -> datetime:
-    """published_parsed 또는 updated_parsed → datetime."""
+def _parse_datetime(entry: dict[str, Any]) -> Optional[datetime]:
+    """published_parsed 또는 updated_parsed → datetime. 파싱 실패 시 None."""
     try:
         t = entry.get("published_parsed") or entry.get("updated_parsed")
         if t:
@@ -232,7 +232,7 @@ def _parse_datetime(entry: dict[str, Any]) -> datetime:
             return datetime.fromtimestamp(time_mod.mktime(t), tz=timezone.utc)
     except Exception:
         pass
-    return datetime.now(timezone.utc)
+    return None
 
 
 # ── 수집기 ───────────────────────────────────────────────────────────────────
@@ -376,13 +376,15 @@ class RSSCollector:
                 result.skipped += 1
                 continue
 
-            event_time = _parse_datetime(entry)
+            collected_at = datetime.now(timezone.utc)
+            event_time = _parse_datetime(entry) or collected_at
             raw_metadata = {
                 "title": entry.get("title", "")[:512],
                 "link": entry.get("link", ""),
                 "author": entry.get("author", ""),
                 "tags": [t.get("term", "") for t in entry.get("tags", [])],
                 "published": event_time.isoformat(),  # 실제 발행 시간 (정규화에서 사용)
+                "time_source": "parsed" if _parse_datetime(entry) else "collected_at",
             }
 
             raw_event = RawEvent(
@@ -392,7 +394,7 @@ class RSSCollector:
                 raw_text=text[:10000],
                 raw_metadata=raw_metadata,
                 lang=None,
-                collected_at=datetime.now(timezone.utc),
+                collected_at=collected_at,
             )
             db.add(raw_event)
             result.raw_event_ids.append(raw_event)  # flush 후 ID 확보용

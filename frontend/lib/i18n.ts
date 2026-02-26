@@ -55,6 +55,22 @@ export const translations = {
     community_linked_issue: "이슈 연계",
     community_days_ago: "{n}일 전",
 
+    // 커뮤니티 글 수정
+    community_edit_title: "게시글 수정",
+    community_edit_save: "저장",
+    community_edit_title_placeholder: "제목을 입력하세요 (5자 이상)",
+    community_edit_content_placeholder: "내용을 입력하세요 (10자 이상)",
+    community_edit_title_min: "제목은 5자 이상 입력해주세요.",
+    community_edit_content_min: "내용은 10자 이상 입력해주세요.",
+    community_edit_fail: "수정에 실패했습니다.",
+    community_edit_error: "수정 중 오류가 발생했습니다.",
+    community_edit_photo: "사진",
+    community_edit_photo_max: "최대 {n}장",
+    community_edit_add_photo: "사진 추가",
+    community_edit_uploading: "업로드 중...",
+    community_edit_upload_fail: "업로드 실패",
+    community_edit_upload_error: "이미지 업로드 중 오류가 발생했습니다.",
+
     // 커뮤니티 글 상세
     post_header: "커뮤니티",
     post_views: "조회 {n}",
@@ -693,6 +709,22 @@ export const translations = {
     community_anonymous: "Anonymous",
     community_linked_issue: "Linked Issue",
     community_days_ago: "{n}d ago",
+
+    // community edit post
+    community_edit_title: "Edit Post",
+    community_edit_save: "Save",
+    community_edit_title_placeholder: "Enter title (min 5 characters)",
+    community_edit_content_placeholder: "Enter content (min 10 characters)",
+    community_edit_title_min: "Title must be at least 5 characters.",
+    community_edit_content_min: "Content must be at least 10 characters.",
+    community_edit_fail: "Failed to update post.",
+    community_edit_error: "An error occurred while updating.",
+    community_edit_photo: "Photos",
+    community_edit_photo_max: "max {n}",
+    community_edit_add_photo: "Add Photo",
+    community_edit_uploading: "Uploading...",
+    community_edit_upload_fail: "Upload failed",
+    community_edit_upload_error: "An error occurred while uploading image.",
 
     // community post detail
     post_header: "Community",

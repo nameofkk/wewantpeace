@@ -48,11 +48,17 @@ async def increment_event_counters(cluster_id: str, redis) -> tuple[int, int]:
 
     c1 = await redis.incr(k1)
     if c1 == 1:
-        await redis.expire(k1, 60)
+        try:
+            await redis.expire(k1, 60)
+        except Exception as e:
+            logger.error("Spike c1 expire 실패 (cluster=%s): %s", cluster_id, e)
 
     c10 = await redis.incr(k10)
     if c10 == 1:
-        await redis.expire(k10, 600)
+        try:
+            await redis.expire(k10, 600)
+        except Exception as e:
+            logger.error("Spike c10 expire 실패 (cluster=%s): %s", cluster_id, e)
 
     return int(c1), int(c10)
 
