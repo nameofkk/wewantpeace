@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useClusters, useMe } from "@/lib/api";
+import { useClusters, useMe, useGlobalTrending } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName } from "@/lib/countries";
@@ -296,7 +296,8 @@ export default function MapPage() {
   // showPreview → ref 동기화
   useEffect(() => { showPreviewRef.current = showPreview; }, [showPreview]);
 
-  const { data: apiClusters, isError, isLoading, refetch, isFetching } = useClusters();
+  const { data: apiClusters, isError, isLoading, refetch, isFetching } = useClusters({ limit: "500" });
+  const { data: trendingData } = useGlobalTrending();
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState(() => new Date().toISOString());
@@ -308,14 +309,54 @@ export default function MapPage() {
     }
   }, [isLocked]);
 
-  // Pro/Pro+: 실제 API 데이터만 사용 (mock 폴백 없음)
+  // 트렌딩에서 누락된 cluster_ids 수집 → 개별 fetch → 병합
   useEffect(() => {
     if (isLocked) return;
-    if (apiClusters && Array.isArray(apiClusters)) {
+    if (!apiClusters || !Array.isArray(apiClusters)) return;
+    const issueMap = new Map((apiClusters as Cluster[]).map((c) => [c.id, c]));
+
+    // 트렌딩에서 cluster_ids 추출
+    const missingIds: string[] = [];
+    if (trendingData && Array.isArray(trendingData)) {
+      for (const item of trendingData as { cluster_ids?: string[] }[]) {
+        if (item.cluster_ids) {
+          for (const cid of item.cluster_ids) {
+            if (!issueMap.has(cid)) missingIds.push(cid);
+          }
+        }
+      }
+    }
+
+    if (missingIds.length === 0) {
       setClusters(apiClusters as Cluster[]);
       setLastFetchedAt(new Date().toISOString());
+      return;
     }
-  }, [apiClusters, isLocked]);
+
+    // 누락된 클러스터 개별 fetch (최대 20개)
+    const toFetch = [...new Set(missingIds)].slice(0, 20);
+    Promise.all(
+      toFetch.map((id) =>
+        fetch(`${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")}/issues/${id}`, {
+          headers: { "Content-Type": "application/json",
+            ...(typeof window !== "undefined" && localStorage.getItem("firebase_token")
+              ? { Authorization: `Bearer ${localStorage.getItem("firebase_token")}` }
+              : {}),
+          },
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    ).then((results) => {
+      const extra = results.filter((r): r is Cluster => r != null && r.lat != null && r.lon != null);
+      const merged = [...(apiClusters as Cluster[])];
+      for (const c of extra) {
+        if (!issueMap.has(c.id)) merged.push(c);
+      }
+      setClusters(merged);
+      setLastFetchedAt(new Date().toISOString());
+    });
+  }, [apiClusters, trendingData, isLocked]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -334,6 +375,9 @@ export default function MapPage() {
         zoom: mapViewport.zoom,
         attributionControl: false,
       });
+      // 스크롤/트랙패드 줌 속도 2배 빠르게
+      map.scrollZoom.setWheelZoomRate(1 / 200);
+      map.scrollZoom.setZoomRate(1 / 50);
       map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
       map.on("move", () => {
@@ -398,7 +442,7 @@ export default function MapPage() {
           setSelectedCluster(cluster);  // 미리보기에서도 팝업은 열림
         });
         try {
-          const marker = new maplibregl.Marker({ element: markerEl }).setLngLat([cluster.lon, cluster.lat]).addTo(m);
+          const marker = new maplibregl.Marker({ element: markerEl, anchor: "center" }).setLngLat([cluster.lon, cluster.lat]).addTo(m);
           markersRef.current.push(marker);
         } catch { /* noop */ }
       });
