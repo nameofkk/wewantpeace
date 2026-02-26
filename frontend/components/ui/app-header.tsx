@@ -6,13 +6,13 @@ import { useState, useEffect, useRef } from "react";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadCount } from "@/lib/api";
+import { isTossMiniApp } from "@/lib/platform";
 
-export function AppHeader() {
+function AppHeaderInner() {
   const [hidden, setHidden] = useState(false);
   const [tapped, setTapped] = useState(false);
   const lastY = useRef(0);
 
-  // 로그인 여부 확인
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
     const hasAuth =
@@ -45,7 +45,6 @@ export function AppHeader() {
 
   return (
     <>
-      {/* fixed 헤더 */}
       <header
         className={cn(
           "fixed top-0 left-0 right-0 z-40",
@@ -55,10 +54,7 @@ export function AppHeader() {
         )}
       >
         <div className="flex items-center justify-between h-[52px] px-4">
-          {/* 좌측 여백 (벨 아이콘과 대칭) */}
           <div className="w-9" />
-
-          {/* 중앙 로고 */}
           <Link
             href="/home"
             onClick={handleTap}
@@ -67,7 +63,6 @@ export function AppHeader() {
               tapped ? "scale-90 opacity-70" : "scale-100 opacity-100"
             )}
           >
-            {/* 눈 아이콘 — 크기 키움 */}
             <div
               className={cn(
                 "relative overflow-hidden transition-transform duration-300",
@@ -88,13 +83,10 @@ export function AppHeader() {
                 }}
               />
             </div>
-
             <span className="text-[15px] font-semibold tracking-wide text-foreground">
               WeWantPeace
             </span>
           </Link>
-
-          {/* 우측 벨 아이콘 */}
           {isLoggedIn ? (
             <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center">
               <Bell className="w-5 h-5 text-muted-foreground" />
@@ -109,9 +101,12 @@ export function AppHeader() {
           )}
         </div>
       </header>
-
-      {/* 헤더 높이만큼 공간 확보 */}
       <div className="h-[52px]" />
     </>
   );
+}
+
+export function AppHeader() {
+  if (isTossMiniApp()) return null;
+  return <AppHeaderInner />;
 }
