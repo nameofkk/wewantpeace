@@ -279,8 +279,8 @@ export default function AdminKScorePage() {
                     <tr key={row.id} className={cn(
                       "hover:bg-secondary/20",
                       row.is_expired && "opacity-50",
-                      row.kscore >= 3.0 && "bg-red-500/[0.06]",
-                      row.kscore >= 2.0 && row.kscore < 3.0 && "bg-orange-500/[0.03]",
+                      row.kscore >= 7.0 && "bg-red-500/[0.06]",
+                      row.kscore >= 5.0 && row.kscore < 7.0 && "bg-orange-500/[0.03]",
                     )}>
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2.5 max-w-[260px]">

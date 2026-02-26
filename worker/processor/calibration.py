@@ -35,6 +35,12 @@
     EVENT_SCORE_MULTIPLIER 의미 변경: raw total이 아닌 정규화된 total에 적용
     BASELINE_WINDOW_DAYS=7, BASELINE_REFERENCE_SCALE=1000
     채널 수 변동에 자동 적응 — 수동 캘리브 불필요
+
+  v4 (2026-02-27): KScore 정규화 및 0-10 스케일 도입
+    velocity를 0-1 정규화 (기존: 1.0-6.0 비정규화 → 63% 지배)
+    KSCORE_SCALE=10 도입: 최종 KScore = raw(0-1) × 10 → 0-10 범위
+    KSCORE_MIN=1.5 (구 0.4에 대응, 새 스케일 기준)
+    UI 임계값: 정상(<3) / 주의(3-5) / 경계(5-7) / 위기(7+)
 """
 
 # ── 환경 파라미터 (모니터링용) ───────────────────────────────────────────────
@@ -104,9 +110,13 @@ SPIKE_FACTOR: float = 1.5
 # 공식: spread = min(1.0, independent_sources / SPREAD_SATURATION)
 SPREAD_SATURATION: int = 5
 
+# KScore 출력 스케일: raw(0-1) × KSCORE_SCALE → 0-10 범위
+# 10점 만점 직관적 스케일. UI 임계값: 정상(<3) / 주의(3+) / 경계(5+) / 위기(7+)
+KSCORE_SCALE: float = 10.0
+
 # KScore 최소 포함 임계값 (이 미만은 트렌딩 제외)
-# v1=0.7, v2=0.4 (초기 데이터 부족 시 필터 완화)
-KSCORE_MIN: float = 0.4
+# v1=0.7, v2=0.4 (0-2.25 스케일), v4=1.5 (0-10 스케일, 구 0.4에 대응)
+KSCORE_MIN: float = 1.5
 
 # 트렌딩 상위 N개 저장
 # v1=20, v2=30 (더 많은 채널 = 더 많은 이슈)

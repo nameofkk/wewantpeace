@@ -1,9 +1,14 @@
 """
 TrendingEngine: KScore 기반 트렌딩 키워드 계산.
 
-KScore = 0.25*velocity + 0.15*quality + 0.40*severity_norm + 0.20*spread
-포함 조건: KScore >= calibration.KSCORE_MIN
+KScore (v4, 0-10 스케일):
+  raw = 0.25*velocity_norm + 0.15*quality + 0.40*severity_norm + 0.20*spread
+  KScore = raw × KSCORE_SCALE(10)
 
+  모든 컴포넌트 0~1 정규화 → 가중치가 실제 영향도를 정확히 반영.
+  UI 임계값: 정상(<3) / 주의(3-5) / 경계(5-7) / 위기(7+)
+
+포함 조건: KScore >= calibration.KSCORE_MIN
 결과를 trending_keywords 테이블에 UPSERT.
 모든 튜닝 가능한 상수는 calibration.py에서 관리.
 """
@@ -24,6 +29,7 @@ from worker.processor.calibration import (
     SPIKE_FACTOR,
     SPREAD_SATURATION,
     KSCORE_MIN,
+    KSCORE_SCALE,
     TRENDING_LIMIT,
     KSCORE_VALID_MINUTES,
 )
@@ -43,26 +49,25 @@ def _calc_kscore(
     source_tiers: list[str],
 ) -> float:
     """
-    KScore 계산 (v2).
+    KScore 계산 (v4) — 0~10 스케일.
 
-    KScore = 0.25*velocity + 0.15*quality + 0.40*severity_norm + 0.20*spread
+    모든 컴포넌트를 0~1 정규화 후 가중합산, × KSCORE_SCALE(10).
+    KScore = (0.25*velocity_norm + 0.15*quality + 0.40*severity_norm + 0.20*spread) × 10
 
-    velocity:
-    - k10^VELOCITY_EXPONENT × spike_factor, 상한 VELOCITY_CAP
-    - 소규모(1~10) 구간 변별력 유지, 대규모에서 cap에 수렴
-    - k10=5: 3.09, k10=10: 5.01, k10=15: 6.0(cap)
+    velocity_norm (0~1):
+    - min(1.0, k10^VELOCITY_EXPONENT × spike_factor / VELOCITY_CAP)
+    - k10=5: 0.52, k10=10: 0.84, k10=15: 1.0(cap)
 
-    가중치 조정 (v3):
-    - velocity 0.35→0.25 (속도 과지배 방지)
-    - severity 0.35→0.40 (심각도 우선)
-    - spread 0.15→0.20 (소스 다양성 강조)
+    UI 임계값: 정상(<3) / 주의(3~5) / 경계(5~7) / 위기(7+)
 
     상수 변경 시: calibration.py 수정 후 이 함수는 자동 반영됨.
     """
     k10 = max(1, event_count)
 
     sf = SPIKE_FACTOR if is_spike else 1.0
-    velocity = min(VELOCITY_CAP, (k10 ** VELOCITY_EXPONENT) * sf)
+    # v4: velocity를 0~1 정규화 (기존: 1.0~6.0 비정규화 → 63% 지배 버그)
+    velocity_raw = min(VELOCITY_CAP, (k10 ** VELOCITY_EXPONENT) * sf)
+    velocity_norm = velocity_raw / VELOCITY_CAP
 
     # quality: confidence + tier 보너스
     tier_bonus = sum(
@@ -76,13 +81,13 @@ def _calc_kscore(
     # spread: 독립출처 수 기반 (최대 1.0, calibration.SPREAD_SATURATION 기준)
     spread = min(1.0, independent_sources / float(SPREAD_SATURATION))
 
-    kscore = (
-        0.25 * velocity
+    raw = (
+        0.25 * velocity_norm
         + 0.15 * quality
         + 0.40 * severity_norm
         + 0.20 * spread
     )
-    return round(kscore, 3)
+    return round(raw * KSCORE_SCALE, 2)
 
 
 async def calculate_global_trending(db: AsyncSession) -> list[dict]:

@@ -462,7 +462,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 3.0 ? "text-red-400" : (c.kscore ?? 0) >= 2.0 ? "text-orange-400" : (c.kscore ?? 0) >= 1.0 ? "text-yellow-400" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 7.0 ? "text-red-400" : (c.kscore ?? 0) >= 5.0 ? "text-orange-400" : (c.kscore ?? 0) >= 3.0 ? "text-yellow-400" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );

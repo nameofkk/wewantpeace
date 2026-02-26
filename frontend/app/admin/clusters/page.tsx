@@ -226,7 +226,7 @@ export default function AdminClustersPage() {
                     <td className="px-3 py-3">
                       <span className={cn(
                         "text-xs font-bold tabular-nums",
-                        c.kscore >= 3 ? "text-red-400" : c.kscore >= 2 ? "text-orange-400" : c.kscore >= 1 ? "text-yellow-400" : "text-muted-foreground"
+                        c.kscore >= 7 ? "text-red-400" : c.kscore >= 5 ? "text-orange-400" : c.kscore >= 3 ? "text-yellow-400" : "text-muted-foreground"
                       )}>
                         {c.kscore.toFixed(2)}
                       </span>
@@ -265,7 +265,7 @@ export default function AdminClustersPage() {
                       {c.is_spike && <span className="ml-2 text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>}
                     </p>
                   </div>
-                  <span className={cn("text-xs font-bold tabular-nums", c.kscore >= 3 ? "text-red-400" : c.kscore >= 2 ? "text-orange-400" : c.kscore >= 1 ? "text-yellow-400" : "text-muted-foreground")}>
+                  <span className={cn("text-xs font-bold tabular-nums", c.kscore >= 7 ? "text-red-400" : c.kscore >= 5 ? "text-orange-400" : c.kscore >= 3 ? "text-yellow-400" : "text-muted-foreground")}>
                     {c.kscore.toFixed(2)}
                   </span>
                 </div>

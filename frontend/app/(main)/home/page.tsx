@@ -28,12 +28,18 @@ const TOPIC_COLORS: Record<string, string> = {
 };
 
 
-// KScore에 따른 카드 좌측 강조선 색
+// KScore 반올림: 표시값과 색상 판별에 동일한 값 사용
+function roundKScore(kscore: number): number {
+  return Math.round(kscore * 100) / 100;
+}
+
+// KScore에 따른 카드 좌측 강조선 색 (0-10 스케일)
 function kscoreAccent(kscore?: number): string {
   if (!kscore) return "border-l-border";
-  if (kscore >= 3.0) return "border-l-red-500";
-  if (kscore >= 2.0) return "border-l-orange-500";
-  if (kscore >= 1.0) return "border-l-yellow-500";
+  const k = roundKScore(kscore);
+  if (k >= 7.0) return "border-l-red-500";
+  if (k >= 5.0) return "border-l-orange-500";
+  if (k >= 3.0) return "border-l-yellow-500";
   return "border-l-green-600";
 }
 
@@ -272,7 +278,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const lang = useAppStore((s) => s.lang);
   const [showHistory, setShowHistory] = useState(false);
   const topic = item.topic ?? "unknown";
-  const isCritical = item.kscore >= 3.0;
+  const isCritical = roundKScore(item.kscore) >= 7.0;
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
   const displayTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
@@ -336,12 +342,12 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
         <div className="shrink-0 flex flex-col items-end gap-0.5">
           <span className={cn(
             "text-sm font-bold tabular-nums",
-            item.kscore >= 3.0 ? "text-red-400" :
-            item.kscore >= 2.0 ? "text-orange-400" :
-            item.kscore >= 1.0 ? "text-yellow-400" :
+            roundKScore(item.kscore) >= 7.0 ? "text-red-400" :
+            roundKScore(item.kscore) >= 5.0 ? "text-orange-400" :
+            roundKScore(item.kscore) >= 3.0 ? "text-yellow-400" :
             "text-muted-foreground"
           )}>
-            {item.kscore.toFixed(2)}
+            {roundKScore(item.kscore).toFixed(1)}
           </span>
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
             KScore

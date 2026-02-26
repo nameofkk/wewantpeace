@@ -146,7 +146,7 @@ export default function SettingsPage() {
   const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태
 
   // 알림 설정 로컬 상태
-  const [kscoreValue, setKscoreValue] = useState(1.0);
+  const [kscoreValue, setKscoreValue] = useState(3.0);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("23:00");
@@ -276,7 +276,7 @@ export default function SettingsPage() {
   // prefs 로드 시 알림 상태 동기화
   useEffect(() => {
     if (prefs) {
-      setKscoreValue(prefs.min_kscore ?? 1.0);
+      setKscoreValue(prefs.min_kscore ?? 3.0);
       setSelectedTopics(prefs.topics ?? []);
       const hasQuiet = !!(prefs.quiet_hours_start && prefs.quiet_hours_end);
       setQuietEnabled(hasQuiet);
@@ -751,9 +751,9 @@ export default function SettingsPage() {
                 <div className="mt-2 space-y-1">
                   <input
                     type="range"
-                    min={plan === "pro_plus" ? 0.5 : 1.0}
-                    max={4.0}
-                    step={0.1}
+                    min={plan === "pro_plus" ? 1.5 : 3.0}
+                    max={10.0}
+                    step={0.5}
                     value={kscoreValue}
                     onChange={(e) => setKscoreValue(parseFloat(e.target.value))}
                     onMouseUp={handleSaveKscore}
@@ -761,8 +761,8 @@ export default function SettingsPage() {
                     className="w-full accent-primary"
                   />
                   <div className="flex justify-between text-[9px] text-muted-foreground">
-                    <span>{plan === "pro_plus" ? "0.5" : "1.0"} · {t(lang, "notif_kscore_low")}</span>
-                    <span>4.0 · {t(lang, "notif_kscore_high")}</span>
+                    <span>{plan === "pro_plus" ? "1.5" : "3.0"} · {t(lang, "notif_kscore_low")}</span>
+                    <span>10.0 · {t(lang, "notif_kscore_high")}</span>
                   </div>
                 </div>
               )}

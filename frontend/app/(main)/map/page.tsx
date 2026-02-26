@@ -55,17 +55,24 @@ interface Cluster {
   grouped_total_events?: number;
 }
 
+// KScore 반올림: 표시값과 색상 판별에 동일한 값 사용 (0.98 vs 1.00 불일치 방지)
+function roundKScore(kscore: number): number {
+  return Math.round(kscore * 100) / 100;
+}
+
 function getKScoreColor(kscore: number): string {
-  if (kscore >= 3.0) return "#ef4444";
-  if (kscore >= 2.0) return "#f97316";
-  if (kscore >= 1.0) return "#eab308";
+  const k = roundKScore(kscore);
+  if (k >= 7.0) return "#ef4444";
+  if (k >= 5.0) return "#f97316";
+  if (k >= 3.0) return "#eab308";
   return "#22c55e";
 }
 
 function getKScoreLabel(kscore: number, lang: Lang): string {
-  if (kscore >= 3.0) return t(lang, "map_level_crisis");
-  if (kscore >= 2.0) return t(lang, "map_level_alert");
-  if (kscore >= 1.0) return t(lang, "map_level_watch");
+  const k = roundKScore(kscore);
+  if (k >= 7.0) return t(lang, "map_level_crisis");
+  if (k >= 5.0) return t(lang, "map_level_alert");
+  if (k >= 3.0) return t(lang, "map_level_watch");
   return t(lang, "map_level_normal");
 }
 
@@ -199,7 +206,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-lg p-2" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-          <p className="text-lg font-bold" style={{ color }}>{cluster.kscore.toFixed(2)}</p>
+          <p className="text-lg font-bold" style={{ color }}>{roundKScore(cluster.kscore).toFixed(1)}</p>
           <p className="flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground">
             KScore
             <InfoTooltip direction="up" text={t(lang, "map_popup_kscore_tooltip")} />
