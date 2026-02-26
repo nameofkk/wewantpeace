@@ -8,7 +8,7 @@ import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
 import Link from "next/link";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, useMe } from "@/lib/api";
 
 interface Feature {
   labelKo: string;
@@ -159,6 +159,8 @@ function AppInstallPrompt({ lang }: { lang: Lang }) {
 export default function UpgradePage() {
   const { user } = useAuth();
   const { lang } = useAppStore();
+  const { data: me } = useMe();
+  const currentPlan = (me as { plan?: string })?.plan ?? "free";
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
@@ -167,6 +169,11 @@ export default function UpgradePage() {
   useEffect(() => {
     setPlatform(detectPlatform());
   }, []);
+
+  // 현재 플랜에 따라 기본 선택 변경
+  useEffect(() => {
+    if (currentPlan === "pro") setSelected("pro_plus");
+  }, [currentPlan]);
 
   async function handleSubscribe(planId: string) {
     if (planId === "free") return;
@@ -391,9 +398,15 @@ export default function UpgradePage() {
                 {lang === "ko" ? "무료" : "Free"}
               </p>
             </div>
-            <div className="mt-3 w-full rounded-xl py-2 text-xs font-semibold text-center bg-secondary/50 text-muted-foreground">
-              {t(lang, "upgrade_current_plan")}
-            </div>
+            {currentPlan === "free" ? (
+              <div className="mt-3 w-full rounded-xl py-2 text-xs font-semibold text-center bg-secondary/50 text-muted-foreground">
+                {t(lang, "upgrade_current_plan")}
+              </div>
+            ) : (
+              <div className="mt-3 w-full rounded-xl py-2 text-xs font-medium text-center text-muted-foreground/50">
+                {lang === "ko" ? "무료 플랜" : "Free plan"}
+              </div>
+            )}
           </div>
 
           {/* Pro 카드 — 블루 글로시 */}
@@ -461,7 +474,15 @@ export default function UpgradePage() {
               </div>
 
               {/* 구독 버튼 */}
-              {!isWeb ? (
+              {currentPlan === "pro" ? (
+                <div className="mt-5 w-full rounded-xl py-3 text-xs font-semibold text-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {t(lang, "upgrade_current_plan")}
+                </div>
+              ) : currentPlan === "pro_plus" ? (
+                <div className="mt-5 w-full rounded-xl py-3 text-xs font-medium text-center text-muted-foreground/50">
+                  {lang === "ko" ? "현재 Pro+ 이용 중" : "Currently on Pro+"}
+                </div>
+              ) : !isWeb ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
                   disabled={loading === "pro"}
@@ -553,7 +574,11 @@ export default function UpgradePage() {
               </div>
 
               {/* 구독 버튼 */}
-              {!isWeb ? (
+              {currentPlan === "pro_plus" ? (
+                <div className="mt-5 w-full rounded-xl py-3 text-xs font-semibold text-center bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  {t(lang, "upgrade_current_plan")}
+                </div>
+              ) : !isWeb ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSubscribe("pro_plus"); }}
                   disabled={loading === "pro_plus"}
@@ -570,7 +595,9 @@ export default function UpgradePage() {
                       <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                       {t(lang, "upgrade_processing")}
                     </span>
-                  ) : t(lang, "upgrade_subscribe")}
+                  ) : currentPlan === "pro"
+                    ? (lang === "ko" ? "Pro+로 업그레이드" : "Upgrade to Pro+")
+                    : t(lang, "upgrade_subscribe")}
                 </button>
               ) : (
                 <div className="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-center bg-purple-500/10 text-purple-400 border border-purple-500/20">

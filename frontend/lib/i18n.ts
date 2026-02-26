@@ -442,6 +442,7 @@ export const translations = {
     settings_push_desc_unsupported: "이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome/Safari에서 열어주세요",
     settings_push_desc_denied: "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요",
     settings_push_desc_default: "중요 이슈 발생 시 즉시 알림 수신",
+    settings_push_off_hint: "푸시 알림을 켜면 설정할 수 있습니다",
     settings_push_enable: "알림 활성화",
     settings_push_disable: "알림 비활성화",
     settings_verified_on: "공식 확인 이슈 알림 켜짐",
@@ -461,6 +462,11 @@ export const translations = {
     settings_plan_proplus_desc: "무제한 지역 · 실시간 지도 · API 접근 · 모든 기능",
     settings_plan_upgrade_proplus: "Pro+로 업그레이드",
     settings_plan_active: "현재 플랜",
+    settings_plan_started: "결제 시작일",
+    settings_plan_next_billing: "다음 결제 예정일",
+    settings_plan_expires: "만료 예정일",
+    settings_plan_not_renewing: "자동 갱신이 해제되어 있습니다",
+    settings_plan_change: "플랜 변경하기",
     settings_pro_limit: "Pro 플랜은 최대 {n}개 국가까지 설정 가능합니다.",
 
     // chart
@@ -1133,6 +1139,7 @@ export const translations = {
     settings_push_desc_unsupported: "Push not supported in this browser. Open in Chrome/Safari",
     settings_push_desc_denied: "Blocked — allow in your browser settings",
     settings_push_desc_default: "Get instant alerts for critical events",
+    settings_push_off_hint: "Enable push to configure these settings",
     settings_push_enable: "Enable",
     settings_push_disable: "Disable",
     settings_verified_on: "Verified alerts on",
@@ -1152,6 +1159,11 @@ export const translations = {
     settings_plan_proplus_desc: "Unlimited regions · Real-time map · API access · All features",
     settings_plan_upgrade_proplus: "Upgrade to Pro+",
     settings_plan_active: "Current Plan",
+    settings_plan_started: "Billing started",
+    settings_plan_next_billing: "Next billing date",
+    settings_plan_expires: "Expires on",
+    settings_plan_not_renewing: "Auto-renewal is off",
+    settings_plan_change: "Change Plan",
     settings_pro_limit: "Pro plan allows up to {n} countries.",
 
     // chart

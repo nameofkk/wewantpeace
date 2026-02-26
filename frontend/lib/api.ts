@@ -216,7 +216,20 @@ export function usePatchArea() {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "areas"] }),
+    onMutate: async ({ id, body }) => {
+      await qc.cancelQueries({ queryKey: ["me", "areas"] });
+      const prev = qc.getQueryData<UserArea[]>(["me", "areas"]);
+      if (prev) {
+        qc.setQueryData<UserArea[]>(["me", "areas"], prev.map((a) =>
+          a.id === id ? { ...a, ...body } : a
+        ));
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["me", "areas"], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["me", "areas"] }),
   });
 }
 

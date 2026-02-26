@@ -404,9 +404,16 @@ function LoadingSkeleton() {
 
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const { trendingTab, setTrendingTab, myCountries, lang } = useAppStore();
+  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan } = useAppStore();
   const { data: me } = useMe();
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
+
+  // 서버 plan → store 동기화
+  useEffect(() => {
+    if (userPlan && userPlan !== storePlan) {
+      setUserPlan(userPlan as "free" | "pro" | "pro_plus");
+    }
+  }, [userPlan, storePlan, setUserPlan]);
 
   // Zustand persist 수화 완료 전까지 mine 쿼리 비활성화
   const [hydrated, setHydrated] = useState(false);

@@ -110,8 +110,16 @@ function CountryPickerPanel({
 export default function SettingsPage() {
   const router = useRouter();
   const { user: firebaseUser, loading: authLoading } = useAuth();
-  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang } = useAppStore();
+  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan } = useAppStore();
   const { data: me } = useMe();
+
+  // 서버 plan → store 동기화 (Pro/Pro+ 관심국가 제한 반영)
+  useEffect(() => {
+    const serverPlan = (me as { plan?: string })?.plan;
+    if (serverPlan && serverPlan !== userPlan) {
+      setUserPlan(serverPlan as "free" | "pro" | "pro_plus");
+    }
+  }, [me, userPlan, setUserPlan]);
   const { data: prefs } = useMyPreferences();
   const { data: areas } = useMyAreas();
   const patchPrefs = usePatchPreferences();
@@ -159,7 +167,15 @@ export default function SettingsPage() {
   const [deleteInput, setDeleteInput] = useState("");
 
   // 구독 정보 조회
-  const [subPlatform, setSubPlatform] = useState<string>("web");
+  const [subInfo, setSubInfo] = useState<{
+    platform: string;
+    started_at?: string;
+    expires_at?: string;
+    next_billing_at?: string;
+    auto_renewing?: boolean;
+    status?: string;
+  }>({ platform: "web" });
+  const subPlatform = subInfo.platform;
   useEffect(() => {
     if (!firebaseUser) return;
     firebaseUser.getIdToken().then((token) => {
@@ -168,7 +184,16 @@ export default function SettingsPage() {
       })
         .then((r) => r.json())
         .then((d) => {
-          if (d.platform) setSubPlatform(d.platform);
+          if (d.plan !== "free") {
+            setSubInfo({
+              platform: d.platform || "web",
+              started_at: d.started_at,
+              expires_at: d.expires_at,
+              next_billing_at: d.next_billing_at,
+              auto_renewing: d.auto_renewing,
+              status: d.status,
+            });
+          }
         })
         .catch(() => {});
     });
@@ -484,30 +509,35 @@ export default function SettingsPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{getCountryName(code, lang)}</p>
                             {area ? (
-                              <div className="mt-2 space-y-1.5">
+                              <div className={cn("mt-2 space-y-1.5", !hasFCMToken && "opacity-40 pointer-events-none")}>
+                                {!hasFCMToken && (
+                                  <p className="text-[9px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
+                                )}
                                 {/* Verified 토글 */}
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => patchArea.mutate({ id: area.id, body: { notify_verified: !area.notify_verified } })}
+                                      disabled={!hasFCMToken}
                                       className={cn(
                                         "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
-                                        area.notify_verified ? "bg-green-500" : "bg-muted"
+                                        !hasFCMToken ? "bg-muted cursor-not-allowed"
+                                          : area.notify_verified ? "bg-green-500" : "bg-muted"
                                       )}
                                     >
                                       <div className={cn(
                                         "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
-                                        area.notify_verified ? "translate-x-3.5" : "translate-x-0.5"
+                                        hasFCMToken && area.notify_verified ? "translate-x-3.5" : "translate-x-0.5"
                                       )} />
                                     </button>
-                                    <span className={cn("text-[11px]", area.notify_verified ? "text-green-400" : "text-muted-foreground")}>
+                                    <span className={cn("text-[11px]", hasFCMToken && area.notify_verified ? "text-green-400" : "text-muted-foreground")}>
                                       {area.notify_verified
                                         ? (t(lang, "settings_verified_on"))
                                         : (t(lang, "settings_verified_off"))}
                                     </span>
                                     <button
                                       onClick={() => setOpenInfo(openInfo === `verified-${code}` ? null : `verified-${code}`)}
-                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none"
+                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none pointer-events-auto"
                                     >
                                       ⓘ
                                     </button>
@@ -523,22 +553,22 @@ export default function SettingsPage() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <button
-                                      onClick={() => { if (plan !== "free") patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } }); }}
-                                      disabled={plan === "free"}
+                                      onClick={() => { if (plan !== "free" && hasFCMToken) patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } }); }}
+                                      disabled={plan === "free" || !hasFCMToken}
                                       className={cn(
                                         "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
-                                        plan === "free" ? "bg-muted opacity-40 cursor-not-allowed"
+                                        (plan === "free" || !hasFCMToken) ? "bg-muted opacity-40 cursor-not-allowed"
                                           : area.notify_fast ? "bg-orange-500" : "bg-muted"
                                       )}
                                     >
                                       <div className={cn(
                                         "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
-                                        area.notify_fast && plan !== "free" ? "translate-x-3.5" : "translate-x-0.5"
+                                        area.notify_fast && plan !== "free" && hasFCMToken ? "translate-x-3.5" : "translate-x-0.5"
                                       )} />
                                     </button>
                                     <span className={cn(
                                       "text-[11px]",
-                                      plan === "free" ? "text-muted-foreground/40"
+                                      (plan === "free" || !hasFCMToken) ? "text-muted-foreground/40"
                                         : area.notify_fast ? "text-orange-400" : "text-muted-foreground"
                                     )}>
                                       {plan === "free"
@@ -549,7 +579,7 @@ export default function SettingsPage() {
                                     </span>
                                     <button
                                       onClick={() => setOpenInfo(openInfo === `fast-${code}` ? null : `fast-${code}`)}
-                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none"
+                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none pointer-events-auto"
                                     >
                                       ⓘ
                                     </button>
@@ -736,7 +766,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 3. 토픽 필터 (Pro / Pro+) */}
-            <div className={cn("p-4", plan === "free" && "opacity-70")}>
+            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-70 pointer-events-none")}>
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_topics_title")}</p>
@@ -811,7 +841,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 4. 방해금지 시간 (Pro / Pro+) */}
-            <div className={cn("p-4", plan === "free" && "opacity-60")}>
+            <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-60 pointer-events-none")}>
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_quiet_title")}</p>
@@ -889,6 +919,37 @@ export default function SettingsPage() {
                t(lang, "settings_plan_free_desc", { n: FREE_COUNTRY_LIMIT })}
             </p>
 
+            {/* 결제 정보 (유료 플랜) */}
+            {plan !== "free" && subInfo.started_at && (
+              <div className="mt-3 space-y-1 rounded-lg bg-muted/30 px-3 py-2.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">{t(lang, "settings_plan_started")}</span>
+                  <span className="font-medium">
+                    {new Date(subInfo.started_at).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR")}
+                  </span>
+                </div>
+                {subInfo.next_billing_at && (
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">{t(lang, "settings_plan_next_billing")}</span>
+                    <span className="font-medium">
+                      {new Date(subInfo.next_billing_at).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR")}
+                    </span>
+                  </div>
+                )}
+                {!subInfo.next_billing_at && subInfo.expires_at && (
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">{t(lang, "settings_plan_expires")}</span>
+                    <span className="font-medium">
+                      {new Date(subInfo.expires_at).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR")}
+                    </span>
+                  </div>
+                )}
+                {subInfo.auto_renewing === false && (
+                  <p className="text-[10px] text-amber-400 mt-1">{t(lang, "settings_plan_not_renewing")}</p>
+                )}
+              </div>
+            )}
+
             {/* Free 플랜 잠긴 기능 목록 */}
             {plan === "free" && (
               <div className="mt-3 space-y-1.5">
@@ -912,20 +973,16 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* 플랜 변경/업그레이드 버튼 */}
             {plan === "free" && (
               <a href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-center text-sm font-bold text-white">
                 {t(lang, "settings_upgrade_btn")}
               </a>
             )}
-            {plan === "pro" && (
-              <a href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 py-2.5 text-center text-sm font-bold text-white">
-                {t(lang, "settings_plan_upgrade_proplus")}
+            {plan !== "free" && (
+              <a href="/upgrade" className="mt-3 block w-full rounded-lg border border-border py-2.5 text-center text-sm font-medium text-foreground hover:bg-muted/30 transition-colors">
+                {t(lang, "settings_plan_change")}
               </a>
-            )}
-            {plan === "pro_plus" && (
-              <p className="mt-3 text-center text-xs text-green-400 font-medium">
-                ✓ {t(lang, "settings_plan_active")}
-              </p>
             )}
 
             {/* 스토어 구독 관리 링크 */}
