@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
+from worker.processor.trending_engine import _calc_kscore
 
 logger = logging.getLogger(__name__)
 
@@ -209,9 +210,27 @@ async def assign_cluster(
             cluster.lon = event.lon
             cluster.country_code = event.country_code
             cluster.geohash5 = event.geohash5
+        # KScore 즉시 계산 (calculate_trending 의존 제거)
+        cluster.kscore = _calc_kscore(
+            event_count=cluster.event_count,
+            is_spike=cluster.is_spike,
+            confidence=cluster.confidence,
+            severity=cluster.severity,
+            independent_sources=cluster.independent_sources or 1,
+            source_tiers=cluster.source_tiers or [],
+        )
         cluster.updated_at = now
     else:
         title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
+        # KScore 즉시 계산
+        initial_kscore = _calc_kscore(
+            event_count=1,
+            is_spike=False,
+            confidence=event.confidence,
+            severity=event.severity,
+            independent_sources=1,
+            source_tiers=[event.source_tier] if event.source_tier else [],
+        )
         cluster = IssueCluster(
             cluster_key=key,
             geohash5=geohash5,
@@ -225,7 +244,7 @@ async def assign_cluster(
             event_count=1,
             severity=event.severity,
             confidence=event.confidence,
-            kscore=0.0,
+            kscore=initial_kscore,
             is_spike=False,
             source_tiers=[event.source_tier] if event.source_tier else [],
             independent_sources=1,

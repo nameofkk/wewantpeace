@@ -5,6 +5,7 @@ GET /issues/{id} — 이슈 상세 (타임라인 + 소스 이벤트).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -152,8 +153,11 @@ async def list_clusters(
     - country_code: 국가 코드 필터
     - severity_min: 최소 심각도 (0~100)
     """
+    # 48시간 윈도우: 오래된 이슈가 지도에 표시되지 않도록 필터링
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
     stmt = select(IssueCluster).where(
         IssueCluster.severity >= severity_min,
+        IssueCluster.last_event_at >= cutoff,
     ).order_by(IssueCluster.last_event_at.desc()).limit(limit)
 
     if topic:
