@@ -681,6 +681,11 @@ export const translations = {
     upgrade_processing: "처리 중...",
     upgrade_payment_failed: "결제 준비 실패",
     upgrade_payment_error: "결제 처리 중 오류가 발생했습니다.",
+    upgrade_downgrade_free: "Free로 다운그레이드",
+    upgrade_downgrade_pro: "Pro로 다운그레이드",
+    upgrade_downgrade_confirm: "정말 다운그레이드하시겠습니까?\n현재 결제 기간 만료 후 변경됩니다.",
+    upgrade_downgrade_store: "구독 변경은 스토어에서 관리해주세요.",
+    upgrade_cancel_success: "구독이 취소되었습니다. 현재 결제 기간 만료까지 서비스를 이용할 수 있습니다.",
     upgrade_footer: "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능",
 
     // store (IAP)
@@ -1377,6 +1382,11 @@ export const translations = {
     upgrade_processing: "Processing...",
     upgrade_payment_failed: "Payment preparation failed",
     upgrade_payment_error: "An error occurred during payment processing.",
+    upgrade_downgrade_free: "Downgrade to Free",
+    upgrade_downgrade_pro: "Downgrade to Pro",
+    upgrade_downgrade_confirm: "Are you sure you want to downgrade?\nChanges take effect after the current billing period.",
+    upgrade_downgrade_store: "Please manage your subscription in the app store.",
+    upgrade_cancel_success: "Subscription cancelled. You can continue using the service until the current billing period ends.",
     upgrade_footer: "Cancel anytime",
 
     // store (IAP)

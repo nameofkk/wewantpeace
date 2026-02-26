@@ -108,7 +108,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 360s linear infinite;
+  animation: ticker-scroll 2880s linear infinite;
 }
 .ticker-track:hover {
   animation-play-state: paused;

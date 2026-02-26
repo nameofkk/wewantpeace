@@ -112,15 +112,30 @@ function groupClustersByCountry(clusters: Cluster[]): Cluster[] {
   const byCountry = new Map<string, Cluster[]>();
   const noCode: Cluster[] = [];
   for (const c of clusters) {
-    if (c.lat == null || c.lon == null) continue;
-    if (c.country_code) { const list = byCountry.get(c.country_code) ?? []; list.push(c); byCountry.set(c.country_code, list); }
-    else { noCode.push(c); }
+    if (c.country_code) {
+      const list = byCountry.get(c.country_code) ?? [];
+      list.push(c);
+      byCountry.set(c.country_code, list);
+    } else if (c.lat != null && c.lon != null) {
+      noCode.push(c);
+    }
   }
   const result: Cluster[] = [];
   byCountry.forEach((group) => {
-    const lead = group.reduce((a, b) => (repScore(a) > repScore(b) ? a : b));
+    // 좌표가 있는 클러스터 중 가장 높은 kscore를 가진 것을 대표로 사용
+    const withCoords = group.filter((c) => c.lat != null && c.lon != null);
+    if (withCoords.length === 0) return; // 좌표 있는 클러스터 없으면 skip
+    const lead = withCoords.reduce((a, b) => (a.kscore > b.kscore ? a : b));
     const totalEvents = group.reduce((s, c) => s + c.event_count, 0);
-    result.push({ ...lead, event_count: lead.event_count, grouped_total_events: totalEvents, severity: Math.max(...group.map((c) => c.severity)), kscore: Math.max(...group.map((c) => c.kscore)), is_spike: group.some((c) => c.is_spike), grouped_count: group.length });
+    result.push({
+      ...lead,
+      event_count: lead.event_count,
+      grouped_total_events: totalEvents,
+      severity: Math.max(...group.map((c) => c.severity)),
+      kscore: Math.max(...group.map((c) => c.kscore)),
+      is_spike: group.some((c) => c.is_spike),
+      grouped_count: group.length,
+    });
   });
   noCode.forEach((c) => result.push({ ...c, grouped_count: 1 }));
   return result;
@@ -368,7 +383,8 @@ export default function MapPage() {
       const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
       let displayClusters: Cluster[];
       try {
-        const countryGrouped = mapZoom < 4 ? groupClustersByCountry(withCoords) : withCoords;
+        // zoom < 4: 국가별 그룹핑 (좌표 없는 클러스터도 카운트에 포함)
+        const countryGrouped = mapZoom < 4 ? groupClustersByCountry(clusters) : withCoords;
         displayClusters = groupByPixelProximity(countryGrouped, currentMap, 40);
       } catch {
         displayClusters = withCoords;
@@ -379,8 +395,8 @@ export default function MapPage() {
         if (cluster.lat == null || cluster.lon == null) return;
         const m = mapRef.current;
         if (!m) return;
-        const count = cluster.event_count;
-        const sizeBase = cluster.grouped_total_events ?? count;
+        const displayCount = (cluster.grouped_count ?? 1) > 1 ? cluster.grouped_count! : cluster.event_count;
+        const sizeBase = cluster.grouped_total_events ?? cluster.event_count;
         const size = Math.max(28, Math.min(56, 22 + Math.sqrt(sizeBase) * 4));
         const color = getKScoreColor(cluster.kscore);
         const markerEl = document.createElement("div");
@@ -391,7 +407,7 @@ export default function MapPage() {
         requestAnimationFrame(() => {
           innerEl.className = "marker-enter marker-pulse" + (cluster.is_spike ? " marker-spike" : "");
         });
-        innerEl.textContent = count > 99 ? "99+" : String(count);
+        innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
         markerEl.appendChild(innerEl);
         innerEl.addEventListener("mouseenter", () => { innerEl.style.transform = "scale(1.2)"; innerEl.style.boxShadow = `0 0 12px ${color}80`; });
         innerEl.addEventListener("mouseleave", () => { innerEl.style.transform = "scale(1)"; innerEl.style.boxShadow = ""; });

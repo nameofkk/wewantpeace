@@ -8,6 +8,7 @@ import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { API_BASE, useMe } from "@/lib/api";
 
 interface Feature {
@@ -157,6 +158,7 @@ function AppInstallPrompt({ lang }: { lang: Lang }) {
 }
 
 export default function UpgradePage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { lang } = useAppStore();
   const { data: me } = useMe();
@@ -165,6 +167,7 @@ export default function UpgradePage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
   const [platform, setPlatform] = useState<AppPlatform>("web");
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     setPlatform(detectPlatform());
@@ -191,6 +194,36 @@ export default function UpgradePage() {
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || t(lang, "upgrade_payment_error"));
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleDowngrade() {
+    if (!user) return;
+    if (!confirm(t(lang, "upgrade_downgrade_confirm"))) return;
+    setLoading("downgrade");
+    setError(null);
+    setCancelSuccess(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/subscriptions/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: "plan_downgrade" }),
+      });
+      const data = await res.json();
+      if (data.status === "store_cancel_required") {
+        // 스토어 구독 → 스토어로 안내
+        if (data.manage_url) window.open(data.manage_url, "_blank");
+        setCancelSuccess(t(lang, "upgrade_downgrade_store"));
+      } else if (data.status === "cancelled") {
+        setCancelSuccess(data.message || t(lang, "upgrade_cancel_success"));
+      } else if (!res.ok) {
+        setError(data.detail || t(lang, "upgrade_payment_error"));
+      }
+    } catch {
+      setError(t(lang, "upgrade_payment_error"));
     } finally {
       setLoading(null);
     }
@@ -370,6 +403,12 @@ export default function UpgradePage() {
           </div>
         )}
 
+        {cancelSuccess && (
+          <div className="mb-6 rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 text-center">
+            {cancelSuccess}
+          </div>
+        )}
+
         {/* 웹 브라우저: 앱 설치 유도 */}
         {isWeb && (
           <div className="mb-8" style={{ animation: "fadeSlideUp 0.35s ease both" }}>
@@ -403,9 +442,13 @@ export default function UpgradePage() {
                 {t(lang, "upgrade_current_plan")}
               </div>
             ) : (
-              <div className="mt-3 w-full rounded-xl py-2 text-xs font-medium text-center text-muted-foreground/50">
-                {lang === "ko" ? "무료 플랜" : "Free plan"}
-              </div>
+              <button
+                onClick={handleDowngrade}
+                disabled={loading === "downgrade"}
+                className="mt-3 w-full rounded-xl py-2 text-xs font-medium text-center text-red-400/80 border border-red-500/20 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                {loading === "downgrade" ? t(lang, "upgrade_processing") : t(lang, "upgrade_downgrade_free")}
+              </button>
             )}
           </div>
 
@@ -479,9 +522,13 @@ export default function UpgradePage() {
                   {t(lang, "upgrade_current_plan")}
                 </div>
               ) : currentPlan === "pro_plus" ? (
-                <div className="mt-5 w-full rounded-xl py-3 text-xs font-medium text-center text-muted-foreground/50">
-                  {lang === "ko" ? "현재 Pro+ 이용 중" : "Currently on Pro+"}
-                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDowngrade(); }}
+                  disabled={loading === "downgrade"}
+                  className="mt-5 w-full rounded-xl py-3 text-xs font-medium text-center text-orange-400/80 border border-orange-500/20 hover:bg-orange-500/10 transition-colors disabled:opacity-50"
+                >
+                  {loading === "downgrade" ? t(lang, "upgrade_processing") : t(lang, "upgrade_downgrade_pro")}
+                </button>
               ) : !isWeb ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
