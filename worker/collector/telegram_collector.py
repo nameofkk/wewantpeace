@@ -128,9 +128,12 @@ class TelegramCollector:
         entity = None
 
         # 1) channel_id가 있으면 우선 사용 (영구 불변)
+        #    Telethon resolve_id()는 양수를 PeerUser로 해석하므로
+        #    채널 ID는 Bot API 마킹 형식(-100 prefix)으로 변환 필요
         if channel.channel_id:
             try:
-                entity = await client.get_entity(channel.channel_id)
+                marked_id = -1_000_000_000_000 - channel.channel_id
+                entity = await client.get_entity(marked_id)
             except Exception as e:
                 logger.warning(
                     "channel_id %s로 엔티티 해석 실패 (%s), username fallback",
