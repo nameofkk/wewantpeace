@@ -30,6 +30,11 @@
   v2 (2026-02-25): 37채널, ~1000건/사이클 기준
     VOLUME_SATURATION=100, ACCEL_BASELINE=20, TRENDING_LIMIT=30
     KSCORE_MIN=0.4, TENSION_WARMUP_RECORDS=20, TENSION_WARMUP_FACTOR=0.6
+
+  v3 (2026-02-27): 롤링 베이스라인 정규화 도입
+    EVENT_SCORE_MULTIPLIER 의미 변경: raw total이 아닌 정규화된 total에 적용
+    BASELINE_WINDOW_DAYS=7, BASELINE_REFERENCE_SCALE=1000
+    채널 수 변동에 자동 적응 — 수동 캘리브 불필요
 """
 
 # ── 환경 파라미터 (모니터링용) ───────────────────────────────────────────────
@@ -54,9 +59,20 @@ VOLUME_SATURATION: int = 100
 ACCEL_BASELINE: int = 20
 
 # EventScore 로그 정규화 계수
-# 공식: min(100.0, EVENT_SCORE_MULTIPLIER * log10(1 + total))
-# total=10→23점, total=100→50점, total=500→84점, total=1000→100점
+# v3: 롤링 베이스라인 정규화 후 적용 → total은 BASELINE_REFERENCE_SCALE 기준 상대값
+# 공식: min(100.0, EVENT_SCORE_MULTIPLIER * log10(1 + normalized_total))
+# normalized=100→50점, normalized=500→68점, normalized=1000→75점, normalized=5000→93점
 EVENT_SCORE_MULTIPLIER: float = 25.0
+
+# 롤링 베이스라인 윈도우 (일)
+# 전체 국가의 최근 N일 event_score raw total 이동평균을 기준선으로 사용
+BASELINE_WINDOW_DAYS: int = 7
+
+# 정규화 기준 스케일
+# 글로벌 베이스라인 = 전체 국가 total의 중앙값
+# normalized_total = (country_total / baseline) * REFERENCE_SCALE
+# REFERENCE_SCALE=1000: 중앙값 수준 국가의 total이 1000이 됨 → 기존 공식과 호환
+BASELINE_REFERENCE_SCALE: float = 1000.0
 
 # 오래된 클러스터(24h 초과) EventScore decay 계수
 # 공식: event_score = _calc_event_score(recent) + _calc_event_score(stale) * STALE_DECAY

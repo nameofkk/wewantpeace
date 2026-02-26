@@ -38,6 +38,8 @@ from worker.processor.calibration import (
     STALE_DECAY,
     TENSION_WARMUP_RECORDS,
     TENSION_WARMUP_FACTOR,
+    BASELINE_WINDOW_DAYS,
+    BASELINE_REFERENCE_SCALE,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,27 +154,37 @@ def _tension_level(percentile: float, raw_score: float = 0.0) -> int:
     return min(max_level, max(p_level, r_level))
 
 
-def _calc_event_score(clusters: list[IssueCluster]) -> float:
-    """event_count 가중 severity×confidence 로그 누적합 → 0~100.
-
-    개선 사항:
-    1. 클러스터 내 원본 이벤트 수(event_count)를 log2 스케일로 가중 →
-       "우크라이나 전쟁 클러스터 event_count=11" 같은 고밀도 이슈를 정확히 반영
-    2. 단순 평균이 아닌 로그 누적합 → 클러스터 많을수록 점수 상승 (단 감쇠)
-
-    예시 (EVENT_SCORE_MULTIPLIER=25):
-      UA: 1클러스터 × severity85 × conf0.7 × log2(81) ≈ total 377 → ~64점
-      KR: 1클러스터 × severity35 × conf0.6 × log2(2) ≈ total 21 → ~33점
-    """
+def _calc_raw_total(clusters: list[IssueCluster]) -> float:
+    """클러스터 목록의 severity×confidence×log2(event_count) 합산 (정규화 전 raw 값)."""
     if not clusters:
         return 0.0
-    # event_count 가중: 원본 이벤트가 많을수록 신뢰도 상승 (log2 스케일)
-    total = sum(
+    return sum(
         c.severity * c.confidence * math.log2(1.0 + c.event_count)
         for c in clusters
     )
-    # log10 스케일 정규화 (calibration.EVENT_SCORE_MULTIPLIER)
-    return min(100.0, EVENT_SCORE_MULTIPLIER * math.log10(1.0 + total))
+
+
+def _calc_event_score(clusters: list[IssueCluster], baseline: float = 0.0) -> float:
+    """event_count 가중 severity×confidence 로그 누적합 → 0~100.
+
+    v3: 롤링 베이스라인 정규화 적용.
+    baseline > 0이면 total을 baseline 대비 상대값으로 변환 후 스코어링.
+    baseline = 0이면 raw total 그대로 사용 (워밍업 기간).
+
+    정규화: normalized = (total / baseline) * REFERENCE_SCALE
+    → 채널 수 변동에 자동 적응. baseline이 커지면 normalized가 줄어듦.
+    """
+    total = _calc_raw_total(clusters)
+    if total == 0.0:
+        return 0.0
+
+    # 롤링 베이스라인 정규화
+    if baseline > 0:
+        normalized = (total / baseline) * BASELINE_REFERENCE_SCALE
+    else:
+        normalized = total
+
+    return min(100.0, EVENT_SCORE_MULTIPLIER * math.log10(1.0 + normalized))
 
 
 def _calc_accel_score(
@@ -258,10 +270,14 @@ async def _get_percentile_30d(
 async def calculate_country_tension(
     country_code: str,
     db: AsyncSession,
+    baseline: float = 0.0,
 ) -> Optional[dict]:
     """
     단일 국가의 긴장도 계산.
     Returns dict or None.
+
+    baseline: 글로벌 롤링 베이스라인 (전체 국가 raw total 중앙값의 7일 이동평균).
+              0이면 정규화 미적용 (워밍업 기간).
 
     윈도우 전략:
     - 1차: 최근 48시간 클러스터 (충분한 데이터 확보, 지속 분쟁국 대응)
@@ -287,10 +303,10 @@ async def calculate_country_tension(
     recent_clusters = [c for c in all_clusters if c.last_event_at >= recent_cutoff]
     stale_clusters  = [c for c in all_clusters if c.last_event_at < recent_cutoff]
 
-    # Decayed EventScore: 최신 + 오래된×STALE_DECAY
+    # Decayed EventScore: 최신 + 오래된×STALE_DECAY (롤링 베이스라인 정규화 적용)
     event_score = (
-        _calc_event_score(recent_clusters)
-        + _calc_event_score(stale_clusters) * STALE_DECAY
+        _calc_event_score(recent_clusters, baseline)
+        + _calc_event_score(stale_clusters, baseline) * STALE_DECAY
     )
     event_score = min(100.0, event_score)
 
@@ -424,12 +440,91 @@ MONITORED_COUNTRIES = [
 ]
 
 
+async def _get_rolling_baseline(db: AsyncSession) -> float:
+    """
+    글로벌 롤링 베이스라인 계산.
+
+    1단계: 현재 사이클의 전체 국가 raw total 중앙값 산출
+    2단계: Redis에서 7일 이동평균 조회/갱신
+    3단계: 이동평균 반환 (없으면 현재 중앙값 사용)
+
+    채널 수나 데이터 규모가 바뀌면 7일에 걸쳐 자동 적응.
+    """
+    import statistics
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=48)
+
+    # 전체 국가별 raw total 계산
+    country_totals: list[float] = []
+    for cc in MONITORED_COUNTRIES:
+        res = await db.execute(
+            select(IssueCluster).where(
+                IssueCluster.country_code == cc,
+                IssueCluster.last_event_at >= cutoff,
+                IssueCluster.severity >= 30,
+            )
+        )
+        clusters = res.scalars().all()
+        total = _calc_raw_total(clusters)
+        if total > 0:
+            country_totals.append(total)
+
+    if not country_totals:
+        return 0.0
+
+    current_median = statistics.median(country_totals)
+
+    # Redis 7일 이동평균
+    try:
+        from backend.app.core.redis import get_redis
+        redis = get_redis()
+        import json
+
+        key = "tension:baseline:history"
+        raw = await redis.get(key)
+        history: list[dict] = json.loads(raw) if raw else []
+
+        # 7일 이전 항목 제거
+        window_cutoff = (now - timedelta(days=BASELINE_WINDOW_DAYS)).isoformat()
+        history = [h for h in history if h["t"] > window_cutoff]
+
+        # 현재 중앙값 추가
+        history.append({"t": now.isoformat(), "v": round(current_median, 2)})
+
+        # 저장 (TTL 8일 — 윈도우 7일 + 여유 1일)
+        await redis.set(key, json.dumps(history), ex=8 * 86400)
+
+        # 이동평균 계산
+        if len(history) >= 2:
+            baseline = sum(h["v"] for h in history) / len(history)
+        else:
+            baseline = current_median
+
+        logger.info(
+            "롤링 베이스라인: median=%.1f, 7d_avg=%.1f (히스토리 %d개)",
+            current_median, baseline, len(history),
+        )
+        return baseline
+
+    except Exception as e:
+        logger.warning("베이스라인 Redis 실패, 현재 중앙값 사용: %s", e)
+        return current_median
+
+
 async def calculate_all_tensions(db: AsyncSession) -> list[dict]:
-    """전체 모니터링 국가의 긴장도 계산."""
+    """전체 모니터링 국가의 긴장도 계산 (롤링 베이스라인 정규화 적용)."""
+    # 1단계: 글로벌 베이스라인 산출
+    baseline = await _get_rolling_baseline(db)
+
+    # 2단계: 각 국가별 긴장도 계산 (베이스라인 전달)
     results = []
     for code in MONITORED_COUNTRIES:
-        result = await calculate_country_tension(code, db)
+        result = await calculate_country_tension(code, db, baseline)
         if result:
             results.append(result)
-    logger.info("긴장도 계산 완료: %d개국", len(results))
+    logger.info(
+        "긴장도 계산 완료: %d개국 (baseline=%.1f)",
+        len(results), baseline,
+    )
     return results
