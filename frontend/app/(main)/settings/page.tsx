@@ -342,7 +342,7 @@ export default function SettingsPage() {
   const countryMap = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c]));
 
   function handleAdd(code: string) {
-    const ok = addMyCountry(code);
+    const ok = addMyCountry(code, plan);
     if (!ok) return; // 제한 초과 (store에서 처리)
     // 백엔드에도 저장
     addArea.mutate({ area_type: "country", country_code: code });

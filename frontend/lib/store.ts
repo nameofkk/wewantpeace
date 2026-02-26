@@ -41,7 +41,7 @@ interface AppStore {
   setFilter: (key: keyof FilterState, value: FilterState[keyof FilterState]) => void;
   setTrendingTab: (tab: "global" | "mine") => void;
   setUserPlan: (plan: "free" | "pro" | "pro_plus") => void;
-  addMyCountry: (code: string) => boolean; // false = 제한 초과
+  addMyCountry: (code: string, plan?: string) => boolean; // false = 제한 초과
   removeMyCountry: (code: string) => void;
   setLang: (lang: Lang) => void;
 }
@@ -75,11 +75,12 @@ export const useAppStore = create<AppStore>()(
       setTrendingTab: (tab) => set({ trendingTab: tab }),
       setUserPlan: (plan) => set({ userPlan: plan }),
 
-      addMyCountry: (code) => {
+      addMyCountry: (code, planOverride) => {
         const { myCountries, userPlan } = get();
+        const effectivePlan = planOverride ?? userPlan;
         if (myCountries.includes(code)) return true;
-        if (userPlan === "free" && myCountries.length >= FREE_COUNTRY_LIMIT) return false;
-        if (userPlan === "pro" && myCountries.length >= PRO_COUNTRY_LIMIT) return false;
+        if (effectivePlan === "free" && myCountries.length >= FREE_COUNTRY_LIMIT) return false;
+        if (effectivePlan === "pro" && myCountries.length >= PRO_COUNTRY_LIMIT) return false;
         set({ myCountries: [...myCountries, code] });
         return true;
       },
