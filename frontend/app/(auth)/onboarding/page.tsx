@@ -104,7 +104,7 @@ export default function OnboardingPage() {
       />
 
       {/* 콘텐츠 — dvh 기준 한 화면 */}
-      <div className="relative flex flex-1 flex-col items-center justify-between px-5 pt-10 pb-6">
+      <div className="relative flex flex-1 flex-col items-center justify-center gap-4 px-5 py-6">
         {/* 상단: 로고 + LIVE + 설명 */}
         <div className="flex flex-col items-center text-center">
           {/* 로고 + 레이더 파동 */}
@@ -140,16 +140,16 @@ export default function OnboardingPage() {
             </span>
           </div>
           {/* 서비스 설명 */}
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground max-w-[260px]"
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground max-w-[260px] whitespace-pre-line"
             style={{ animation: "fadeSlideUp 0.5s ease-out 0.15s both" }}>
             {lang === "ko"
-              ? "전세계 분쟁·긴장 이슈를 AI가 실시간 수집·분석해 검증된 중요 소식만 전달합니다"
-              : "AI-powered real-time analysis of global conflicts — only verified alerts delivered"}
+              ? "전세계 분쟁·긴장 이슈를 실시간 수집·분석해\n검증된 중요 소식만 전달합니다"
+              : "Real-time collection & analysis of global conflicts\nOnly verified alerts delivered"}
           </p>
         </div>
 
         {/* 중간: 스캔 피드 + 통계 */}
-        <div className="w-full max-w-xs flex flex-col gap-3 my-3">
+        <div className="w-full max-w-xs flex flex-col gap-2.5">
           {/* 스캔 피드 */}
           <div
             className="rounded-lg border border-border/40 bg-card/40 backdrop-blur-sm overflow-hidden"
@@ -202,7 +202,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* 하단: 버튼 + 앱 다운로드 */}
-        <div className="w-full max-w-xs flex flex-col gap-2.5">
+        <div className="w-full max-w-xs flex flex-col gap-2">
           {/* CTA 버튼 */}
           <div style={{ animation: "fadeSlideUp 0.4s ease-out 0.35s both" }}>
             <button
@@ -230,7 +230,7 @@ export default function OnboardingPage() {
 
           {/* 앱 다운로드 */}
           <div style={{ animation: "fadeSlideUp 0.4s ease-out 0.45s both" }}>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1.5">
               <div className="flex-1 h-px bg-border/40" />
               <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
                 <Smartphone className="h-3 w-3" />

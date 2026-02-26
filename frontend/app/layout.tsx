@@ -58,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark">
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="48x48" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-screen bg-background antialiased">
