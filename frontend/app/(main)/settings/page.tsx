@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, BellOff, MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2 } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -325,40 +325,32 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleEnableNotifications() {
-    // 인앱브라우저 등 푸시 미지원 환경 감지
-    if (!isPushSupported()) {
-      setNotifStatus("unsupported");
-      return;
-    }
-    setNotifStatus("loading");
-    try {
-      const token = await requestAndGetFCMToken();
-      if (!token) {
-        const perm = typeof window !== "undefined" && "Notification" in window
-          ? Notification.permission : "default";
-        setNotifStatus(perm === "denied" ? "denied" : "idle");
-        return;
-      }
-      await registerToken.mutateAsync({ fcm_token: token, platform: "web" });
-      setNotifStatus("done");
-    } catch {
+  async function handleTogglePush() {
+    if (hasFCMToken) {
+      // 즉시 UI 반영 → 비동기 처리
       setNotifStatus("idle");
-    }
-  }
-
-  async function handleDisableNotifications() {
-    setNotifStatus("loading");
-    const token = getStoredFCMToken();
-    if (token && firebaseUser) {
+      const token = getStoredFCMToken();
+      clearStoredFCMToken();
+      if (token && firebaseUser) {
+        try { await deleteToken.mutateAsync({ fcm_token: token }); } catch {}
+      }
+    } else {
+      if (!isPushSupported()) { setNotifStatus("unsupported"); return; }
+      // 즉시 UI 반영
+      setNotifStatus("done");
       try {
-        await deleteToken.mutateAsync({ fcm_token: token });
+        const token = await requestAndGetFCMToken();
+        if (!token) {
+          const perm = typeof window !== "undefined" && "Notification" in window
+            ? Notification.permission : "default";
+          setNotifStatus(perm === "denied" ? "denied" : "idle");
+          return;
+        }
+        await registerToken.mutateAsync({ fcm_token: token, platform: "web" });
       } catch {
-        // 서버 오류여도 로컬 토큰은 삭제
+        setNotifStatus("idle");
       }
     }
-    clearStoredFCMToken();
-    setNotifStatus("idle");
   }
 
   const hasFCMToken =
@@ -686,38 +678,21 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                {hasFCMToken ? (
-                  <button
-                    onClick={handleDisableNotifications}
-                    disabled={notifStatus === "loading"}
-                    className="shrink-0 flex items-center gap-1.5 rounded-full bg-green-500/15 border border-green-500/30 px-3 py-1.5 text-xs font-medium text-green-400 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-colors"
-                  >
-                    {notifStatus === "loading" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Bell className="h-3.5 w-3.5" />
-                    )}
-                    {t(lang, "settings_push_disable")}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleEnableNotifications}
-                    disabled={notifStatus === "loading" || notifStatus === "denied" || notifStatus === "unsupported"}
-                    className={cn(
-                      "shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                      (notifStatus === "denied" || notifStatus === "unsupported")
-                        ? "border-border text-muted-foreground opacity-50 cursor-not-allowed"
-                        : "border-primary/40 text-primary hover:bg-primary/10"
-                    )}
-                  >
-                    {notifStatus === "loading" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <BellOff className="h-3.5 w-3.5" />
-                    )}
-                    {t(lang, "settings_push_enable")}
-                  </button>
-                )}
+                <button
+                  onClick={handleTogglePush}
+                  disabled={notifStatus === "denied" || notifStatus === "unsupported"}
+                  className={cn(
+                    "h-6 w-11 rounded-full relative flex-shrink-0 transition-colors",
+                    (notifStatus === "denied" || notifStatus === "unsupported")
+                      ? "bg-muted opacity-40 cursor-not-allowed"
+                      : hasFCMToken ? "bg-green-500" : "bg-muted"
+                  )}
+                >
+                  <div className={cn(
+                    "h-5 w-5 rounded-full bg-white absolute top-0.5 transition-transform shadow-sm",
+                    hasFCMToken ? "translate-x-[22px]" : "translate-x-0.5"
+                  )} />
+                </button>
               </div>
             </div>
 
