@@ -67,6 +67,51 @@ async def _bootstrap_admin():
         logger.error("bootstrap_admin 실패: %s", e)
 
 
+async def _cleanup_stale_data():
+    """기존 데이터 정리: kscore=0 재계산 + 오래된 데이터 삭제."""
+    import traceback
+    from datetime import datetime, timezone, timedelta
+    from backend.app.core.database import AsyncSessionLocal
+    from sqlalchemy import select, text
+
+    logger.info("cleanup_stale_data 시작...")
+    try:
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                from backend.app.models.issue_cluster import IssueCluster
+                from worker.processor.trending_engine import _calc_kscore
+
+                # 1. kscore=0.0인 클러스터 재계산
+                result = await db.execute(
+                    select(IssueCluster).where(IssueCluster.kscore == 0.0)
+                )
+                zero_clusters = result.scalars().all()
+                for c in zero_clusters:
+                    c.kscore = _calc_kscore(
+                        event_count=c.event_count,
+                        is_spike=c.is_spike,
+                        confidence=c.confidence,
+                        severity=c.severity,
+                        independent_sources=c.independent_sources or 1,
+                        source_tiers=c.source_tiers or [],
+                    )
+                logger.info("kscore=0 재계산: %d개", len(zero_clusters))
+
+                # 2. 7일 초과 클러스터 + 연관 데이터 삭제
+                old_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+                r1 = await db.execute(text(
+                    "DELETE FROM cluster_events WHERE cluster_id IN "
+                    "(SELECT id FROM issue_clusters WHERE last_event_at < :cutoff)"
+                ), {"cutoff": old_cutoff})
+                r2 = await db.execute(text(
+                    "DELETE FROM issue_clusters WHERE last_event_at < :cutoff"
+                ), {"cutoff": old_cutoff})
+                logger.info("오래된 데이터 삭제: cluster_events %d건, issue_clusters %d건",
+                            r1.rowcount, r2.rowcount)
+    except Exception as e:
+        logger.error("cleanup_stale_data 실패: %s\n%s", e, traceback.format_exc())
+
+
 async def _startup_tension_calculation():
     """백엔드 기동 시 긴장도·트렌딩 즉시 계산 (백그라운드).
 
@@ -76,6 +121,9 @@ async def _startup_tension_calculation():
     import traceback
 
     from backend.app.core.database import AsyncSessionLocal
+
+    # 데이터 정리 먼저 실행
+    await _cleanup_stale_data()
 
     logger.info("startup_tension_calculation 시작...")
     try:
