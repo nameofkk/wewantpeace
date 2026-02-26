@@ -40,7 +40,7 @@ async def _bootstrap_admin():
         async with AsyncSessionLocal() as db:
             async with db.begin():
                 # 1) ADMIN_EMAILS 환경변수 처리
-                admin_emails_str = os.environ.get("ADMIN_EMAILS", "")
+                admin_emails_str = os.environ.get("ADMIN_EMAILS", "krshin7@gmail.com")
                 if admin_emails_str:
                     emails = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
                     if emails:

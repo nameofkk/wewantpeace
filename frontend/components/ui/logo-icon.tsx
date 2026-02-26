@@ -25,7 +25,7 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "2px",           // ← gap을 style로 직접 지정
+        gap: "2px",
         flexShrink: 0,
         opacity: tapped ? 0.6 : 1,
         transition: "opacity 0.15s",
@@ -34,6 +34,7 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
       }}
     >
       <div
+        className="logo-radar-wrap"
         style={{
           position: "relative",
           width,
@@ -41,14 +42,21 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
           flexShrink: 0,
           transform: tapped ? "scale(0.92)" : "scale(1)",
           transition: "transform 0.2s ease-out",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
+        {/* 레이더 파동 링 */}
+        <span className="logo-radar logo-radar--1" />
+        <span className="logo-radar logo-radar--2" />
         <Image
           src="/logo-eye.png"
           alt="WeWantPeace"
           fill
           priority
           className="object-contain"
+          style={{ position: "relative", zIndex: 1 }}
         />
       </div>
 

@@ -188,3 +188,21 @@
   animation: splash-dots 1.2s ease-in-out infinite;
 }
 
+/* ── LogoIcon 레이더 파동 ─────────────────────────── */
+@keyframes logo-radar-pulse {
+  0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 0.5; }
+  100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+}
+.logo-radar {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(59,130,246,0.18);
+  transform: translate(-50%,-50%) scale(0.5);
+  animation: logo-radar-pulse 3s ease-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.logo-radar--2 { animation-delay: 1.5s; }
+

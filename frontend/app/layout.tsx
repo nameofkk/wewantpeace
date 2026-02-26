@@ -76,14 +76,25 @@ export default function RootLayout({
             background: "#0f1729",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo-eye.png"
-            alt=""
-            width={184}
-            height={80}
-            style={{ height: 80, width: "auto", objectFit: "contain" }}
-          />
+          {/* 레이더 파동 + 로고 */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: 184, height: 80 }}>
+            <div className="splash-breathe" style={{ position: "absolute", top: "50%", left: "50%", width: 40, height: 40, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.2)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out infinite" }} />
+            <div style={{ position: "absolute", top: "50%", left: "50%", width: 40, height: 40, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.15)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out 1.5s infinite" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-eye.png"
+              alt=""
+              width={184}
+              height={80}
+              style={{ position: "relative", zIndex: 1, height: 80, width: "auto", objectFit: "contain" }}
+            />
+          </div>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes splash-radar {
+              0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0.6; }
+              100% { transform: translate(-50%,-50%) scale(3); opacity: 0; }
+            }
+          ` }} />
           <p
             style={{
               marginTop: 12,
