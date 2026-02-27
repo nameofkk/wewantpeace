@@ -98,5 +98,10 @@ class Settings(BaseSettings):
     apple_bundle_id: str = "com.wewantpeace.app"
     apple_environment: str = "Sandbox"  # "Production" when live
 
+    # 토스 앱인토스 (Toss Apps-in-Toss)
+    toss_app_secret: str = ""          # 토스 콘솔에서 발급받은 앱 시크릿
+    toss_decryption_key: str = ""      # 유저 정보 복호화 키 (AES-256-GCM)
+    toss_decryption_aad: str = ""      # 복호화 AAD
+
 
 settings = Settings()

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   signInWithGoogle,
   signInWithEmail,
+  signInWithToss,
   createEmailUser,
   getFirebaseAuth,
 } from "@/lib/auth";
@@ -145,6 +146,30 @@ export default function LoginPage() {
       if (emailDebounce.current) clearTimeout(emailDebounce.current);
     };
   }, []);
+
+  async function handleTossLogin() {
+    setLoading(true);
+    setError(null);
+    try {
+      const { user, isNewUser } = await signInWithToss();
+      if (!user) throw new Error("토스 로그인 실패");
+
+      if (isNewUser) {
+        // 신규 유저 → 회원가입 폼으로 (Google 신규와 동일 흐름)
+        setGoogleUser(user); // googleUser state 재활용
+        setTab("google-register");
+      } else {
+        // 기존 유저 → 홈으로
+        localStorage.setItem("onboarding_done", "true");
+        router.push("/home");
+      }
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setError(err.message || "토스 로그인에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -388,7 +413,26 @@ export default function LoginPage() {
 
       {tab === "login" ? (
         <div className="space-y-4">
-          {!isTossMiniApp() && (
+          {isTossMiniApp() ? (
+            <>
+              <button
+                onClick={handleTossLogin}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm font-bold text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "#0064FF" }}
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 14.5v-9l7 4.5-7 4.5z" fill="white"/>
+                </svg>
+                {t(lang, "login_toss")}
+              </button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+                <div className="relative flex justify-center text-xs text-muted-foreground"><span className="bg-card px-2">{t(lang, "login_or_email")}</span></div>
+              </div>
+            </>
+          ) : (
             <>
               <button
                 onClick={handleGoogleLogin}

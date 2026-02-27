@@ -6,6 +6,7 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -78,6 +79,46 @@ export async function createEmailUser(email: string, password: string): Promise<
   if (!auth) throw new Error("Firebase가 설정되지 않았습니다.");
   const result = await createUserWithEmailAndPassword(auth, email, password);
   return result.user;
+}
+
+// 토스 앱인토스 로그인
+export async function signInWithToss(): Promise<{
+  user: FirebaseUser | null;
+  isNewUser: boolean;
+}> {
+  const { createAsyncBridge } = await import("@apps-in-toss/bridge-core");
+  const appLogin = createAsyncBridge<
+    [],
+    { authorizationCode: string; referrer: string }
+  >("appLogin");
+
+  // 1. 토스 네이티브 로그인 → authorizationCode 획득
+  const { authorizationCode } = await appLogin();
+
+  // 2. 백엔드에서 코드 교환 → Firebase Custom Token
+  const API_BASE =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const res = await fetch(`${API_BASE}/auth/toss-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ authorization_code: authorizationCode }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err.detail || "토스 로그인에 실패했습니다."
+    );
+  }
+
+  const { firebase_custom_token, is_new_user } = await res.json();
+
+  // 3. Firebase Custom Token으로 인증
+  const auth = getFirebaseAuth();
+  if (!auth) throw new Error("Firebase가 설정되지 않았습니다.");
+
+  const result = await signInWithCustomToken(auth, firebase_custom_token);
+  return { user: result.user, isNewUser: is_new_user };
 }
 
 // 로그아웃

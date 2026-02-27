@@ -2,6 +2,7 @@
 /auth/* 인증·프로필 API
 
 POST /auth/register      — Firebase 가입 후 서버 등록 (닉네임, 약관 동의)
+POST /auth/toss-login    — 토스 앱인토스 로그인 (authorizationCode → Firebase Custom Token)
 GET  /auth/check-nickname — 닉네임 중복 확인
 PATCH /auth/profile       — 프로필 수정
 DELETE /auth/account      — 회원 탈퇴
@@ -9,6 +10,7 @@ DELETE /auth/account      — 회원 탈퇴
 from __future__ import annotations
 import re
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -18,8 +20,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, _verify_firebase_token, _get_or_create_user
+from backend.app.core.config import settings
 from backend.app.models.user import User, UserPreference
 from backend.app.models.terms import UserConsent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -94,6 +99,136 @@ def _user_to_out(u: User) -> UserOut:
         agreed_terms_at=u.agreed_terms_at.isoformat() if u.agreed_terms_at else None,
         agreed_privacy_at=u.agreed_privacy_at.isoformat() if u.agreed_privacy_at else None,
         marketing_agreed_at=u.marketing_agreed_at.isoformat() if u.marketing_agreed_at else None,
+    )
+
+
+# ── 토스 로그인 ─────────────────────────────────────────────────────────────
+
+class TossLoginBody(BaseModel):
+    authorization_code: str
+
+
+class TossLoginOut(BaseModel):
+    firebase_custom_token: str
+    is_new_user: bool
+    user_id: Optional[str] = None
+
+
+TOSS_API_BASE = "https://apps-in-toss-api.toss.im"
+
+
+async def _exchange_toss_code(authorization_code: str) -> dict:
+    """Toss authorizationCode → accessToken 교환."""
+    import httpx
+
+    if not settings.toss_app_secret:
+        raise HTTPException(503, detail="토스 로그인이 설정되지 않았습니다. (TOSS_APP_SECRET 필요)")
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
+            json={"authorizationCode": authorization_code},
+            headers={
+                "Authorization": f"Bearer {settings.toss_app_secret}",
+                "Content-Type": "application/json",
+            },
+        )
+    if resp.status_code != 200:
+        logger.error("토스 토큰 교환 실패: %s %s", resp.status_code, resp.text)
+        raise HTTPException(401, detail="토스 인증에 실패했습니다.")
+    return resp.json()
+
+
+async def _get_toss_user_key(access_token: str) -> str:
+    """Toss accessToken → userKey 조회."""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/login-me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if resp.status_code != 200:
+        logger.error("토스 유저 정보 조회 실패: %s %s", resp.status_code, resp.text)
+        raise HTTPException(401, detail="토스 유저 정보를 가져올 수 없습니다.")
+
+    data = resp.json()
+
+    # 응답이 암호화된 경우 복호화 시도
+    if "encryptedData" in data and settings.toss_decryption_key:
+        data = _decrypt_toss_user_data(data["encryptedData"])
+
+    user_key = data.get("userKey") or data.get("user_key")
+    if not user_key:
+        logger.error("토스 응답에 userKey 없음: %s", list(data.keys()))
+        raise HTTPException(500, detail="토스 유저 식별 실패")
+    return user_key
+
+
+def _decrypt_toss_user_data(encrypted_data: str) -> dict:
+    """AES-256-GCM으로 암호화된 토스 유저 데이터 복호화."""
+    import base64
+    import json
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    key = base64.b64decode(settings.toss_decryption_key)
+    aad = settings.toss_decryption_aad.encode() if settings.toss_decryption_aad else None
+
+    raw = base64.b64decode(encrypted_data)
+    # 첫 12바이트: nonce(IV), 나머지: ciphertext + tag
+    nonce, ciphertext = raw[:12], raw[12:]
+
+    aesgcm = AESGCM(key)
+    plaintext = aesgcm.decrypt(nonce, ciphertext, aad)
+    return json.loads(plaintext)
+
+
+@router.post("/toss-login", response_model=TossLoginOut)
+async def toss_login(
+    body: TossLoginBody,
+    db: AsyncSession = Depends(get_db),
+):
+    """토스 앱인토스 로그인.
+
+    1. authorizationCode → Toss API에서 accessToken 교환
+    2. accessToken으로 userKey 조회
+    3. firebase_uid = "toss:{userKey}" 로 유저 조회/생성
+    4. Firebase Custom Token 발급 → 프론트에서 signInWithCustomToken()
+    """
+    # 1. 코드 → 토큰 교환
+    token_data = await _exchange_toss_code(body.authorization_code)
+    access_token = token_data.get("accessToken") or token_data.get("access_token")
+    if not access_token:
+        raise HTTPException(500, detail="토스 토큰 응답에 accessToken 없음")
+
+    # 2. userKey 조회
+    user_key = await _get_toss_user_key(access_token)
+    firebase_uid = f"toss:{user_key}"
+
+    # 3. 유저 조회 (기존 유저인지 확인)
+    result = await db.execute(select(User).where(User.firebase_uid == firebase_uid))
+    existing_user = result.scalar_one_or_none()
+    is_new = existing_user is None
+
+    if not is_new:
+        # 기존 유저 — 활동 시간 갱신
+        existing_user.last_active = datetime.now(timezone.utc)
+        await db.flush()
+
+    # 4. Firebase Custom Token 발급
+    try:
+        import firebase_admin.auth as fb_auth
+        custom_token = fb_auth.create_custom_token(firebase_uid)
+        if isinstance(custom_token, bytes):
+            custom_token = custom_token.decode("utf-8")
+    except Exception as e:
+        logger.error("Firebase Custom Token 생성 실패: %s", e)
+        raise HTTPException(500, detail="인증 토큰 생성에 실패했습니다.")
+
+    return TossLoginOut(
+        firebase_custom_token=custom_token,
+        is_new_user=is_new,
+        user_id=str(existing_user.id) if existing_user else None,
     )
 
 
