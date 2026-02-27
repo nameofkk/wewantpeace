@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { isTossMiniApp } from "@/lib/platform";
 
 const DISMISS_KEY = "pwa_install_dismissed";
 const DISMISS_HOURS = 24;
@@ -30,7 +31,7 @@ export function PWAInstallPrompt() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isDismissed()) return;
+    if (isDismissed() || isTossMiniApp()) return;
 
     const handler = (e: Event) => {
       e.preventDefault();

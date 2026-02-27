@@ -6,6 +6,8 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -13,6 +15,7 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import { useState, useEffect, useCallback } from "react";
+import { isTossMiniApp } from "@/lib/platform";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -41,7 +44,7 @@ function getFirebaseAuth(): Auth | null {
 }
 
 // Google 로그인
-export async function signInWithGoogle(): Promise<FirebaseUser> {
+export async function signInWithGoogle(): Promise<FirebaseUser | null> {
   const auth = getFirebaseAuth();
   if (!auth) {
     throw new Error(
@@ -50,6 +53,13 @@ export async function signInWithGoogle(): Promise<FirebaseUser> {
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
+
+  // 토스 미니앱(웹뷰)에서는 팝업이 차단되므로 redirect 방식 사용
+  if (isTossMiniApp()) {
+    await signInWithRedirect(auth, provider);
+    return null; // redirect 후 페이지가 새로고침되므로 여기 도달하지 않음
+  }
+
   const result = await signInWithPopup(auth, provider);
   return result.user;
 }
@@ -112,6 +122,11 @@ export function useAuth() {
       setLoading(false);
       return;
     }
+    // 토스 미니앱: redirect 로그인 결과 처리
+    if (isTossMiniApp()) {
+      getRedirectResult(auth).catch(() => {});
+    }
+
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
       if (u) {

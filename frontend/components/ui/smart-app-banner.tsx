@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Smartphone, X, ExternalLink } from "lucide-react";
 import { isInAppBrowser, isStandalone } from "@/lib/browser-detect";
 import { isNativeApp, isMobileBrowser, isAndroidBrowser, isIOSBrowser } from "@/lib/platform-detect";
+import { isTossMiniApp } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 
@@ -30,8 +31,8 @@ export function SmartAppBanner() {
   const lang = useAppStore((s) => s.lang);
 
   useEffect(() => {
-    // 네이티브 앱(TWA/iOS) 또는 standalone이면 표시 안 함
-    if (isNativeApp() || isStandalone()) return;
+    // 네이티브 앱(TWA/iOS), standalone, 토스 미니앱이면 표시 안 함
+    if (isNativeApp() || isStandalone() || isTossMiniApp()) return;
 
     // 72시간 내 닫은 적 있으면 무시
     const dismissed = localStorage.getItem(DISMISS_KEY);

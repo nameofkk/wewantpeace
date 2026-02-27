@@ -150,6 +150,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const user = await signInWithGoogle();
+      if (!user) return; // redirect 방식 (토스 미니앱) — 페이지가 새로고침됨
       const token = await user.getIdToken();
       const meRes = await fetch(`${API_BASE}/me`, {
         headers: { Authorization: `Bearer ${token}` },
