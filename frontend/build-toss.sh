@@ -1,6 +1,20 @@
 #!/bin/sh
 set -e
 
+# ── 토스 미니앱 빌드 환경변수 ──
+export NEXT_PUBLIC_IS_TOSS_MINIAPP=true
+export NEXT_PUBLIC_API_URL=https://backend-production-3af7.up.railway.app
+export NEXT_PUBLIC_SITE_URL=https://www.wewantpeace.live
+
+# Firebase (railway-frontend.json과 동일)
+export NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyBlJf58F_C9hkIry1eEV185-S1EQZmt2ps
+export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=wewantpeace-14660.firebaseapp.com
+export NEXT_PUBLIC_FIREBASE_PROJECT_ID=wewantpeace-14660
+export NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=wewantpeace-14660.firebasestorage.app
+export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=736999139205
+export NEXT_PUBLIC_FIREBASE_APP_ID=1:736999139205:web:50b36428d7a3fc25e806ec
+export NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-60XVQW25QY
+
 # 1) config 교체
 cp next.config.toss.js next.config.js
 
