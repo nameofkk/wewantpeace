@@ -24,6 +24,7 @@ from backend.app.core.auth import get_current_user, get_db, _verify_firebase_tok
 from backend.app.core.config import settings
 from backend.app.models.user import User, UserPreference
 from backend.app.models.terms import UserConsent
+from backend.app.models.community import Feedback
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +340,40 @@ async def find_email(nickname: str, birth_year: int, db: AsyncSession = Depends(
     local, domain = email.split("@", 1)
     masked = local[0] + "*" * (len(local) - 1) + "@" + domain
     return {"found": True, "email": masked}
+
+
+# ── 피드백 ──────────────────────────────────────────────────────────────────
+
+class FeedbackBody(BaseModel):
+    message: str
+    category: str = "general"
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 5:
+            raise ValueError("피드백은 5자 이상 입력해주세요.")
+        if len(v) > 2000:
+            raise ValueError("피드백은 2000자 이내로 입력해주세요.")
+        return v
+
+
+@router.post("/feedback", status_code=201)
+async def submit_feedback(
+    body: FeedbackBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """앱 의견 보내기."""
+    fb = Feedback(
+        user_id=current_user.id,
+        message=body.message,
+        category=body.category,
+    )
+    db.add(fb)
+    await db.flush()
+    return {"status": "ok", "id": fb.id}
 
 
 @router.patch("/profile", response_model=UserOut)

@@ -101,6 +101,19 @@ class Report(Base):
     )
 
 
+class Feedback(Base):
+    """앱 피드백 (의견 보내기)"""
+    __tablename__ = "feedbacks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    admin_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 class AdminLog(Base):
     __tablename__ = "admin_logs"
 

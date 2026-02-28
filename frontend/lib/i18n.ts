@@ -719,6 +719,18 @@ export const translations = {
     store_cancel_in_store: "구독 취소는 스토어에서 직접 해주세요",
     store_subscribe_in_app_desc: "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요",
 
+    // 피드백
+    feedback_title: "의견 보내기",
+    feedback_desc: "서비스 개선을 위한 의견이나 건의사항을 보내주세요.",
+    feedback_placeholder: "의견을 입력하세요 (5자 이상)",
+    feedback_submit: "보내기",
+    feedback_error: "의견 전송에 실패했습니다.",
+    feedback_sent_title: "의견이 전달되었습니다!",
+    feedback_sent_desc: "소중한 의견 감사합니다. 검토 후 반영하겠습니다.",
+
+    // 관리자 피드백
+    admin_feedbacks: "피드백 관리",
+
     // PWA 설치 배너
     pwa_install_title: "WeWantPeace 앱 설치",
     pwa_install_desc: "실시간 알림과 빠른 접근을 위해 설치하세요",
@@ -1439,6 +1451,18 @@ export const translations = {
     store_login_to_sync: "Log in to the app to sync",
     store_cancel_in_store: "Please cancel your subscription in the store",
     store_subscribe_in_app_desc: "Install the WeWantPeace app and subscribe to Pro/Pro+",
+
+    // feedback
+    feedback_title: "Send Feedback",
+    feedback_desc: "Share your suggestions or feedback to help us improve.",
+    feedback_placeholder: "Enter your feedback (min 5 characters)",
+    feedback_submit: "Send",
+    feedback_error: "Failed to send feedback.",
+    feedback_sent_title: "Feedback sent!",
+    feedback_sent_desc: "Thank you for your feedback. We'll review it shortly.",
+
+    // admin feedback
+    admin_feedbacks: "Feedbacks",
 
     // PWA install banner
     pwa_install_title: "Install WeWantPeace App",

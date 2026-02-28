@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.auth import get_current_user, get_db, require_admin
 from backend.app.core.redis import get_redis
 from backend.app.models.user import User, UserPushToken
-from backend.app.models.community import Post, Report, AdminLog
+from backend.app.models.community import Post, Report, AdminLog, Feedback
 from backend.app.models.subscription import Subscription, PaymentHistory
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.normalized_event import NormalizedEvent
@@ -951,4 +951,76 @@ async def update_source(
     channel.updated_at = datetime.now(timezone.utc)
     await db.flush()
     await _log_action(db, admin, "update_source", "source_channel", str(source_id), changes)
+    return {"status": "ok"}
+
+
+# ── 피드백 관리 ─────────────────────────────────────────────────────────────
+
+class FeedbackReply(BaseModel):
+    admin_reply: Optional[str] = None
+    status: Optional[str] = None  # pending | replied | resolved
+
+
+@router.get("/feedbacks")
+async def list_feedbacks(
+    page: int = Query(1, ge=1),
+    status: Optional[str] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(Feedback)
+    if status:
+        q = q.where(Feedback.status == status)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(Feedback.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    feedbacks = result.scalars().all()
+
+    # user nickname 일괄 조회
+    user_ids = [f.user_id for f in feedbacks if f.user_id]
+    nickname_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        user_result = await db.execute(
+            select(User.id, User.nickname, User.email).where(User.id.in_(user_ids))
+        )
+        nickname_map = {row.id: (row.nickname or row.email or "익명") for row in user_result.all()}
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": f.id,
+                "user_nickname": nickname_map.get(f.user_id, "익명") if f.user_id else "익명",
+                "message": f.message,
+                "category": f.category,
+                "status": f.status,
+                "admin_reply": f.admin_reply,
+                "created_at": f.created_at.isoformat(),
+            }
+            for f in feedbacks
+        ],
+    }
+
+
+@router.patch("/feedbacks/{feedback_id}")
+async def reply_feedback(
+    feedback_id: int,
+    body: FeedbackReply,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Feedback).where(Feedback.id == feedback_id))
+    fb = result.scalar_one_or_none()
+    if not fb:
+        raise HTTPException(404)
+
+    if body.admin_reply is not None:
+        fb.admin_reply = body.admin_reply
+        fb.status = "replied"
+    if body.status is not None:
+        fb.status = body.status
+
+    await db.flush()
+    await _log_action(db, admin, "reply_feedback", "feedback", str(feedback_id))
     return {"status": "ok"}

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Layers, Activity, FileText,
   Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
-  CreditCard, MessageSquare, TrendingUp,
+  CreditCard, MessageSquare, TrendingUp, MessageCircleQuestion,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" as const },
   { href: "/admin/subscriptions", icon: CreditCard, labelKey: "admin_subscriptions" as const },
   { href: "/admin/posts", icon: MessageSquare, labelKey: "admin_posts" as const },
+  { href: "/admin/feedbacks", icon: MessageCircleQuestion, labelKey: "admin_feedbacks" as const },
   { href: "/admin/settings", icon: Settings, labelKey: "admin_settings" as const },
 ];
 

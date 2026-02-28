@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -165,6 +165,38 @@ export default function SettingsPage() {
   const [deleteStep, setDeleteStep] = useState(0); // 0: idle, 1: confirm dialog
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
+
+  // 피드백 모달
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  async function handleSubmitFeedback() {
+    if (!firebaseUser || !feedbackMsg.trim()) return;
+    setFeedbackSending(true);
+    setFeedbackError(null);
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch(`${API_BASE}/auth/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message: feedbackMsg.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || t(lang, "feedback_error"));
+      }
+      setFeedbackSent(true);
+      setFeedbackMsg("");
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setFeedbackError(err.message || t(lang, "feedback_error"));
+    } finally {
+      setFeedbackSending(false);
+    }
+  }
 
   // 구독 정보 조회
   const [subInfo, setSubInfo] = useState<{
@@ -1074,14 +1106,25 @@ export default function SettingsPage() {
               </div>
               <span className="text-muted-foreground text-xs">→</span>
             </a>
-            <a
-              href="mailto:krshin7@naver.com?subject=WeWantPeace%20의견"
-              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
-            >
-              <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="flex-1">{t(lang, "settings_support_feedback")}</span>
-              <span className="text-muted-foreground text-xs">→</span>
-            </a>
+            {firebaseUser ? (
+              <button
+                onClick={() => { setShowFeedback(true); setFeedbackSent(false); setFeedbackError(null); }}
+                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50 w-full text-left"
+              >
+                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="flex-1">{t(lang, "settings_support_feedback")}</span>
+                <span className="text-muted-foreground text-xs">→</span>
+              </button>
+            ) : (
+              <a
+                href="mailto:krshin7@naver.com?subject=WeWantPeace%20의견"
+                className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
+              >
+                <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="flex-1">{t(lang, "settings_support_feedback")}</span>
+                <span className="text-muted-foreground text-xs">→</span>
+              </a>
+            )}
           </div>
         </section>
 
@@ -1164,6 +1207,61 @@ export default function SettingsPage() {
           <p className="text-center text-[10px] text-muted-foreground/20 select-none">
             WeWantPeace v2.0
           </p>
+
+          {/* 피드백 모달 */}
+          {showFeedback && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setShowFeedback(false)}>
+              <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                {feedbackSent ? (
+                  <>
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <CheckCircle className="h-10 w-10 text-green-500" />
+                      <p className="text-sm font-semibold">{t(lang, "feedback_sent_title")}</p>
+                      <p className="text-[12px] text-muted-foreground text-center">{t(lang, "feedback_sent_desc")}</p>
+                    </div>
+                    <button
+                      onClick={() => setShowFeedback(false)}
+                      className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground"
+                    >
+                      {t(lang, "settings_close")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold">{t(lang, "feedback_title")}</p>
+                    <p className="text-[12px] text-muted-foreground">{t(lang, "feedback_desc")}</p>
+                    {feedbackError && <p className="text-xs text-destructive">{feedbackError}</p>}
+                    <textarea
+                      value={feedbackMsg}
+                      onChange={(e) => setFeedbackMsg(e.target.value)}
+                      maxLength={2000}
+                      rows={5}
+                      placeholder={t(lang, "feedback_placeholder")}
+                      autoFocus
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary resize-none"
+                    />
+                    <p className="text-[10px] text-muted-foreground text-right">{feedbackMsg.length}/2000</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSubmitFeedback}
+                        disabled={feedbackSending || feedbackMsg.trim().length < 5}
+                        className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        {feedbackSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                        {t(lang, "feedback_submit")}
+                      </button>
+                      <button
+                        onClick={() => setShowFeedback(false)}
+                        className="flex-1 rounded-lg border border-border py-2.5 text-sm text-muted-foreground"
+                      >
+                        {t(lang, "settings_cancel")}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 탈퇴 확인 다이얼로그 */}
           {firebaseUser && deleteStep === 1 && (
