@@ -557,7 +557,7 @@ export default function MapPage() {
       )}
 
       {/* ── Pro/Pro+ 데이터 없음 안내 ─────────────────────────────── */}
-      {!isLocked && !isLoading && isMapReady && clusters.length === 0 && (
+      {!isLocked && !isLoading && isMapReady && clusters.length === 0 && (!apiClusters || !Array.isArray(apiClusters) || apiClusters.length === 0) && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 rounded-xl bg-background/95 px-6 py-5 border border-border backdrop-blur-sm text-center max-w-[280px]">
           <Layers className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
           <p className="text-sm font-medium mb-1">
