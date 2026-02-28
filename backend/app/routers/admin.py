@@ -1132,3 +1132,73 @@ async def list_feedbacks(
             for f in feedbacks
         ],
     }
+
+
+# ── 클러스터 쓰레기 제목 일괄 수정 ──────────────────────────────────────────
+
+import re as _re
+
+
+def _is_junk(title: str) -> bool:
+    stripped = _re.sub(r'#\w+', '', title).strip()
+    return len(stripped) < 5
+
+
+def _translate(title: str) -> str | None:
+    try:
+        from deep_translator import GoogleTranslator
+        result = GoogleTranslator(source="en", target="ko").translate(title[:200])
+        return result[:70] if result else None
+    except Exception:
+        return None
+
+
+@router.post("/fix-junk-titles")
+async def fix_junk_titles(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """해시태그만 있는 쓰레기 제목을 가진 클러스터를 같은 토픽/국가 이벤트에서 찾은 좋은 제목으로 교체."""
+    result = await db.execute(
+        select(IssueCluster)
+        .where(IssueCluster.severity > 0)
+        .order_by(IssueCluster.last_event_at.desc())
+    )
+    clusters = result.scalars().all()
+
+    fixed = []
+    for c in clusters:
+        if not _is_junk(c.title):
+            continue
+
+        # 같은 토픽+국가+시간범위에서 좋은 제목 찾기
+        ev_result = await db.execute(
+            text("""
+                SELECT title FROM normalized_events
+                WHERE topic = :topic
+                  AND (:cc IS NULL OR country_code = :cc)
+                  AND event_time BETWEEN :ws AND :we
+                ORDER BY severity DESC, confidence DESC
+                LIMIT 20
+            """),
+            {"topic": c.topic, "cc": c.country_code,
+             "ws": c.window_start, "we": c.window_end},
+        )
+        events = ev_result.fetchall()
+
+        best = None
+        for ev in events:
+            if not _is_junk(ev[0]) and len(ev[0]) > len(best or ""):
+                best = ev[0]
+
+        if not best:
+            continue
+
+        old_title = c.title
+        c.title = best
+        c.title_ko = _translate(best)
+        fixed.append({"id": str(c.id), "old": old_title, "new": best, "ko": c.title_ko})
+
+    await db.commit()
+    await _log_action(db, admin, "fix_junk_titles", detail={"count": len(fixed)})
+    return {"fixed": len(fixed), "details": fixed}

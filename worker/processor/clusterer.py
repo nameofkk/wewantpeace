@@ -226,6 +226,18 @@ async def assign_cluster(
             existing = list(cluster.source_tiers or [])
             existing.append(event.source_tier)
             cluster.source_tiers = existing
+        # 제목 승격: 현재 제목이 쓰레기이고 새 이벤트 제목이 더 나으면 교체
+        if _is_junk_title(cluster.title) and not _is_junk_title(event.title):
+            cluster.title = event.title
+            cluster.title_ko = _make_cluster_title_ko(
+                event.title, event.topic, event.country_code or cluster.country_code,
+            )
+            logger.info("클러스터 제목 승격: %s → %s", cluster.cluster_key, event.title[:50])
+        # 제목은 괜찮은데 title_ko가 없으면 재생성 시도
+        elif cluster.title_ko is None and not _is_junk_title(cluster.title):
+            cluster.title_ko = _make_cluster_title_ko(
+                cluster.title, cluster.topic, cluster.country_code,
+            )
         # geo: 아직 없으면 이벤트 것으로 채우기
         if cluster.lat is None and event.lat is not None:
             cluster.lat = event.lat
