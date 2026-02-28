@@ -1457,7 +1457,7 @@ def _classify_topic_multilang(text: str, lang: str) -> Optional[str]:
     text_lower = text.lower()
     scores: dict[str, int] = {}
     for topic, keywords in lang_kws.items():
-        hits = sum(1 for kw in keywords if kw in text_lower)
+        hits = sum(1 for kw in keywords if _kw_in_text(kw, text_lower))
         if hits >= 1:
             scores[topic] = hits
     return max(scores, key=lambda t: scores[t]) if scores else None
@@ -1468,6 +1468,19 @@ def _has_non_military_context(text: str) -> bool:
     for p in _NON_MILITARY_CONTEXT:
         if p.search(text):
             return True
+    return False
+
+
+def _kw_in_text(kw: str, text: str) -> bool:
+    """단어 경계를 고려한 키워드 매칭. 'coup'이 'coupang'에 매칭되지 않도록."""
+    idx = text.find(kw)
+    while idx != -1:
+        before_ok = idx == 0 or not text[idx - 1].isalnum()
+        end = idx + len(kw)
+        after_ok = end >= len(text) or not text[end].isalnum()
+        if before_ok and after_ok:
+            return True
+        idx = text.find(kw, idx + 1)
     return False
 
 
@@ -1486,12 +1499,12 @@ def _classify_topic(text: str) -> str:
     for topic, keywords in TOPIC_KEYWORDS.items():
         # 강력 키워드 체크
         strong = _STRONG_KEYWORDS.get(topic, set())
-        strong_hits = sum(1 for kw in strong if kw in text_lower)
+        strong_hits = sum(1 for kw in strong if _kw_in_text(kw, text_lower))
         if strong_hits:
             scores[topic] = scores.get(topic, 0) + strong_hits * 3  # 가중치 3배
 
         # 일반 키워드 체크
-        weak_hits = sum(1 for kw in keywords if kw not in strong and kw in text_lower)
+        weak_hits = sum(1 for kw in keywords if kw not in strong and _kw_in_text(kw, text_lower))
 
         # 비군사 문맥이면 conflict/terror weak 키워드 무효화
         if non_military and topic in ("conflict", "terror"):
@@ -1519,8 +1532,8 @@ def _calculate_severity(text: str, topic: str) -> int:
     text_lower = text.lower()
 
     # 키워드 보정 (누적 상한 ±40)
-    keyword_delta = sum(delta for kw, delta in SEVERITY_UP if kw in text_lower)
-    keyword_delta += sum(delta for kw, delta in SEVERITY_DOWN if kw in text_lower)
+    keyword_delta = sum(delta for kw, delta in SEVERITY_UP if _kw_in_text(kw, text_lower))
+    keyword_delta += sum(delta for kw, delta in SEVERITY_DOWN if _kw_in_text(kw, text_lower))
     keyword_delta = max(-40, min(40, keyword_delta))
 
     # 사상자 수 기반 추가 보정 (별도 상한, _casualty_bonus 내부에서 max 30)
@@ -1549,7 +1562,7 @@ def _extract_geo(
     if title:
         title_lower = title.lower()
         for kw in sorted_kws:
-            if kw in title_lower:
+            if _kw_in_text(kw, title_lower):
                 code, lat, lon = COUNTRY_MAP[kw]
                 count = title_lower.count(kw)
                 weight = count * len(kw) * 3  # 제목 3배 가중치
@@ -1558,7 +1571,7 @@ def _extract_geo(
     # body(전체 텍스트) 매칭
     text_lower = text.lower()
     for kw in sorted_kws:
-        if kw in text_lower:
+        if _kw_in_text(kw, text_lower):
             code, lat, lon = COUNTRY_MAP[kw]
             count = text_lower.count(kw)
             weight = count * len(kw)
