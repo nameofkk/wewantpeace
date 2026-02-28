@@ -525,7 +525,7 @@ export default function TensionPage() {
   useEffect(() => setHydrated(true), []);
 
   const [viewMode, _setViewMode] = useState<"mine" | "all">("all");
-  const setViewMode = (m: "mine" | "all") => { _setViewMode(m); setVisibleCount(30); };
+  const setViewMode = (m: "mine" | "all") => { _setViewMode(m); setVisibleCount(30); setLoadingMore(false); };
 
   const targetCountries = viewMode === "all"
     ? ALL_MONITORED_COUNTRIES
@@ -543,6 +543,7 @@ export default function TensionPage() {
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
   const [spinning, setSpinning] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // hydrate 후 관심지역이 있으면 "mine" 탭으로 전환
   const [autoSwitched, setAutoSwitched] = useState(false);
@@ -796,13 +797,29 @@ export default function TensionPage() {
               ))}
               {visibleCount < tensions.length && (
                 <button
-                  onClick={() => setVisibleCount((v) => v + 30)}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary/50 py-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  onClick={() => {
+                    setLoadingMore(true);
+                    requestAnimationFrame(() => {
+                      setVisibleCount((v) => v + 30);
+                      setLoadingMore(false);
+                    });
+                  }}
+                  disabled={loadingMore}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary/50 py-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-60"
                 >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                  {lang === "ko"
-                    ? `더보기 (${Math.min(visibleCount, tensions.length)}/${tensions.length})`
-                    : `Load more (${Math.min(visibleCount, tensions.length)}/${tensions.length})`}
+                  {loadingMore ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      {lang === "ko" ? "불러오는 중…" : "Loading…"}
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      {lang === "ko"
+                        ? `더보기 (${Math.min(visibleCount, tensions.length)}/${tensions.length})`
+                        : `Load more (${Math.min(visibleCount, tensions.length)}/${tensions.length})`}
+                    </>
+                  )}
                 </button>
               )}
             </>
