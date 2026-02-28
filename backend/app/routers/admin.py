@@ -525,6 +525,8 @@ class ClusterPatch(BaseModel):
     severity: Optional[int] = None
     topic: Optional[str] = None
     is_active: Optional[bool] = None
+    title: Optional[str] = None
+    title_ko: Optional[str] = None
 
 
 @router.get("/clusters")
@@ -606,6 +608,23 @@ async def update_cluster(
             cluster.severity = 0
             changes["deactivated"] = True
         changes["is_active"] = body.is_active
+
+    # 제목 수정 (title_ko만 전달되면 ko→en 자동 번역)
+    if body.title_ko is not None:
+        cluster.title_ko = body.title_ko
+        changes["title_ko"] = body.title_ko
+        if body.title is None:
+            try:
+                from deep_translator import GoogleTranslator
+                translated = GoogleTranslator(source="ko", target="en").translate(body.title_ko[:200])
+                if translated:
+                    cluster.title = translated[:200]
+                    changes["title"] = cluster.title
+            except Exception:
+                pass
+    if body.title is not None:
+        cluster.title = body.title
+        changes["title"] = body.title
 
     await db.flush()
     await _log_action(db, admin, "update_cluster", "cluster", cluster_id, changes)

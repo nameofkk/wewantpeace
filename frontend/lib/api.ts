@@ -313,6 +313,21 @@ export function useMarkAllRead() {
   });
 }
 
+// --- 어드민: 클러스터 제목 수정 훅 ---
+export function usePatchCluster() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: { title_ko?: string; title?: string } }) =>
+      apiFetch(`/admin/clusters/${id}`, undefined, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trending"] });
+    },
+  });
+}
+
 // --- 타입 ---
 export interface UserArea {
   id: number;

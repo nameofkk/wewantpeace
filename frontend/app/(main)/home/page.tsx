@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
@@ -305,10 +305,13 @@ function KScoreHistorySection({
 }
 
 // ── 트렌딩 카드 ──────────────────────────────────────────────────────────
-function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string }) {
+function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = false }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string; isAdmin?: boolean }) {
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
   const [showHistory, setShowHistory] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const patchCluster = usePatchCluster();
   const topic = item.topic ?? "unknown";
   const k = roundKScore(item.kscore);
   const isExtreme = k >= 8;
@@ -325,12 +328,34 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
     ? buildSmartTitle(item.keyword, topic, lang, getCountryName)
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
+  const handleEditStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditValue(item.keyword_ko ?? item.keyword ?? "");
+    setEditing(true);
+  };
+
+  const handleEditSave = async (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (!clusterId || !editValue.trim()) return;
+    try {
+      await patchCluster.mutateAsync({ id: clusterId, body: { title_ko: editValue.trim() } });
+      setEditing(false);
+    } catch {
+      // 실패 시 편집 모드 유지
+    }
+  };
+
+  const handleEditCancel = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    setEditing(false);
+  };
+
   return (
     <div
       className={cn(
         "card-enter rounded-xl border-l-4 border border-border bg-card p-4 relative",
         "transition-all hover:bg-card/80",
-        clusterId && "cursor-pointer",
+        clusterId && !editing && "cursor-pointer",
         kscoreAccent(item.kscore),
         badge.glow,
         isExtreme && "card-pulse-extreme",
@@ -338,7 +363,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
         isAlert && !isSevere && "card-pulse-alert",
       )}
       style={{ animationDelay: `${delay}ms` }}
-      onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+      onClick={clusterId && !editing ? () => router.push(`/issues/${clusterId}`) : undefined}
     >
       {/* 배경 글로우 (경계 이상) */}
       {isAlert && (
@@ -390,7 +415,47 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
             )}
           </div>
 
-          <h3 className="mt-1.5 text-sm font-semibold leading-snug">{displayTitle}</h3>
+          {editing ? (
+            <div className="mt-1.5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <input
+                autoFocus
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleEditSave(e);
+                  if (e.key === "Escape") handleEditCancel(e);
+                }}
+                className="flex-1 min-w-0 rounded-md border border-border bg-background px-2 py-1 text-sm font-semibold leading-snug outline-none focus:border-primary"
+                placeholder={lang === "ko" ? "한국어 제목 입력" : "Enter Korean title"}
+              />
+              <button
+                onClick={handleEditSave}
+                disabled={patchCluster.isPending}
+                className="shrink-0 rounded-md p-1 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleEditCancel}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="mt-1.5 flex items-center gap-1">
+              <h3 className="text-sm font-semibold leading-snug">{displayTitle}</h3>
+              {isAdmin && clusterId && (
+                <button
+                  onClick={handleEditStart}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                  title={lang === "ko" ? "제목 수정" : "Edit title"}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )}
 
           {formatFirstSeen(item.first_event_at, lang) && (
             <p className="mt-0.5 text-[10px] text-muted-foreground/70">
@@ -691,7 +756,7 @@ export default function HomePage() {
 
             {!isLoading && !isError && items && items.length > 0 &&
               items.map((item, i) => (
-                <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} />
+                <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={(me as { role?: string } | undefined)?.role === "admin"} />
               ))
             }
           </div>

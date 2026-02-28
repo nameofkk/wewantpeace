@@ -75,6 +75,7 @@ class UserOut(BaseModel):
     id: str
     firebase_uid: str
     plan: str
+    role: str
     email: Optional[str]
     nickname: Optional[str] = None
     display_name: Optional[str] = None
@@ -115,6 +116,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         id=str(current_user.id),
         firebase_uid=current_user.firebase_uid,
         plan=current_user.plan,
+        role=current_user.role or "user",
         email=current_user.email,
         nickname=current_user.nickname,
         display_name=current_user.display_name,
