@@ -62,6 +62,12 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "sanctions", "embargo", "trade ban", "export control", "asset freeze",
         "blacklist", "tariff", "economic pressure", "restriction",
         "sanctioned", "penalty", "penalties", "sanctioning",
+        # 금융/경제 위기 · 비상조치
+        "stock market", "trading halt", "trading suspension", "market shutdown",
+        "market crash", "market collapse", "financial crisis", "economic crisis",
+        "bank run", "bank holiday", "currency crisis", "default",
+        "national emergency", "state of emergency", "emergency powers",
+        "ieepa", "executive order", "capital controls",
     ],
     "cyber": [
         "cyberattack", "hacked", "ransomware", "malware", "ddos",
@@ -163,6 +169,14 @@ SEVERITY_UP: list[tuple[str, int]] = [
     ("breaking", 5), ("breaking news", 8), ("just in", 5),
     ("launches attack", 12), ("launched attack", 12), ("opens fire", 10),
     ("military offensive", 12), ("commenced", 8), ("underway", 6),
+    # 국가비상사태 · 금융위기
+    ("national emergency", 15), ("state of emergency", 12),
+    ("emergency powers", 12), ("ieepa", 12),
+    ("trading halt", 10), ("trading suspension", 10), ("market shutdown", 12),
+    ("market crash", 10), ("market collapse", 12), ("financial crisis", 10),
+    ("stock market crash", 12), ("bank run", 10), ("bank holiday", 8),
+    ("currency crisis", 10), ("sovereign default", 15), ("default", 6),
+    ("capital controls", 8), ("economic collapse", 12),
     # 인프라
     ("power grid", 8), ("hospital", 6), ("school", 5), ("market", 4),
     ("dam", 8), ("nuclear plant", 15), ("nuclear facility", 15),
