@@ -9,17 +9,21 @@ interface KScoreBarProps {
 const KSCORE_MAX = 10.0;  // 바 100% 기준값
 
 function kscoreColor(k: number): string {
-  if (k >= 7.0) return "from-red-500 to-red-400";
+  if (k >= 8.5) return "from-red-500 to-red-400";
+  if (k >= 7.0) return "from-rose-500 to-rose-400";
   if (k >= 5.0) return "from-orange-500 to-orange-400";
-  if (k >= 3.0) return "from-yellow-500 to-yellow-400";
+  if (k >= 3.5) return "from-yellow-500 to-yellow-400";
+  if (k >= 2.0) return "from-blue-500 to-blue-400";
   return "from-green-500 to-green-400";
 }
 
 function kscoreLabel(k: number, rounded: number): string {
-  if (rounded >= 7.0) return "위기";
+  if (rounded >= 8.5) return "위기";
+  if (rounded >= 7.0) return "심각";
   if (rounded >= 5.0) return "경계";
-  if (rounded >= 3.0) return "주의";
-  return "정상";
+  if (rounded >= 3.5) return "주의";
+  if (rounded >= 2.0) return "관심";
+  return "안정";
 }
 
 export function KScoreBar({ kscore, showLabel = true, className = "" }: KScoreBarProps) {

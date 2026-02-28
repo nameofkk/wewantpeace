@@ -12,12 +12,14 @@ import {
 } from "recharts";
 import { type Lang } from "@/lib/i18n";
 
-// KScore 구간별 색상 (0-10 스케일)
+// KScore 구간별 색상 (0-10 스케일, 6단계)
 function kscoreColor(kscore: number): string {
-  if (kscore >= 7.0) return "#ef4444"; // 적색 (위기)
+  if (kscore >= 8.5) return "#ef4444"; // 빨강 (위기)
+  if (kscore >= 7.0) return "#f43f5e"; // 로즈 (심각)
   if (kscore >= 5.0) return "#f97316"; // 주황 (경계)
-  if (kscore >= 3.0) return "#eab308"; // 노랑 (주의)
-  return "#22c55e"; // 녹색 (정상)
+  if (kscore >= 3.5) return "#eab308"; // 노랑 (주의)
+  if (kscore >= 2.0) return "#3b82f6"; // 파랑 (관심)
+  return "#22c55e"; // 녹색 (안정)
 }
 
 interface KScorePoint {
@@ -88,10 +90,12 @@ export function KScoreHistoryChart({ data, range, lang }: KScoreHistoryChartProp
           <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
 
-            {/* KScore 구간 경계선 (0-10 스케일) */}
-            <ReferenceLine y={3.0} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.4} />
+            {/* KScore 구간 경계선 (0-10 스케일, 6단계) */}
+            <ReferenceLine y={2.0} stroke="#3b82f6" strokeDasharray="4 4" strokeOpacity={0.3} />
+            <ReferenceLine y={3.5} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.4} />
             <ReferenceLine y={5.0} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
-            <ReferenceLine y={7.0} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
+            <ReferenceLine y={7.0} stroke="#f43f5e" strokeDasharray="4 4" strokeOpacity={0.4} />
+            <ReferenceLine y={8.5} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
 
             <XAxis
               dataKey="time"
@@ -106,7 +110,7 @@ export function KScoreHistoryChart({ data, range, lang }: KScoreHistoryChartProp
               tick={{ fontSize: 9, fill: "#6b7280" }}
               axisLine={false}
               tickLine={false}
-              ticks={[0, 3, 5, 7, 10]}
+              ticks={[0, 2, 3.5, 5, 7, 8.5, 10]}
             />
             <Tooltip content={<CustomTooltip lang={lang} />} />
             <Line
@@ -122,13 +126,15 @@ export function KScoreHistoryChart({ data, range, lang }: KScoreHistoryChartProp
         </ResponsiveContainer>
       </div>
 
-      {/* 범례 (0-10 스케일) */}
-      <div className="flex items-center justify-center gap-3 mt-1 mb-1">
+      {/* 범례 (0-10 스케일, 6단계) */}
+      <div className="flex items-center justify-center gap-2 mt-1 mb-1 flex-wrap">
         {[
-          { label: lang === "ko" ? "정상" : "Normal",    color: "#22c55e", range: "< 3" },
-          { label: lang === "ko" ? "주의" : "Watch",     color: "#eab308", range: "3~5" },
-          { label: lang === "ko" ? "경계" : "Alert",     color: "#f97316", range: "5~7" },
-          { label: lang === "ko" ? "위기" : "Crisis",    color: "#ef4444", range: "7+" },
+          { label: lang === "ko" ? "안정" : "Stable",     color: "#22c55e", range: "<2" },
+          { label: lang === "ko" ? "관심" : "Interest",   color: "#3b82f6", range: "2~3.5" },
+          { label: lang === "ko" ? "주의" : "Caution",    color: "#eab308", range: "3.5~5" },
+          { label: lang === "ko" ? "경계" : "Alert",      color: "#f97316", range: "5~7" },
+          { label: lang === "ko" ? "심각" : "Severe",     color: "#f43f5e", range: "7~8.5" },
+          { label: lang === "ko" ? "위기" : "Crisis",     color: "#ef4444", range: "8.5+" },
         ].map(({ label, color, range: r }) => (
           <span key={r} className="flex items-center gap-1 text-[9px] text-muted-foreground">
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />

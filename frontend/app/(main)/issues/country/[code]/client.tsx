@@ -99,7 +99,7 @@ export default function CountryIssuesPage() {
 
         {clusters?.map((cluster) => {
           const color = getSeverityColor(cluster.severity);
-          const level = (cluster.severity >= 75 ? 3 : cluster.severity >= 50 ? 2 : cluster.severity >= 25 ? 1 : 0) as 0 | 1 | 2 | 3;
+          const level = (cluster.severity >= 85 ? 5 : cluster.severity >= 70 ? 4 : cluster.severity >= 50 ? 3 : cluster.severity >= 30 ? 2 : cluster.severity >= 15 ? 1 : 0) as 0 | 1 | 2 | 3 | 4 | 5;
           const levelLabel = getTensionLevelLabel(level, lang);
           const topicKey = `topic_${cluster.topic}` as Parameters<typeof t>[1];
           const clusterTitle = lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title);

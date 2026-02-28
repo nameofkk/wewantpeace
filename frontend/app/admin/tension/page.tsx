@@ -22,19 +22,23 @@ interface TensionRow {
   updated_at: string;
 }
 
-const LEVEL_LABELS_KO = ["안정", "주의", "경계", "위기"];
-const LEVEL_LABELS_EN = ["Normal", "Watch", "Alert", "Crisis"];
+const LEVEL_LABELS_KO = ["안정", "관심", "주의", "경계", "심각", "위기"];
+const LEVEL_LABELS_EN = ["Stable", "Interest", "Caution", "Alert", "Severe", "Crisis"];
 const LEVEL_COLORS = [
   "bg-green-500/20 text-green-400 border-green-500/50",
+  "bg-blue-500/20 text-blue-400 border-blue-500/50",
   "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",
   "bg-orange-500/20 text-orange-300 border-orange-400/80",
+  "bg-rose-500/20 text-rose-300 border-rose-400/80",
   "bg-red-500/20 text-red-200 border-red-500/90",
 ];
 
 const ROW_BG = [
   "",
   "",
+  "",
   "bg-orange-500/[0.03]",
+  "bg-rose-500/[0.04]",
   "bg-red-500/[0.06]",
 ];
 

@@ -131,9 +131,11 @@ export function useTensionHistory(countryCode: string, range: "7d" | "30d" | "90
 export function getTensionLevelColor(level: number): string {
   const colors: Record<number, string> = {
     0: "#22c55e",
-    1: "#eab308",
-    2: "#f97316",
-    3: "#ef4444",
+    1: "#3b82f6",
+    2: "#eab308",
+    3: "#f97316",
+    4: "#f43f5e",
+    5: "#ef4444",
   };
   return colors[level] ?? "#6b7280";
 }
@@ -141,9 +143,11 @@ export function getTensionLevelColor(level: number): string {
 export function getTensionLevelLabel(level: number): string {
   const labels: Record<number, string> = {
     0: "안정",
-    1: "주의",
-    2: "경계",
-    3: "위기",
+    1: "관심",
+    2: "주의",
+    3: "경계",
+    4: "심각",
+    5: "위기",
   };
   return labels[level] ?? "알 수 없음";
 }

@@ -14,32 +14,54 @@ from worker.processor.tension_calculator import (
 )
 
 
-# ── tension_level 분류 ────────────────────────────────────────────────────────
+# ── tension_level 분류 (6단계) ────────────────────────────────────────────────
 
 class TestTensionLevel:
     def test_stable(self):
-        assert _tension_level(0) == 0
-        assert _tension_level(24) == 0
+        # raw_score 기반: 0~14 → 0 (안정)
+        assert _tension_level(0, 0) == 0
+        assert _tension_level(14, 14) == 0
+
+    def test_interest(self):
+        # raw_score 기반: 15~29 → 1 (관심)
+        assert _tension_level(15, 15) == 1
+        assert _tension_level(29, 29) == 1
 
     def test_caution(self):
-        assert _tension_level(25) == 1
-        assert _tension_level(49) == 1
+        # raw_score 기반: 30~49 → 2 (주의)
+        assert _tension_level(30, 30) == 2
+        assert _tension_level(49, 49) == 2
 
     def test_alert(self):
-        assert _tension_level(50) == 2
-        assert _tension_level(74) == 2
+        # raw_score 기반: 50~69 → 3 (경계)
+        assert _tension_level(50, 50) == 3
+        assert _tension_level(69, 69) == 3
+
+    def test_severe(self):
+        # raw_score 기반: 70~84 → 4 (심각)
+        assert _tension_level(70, 70) == 4
+        assert _tension_level(84, 84) == 4
 
     def test_crisis(self):
-        assert _tension_level(75) == 3
-        assert _tension_level(100) == 3
+        # raw_score 기반: 85~100 → 5 (위기)
+        assert _tension_level(85, 85) == 5
+        assert _tension_level(100, 100) == 5
+
+    def test_floor_low_raw_score(self):
+        """raw_score < 15이면 퍼센타일이 높아도 레벨 0."""
+        assert _tension_level(90, 10) == 0
+
+    def test_floor_medium_raw_score(self):
+        """raw_score < 30이면 max_level=1."""
+        assert _tension_level(90, 25) == 1
 
 
 # ── event_score ───────────────────────────────────────────────────────────────
 
 from types import SimpleNamespace
 
-def _make_cluster(severity: int = 55, confidence: float = 0.70):
-    return SimpleNamespace(severity=severity, confidence=confidence)
+def _make_cluster(severity: int = 55, confidence: float = 0.70, event_count: int = 1):
+    return SimpleNamespace(severity=severity, confidence=confidence, event_count=event_count)
 
 
 class TestEventScore:
@@ -48,7 +70,7 @@ class TestEventScore:
 
     def test_single_cluster(self):
         score = _calc_event_score([_make_cluster(100, 1.0)])
-        assert score == pytest.approx(100.0)
+        assert 0 < score <= 100
 
     def test_low_confidence_reduces_score(self):
         high = _calc_event_score([_make_cluster(80, 1.0)])
@@ -64,31 +86,28 @@ class TestEventScore:
 # ── accel_score ───────────────────────────────────────────────────────────────
 
 class TestAccelScore:
-    def test_zero_prev_with_current(self):
-        """이전 0에서 현재 10 → 최대 1.0."""
-        score = _calc_accel_score(10, 0)
-        assert score == pytest.approx(1.0)
+    def test_zero_prev_volume_only(self):
+        """이전 0에서 현재 100 events, 10 clusters → 볼륨 위주."""
+        score = _calc_accel_score(100, 0, 10)
+        assert score == pytest.approx(0.6, abs=0.01)  # 0.6 * volume(1.0) + 0.4 * accel(0)
 
     def test_no_change(self):
-        """변화 없으면 0."""
-        score = _calc_accel_score(5, 5)
-        assert score == pytest.approx(0.0)
+        """클러스터 수 변화 없으면 가속도 0, 볼륨만."""
+        score = _calc_accel_score(50, 5, 5)
+        # volume = 50/100 = 0.5, accel = 0
+        assert score == pytest.approx(0.3, abs=0.01)
 
     def test_decrease(self):
-        """감소하면 0 (음수 없음)."""
-        score = _calc_accel_score(2, 10)
-        assert score == 0.0
+        """감소하면 가속도 0 (음수 없음)."""
+        score = _calc_accel_score(20, 10, 5)
+        # volume = 0.2, accel = max(0, (5-10)/10) = 0
+        assert score == pytest.approx(0.12, abs=0.01)
 
-    def test_capped_at_1(self):
-        """최대 1.0."""
-        score = _calc_accel_score(1000, 1)
-        assert score == pytest.approx(1.0)
-
-    def test_moderate_increase(self):
-        """50% 증가."""
-        score = _calc_accel_score(15, 10)
-        # (15-10)/(10+1) ≈ 0.45
-        assert score == pytest.approx(0.45, abs=0.01)
+    def test_growth_increases_score(self):
+        """클러스터 수 증가하면 가속도 보너스."""
+        no_growth = _calc_accel_score(50, 5, 5)
+        growth = _calc_accel_score(50, 5, 10)
+        assert growth > no_growth
 
 
 # ── spillover ─────────────────────────────────────────────────────────────────
@@ -103,15 +122,17 @@ class TestSpillover:
             "RU": [_make_cluster(severity=80)],
         }
         score = _calc_spillover("UA", neighbor_clusters)
-        assert score == pytest.approx(0.80)
+        # avg_sev=80, (80/100)*0.7 = 0.56
+        assert score == pytest.approx(0.56, abs=0.01)
 
-    def test_multiple_neighbors_max(self):
+    def test_multiple_neighbors_avg(self):
         neighbor_clusters = {
             "RU": [_make_cluster(severity=60)],
             "BY": [_make_cluster(severity=90)],
         }
         score = _calc_spillover("UA", neighbor_clusters)
-        assert score == pytest.approx(0.90)
+        # avg_sev = (60+90)/2 = 75, (75/100)*0.7 = 0.525
+        assert score == pytest.approx(0.525, abs=0.01)
 
     def test_empty_neighbor_clusters(self):
         score = _calc_spillover("UA", {"RU": [], "BY": []})

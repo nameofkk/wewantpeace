@@ -6,7 +6,7 @@ KScore (v4, 0-10 스케일):
   KScore = raw × KSCORE_SCALE(10)
 
   모든 컴포넌트 0~1 정규화 → 가중치가 실제 영향도를 정확히 반영.
-  UI 임계값: 정상(<3) / 주의(3-5) / 경계(5-7) / 위기(7+)
+  UI 임계값: 안정(<2) / 관심(2-3.5) / 주의(3.5-5) / 경계(5-7) / 심각(7-8.5) / 위기(8.5+)
 
 포함 조건: KScore >= calibration.KSCORE_MIN
 결과를 trending_keywords 테이블에 UPSERT.
@@ -58,7 +58,7 @@ def _calc_kscore(
     - min(1.0, k10^VELOCITY_EXPONENT × spike_factor / VELOCITY_CAP)
     - k10=5: 0.52, k10=10: 0.84, k10=15: 1.0(cap)
 
-    UI 임계값: 정상(<3) / 주의(3~5) / 경계(5~7) / 위기(7+)
+    UI 임계값: 안정(<2) / 관심(2~3.5) / 주의(3.5~5) / 경계(5~7) / 심각(7~8.5) / 위기(8.5+)
 
     상수 변경 시: calibration.py 수정 후 이 함수는 자동 반영됨.
     """

@@ -13,10 +13,12 @@ TensionCalculator: 국가별 긴장도 지수 계산.
 
   percentile  = 현재 Raw의 최근 30일 분포 내 위치 → 0~100
   tension_level:
-    0 = 안정  (0–24)
-    1 = 주의  (25–49)
-    2 = 경계  (50–74)
-    3 = 위기  (75–100)
+    0 = 안정  (0–15)
+    1 = 관심  (15–30)
+    2 = 주의  (30–50)
+    3 = 경계  (50–70)
+    4 = 심각  (70–85)
+    5 = 위기  (85–100)
 
 결과를 tension_index 테이블에 저장.
 모든 튜닝 가능한 상수는 calibration.py에서 관리.
@@ -129,28 +131,47 @@ NEIGHBOR_MAP: dict[str, list[str]] = {
 
 def _tension_level(percentile: float, raw_score: float = 0.0) -> int:
     """
-    퍼센타일과 raw_score 둘 다 고려하여 레벨 결정.
+    퍼센타일과 raw_score 둘 다 고려하여 6단계 레벨 결정.
 
     퍼센타일만 쓰면 '항상 전쟁 중인 나라'(UA)는 30일 모두 높아서
     오늘도 비슷하면 낮은 퍼센타일이 나온다.
     raw_score 절대값 기준도 함께 적용해 높은 쪽을 채택.
 
+    6단계:
+      0 = 안정 (0–15)     Stable
+      1 = 관심 (15–30)    Interest
+      2 = 주의 (30–50)    Caution
+      3 = 경계 (50–70)    Alert
+      4 = 심각 (70–85)    Severe
+      5 = 위기 (85–100)   Crisis
+
     절대값 플로어:
-      raw_score < 20  → 최대 안정(0)  — "8점인데 노란색" 방지
-      raw_score < 40  → 최대 주의(1)  — 낮은 점수가 경계/위기로 튀는 방지
+      raw_score < 15  → 최대 안정(0)
+      raw_score < 30  → 최대 관심(1)
     """
     # 절대값이 너무 낮으면 퍼센타일이 높아도 상위 레벨 차단
-    if raw_score < 20:
+    if raw_score < 15:
         return 0
-    if raw_score < 40:
+    if raw_score < 30:
         max_level = 1
     else:
-        max_level = 3
+        max_level = 5
 
-    # 퍼센타일 기반 레벨
-    p_level = 3 if percentile >= 75 else 2 if percentile >= 50 else 1 if percentile >= 25 else 0
-    # raw_score 절대값 기반 레벨 (같은 구간 적용)
-    r_level = 3 if raw_score >= 75 else 2 if raw_score >= 50 else 1 if raw_score >= 25 else 0
+    def _to_level(v: float) -> int:
+        if v >= 85:
+            return 5
+        if v >= 70:
+            return 4
+        if v >= 50:
+            return 3
+        if v >= 30:
+            return 2
+        if v >= 15:
+            return 1
+        return 0
+
+    p_level = _to_level(percentile)
+    r_level = _to_level(raw_score)
     return min(max_level, max(p_level, r_level))
 
 

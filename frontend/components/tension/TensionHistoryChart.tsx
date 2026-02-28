@@ -12,12 +12,14 @@ import {
 } from "recharts";
 import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
 
-// 긴장도 레벨별 색상
+// 긴장도 레벨별 색상 (6단계)
 const LEVEL_COLORS: Record<number, string> = {
   0: "#22c55e", // 안정 - green
-  1: "#eab308", // 주의 - yellow
-  2: "#f97316", // 경계 - orange
-  3: "#ef4444", // 위기 - red
+  1: "#3b82f6", // 관심 - blue
+  2: "#eab308", // 주의 - yellow
+  3: "#f97316", // 경계 - orange
+  4: "#f43f5e", // 심각 - rose
+  5: "#ef4444", // 위기 - red
 };
 
 interface HistoryPoint {
@@ -59,7 +61,7 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   const color = LEVEL_COLORS[d.tension_level] ?? "#6b7280";
-  const label = getTensionLevelLabel(d.tension_level as 0 | 1 | 2 | 3, lang);
+  const label = getTensionLevelLabel(d.tension_level as 0 | 1 | 2 | 3 | 4 | 5, lang);
   const locale = lang === "en" ? "en-US" : "ko-KR";
   const scoreUnit = t(lang, "chart_tooltip_score_unit");
   const pctLabel = t(lang, "chart_tooltip_percentile");
@@ -95,10 +97,12 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
 
-          {/* 단계 경계선 */}
-          <ReferenceLine y={25} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.4} />
+          {/* 단계 경계선 (6단계) */}
+          <ReferenceLine y={15} stroke="#3b82f6" strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={30} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={50} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
-          <ReferenceLine y={75} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
+          <ReferenceLine y={70} stroke="#f43f5e" strokeDasharray="4 4" strokeOpacity={0.4} />
+          <ReferenceLine y={85} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
 
           <XAxis
             dataKey="time"
@@ -113,7 +117,7 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
             tick={{ fontSize: 9, fill: "#6b7280" }}
             axisLine={false}
             tickLine={false}
-            ticks={[0, 25, 50, 75, 100]}
+            ticks={[0, 15, 30, 50, 70, 85, 100]}
           />
           <Tooltip content={<CustomTooltip lang={lang} />} />
           <Line
@@ -129,9 +133,9 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
       </ResponsiveContainer>
       </div>
 
-      {/* 레벨 범례 */}
-      <div className="flex items-center justify-center gap-3 mt-3 mb-2">
-        {([0, 1, 2, 3] as const).map((level) => (
+      {/* 레벨 범례 (6단계) */}
+      <div className="flex items-center justify-center gap-2 mt-3 mb-2 flex-wrap">
+        {([0, 1, 2, 3, 4, 5] as const).map((level) => (
           <span key={level} className="flex items-center gap-1 text-[9px] text-muted-foreground">
             <span
               className="inline-block w-2 h-2 rounded-full"
