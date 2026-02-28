@@ -726,7 +726,7 @@ export const translations = {
     feedback_submit: "보내기",
     feedback_error: "의견 전송에 실패했습니다.",
     feedback_sent_title: "의견이 전달되었습니다!",
-    feedback_sent_desc: "소중한 의견 감사합니다. 검토 후 반영하겠습니다.",
+    feedback_sent_desc: "소중한 의견 감사합니다.\n더 좋은 서비스를 만드는 데 참고하겠습니다.",
 
     // 관리자 피드백
     admin_feedbacks: "피드백 관리",
@@ -1459,7 +1459,7 @@ export const translations = {
     feedback_submit: "Send",
     feedback_error: "Failed to send feedback.",
     feedback_sent_title: "Feedback sent!",
-    feedback_sent_desc: "Thank you for your feedback. We'll review it shortly.",
+    feedback_sent_desc: "Thank you for sharing your thoughts.\nYour feedback helps us build a better service.",
 
     // admin feedback
     admin_feedbacks: "Feedbacks",
