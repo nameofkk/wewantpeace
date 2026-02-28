@@ -6,7 +6,7 @@ KScore (v4, 0-10 스케일):
   KScore = raw × KSCORE_SCALE(10)
 
   모든 컴포넌트 0~1 정규화 → 가중치가 실제 영향도를 정확히 반영.
-  UI 임계값: 안정(<2) / 관심(2-3.5) / 주의(3.5-5) / 경계(5-7) / 심각(7-8.5) / 위기(8.5+)
+  UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)
 
 포함 조건: KScore >= calibration.KSCORE_MIN
 결과를 trending_keywords 테이블에 UPSERT.

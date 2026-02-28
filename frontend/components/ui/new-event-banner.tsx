@@ -62,29 +62,26 @@ const TOPIC_DOT: Record<string, string> = {
 
 const TENSION_LEVEL_LABELS: Record<number, string> = {
   0: "안정",
-  1: "관심",
-  2: "주의",
-  3: "경계",
-  4: "심각",
-  5: "위기",
+  1: "주의",
+  2: "경계",
+  3: "심각",
+  4: "극심",
 };
 
 const TENSION_ACCENT: Record<number, string> = {
   0: "bg-emerald-500",
-  1: "bg-blue-500",
-  2: "bg-yellow-500",
-  3: "bg-orange-500",
-  4: "bg-purple-500",
-  5: "bg-red-500",
+  1: "bg-yellow-500",
+  2: "bg-orange-500",
+  3: "bg-red-500",
+  4: "bg-red-600",
 };
 
 const TENSION_DOT: Record<number, string> = {
   0: "bg-emerald-400",
-  1: "bg-blue-400",
-  2: "bg-yellow-400",
-  3: "bg-orange-400",
-  4: "bg-purple-400",
-  5: "bg-red-400",
+  1: "bg-yellow-400",
+  2: "bg-orange-400",
+  3: "bg-red-400",
+  4: "bg-red-300",
 };
 
 // cluster_id 기반 중복 추적 (row id가 매번 바뀌는 문제 방지)

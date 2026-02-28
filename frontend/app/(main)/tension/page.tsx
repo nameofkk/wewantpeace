@@ -25,7 +25,7 @@ interface ClusterSummary {
 interface TensionData {
   country_code: string;
   raw_score: number;
-  tension_level: 0 | 1 | 2 | 3 | 4 | 5;
+  tension_level: 0 | 1 | 2 | 3 | 4;
   tension_label: string;
   percentile_30d: number;
   event_score: number;
@@ -71,17 +71,16 @@ function useElapsed(isoString?: string, lang: Lang = "ko") {
   return `${Math.floor(elapsed / 3600)}시간 전`;
 }
 
-// 게이지 호 색상: raw_score 절대값 기준 (6단계)
+// 게이지 호 색상: raw_score 절대값 기준 (5단계)
 function scoreArcColor(score: number): string {
-  if (score >= 85) return "#ef4444";  // 위기
-  if (score >= 70) return "#a855f7";  // 심각
-  if (score >= 50) return "#f97316";  // 경계
-  if (score >= 30) return "#eab308";  // 주의
-  if (score >= 15) return "#3b82f6";  // 관심
+  if (score >= 80) return "#dc2626";  // 극심
+  if (score >= 60) return "#ef4444";  // 심각
+  if (score >= 40) return "#f97316";  // 경계
+  if (score >= 20) return "#eab308";  // 주의
   return "#22c55e";                   // 안정
 }
 
-function TensionGauge({ score, level, lang }: { score: number; level: 0 | 1 | 2 | 3 | 4 | 5; lang: Lang }) {
+function TensionGauge({ score, level, lang }: { score: number; level: 0 | 1 | 2 | 3 | 4; lang: Lang }) {
   const info = TENSION_LEVELS[level];
   const radius = 60;
   const circumference = Math.PI * radius;
@@ -293,13 +292,12 @@ function HistorySection({
   );
 }
 
-// ── raw_score 절대값 기준 레벨 (배지·테두리·배경 전용, 6단계) ─────────────────
-function scoreLevel(score: number): 0 | 1 | 2 | 3 | 4 | 5 {
-  if (score >= 85) return 5;
-  if (score >= 70) return 4;
-  if (score >= 50) return 3;
-  if (score >= 30) return 2;
-  if (score >= 15) return 1;
+// ── raw_score 절대값 기준 레벨 (배지·테두리·배경 전용, 5단계) ─────────────────
+function scoreLevel(score: number): 0 | 1 | 2 | 3 | 4 {
+  if (score >= 80) return 4;
+  if (score >= 60) return 3;
+  if (score >= 40) return 2;
+  if (score >= 20) return 1;
   return 0;
 }
 
@@ -313,11 +311,10 @@ function pctRankLabel(pct: number, lang: Lang): { text: string; color: string } 
 }
 
 function scoreBorderStyle(score: number): string {
-  if (score >= 85) return "border-red-500/60 shadow-red-950/40 shadow-lg";
-  if (score >= 70) return "border-purple-500/50 shadow-purple-950/30 shadow-md";
-  if (score >= 50) return "border-orange-500/50 shadow-orange-950/20 shadow-md";
-  if (score >= 30) return "border-yellow-500/30";
-  if (score >= 15) return "border-blue-500/20";
+  if (score >= 80) return "border-red-600/70 shadow-red-950/50 shadow-lg";
+  if (score >= 60) return "border-red-500/60 shadow-red-950/40 shadow-lg";
+  if (score >= 40) return "border-orange-500/50 shadow-orange-950/20 shadow-md";
+  if (score >= 20) return "border-yellow-500/30";
   return "border-border";
 }
 
@@ -332,8 +329,8 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
   const displayLevel = scoreLevel(data.raw_score);
   const info = TENSION_LEVELS[displayLevel];
   const label = getCountryName(data.country_code, lang);
-  const isCritical = displayLevel >= 4;
-  const isSpike = data.percentile_30d >= 75 && displayLevel < 4;
+  const isCritical = displayLevel >= 3;
+  const isSpike = data.percentile_30d >= 75 && displayLevel < 3;
 
   const locale = lang === "en" ? "en-US" : "ko-KR";
   const updatedTime = new Date(data.updated_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
@@ -343,16 +340,17 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
       className={cn(
         "relative card-enter rounded-xl border bg-card p-4 transition-all",
         scoreBorderStyle(data.raw_score),
-        displayLevel >= 4 && "alert-pulse-critical",
-        displayLevel === 3 && "alert-pulse-warning",
+        displayLevel >= 3 && "alert-pulse-critical",
+        displayLevel === 2 && "alert-pulse-warning",
       )}
       style={{ animationDelay: `${index * 100}ms` }}
     >
-      {/* 경각심 컬러 오버레이 */}
-      {data.raw_score >= 50 && (
+      {/* 경각심 컬러 오버레이 (5단계) */}
+      {data.raw_score >= 60 && (
         <div className={cn(
           "absolute inset-0 rounded-xl pointer-events-none",
-          data.raw_score >= 75 ? "bg-red-500/[0.09]" : "bg-orange-500/[0.07]"
+          data.raw_score >= 80 ? "bg-red-600/[0.09]" :
+          "bg-red-500/[0.07]"
         )} />
       )}
       <div className="flex items-center justify-between mb-3">
@@ -384,8 +382,8 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
         <span className={cn(
           "rounded-full px-3 py-1 text-xs font-bold border badge-pop",
           info.bg, info.color, info.border,
-          displayLevel >= 4 && "shadow-red-900/60 shadow-md",
-          displayLevel === 3 && "shadow-orange-900/40 shadow-sm",
+          displayLevel >= 3 && "shadow-red-900/60 shadow-md",
+          displayLevel === 2 && "shadow-orange-900/40 shadow-sm",
         )}>
           {getTensionLevelLabel(displayLevel, lang)}
         </span>
@@ -413,8 +411,10 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
-                  pct >= 75 ? "bg-amber-400" :
-                  pct >= 50 ? "bg-yellow-500" : "bg-green-500"
+                  pct >= 80 ? "bg-red-600" :
+                  pct >= 60 ? "bg-red-400" :
+                  pct >= 40 ? "bg-amber-400" :
+                  pct >= 20 ? "bg-yellow-500" : "bg-green-500"
                 )}
                 style={{ width: pctFilled ? `${pct}%` : "0%" }}
               />
@@ -468,7 +468,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 7.0 ? "text-red-400" : (c.kscore ?? 0) >= 5.0 ? "text-orange-400" : (c.kscore ?? 0) >= 3.0 ? "text-yellow-400" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 8 ? "text-red-200" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-yellow-300" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );
@@ -560,8 +560,9 @@ export default function TensionPage() {
     }
   }, [tensions, isLoading, refetch]);
 
-  const crisisCount = (tensions ?? []).filter((item) => item.raw_score >= 75).length;
-  const warningCount = (tensions ?? []).filter((item) => item.raw_score >= 50).length;
+  const crisisCount = (tensions ?? []).filter((item) => item.raw_score >= 80).length;
+  const severeCount = (tensions ?? []).filter((item) => item.raw_score >= 60).length;
+  const warningCount = (tensions ?? []).filter((item) => item.raw_score >= 40).length;
 
   const [lastFetchedAt, setLastFetchedAt] = useState(() => new Date().toISOString());
   useEffect(() => {
@@ -601,7 +602,13 @@ export default function TensionPage() {
                 {crisisCount}
               </span>
             )}
-            {crisisCount === 0 && warningCount > 0 && (
+            {crisisCount === 0 && severeCount > 0 && (
+              <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                {severeCount}
+              </span>
+            )}
+            {crisisCount === 0 && severeCount === 0 && warningCount > 0 && (
               <span className="flex items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-400">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {warningCount}

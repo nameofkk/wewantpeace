@@ -28,34 +28,31 @@ interface TrendingRow {
 }
 
 const KSCORE_COLORS = [
-  "bg-green-500/20 text-green-400 border-green-500/50",    // < 2.0
-  "bg-blue-500/20 text-blue-400 border-blue-500/50",       // 2.0 ~ 3.5
-  "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 3.5 ~ 5.0
-  "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 5.0 ~ 7.0
-  "bg-purple-500/20 text-purple-300 border-purple-400/80",   // 7.0 ~ 8.5
-  "bg-red-500/20 text-red-200 border-red-500/90",           // >= 8.5
+  "bg-green-500/20 text-green-400 border-green-500/50",    // < 2
+  "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 2 ~ 4
+  "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 4 ~ 6
+  "bg-red-500/20 text-red-400 border-red-500/80",           // 6 ~ 8
+  "bg-red-600/20 text-red-200 border-red-600/90",           // >= 8
 ];
 
 function kscoreColorIdx(k: number): number {
-  if (k >= 8.5) return 5;
-  if (k >= 7.0) return 4;
-  if (k >= 5.0) return 3;
-  if (k >= 3.5) return 2;
-  if (k >= 2.0) return 1;
+  if (k >= 8) return 4;
+  if (k >= 6) return 3;
+  if (k >= 4) return 2;
+  if (k >= 2) return 1;
   return 0;
 }
 
 function kscoreBarColor(k: number): string {
-  if (k >= 8.5) return "bg-red-500";
-  if (k >= 7.0) return "bg-purple-500";
-  if (k >= 5.0) return "bg-orange-500";
-  if (k >= 3.5) return "bg-yellow-500";
-  if (k >= 2.0) return "bg-blue-500";
+  if (k >= 8) return "bg-red-600";
+  if (k >= 6) return "bg-red-500";
+  if (k >= 4) return "bg-orange-500";
+  if (k >= 2) return "bg-yellow-500";
   return "bg-green-500";
 }
 
-const KSCORE_LABELS_KO = ["안정", "관심", "주의", "경계", "심각", "위기"];
-const KSCORE_LABELS_EN = ["Stable", "Interest", "Caution", "Alert", "Severe", "Crisis"];
+const KSCORE_LABELS_KO = ["안정", "주의", "경계", "심각", "극심"];
+const KSCORE_LABELS_EN = ["Stable", "Caution", "Alert", "Severe", "Extreme"];
 
 const TOPIC_COLORS: Record<string, string> = {
   military: "bg-red-500/20 text-red-300",
@@ -285,8 +282,9 @@ export default function AdminKScorePage() {
                     <tr key={row.id} className={cn(
                       "hover:bg-secondary/20",
                       row.is_expired && "opacity-50",
-                      row.kscore >= 7.0 && "bg-red-500/[0.06]",
-                      row.kscore >= 5.0 && row.kscore < 7.0 && "bg-orange-500/[0.03]",
+                      row.kscore >= 8 && "bg-red-600/[0.06]",
+                      row.kscore >= 6 && row.kscore < 8 && "bg-red-500/[0.04]",
+                      row.kscore >= 4 && row.kscore < 6 && "bg-orange-500/[0.03]",
                     )}>
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2.5 max-w-[260px]">
@@ -351,8 +349,8 @@ export default function AdminKScorePage() {
                 <div key={row.id} className={cn(
                   "rounded-xl border border-border bg-card p-4",
                   row.is_expired && "opacity-50",
-                  row.kscore >= 7.0 && "bg-red-500/[0.06]",
-                  row.kscore >= 5.0 && row.kscore < 7.0 && "bg-orange-500/[0.03]",
+                  row.kscore >= 6 && "bg-red-500/[0.06]",
+                  row.kscore >= 4 && row.kscore < 6 && "bg-orange-500/[0.03]",
                 )}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">

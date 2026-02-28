@@ -62,21 +62,19 @@ function roundKScore(kscore: number): number {
 
 function getKScoreColor(kscore: number): string {
   const k = roundKScore(kscore);
-  if (k >= 8.5) return "#ef4444";  // 위기 - red
-  if (k >= 7.0) return "#a855f7";  // 심각 - purple
-  if (k >= 5.0) return "#f97316";  // 경계 - orange
-  if (k >= 3.5) return "#eab308";  // 주의 - yellow
-  if (k >= 2.0) return "#3b82f6";  // 관심 - blue
-  return "#22c55e";                // 안정 - green
+  if (k >= 8) return "#dc2626";  // 극심 - dark red
+  if (k >= 6) return "#ef4444";  // 심각 - red
+  if (k >= 4) return "#f97316";  // 경계 - orange
+  if (k >= 2) return "#eab308";  // 주의 - yellow
+  return "#22c55e";              // 안정 - green
 }
 
 function getKScoreLabel(kscore: number, lang: Lang): string {
   const k = roundKScore(kscore);
-  if (k >= 8.5) return t(lang, "map_level_crisis");
-  if (k >= 7.0) return t(lang, "map_level_severe");
-  if (k >= 5.0) return t(lang, "map_level_alert");
-  if (k >= 3.5) return t(lang, "map_level_caution");
-  if (k >= 2.0) return t(lang, "map_level_interest");
+  if (k >= 8) return t(lang, "map_level_extreme");
+  if (k >= 6) return t(lang, "map_level_severe");
+  if (k >= 4) return t(lang, "map_level_alert");
+  if (k >= 2) return t(lang, "map_level_caution");
   return t(lang, "map_level_stable");
 }
 
@@ -472,11 +470,10 @@ export default function MapPage() {
 
   const LEGEND = [
     [t(lang, "map_level_stable"), "#22c55e"],
-    [t(lang, "map_level_interest"), "#3b82f6"],
     [t(lang, "map_level_caution"), "#eab308"],
     [t(lang, "map_level_alert"), "#f97316"],
-    [t(lang, "map_level_severe"), "#a855f7"],
-    [t(lang, "map_level_crisis"), "#ef4444"],
+    [t(lang, "map_level_severe"), "#ef4444"],
+    [t(lang, "map_level_extreme"), "#dc2626"],
   ] as const;
 
   return (

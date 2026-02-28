@@ -30,17 +30,19 @@ interface ClusterOut {
 }
 
 function getSeverityColor(severity: number): string {
-  if (severity >= 75) return "#ef4444";
-  if (severity >= 50) return "#f97316";
-  if (severity >= 25) return "#eab308";
-  return "#22c55e";
+  if (severity >= 80) return "#dc2626";   // 극심 - dark red
+  if (severity >= 60) return "#ef4444";   // 심각 - red
+  if (severity >= 40) return "#f97316";   // 경계 - orange
+  if (severity >= 20) return "#eab308";   // 주의 - yellow
+  return "#22c55e";                        // 안정 - green
 }
 
 const TENSION_BG: Record<number, string> = {
   0: "bg-green-500/20 text-green-400",
   1: "bg-yellow-500/30 text-yellow-300",
   2: "bg-orange-500/40 text-orange-300",
-  3: "bg-red-500/50 text-red-200",
+  3: "bg-red-500/40 text-red-400",
+  4: "bg-red-600/50 text-red-200",
 };
 
 export default function CountryIssuesPage() {
@@ -99,7 +101,7 @@ export default function CountryIssuesPage() {
 
         {clusters?.map((cluster) => {
           const color = getSeverityColor(cluster.severity);
-          const level = (cluster.severity >= 85 ? 5 : cluster.severity >= 70 ? 4 : cluster.severity >= 50 ? 3 : cluster.severity >= 30 ? 2 : cluster.severity >= 15 ? 1 : 0) as 0 | 1 | 2 | 3 | 4 | 5;
+          const level = (cluster.severity >= 80 ? 4 : cluster.severity >= 60 ? 3 : cluster.severity >= 40 ? 2 : cluster.severity >= 20 ? 1 : 0) as 0 | 1 | 2 | 3 | 4;
           const levelLabel = getTensionLevelLabel(level, lang);
           const topicKey = `topic_${cluster.topic}` as Parameters<typeof t>[1];
           const clusterTitle = lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title);

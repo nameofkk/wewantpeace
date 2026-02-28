@@ -25,7 +25,7 @@ export const translations = {
     // 긴장도 기본
     tension_title: "긴장도 지수",
     tension_subtitle: "국가별 긴장도를 점수와 일별 추이로 한눈에 파악하세요",
-    tension_crisis: "위기",
+    tension_crisis: "극심",
     tension_warning: "경계",
     tension_updated: "갱신",
     tension_refresh_interval: "15분마다 갱신",
@@ -33,11 +33,10 @@ export const translations = {
 
     // 긴장도 레벨 (TENSION_LEVELS 대체)
     tension_level_0: "안정",
-    tension_level_1: "관심",
-    tension_level_2: "주의",
-    tension_level_3: "경계",
-    tension_level_4: "심각",
-    tension_level_5: "위기",
+    tension_level_1: "주의",
+    tension_level_2: "경계",
+    tension_level_3: "심각",
+    tension_level_4: "극심",
 
     // 커뮤니티
     community_title: "커뮤니티",
@@ -171,7 +170,7 @@ export const translations = {
     signal_severity_tooltip: "이슈 위험도 (0~100). 무력충돌·사망자·쿠데타 등 위협 요소 기반.",
     signal_spread: "확산도",
     signal_spread_tooltip: "독립 출처(언론사·기관) 수. 많을수록 여러 곳에서 동시 보도된 이슈.",
-    signal_kscore_tooltip: "트렌딩 종합 점수 (0~10).\n\n• 속도(25%): 이벤트 보도 건수\n• 심각도(40%): 위험 수준\n• 신뢰도(15%): 출처 품질\n• 확산도(20%): 독립 출처 수\n\n8.5↑ 위기 / 7~8.5 심각 / 5~7 경계 / 3.5~5 주의 / 2~3.5 관심 / 2↓ 안정",
+    signal_kscore_tooltip: "트렌딩 종합 점수 (0~10).\n\n• 속도(25%): 이벤트 보도 건수\n• 심각도(40%): 위험 수준\n• 신뢰도(15%): 출처 품질\n• 확산도(20%): 독립 출처 수\n\n8↑ 극심 / 6~8 심각 / 4~6 경계 / 2~4 주의 / 2↓ 안정",
     signal_new_tooltip: "2시간 이내에 처음 보고된 이슈입니다. 초기 보고라 아직 확인이 덜 됐을 수 있습니다.",
     signal_sources: "{n}개 출처",
     signal_count: "{n}건",
@@ -195,7 +194,7 @@ export const translations = {
     tension_percentile_high: "높음",
     tension_spike_label: "📈 급등",
     tension_spike_tooltip: "오늘 긴장점수가 최근 30일 중 상위 {pct}%에 해당합니다. 평소엔 평온한 나라지만 현재 이례적인 수준으로 상승 중입니다.",
-    tension_crisis_badge: "위기",
+    tension_crisis_badge: "극심",
     tension_updated_at: "{time} 갱신",
     tension_cause_issues: "주요 원인 이슈 ({n}개)",
     tension_history_7d: "7일",
@@ -342,12 +341,11 @@ export const translations = {
     map_spike: "스파이크 {n}",
     map_updated: "갱신",
     map_level_stable: "안정",
-    map_level_interest: "관심",
     map_level_caution: "주의",
     map_level_alert: "경계",
     map_level_severe: "심각",
-    map_level_crisis: "위기",
-    map_kscore_legend: "KScore: 위기 8.5↑ / 심각 7~8.5 / 경계 5~7 / 주의 3.5~5 / 관심 2~3.5 / 안정 2↓",
+    map_level_extreme: "극심",
+    map_kscore_legend: "KScore: 극심 8↑ / 심각 6~8 / 경계 4~6 / 주의 2~4 / 안정 2↓",
     map_popup_spike: "스파이크",
     map_popup_verified: "✓ 검증",
     map_popup_grouped: "총 {n}개 이슈",
@@ -762,7 +760,7 @@ export const translations = {
     // tension
     tension_title: "Tension Index",
     tension_subtitle: "Monitor country-level tension scores and daily trends",
-    tension_crisis: "Crisis",
+    tension_crisis: "Extreme",
     tension_warning: "Warning",
     tension_updated: "updated",
     tension_refresh_interval: "Refreshes every 15 min",
@@ -770,11 +768,10 @@ export const translations = {
 
     // tension level labels
     tension_level_0: "Stable",
-    tension_level_1: "Interest",
-    tension_level_2: "Caution",
-    tension_level_3: "Alert",
-    tension_level_4: "Severe",
-    tension_level_5: "Crisis",
+    tension_level_1: "Caution",
+    tension_level_2: "Alert",
+    tension_level_3: "Severe",
+    tension_level_4: "Extreme",
 
     // community
     community_title: "Community",
@@ -908,7 +905,7 @@ export const translations = {
     signal_severity_tooltip: "Risk level (0–100). Based on armed conflict, casualties, coups, etc.",
     signal_spread: "Spread",
     signal_spread_tooltip: "Number of independent sources (outlets/agencies). Higher = wider coverage.",
-    signal_kscore_tooltip: "Trending composite score (0–10).\n\n• Speed (25%): event report count\n• Severity (40%): risk level\n• Credibility (15%): source quality\n• Spread (20%): independent sources\n\n8.5+ crisis / 7–8.5 severe / 5–7 alert / 3.5–5 caution / 2–3.5 interest / <2 stable",
+    signal_kscore_tooltip: "Trending composite score (0–10).\n\n• Speed (25%): event report count\n• Severity (40%): risk level\n• Credibility (15%): source quality\n• Spread (20%): independent sources\n\n8+ extreme / 6–8 severe / 4–6 alert / 2–4 caution / <2 stable",
     signal_new_tooltip: "First reported within the last 2 hours. May not yet be fully verified.",
     signal_sources: "{n} sources",
     signal_count: "{n} reports",
@@ -946,7 +943,7 @@ export const translations = {
     tension_percentile_high: "High",
     tension_spike_label: "📈 Spike",
     tension_spike_tooltip: "Today's tension ranks in the top {pct}% of the past 30 days. Normally calm but currently at an unusual level.",
-    tension_crisis_badge: "Crisis",
+    tension_crisis_badge: "Extreme",
     tension_updated_at: "Updated {time}",
     tension_cause_issues: "Top Causes ({n})",
     tension_history_7d: "7d",
@@ -1079,12 +1076,11 @@ export const translations = {
     map_spike: "Spike {n}",
     map_updated: "updated",
     map_level_stable: "Stable",
-    map_level_interest: "Interest",
     map_level_caution: "Caution",
     map_level_alert: "Alert",
     map_level_severe: "Severe",
-    map_level_crisis: "Crisis",
-    map_kscore_legend: "KScore: Crisis 8.5+ / Severe 7–8.5 / Alert 5–7 / Caution 3.5–5 / Interest 2–3.5 / Stable <2",
+    map_level_extreme: "Extreme",
+    map_kscore_legend: "KScore: Extreme 8+ / Severe 6–8 / Alert 4–6 / Caution 2–4 / Stable <2",
     map_popup_spike: "Spike",
     map_popup_verified: "✓ Verified",
     map_popup_grouped: "{n} issues total",
@@ -1491,8 +1487,8 @@ export function t(lang: Lang, key: TranslationKey, vars?: Record<string, string 
   return str;
 }
 
-/** TENSION_LEVELS 레벨 라벨 번역 헬퍼 (6단계) */
-export function getTensionLevelLabel(level: 0 | 1 | 2 | 3 | 4 | 5, lang: Lang): string {
-  const keys = ["tension_level_0", "tension_level_1", "tension_level_2", "tension_level_3", "tension_level_4", "tension_level_5"] as const;
+/** TENSION_LEVELS 레벨 라벨 번역 헬퍼 (5단계) */
+export function getTensionLevelLabel(level: 0 | 1 | 2 | 3 | 4, lang: Lang): string {
+  const keys = ["tension_level_0", "tension_level_1", "tension_level_2", "tension_level_3", "tension_level_4"] as const;
   return t(lang, keys[level] ?? "tension_level_0");
 }

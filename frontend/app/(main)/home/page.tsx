@@ -33,37 +33,43 @@ function roundKScore(kscore: number): number {
   return Math.round(kscore * 100) / 100;
 }
 
-// KScore에 따른 카드 좌측 강조선 색 (0-10 스케일)
+// KScore에 따른 카드 좌측 강조선 색 (0-10 스케일, 5단계)
 function kscoreAccent(kscore?: number): string {
   if (!kscore) return "border-l-border";
   const k = roundKScore(kscore);
-  if (k >= 7.0) return "border-l-red-500";
-  if (k >= 5.0) return "border-l-orange-500";
-  if (k >= 3.0) return "border-l-yellow-500";
+  if (k >= 8) return "border-l-red-600";
+  if (k >= 6) return "border-l-red-500";
+  if (k >= 4) return "border-l-orange-500";
+  if (k >= 2) return "border-l-yellow-500";
   return "border-l-green-600";
 }
 
-// KScore 상태 뱃지 — 색상 + 라벨 (0-10 스케일)
+// KScore 상태 뱃지 — 색상 + 라벨 (0-10 스케일, 5단계)
 function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg: string; text: string; glow: string } {
   const k = roundKScore(kscore);
-  if (k >= 7.0) return {
-    label: lang === "ko" ? "위기" : "Crisis",
+  if (k >= 8) return {
+    label: lang === "ko" ? "극심" : "Extreme",
+    bg: "bg-red-600/15", text: "text-red-200",
+    glow: "shadow-red-600/20 shadow-lg",
+  };
+  if (k >= 6) return {
+    label: lang === "ko" ? "심각" : "Severe",
     bg: "bg-red-500/15", text: "text-red-400",
     glow: "shadow-red-500/20 shadow-lg",
   };
-  if (k >= 5.0) return {
+  if (k >= 4) return {
     label: lang === "ko" ? "경계" : "Alert",
-    bg: "bg-orange-500/15", text: "text-orange-400",
+    bg: "bg-orange-500/15", text: "text-orange-300",
     glow: "shadow-orange-500/15 shadow-md",
   };
-  if (k >= 3.0) return {
-    label: lang === "ko" ? "주의" : "Watch",
-    bg: "bg-yellow-500/10", text: "text-yellow-400",
+  if (k >= 2) return {
+    label: lang === "ko" ? "주의" : "Caution",
+    bg: "bg-yellow-500/10", text: "text-yellow-300",
     glow: "",
   };
   return {
-    label: lang === "ko" ? "정상" : "Normal",
-    bg: "bg-green-500/10", text: "text-green-500",
+    label: lang === "ko" ? "안정" : "Stable",
+    bg: "bg-green-500/10", text: "text-green-400",
     glow: "",
   };
 }
@@ -158,11 +164,10 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
       value: (item.severity ?? 0) / 100,
       display: String(item.severity ?? 0),
       color:
-        (item.severity ?? 0) >= 85 ? "bg-red-500" :
-        (item.severity ?? 0) >= 70 ? "bg-purple-500" :
-        (item.severity ?? 0) >= 50 ? "bg-orange-500" :
-        (item.severity ?? 0) >= 30 ? "bg-yellow-500" :
-        (item.severity ?? 0) >= 15 ? "bg-blue-500" :
+        (item.severity ?? 0) >= 80 ? "bg-red-600" :
+        (item.severity ?? 0) >= 60 ? "bg-red-500" :
+        (item.severity ?? 0) >= 40 ? "bg-orange-500" :
+        (item.severity ?? 0) >= 20 ? "bg-yellow-500" :
         "bg-green-600",
       tooltip: t(lang, "signal_severity_tooltip"),
     },
@@ -306,8 +311,8 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const [showHistory, setShowHistory] = useState(false);
   const topic = item.topic ?? "unknown";
   const k = roundKScore(item.kscore);
-  const isCritical = k >= 7.0;
-  const isAlert = k >= 5.0;
+  const isCritical = k >= 6;
+  const isAlert = k >= 4;
   const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선

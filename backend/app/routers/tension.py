@@ -20,7 +20,7 @@ from backend.app.models.issue_cluster import IssueCluster
 
 router = APIRouter(prefix="/tension", tags=["tension"])
 
-TENSION_LABELS = {0: "안정", 1: "관심", 2: "주의", 3: "경계", 4: "심각", 5: "위기"}
+TENSION_LABELS = {0: "안정", 1: "주의", 2: "경계", 3: "심각", 4: "극심"}
 
 
 # ── Pydantic 스키마 ───────────────────────────────────────────────────────────
