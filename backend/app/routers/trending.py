@@ -371,7 +371,7 @@ async def kscore_history(
     """
     클러스터 KScore 시계열 히스토리.
     Free: 최대 7일 / Pro: 30일 / Pro+: 90일
-    7일 이하: 시간별, 8일 이상: 일별 집계 반환 (최대 200포인트)
+    7일 이하: 원본 데이터 (5분 간격), 8~30일: 시간별, 31일+: 일별 집계
     """
     import uuid as uuid_mod
     from sqlalchemy import text as sa_text
@@ -388,20 +388,32 @@ async def kscore_history(
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # 조회 기간에 따라 집계 단위 결정 (7일 이하: 시간별, 이상: 일별)
-    trunc = "hour" if days <= 7 else "day"
-
-    result = await db.execute(
-        sa_text(f"""
-            SELECT DISTINCT ON (DATE_TRUNC('{trunc}', calculated_at))
-                calculated_at, kscore
-            FROM trending_keywords
-            WHERE cluster_ids @> ARRAY[CAST(:cid AS uuid)]
-              AND calculated_at >= :cutoff
-            ORDER BY DATE_TRUNC('{trunc}', calculated_at), calculated_at ASC
-            LIMIT 200
-        """).bindparams(cid=str(cid), cutoff=cutoff)
-    )
+    if days <= 7:
+        # 7일 이하: 원본 데이터 전체 반환 (5분 간격, ~2000포인트 이내)
+        result = await db.execute(
+            sa_text("""
+                SELECT calculated_at, kscore
+                FROM trending_keywords
+                WHERE cluster_ids @> ARRAY[CAST(:cid AS uuid)]
+                  AND calculated_at >= :cutoff
+                ORDER BY calculated_at ASC
+                LIMIT 2500
+            """).bindparams(cid=str(cid), cutoff=cutoff)
+        )
+    else:
+        # 8일 이상: 시간별(~30일) 또는 일별(31일+) 집계
+        trunc = "hour" if days <= 30 else "day"
+        result = await db.execute(
+            sa_text(f"""
+                SELECT DISTINCT ON (DATE_TRUNC('{trunc}', calculated_at))
+                    calculated_at, kscore
+                FROM trending_keywords
+                WHERE cluster_ids @> ARRAY[CAST(:cid AS uuid)]
+                  AND calculated_at >= :cutoff
+                ORDER BY DATE_TRUNC('{trunc}', calculated_at), calculated_at ASC
+                LIMIT 800
+            """).bindparams(cid=str(cid), cutoff=cutoff)
+        )
     rows = result.fetchall()
 
     return [
