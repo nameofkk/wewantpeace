@@ -130,14 +130,19 @@ def _make_cluster_title_ko(
 def _cluster_key(event: "NormalizedEvent") -> str:
     """
     클러스터 키 생성 전략 (우선순위):
-    1. geohash 4자리 있으면 → {geohash4}:{topic}  (지역별 격리 — 미국 동부 폭풍 vs 서부 총기 등 혼입 방지)
-    2. country_code 있으면 → {country_code}:{topic} (geo 없는 경우 국가 단위)
-    3. 없으면 → 0000:{topic}                        (최후 버킷, 크기 제한 적용)
-
-    ※ country_code 우선 → geohash 방식은 미국·중국·러시아 같은 대국에서
-      전혀 다른 지역의 동일 토픽 이벤트가 같은 클러스터에 뭉치는 문제를 초래함.
-      geohash4(~39km²) 기준으로 묶으면 지리적으로 관련된 이벤트만 클러스터링됨.
+    0. 고심각도(>=50) conflict/terror/coup → {country_code}:{topic}
+       (속보: 이란 공습 등 전국적 사건은 도시별로 쪼개면 안 됨)
+    1. geohash 4자리 있으면 → {geohash4}:{topic}  (지역별 격리)
+    2. country_code 있으면 → {country_code}:{topic}
+    3. 없으면 → 0000:{topic}
     """
+    # 고심각도 군사/테러/쿠데타 이벤트는 국가 단위로 클러스터링
+    # 전국적 사건(공습, 침공 등)이 도시별로 분산되는 것을 방지
+    if (event.severity >= 50
+        and event.topic in ("conflict", "terror", "coup")
+        and event.country_code):
+        return f"{event.country_code}:{event.topic}"
+
     geo4 = (event.geohash5 or "")[:4]
     if geo4:
         return f"{geo4}:{event.topic}"
@@ -190,6 +195,10 @@ async def assign_cluster(
             cluster = None
 
         # (2) 제목 단어 겹침이 너무 낮으면 → 다른 이슈로 판단, 새 클러스터
+        #     단, 고심각도 이벤트(양쪽 모두 >=50)는 같은 키(국가+토픽) 내에서
+        #     영어/한국어 제목 간 겹침이 0%일 수 있으므로 검사 생략
+        elif event.severity >= 50 and cluster.severity >= 50:
+            pass  # 고심각도 속보 — 같은 국가+토픽이면 병합
         elif _title_overlap(event.title, cluster.title) < MIN_TITLE_OVERLAP:
             cluster = None
 

@@ -147,12 +147,21 @@ SEVERITY_UP: list[tuple[str, int]] = [
     ("killed", 10), ("dead", 10), ("casualties", 8), ("deaths", 10),
     ("wounded", 6), ("injured", 5), ("massacre", 15), ("genocide", 20),
     # 무기/공격
-    ("airstrike", 8), ("missile strike", 10), ("explosion", 7), ("bomb", 6),
+    ("airstrike", 8), ("air strike", 8), ("missile strike", 10), ("explosion", 7),
+    ("bomb", 6), ("bombing", 8), ("bombardment", 10),
     ("rocket", 6), ("artillery", 7), ("drone strike", 8), ("shelling", 7),
     ("chemical weapon", 18), ("biological weapon", 18), ("nuclear", 20),
+    # 대규모 군사 작전 (침공/전쟁 선포 급)
+    ("invasion", 15), ("invading", 15), ("invade", 15),
+    ("full-scale", 10), ("all-out", 10), ("total war", 15),
+    ("declaration of war", 15), ("declared war", 15), ("act of war", 12),
+    ("joint attack", 10), ("joint strike", 10), ("joint operation", 8),
+    ("ground offensive", 12), ("ground invasion", 15),
+    ("preemptive strike", 12), ("retaliatory strike", 10),
     # 인프라
     ("power grid", 8), ("hospital", 6), ("school", 5), ("market", 4),
-    ("dam", 8), ("nuclear plant", 15), ("water supply", 7),
+    ("dam", 8), ("nuclear plant", 15), ("nuclear facility", 15),
+    ("water supply", 7),
     # 규모/범위
     ("massive", 6), ("large-scale", 6), ("widespread", 5), ("unprecedented", 8),
     ("catastrophic", 10), ("devastating", 8), ("major offensive", 10),
