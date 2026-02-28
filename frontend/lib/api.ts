@@ -324,6 +324,7 @@ export function usePatchCluster() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["trending"] });
+      qc.invalidateQueries({ queryKey: ["tension"] });
     },
   });
 }
