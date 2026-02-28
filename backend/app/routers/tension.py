@@ -316,12 +316,12 @@ async def tension_mine(
         row.country_code: row for row in raw_result.scalars().all()
     }
 
-    # ── 데이터 없으면 요청 국가만 온더플라이 계산 (경량 fallback) ──
+    # ── 데이터 없는 국가는 소수(≤5개)일 때만 온더플라이 계산 ──
     missing_codes = [c for c in codes if c not in tension_map]
-    if missing_codes:
+    if 0 < len(missing_codes) <= 5:
         import logging
         _logger = logging.getLogger(__name__)
-        _logger.info("tension fallback: %d개국 온더플라이 계산 시작", len(missing_codes))
+        _logger.info("tension fallback: %d개국 온더플라이 계산", len(missing_codes))
         from backend.app.core.database import AsyncSessionLocal
         try:
             async with AsyncSessionLocal() as calc_db:
@@ -331,7 +331,6 @@ async def tension_mine(
                         result = await calculate_country_tension(mc, calc_db)
                         if result:
                             _logger.info("tension fallback 완료: %s", mc)
-            # fallback 계산 후 다시 조회
             raw_result2 = await db.execute(
                 select(TensionIndex)
                 .where(TensionIndex.country_code.in_(missing_codes))
