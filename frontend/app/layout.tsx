@@ -73,7 +73,7 @@ export default function RootLayout({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "#0f1729",
+            background: "hsl(var(--background))",
           }}
         >
           {/* 레이더 파동 + 로고 */}
@@ -101,7 +101,7 @@ export default function RootLayout({
               fontSize: 20,
               fontWeight: 900,
               letterSpacing: "-0.025em",
-              color: "hsl(210 40% 98%)",
+              color: "hsl(var(--foreground))",
             }}
           >
             WeWantPeace

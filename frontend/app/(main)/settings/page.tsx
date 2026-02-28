@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2 } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT } from "@/lib/store";
+import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
 import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
@@ -110,7 +110,7 @@ function CountryPickerPanel({
 export default function SettingsPage() {
   const router = useRouter();
   const { user: firebaseUser, loading: authLoading } = useAuth();
-  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan } = useAppStore();
+  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme } = useAppStore();
   const { data: me } = useMe();
 
   // 서버 plan → store 동기화 (Pro/Pro+ 관심국가 제한 반영)
@@ -687,6 +687,30 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* ── 테마 설정 ─────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_theme")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card p-1 flex gap-1">
+            {(["dark", "light"] as const).map((th) => (
+              <button
+                key={th}
+                onClick={() => useAppStore.getState().setTheme(th)}
+                className={cn(
+                  "flex-1 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
+                  theme === th
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {th === "dark" ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+                {th === "dark" ? t(lang, "settings_theme_dark") : t(lang, "settings_theme_light")}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* ── 알림 설정 ─────────────────────────────────────────────── */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
@@ -1030,6 +1054,36 @@ export default function SettingsPage() {
                 {t(lang, "store_manage_apple")}
               </a>
             )}
+          </div>
+        </section>
+
+        {/* ── 고객센터 ──────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            {t(lang, "settings_support")}
+          </h2>
+          <div className="rounded-xl border border-border bg-card divide-y divide-border">
+            <a
+              href="mailto:wewantpeace.app@gmail.com"
+              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
+            >
+              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <p>{t(lang, "settings_support_email")}</p>
+                <p className="text-[11px] text-muted-foreground">wewantpeace.app@gmail.com</p>
+              </div>
+              <span className="text-muted-foreground text-xs">→</span>
+            </a>
+            <a
+              href="https://forms.gle/placeholder"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
+            >
+              <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="flex-1">{t(lang, "settings_support_feedback")}</span>
+              <span className="text-muted-foreground text-xs">→</span>
+            </a>
           </div>
         </section>
 

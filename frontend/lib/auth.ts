@@ -9,6 +9,7 @@ import {
   signInWithCustomToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   signOut as firebaseSignOut,
   onIdTokenChanged,
   User as FirebaseUser,
@@ -119,6 +120,13 @@ export async function signInWithToss(): Promise<{
 
   const result = await signInWithCustomToken(auth, firebase_custom_token);
   return { user: result.user, isNewUser: is_new_user };
+}
+
+// 비밀번호 재설정 이메일 발송
+export async function sendPasswordResetEmail(email: string): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (!auth) throw new Error("Firebase가 설정되지 않았습니다.");
+  await firebaseSendPasswordResetEmail(auth, email);
 }
 
 // 로그아웃

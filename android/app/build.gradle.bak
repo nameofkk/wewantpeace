@@ -32,7 +32,7 @@ def twaManifest = [
     navigationColorDark: '#0D0D1A', // The color used for the dark navbar.
     navigationDividerColor: '#0F1729', // The navbar divider color.
     navigationDividerColorDark: '#0D0D1A', // The dark navbar divider color.
-    backgroundColor: '#1A1A2E', // The color used for the splash screen background.
+    backgroundColor: '#0F1729', // The color used for the splash screen background.
     enableNotifications: true, // Set to true to enable notification delegation.
     // Every shortcut must include the following fields:
     // - name: String that will show up in the shortcut.
@@ -51,22 +51,14 @@ def twaManifest = [
 ]
 
 android {
-    signingConfigs {
-        release {
-            storeFile file('../wewantpeace-release.keystore')
-            storePassword '111111'
-            keyAlias 'wewantpeace'
-            keyPassword '111111'
-        }
-    }
     compileSdkVersion 36
     namespace "com.wewantpeace.app"
     defaultConfig {
         applicationId "com.wewantpeace.app"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 6
-        versionName "6"
+        versionCode 3
+        versionName "3"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -160,7 +152,6 @@ android {
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
             minifyEnabled true
         }
     }

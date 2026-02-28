@@ -20,6 +20,28 @@
     --input: 217 32% 17%;
     --ring: 210 40% 98%;
     --radius: 0.75rem;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+  }
+
+  html.light {
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 222 47% 11%;
+    --border: 220 13% 87%;
+    --input: 220 14% 94%;
+    --ring: 221 83% 53%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
   }
 }
 
@@ -39,15 +61,15 @@
 }
 
 .mapboxgl-popup-content {
-  background: hsl(222 47% 14%) !important;
-  color: hsl(210 40% 98%) !important;
-  border: 1px solid hsl(217 32% 20%) !important;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
   border-radius: 0.75rem !important;
   padding: 0 !important;
 }
 
 .mapboxgl-popup-tip {
-  border-top-color: hsl(217 32% 20%) !important;
+  border-top-color: hsl(var(--border)) !important;
 }
 
 /* 하단 탭바 */
@@ -108,7 +130,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 2880s linear infinite;
+  animation: ticker-scroll 8000s linear infinite;
 }
 .ticker-track:hover {
   animation-play-state: paused;

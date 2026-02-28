@@ -11,6 +11,7 @@ import {
   signInWithEmail,
   signInWithToss,
   createEmailUser,
+  sendPasswordResetEmail,
   getFirebaseAuth,
 } from "@/lib/auth";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
@@ -48,6 +49,19 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const [showFindEmail, setShowFindEmail] = useState(false);
+  const [findNickname, setFindNickname] = useState("");
+  const [findBirthYear, setFindBirthYear] = useState("");
+  const [findResult, setFindResult] = useState<string | null>(null);
+  const [findLoading, setFindLoading] = useState(false);
+  const [findError, setFindError] = useState<string | null>(null);
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
 
@@ -249,6 +263,47 @@ export default function LoginPage() {
       setError(err.message || (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleFindEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setFindError(null);
+    setFindResult(null);
+    setFindLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/auth/find-email?nickname=${encodeURIComponent(findNickname)}&birth_year=${findBirthYear}`
+      );
+      const data = await res.json();
+      if (data.found) {
+        setFindResult(data.email);
+      } else {
+        setFindError(t(lang, "login_find_email_not_found"));
+      }
+    } catch {
+      setFindError(lang === "en" ? "Request failed. Try again." : "요청에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setFindLoading(false);
+    }
+  }
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setResetError(null);
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(resetEmail);
+      setResetSent(true);
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      if (error.code === "auth/user-not-found") {
+        setResetError(lang === "en" ? "No account found with this email." : "해당 이메일로 등록된 계정이 없습니다.");
+      } else {
+        setResetError(lang === "en" ? "Failed to send reset email. Try again." : "재설정 이메일 전송에 실패했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -473,12 +528,139 @@ export default function LoginPage() {
                 {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            <div className="flex justify-between">
+              <button
+                type="button"
+                onClick={() => { setShowFindEmail(true); setFindNickname(""); setFindBirthYear(""); setFindResult(null); setFindError(null); }}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                {t(lang, "login_find_email")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowResetPw(true); setResetEmail(loginEmail); setResetSent(false); setResetError(null); }}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                {t(lang, "login_forgot_password")}
+              </button>
+            </div>
             <button type="submit" disabled={loading}
               className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {t(lang, "login_submit")}
             </button>
           </form>
+
+          {/* 비밀번호 재설정 모달 */}
+          {showResetPw && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setShowResetPw(false)}>
+              <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                <p className="text-sm font-semibold">{t(lang, "login_reset_title")}</p>
+                {resetSent ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{t(lang, "login_reset_sent")}</p>
+                    <button
+                      onClick={() => setShowResetPw(false)}
+                      className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground"
+                    >
+                      {t(lang, "login_reset_close")}
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handlePasswordReset} className="space-y-3">
+                    <p className="text-xs text-muted-foreground">{t(lang, "login_reset_desc")}</p>
+                    {resetError && <p className="text-xs text-destructive">{resetError}</p>}
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder={t(lang, "login_email_placeholder")}
+                      required
+                      autoFocus
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={resetLoading}
+                        className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        {resetLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {t(lang, "login_reset_submit")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPw(false)}
+                        className="flex-1 rounded-lg border border-border py-2.5 text-sm text-muted-foreground"
+                      >
+                        {t(lang, "login_reset_cancel")}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 아이디(이메일) 찾기 모달 */}
+          {showFindEmail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setShowFindEmail(false)}>
+              <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+                <p className="text-sm font-semibold">{t(lang, "login_find_email_title")}</p>
+                {findResult ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground">{t(lang, "login_find_email_result")}</p>
+                    <p className="text-sm font-mono bg-secondary rounded-lg px-4 py-3">{findResult}</p>
+                    <button
+                      onClick={() => setShowFindEmail(false)}
+                      className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground"
+                    >
+                      {t(lang, "login_reset_close")}
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleFindEmail} className="space-y-3">
+                    <p className="text-xs text-muted-foreground">{t(lang, "login_find_email_desc")}</p>
+                    {findError && <p className="text-xs text-destructive">{findError}</p>}
+                    <input
+                      type="text"
+                      value={findNickname}
+                      onChange={(e) => setFindNickname(e.target.value)}
+                      placeholder={t(lang, "login_nickname_placeholder")}
+                      required
+                      autoFocus
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                    />
+                    <input
+                      type="number"
+                      value={findBirthYear}
+                      onChange={(e) => setFindBirthYear(e.target.value)}
+                      placeholder={t(lang, "login_birth_year_placeholder")}
+                      required
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={findLoading}
+                        className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        {findLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {t(lang, "login_find_email_submit")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowFindEmail(false)}
+                        className="flex-1 rounded-lg border border-border py-2.5 text-sm text-muted-foreground"
+                      >
+                        {t(lang, "login_reset_cancel")}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ) : tab === "google-register" ? (
         <form onSubmit={handleGoogleRegister} className="space-y-3">

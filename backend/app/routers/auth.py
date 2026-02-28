@@ -4,6 +4,7 @@
 POST /auth/register      — Firebase 가입 후 서버 등록 (닉네임, 약관 동의)
 POST /auth/toss-login    — 토스 앱인토스 로그인 (authorizationCode → Firebase Custom Token)
 GET  /auth/check-nickname — 닉네임 중복 확인
+GET  /auth/find-email     — 닉네임+생년도로 이메일 찾기
 PATCH /auth/profile       — 프로필 수정
 DELETE /auth/account      — 회원 탈퇴
 """
@@ -322,6 +323,22 @@ async def check_nickname(nickname: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.nickname == nickname.strip()))
     exists = result.scalar_one_or_none() is not None
     return {"available": not exists, "nickname": nickname.strip()}
+
+
+@router.get("/find-email")
+async def find_email(nickname: str, birth_year: int, db: AsyncSession = Depends(get_db)):
+    """닉네임+생년도로 이메일 찾기."""
+    result = await db.execute(
+        select(User).where(User.nickname == nickname.strip(), User.birth_year == birth_year)
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.email:
+        return {"found": False, "email": None}
+    email = user.email
+    # 이메일 마스킹: abc@gmail.com → a**@gmail.com
+    local, domain = email.split("@", 1)
+    masked = local[0] + "*" * (len(local) - 1) + "@" + domain
+    return {"found": True, "email": masked}
 
 
 @router.patch("/profile", response_model=UserOut)

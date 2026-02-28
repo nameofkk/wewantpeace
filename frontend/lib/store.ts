@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Lang } from "./i18n";
 
+export type Theme = "dark" | "light";
+
 interface Viewport {
   longitude: number;
   latitude: number;
@@ -35,6 +37,9 @@ interface AppStore {
   // 언어
   lang: Lang;
 
+  // 테마
+  theme: Theme;
+
   // 액션
   setMapViewport: (v: Partial<Viewport>) => void;
   setSelectedCluster: (id: string | null) => void;
@@ -44,6 +49,7 @@ interface AppStore {
   addMyCountry: (code: string, plan?: string) => boolean; // false = 제한 초과
   removeMyCountry: (code: string) => void;
   setLang: (lang: Lang) => void;
+  setTheme: (theme: Theme) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -64,6 +70,7 @@ export const useAppStore = create<AppStore>()(
       trendingTab: "global",
       myCountries: [],
       lang: "ko",
+      theme: "dark",
 
       setMapViewport: (v) =>
         set((state) => ({ mapViewport: { ...state.mapViewport, ...v } })),
@@ -87,10 +94,17 @@ export const useAppStore = create<AppStore>()(
       removeMyCountry: (code) =>
         set((state) => ({ myCountries: state.myCountries.filter((c) => c !== code) })),
       setLang: (lang) => set({ lang }),
+      setTheme: (theme) => {
+        set({ theme });
+        if (typeof document !== "undefined") {
+          document.documentElement.classList.toggle("dark", theme === "dark");
+          document.documentElement.classList.toggle("light", theme === "light");
+        }
+      },
     }),
     {
       name: "wwp-store",
-      version: 3, // v1→v2: 기본 8개국 → 빈 배열로 마이그레이션
+      version: 4, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme
       migrate: (old: unknown, version: number) => {
         const s = old as Record<string, unknown>;
         if (version < 2) {
@@ -99,6 +113,9 @@ export const useAppStore = create<AppStore>()(
         if (version < 3) {
           return { ...s, lang: "ko" };
         }
+        if (version < 4) {
+          return { ...s, theme: "dark" };
+        }
         return s;
       },
       partialize: (state) => ({
@@ -106,6 +123,7 @@ export const useAppStore = create<AppStore>()(
         trendingTab: state.trendingTab,
         userPlan: state.userPlan,
         lang: state.lang,
+        theme: state.theme,
       }),
     }
   )
