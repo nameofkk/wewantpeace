@@ -29,7 +29,7 @@ interface TrendingRow {
 
 const KSCORE_COLORS = [
   "bg-green-500/20 text-green-400 border-green-500/50",    // < 2
-  "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 2 ~ 4
+  "bg-amber-500/20 text-amber-300 border-amber-400/60",     // 2 ~ 4
   "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 4 ~ 6
   "bg-red-500/20 text-red-400 border-red-500/80",           // 6 ~ 8
   "bg-red-900/25 text-red-100 border-red-800/90",             // >= 8
@@ -47,7 +47,7 @@ function kscoreBarColor(k: number): string {
   if (k >= 8) return "bg-red-900";
   if (k >= 6) return "bg-red-500";
   if (k >= 4) return "bg-orange-500";
-  if (k >= 2) return "bg-yellow-500";
+  if (k >= 2) return "bg-amber-500";
   return "bg-green-500";
 }
 

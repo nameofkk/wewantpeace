@@ -215,7 +215,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                           event.severity >= 80 ? "bg-red-900/25 text-red-100" :
                           event.severity >= 60 ? "bg-red-500/20 text-red-400" :
                           event.severity >= 40 ? "bg-orange-500/20 text-orange-300" :
-                          event.severity >= 20 ? "bg-yellow-500/20 text-yellow-300" :
+                          event.severity >= 20 ? "bg-amber-500/20 text-amber-300" :
                           "bg-green-600/20 text-green-400"
                         )}>
                           {t(lang, "issue_severity_badge", { n: event.severity })}

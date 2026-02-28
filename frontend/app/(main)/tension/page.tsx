@@ -314,7 +314,7 @@ function scoreBorderStyle(score: number): string {
   if (score >= 80) return "border-red-800/70 shadow-red-950/50 shadow-lg";
   if (score >= 60) return "border-red-500/60 shadow-red-950/40 shadow-lg";
   if (score >= 40) return "border-orange-500/50 shadow-orange-950/20 shadow-md";
-  if (score >= 20) return "border-yellow-500/30";
+  if (score >= 20) return "border-amber-500/30";
   return "border-border";
 }
 
@@ -415,9 +415,9 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
                   pct >= 80 ? "bg-red-900" :
-                  pct >= 60 ? "bg-red-400" :
-                  pct >= 40 ? "bg-amber-400" :
-                  pct >= 20 ? "bg-yellow-500" : "bg-green-500"
+                  pct >= 60 ? "bg-red-500" :
+                  pct >= 40 ? "bg-orange-500" :
+                  pct >= 20 ? "bg-amber-500" : "bg-emerald-500"
                 )}
                 style={{ width: pctFilled ? `${pct}%` : "0%" }}
               />
@@ -471,7 +471,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 8 ? "text-red-100" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-yellow-300" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 8 ? "text-red-100" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-300" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );

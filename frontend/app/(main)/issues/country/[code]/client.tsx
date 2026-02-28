@@ -33,13 +33,13 @@ function getSeverityColor(severity: number): string {
   if (severity >= 80) return "#991b1b";   // 극심 - dark maroon
   if (severity >= 60) return "#ef4444";   // 심각 - red
   if (severity >= 40) return "#f97316";   // 경계 - orange
-  if (severity >= 20) return "#eab308";   // 주의 - yellow
+  if (severity >= 20) return "#f59e0b";   // 주의 - amber
   return "#22c55e";                        // 안정 - green
 }
 
 const TENSION_BG: Record<number, string> = {
   0: "bg-green-500/20 text-green-400",
-  1: "bg-yellow-500/30 text-yellow-300",
+  1: "bg-amber-500/30 text-amber-300",
   2: "bg-orange-500/40 text-orange-300",
   3: "bg-red-500/40 text-red-400",
   4: "bg-red-900/50 text-red-100",
