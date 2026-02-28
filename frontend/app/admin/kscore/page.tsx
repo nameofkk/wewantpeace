@@ -32,7 +32,7 @@ const KSCORE_COLORS = [
   "bg-blue-500/20 text-blue-400 border-blue-500/50",       // 2.0 ~ 3.5
   "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 3.5 ~ 5.0
   "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 5.0 ~ 7.0
-  "bg-rose-500/20 text-rose-300 border-rose-400/80",        // 7.0 ~ 8.5
+  "bg-purple-500/20 text-purple-300 border-purple-400/80",   // 7.0 ~ 8.5
   "bg-red-500/20 text-red-200 border-red-500/90",           // >= 8.5
 ];
 
@@ -47,7 +47,7 @@ function kscoreColorIdx(k: number): number {
 
 function kscoreBarColor(k: number): string {
   if (k >= 8.5) return "bg-red-500";
-  if (k >= 7.0) return "bg-rose-500";
+  if (k >= 7.0) return "bg-purple-500";
   if (k >= 5.0) return "bg-orange-500";
   if (k >= 3.5) return "bg-yellow-500";
   if (k >= 2.0) return "bg-blue-500";

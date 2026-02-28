@@ -74,7 +74,7 @@ const TENSION_ACCENT: Record<number, string> = {
   1: "bg-blue-500",
   2: "bg-yellow-500",
   3: "bg-orange-500",
-  4: "bg-rose-500",
+  4: "bg-purple-500",
   5: "bg-red-500",
 };
 
@@ -83,7 +83,7 @@ const TENSION_DOT: Record<number, string> = {
   1: "bg-blue-400",
   2: "bg-yellow-400",
   3: "bg-orange-400",
-  4: "bg-rose-400",
+  4: "bg-purple-400",
   5: "bg-red-400",
 };
 

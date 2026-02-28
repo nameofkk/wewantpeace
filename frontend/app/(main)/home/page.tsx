@@ -159,7 +159,7 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
       display: String(item.severity ?? 0),
       color:
         (item.severity ?? 0) >= 85 ? "bg-red-500" :
-        (item.severity ?? 0) >= 70 ? "bg-rose-500" :
+        (item.severity ?? 0) >= 70 ? "bg-purple-500" :
         (item.severity ?? 0) >= 50 ? "bg-orange-500" :
         (item.severity ?? 0) >= 30 ? "bg-yellow-500" :
         (item.severity ?? 0) >= 15 ? "bg-blue-500" :

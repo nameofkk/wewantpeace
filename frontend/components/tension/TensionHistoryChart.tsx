@@ -18,7 +18,7 @@ const LEVEL_COLORS: Record<number, string> = {
   1: "#3b82f6", // 관심 - blue
   2: "#eab308", // 주의 - yellow
   3: "#f97316", // 경계 - orange
-  4: "#f43f5e", // 심각 - rose
+  4: "#a855f7", // 심각 - purple
   5: "#ef4444", // 위기 - red
 };
 
@@ -101,7 +101,7 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
           <ReferenceLine y={15} stroke="#3b82f6" strokeDasharray="4 4" strokeOpacity={0.3} />
           <ReferenceLine y={30} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={50} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
-          <ReferenceLine y={70} stroke="#f43f5e" strokeDasharray="4 4" strokeOpacity={0.4} />
+          <ReferenceLine y={70} stroke="#a855f7" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={85} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
 
           <XAxis

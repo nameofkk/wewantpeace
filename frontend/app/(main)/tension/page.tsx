@@ -74,7 +74,7 @@ function useElapsed(isoString?: string, lang: Lang = "ko") {
 // 게이지 호 색상: raw_score 절대값 기준 (6단계)
 function scoreArcColor(score: number): string {
   if (score >= 85) return "#ef4444";  // 위기
-  if (score >= 70) return "#f43f5e";  // 심각
+  if (score >= 70) return "#a855f7";  // 심각
   if (score >= 50) return "#f97316";  // 경계
   if (score >= 30) return "#eab308";  // 주의
   if (score >= 15) return "#3b82f6";  // 관심
@@ -314,7 +314,7 @@ function pctRankLabel(pct: number, lang: Lang): { text: string; color: string } 
 
 function scoreBorderStyle(score: number): string {
   if (score >= 85) return "border-red-500/60 shadow-red-950/40 shadow-lg";
-  if (score >= 70) return "border-rose-500/50 shadow-rose-950/30 shadow-md";
+  if (score >= 70) return "border-purple-500/50 shadow-purple-950/30 shadow-md";
   if (score >= 50) return "border-orange-500/50 shadow-orange-950/20 shadow-md";
   if (score >= 30) return "border-yellow-500/30";
   if (score >= 15) return "border-blue-500/20";

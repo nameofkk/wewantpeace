@@ -10,7 +10,7 @@ const KSCORE_MAX = 10.0;  // 바 100% 기준값
 
 function kscoreColor(k: number): string {
   if (k >= 8.5) return "from-red-500 to-red-400";
-  if (k >= 7.0) return "from-rose-500 to-rose-400";
+  if (k >= 7.0) return "from-purple-500 to-purple-400";
   if (k >= 5.0) return "from-orange-500 to-orange-400";
   if (k >= 3.5) return "from-yellow-500 to-yellow-400";
   if (k >= 2.0) return "from-blue-500 to-blue-400";

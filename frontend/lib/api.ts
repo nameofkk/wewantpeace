@@ -134,7 +134,7 @@ export function getTensionLevelColor(level: number): string {
     1: "#3b82f6",
     2: "#eab308",
     3: "#f97316",
-    4: "#f43f5e",
+    4: "#a855f7",
     5: "#ef4444",
   };
   return colors[level] ?? "#6b7280";
