@@ -627,6 +627,24 @@ async def update_cluster(
         changes["title"] = body.title
 
     await db.flush()
+
+    # 제목 변경 시 trending_keywords 행도 동기화 + Redis 캐시 무효화
+    if "title" in changes or "title_ko" in changes:
+        await db.execute(
+            text("""
+                UPDATE trending_keywords
+                SET keyword = :title, keyword_ko = :title_ko
+                WHERE :cid = ANY(cluster_ids)
+            """),
+            {"title": cluster.title, "title_ko": cluster.title_ko, "cid": uuid.UUID(cluster_id)},
+        )
+        await db.flush()
+        try:
+            redis = get_redis()
+            await redis.delete("trending:global:v1")
+        except Exception:
+            pass
+
     await _log_action(db, admin, "update_cluster", "cluster", cluster_id, changes)
     return {"status": "ok"}
 
