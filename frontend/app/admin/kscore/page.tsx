@@ -32,7 +32,7 @@ const KSCORE_COLORS = [
   "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",  // 2 ~ 4
   "bg-orange-500/20 text-orange-300 border-orange-400/80",  // 4 ~ 6
   "bg-red-500/20 text-red-400 border-red-500/80",           // 6 ~ 8
-  "bg-red-600/20 text-red-200 border-red-600/90",           // >= 8
+  "bg-rose-700/20 text-rose-300 border-rose-600/90",         // >= 8
 ];
 
 function kscoreColorIdx(k: number): number {
@@ -44,7 +44,7 @@ function kscoreColorIdx(k: number): number {
 }
 
 function kscoreBarColor(k: number): string {
-  if (k >= 8) return "bg-red-600";
+  if (k >= 8) return "bg-rose-700";
   if (k >= 6) return "bg-red-500";
   if (k >= 4) return "bg-orange-500";
   if (k >= 2) return "bg-yellow-500";
@@ -282,7 +282,7 @@ export default function AdminKScorePage() {
                     <tr key={row.id} className={cn(
                       "hover:bg-secondary/20",
                       row.is_expired && "opacity-50",
-                      row.kscore >= 8 && "bg-red-600/[0.06]",
+                      row.kscore >= 8 && "bg-rose-700/[0.06]",
                       row.kscore >= 6 && row.kscore < 8 && "bg-red-500/[0.04]",
                       row.kscore >= 4 && row.kscore < 6 && "bg-orange-500/[0.03]",
                     )}>
@@ -349,7 +349,8 @@ export default function AdminKScorePage() {
                 <div key={row.id} className={cn(
                   "rounded-xl border border-border bg-card p-4",
                   row.is_expired && "opacity-50",
-                  row.kscore >= 6 && "bg-red-500/[0.06]",
+                  row.kscore >= 8 && "bg-rose-700/[0.06]",
+                  row.kscore >= 6 && row.kscore < 8 && "bg-red-500/[0.04]",
                   row.kscore >= 4 && row.kscore < 6 && "bg-orange-500/[0.03]",
                 )}>
                   <div className="flex items-center justify-between mb-2">

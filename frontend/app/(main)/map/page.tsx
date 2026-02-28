@@ -62,7 +62,7 @@ function roundKScore(kscore: number): number {
 
 function getKScoreColor(kscore: number): string {
   const k = roundKScore(kscore);
-  if (k >= 8) return "#dc2626";  // 극심 - dark red
+  if (k >= 8) return "#be123c";  // 극심 - crimson
   if (k >= 6) return "#ef4444";  // 심각 - red
   if (k >= 4) return "#f97316";  // 경계 - orange
   if (k >= 2) return "#eab308";  // 주의 - yellow
@@ -473,7 +473,7 @@ export default function MapPage() {
     [t(lang, "map_level_caution"), "#eab308"],
     [t(lang, "map_level_alert"), "#f97316"],
     [t(lang, "map_level_severe"), "#ef4444"],
-    [t(lang, "map_level_extreme"), "#dc2626"],
+    [t(lang, "map_level_extreme"), "#be123c"],
   ] as const;
 
   return (

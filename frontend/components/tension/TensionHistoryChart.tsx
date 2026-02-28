@@ -18,7 +18,7 @@ const LEVEL_COLORS: Record<number, string> = {
   1: "#eab308", // 주의 - yellow
   2: "#f97316", // 경계 - orange
   3: "#ef4444", // 심각 - red
-  4: "#dc2626", // 극심 - dark red
+  4: "#be123c", // 극심 - crimson
 };
 
 interface HistoryPoint {
@@ -100,7 +100,7 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
           <ReferenceLine y={20} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.3} />
           <ReferenceLine y={40} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
-          <ReferenceLine y={80} stroke="#dc2626" strokeDasharray="4 4" strokeOpacity={0.4} />
+          <ReferenceLine y={80} stroke="#be123c" strokeDasharray="4 4" strokeOpacity={0.4} />
 
           <XAxis
             dataKey="time"

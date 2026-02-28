@@ -10,7 +10,7 @@ export const TENSION_LEVELS = {
   1: { label: "주의", color: "text-yellow-300", bg: "bg-yellow-500/30", border: "border-yellow-400/60" },
   2: { label: "경계", color: "text-orange-300", bg: "bg-orange-500/40", border: "border-orange-400/80" },
   3: { label: "심각", color: "text-red-400",    bg: "bg-red-500/40",    border: "border-red-500/80" },
-  4: { label: "극심", color: "text-red-200",    bg: "bg-red-600/50",    border: "border-red-600/90" },
+  4: { label: "극심", color: "text-rose-300",    bg: "bg-rose-700/50",    border: "border-rose-600/90" },
 } as const;
 
 export const SOURCE_TIERS = {

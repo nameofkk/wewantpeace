@@ -37,7 +37,7 @@ function roundKScore(kscore: number): number {
 function kscoreAccent(kscore?: number): string {
   if (!kscore) return "border-l-border";
   const k = roundKScore(kscore);
-  if (k >= 8) return "border-l-red-600";
+  if (k >= 8) return "border-l-rose-700";
   if (k >= 6) return "border-l-red-500";
   if (k >= 4) return "border-l-orange-500";
   if (k >= 2) return "border-l-yellow-500";
@@ -49,8 +49,8 @@ function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg:
   const k = roundKScore(kscore);
   if (k >= 8) return {
     label: lang === "ko" ? "극심" : "Extreme",
-    bg: "bg-red-600/15", text: "text-red-200",
-    glow: "shadow-red-600/20 shadow-lg",
+    bg: "bg-rose-700/15", text: "text-rose-300",
+    glow: "shadow-rose-700/20 shadow-lg",
   };
   if (k >= 6) return {
     label: lang === "ko" ? "심각" : "Severe",
@@ -164,7 +164,7 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
       value: (item.severity ?? 0) / 100,
       display: String(item.severity ?? 0),
       color:
-        (item.severity ?? 0) >= 80 ? "bg-red-600" :
+        (item.severity ?? 0) >= 80 ? "bg-rose-700" :
         (item.severity ?? 0) >= 60 ? "bg-red-500" :
         (item.severity ?? 0) >= 40 ? "bg-orange-500" :
         (item.severity ?? 0) >= 20 ? "bg-yellow-500" :

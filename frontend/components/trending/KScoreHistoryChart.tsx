@@ -14,7 +14,7 @@ import { type Lang } from "@/lib/i18n";
 
 // KScore 구간별 색상 (0-10 스케일, 5단계)
 function kscoreColor(kscore: number): string {
-  if (kscore >= 8) return "#dc2626"; // 다크레드 (극심)
+  if (kscore >= 8) return "#be123c"; // 크림슨 (극심)
   if (kscore >= 6) return "#ef4444"; // 빨강 (심각)
   if (kscore >= 4) return "#f97316"; // 주황 (경계)
   if (kscore >= 2) return "#eab308"; // 노랑 (주의)
@@ -93,7 +93,7 @@ export function KScoreHistoryChart({ data, range, lang }: KScoreHistoryChartProp
             <ReferenceLine y={2} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.3} />
             <ReferenceLine y={4} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
             <ReferenceLine y={6} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
-            <ReferenceLine y={8} stroke="#dc2626" strokeDasharray="4 4" strokeOpacity={0.4} />
+            <ReferenceLine y={8} stroke="#be123c" strokeDasharray="4 4" strokeOpacity={0.4} />
 
             <XAxis
               dataKey="time"
@@ -131,7 +131,7 @@ export function KScoreHistoryChart({ data, range, lang }: KScoreHistoryChartProp
           { label: lang === "ko" ? "주의" : "Caution",    color: "#eab308", range: "2~4" },
           { label: lang === "ko" ? "경계" : "Alert",      color: "#f97316", range: "4~6" },
           { label: lang === "ko" ? "심각" : "Severe",     color: "#ef4444", range: "6~8" },
-          { label: lang === "ko" ? "극심" : "Extreme",    color: "#dc2626", range: "8+" },
+          { label: lang === "ko" ? "극심" : "Extreme",    color: "#be123c", range: "8+" },
         ].map(({ label, color, range: r }) => (
           <span key={r} className="flex items-center gap-1 text-[9px] text-muted-foreground">
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />
