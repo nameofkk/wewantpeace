@@ -56,8 +56,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className="dark">
+    <html lang="ko" className="dark" suppressHydrationWarning>
       <head>
+        {/* 테마 깜빡임 방지: localStorage에서 저장된 테마를 즉시 적용 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            var s = JSON.parse(localStorage.getItem('wwp-store') || '{}');
+            var t = (s.state && s.state.theme) || 'dark';
+            document.documentElement.className = t;
+          } catch(e) {}
+        ` }} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
