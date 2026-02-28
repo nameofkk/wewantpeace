@@ -148,7 +148,7 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
   const bars = [
     {
       label: t(lang, "signal_speed"),
-      value: Math.min(1.0, (eventCount / 10) * (hasSpike ? 1.5 : 1.0)),
+      value: Math.min(1.0, (eventCount / 5) * (hasSpike ? 1.5 : 1.0)),
       display: hasSpike ? t(lang, "signal_count_spike", { n: eventCount }) : t(lang, "signal_count", { n: eventCount }),
       color: "bg-blue-500",
       tooltip: t(lang, "signal_speed_tooltip"),
