@@ -14,11 +14,11 @@ import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
 
 // 긴장도 레벨별 색상 (5단계)
 const LEVEL_COLORS: Record<number, string> = {
-  0: "#22c55e", // 안정 - green
-  1: "#eab308", // 주의 - yellow
+  0: "#10b981", // 안정 - emerald
+  1: "#f59e0b", // 주의 - amber
   2: "#f97316", // 경계 - orange
   3: "#ef4444", // 심각 - red
-  4: "#be123c", // 극심 - crimson
+  4: "#991b1b", // 극심 - dark maroon
 };
 
 interface HistoryPoint {
@@ -97,10 +97,10 @@ export function TensionHistoryChart({ data, range, lang }: TensionHistoryChartPr
           <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
 
           {/* 단계 경계선 (5단계) */}
-          <ReferenceLine y={20} stroke="#eab308" strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={20} stroke="#f59e0b" strokeDasharray="4 4" strokeOpacity={0.3} />
           <ReferenceLine y={40} stroke="#f97316" strokeDasharray="4 4" strokeOpacity={0.4} />
           <ReferenceLine y={60} stroke="#ef4444" strokeDasharray="4 4" strokeOpacity={0.4} />
-          <ReferenceLine y={80} stroke="#be123c" strokeDasharray="4 4" strokeOpacity={0.4} />
+          <ReferenceLine y={80} stroke="#991b1b" strokeDasharray="4 4" strokeOpacity={0.5} />
 
           <XAxis
             dataKey="time"

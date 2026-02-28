@@ -73,11 +73,11 @@ function useElapsed(isoString?: string, lang: Lang = "ko") {
 
 // 게이지 호 색상: raw_score 절대값 기준 (5단계)
 function scoreArcColor(score: number): string {
-  if (score >= 80) return "#be123c";  // 극심
+  if (score >= 80) return "#991b1b";  // 극심
   if (score >= 60) return "#ef4444";  // 심각
   if (score >= 40) return "#f97316";  // 경계
-  if (score >= 20) return "#eab308";  // 주의
-  return "#22c55e";                   // 안정
+  if (score >= 20) return "#f59e0b";  // 주의
+  return "#10b981";                   // 안정
 }
 
 function TensionGauge({ score, level, lang }: { score: number; level: 0 | 1 | 2 | 3 | 4; lang: Lang }) {
@@ -311,7 +311,7 @@ function pctRankLabel(pct: number, lang: Lang): { text: string; color: string } 
 }
 
 function scoreBorderStyle(score: number): string {
-  if (score >= 80) return "border-rose-600/70 shadow-rose-950/50 shadow-lg";
+  if (score >= 80) return "border-red-800/70 shadow-red-950/50 shadow-lg";
   if (score >= 60) return "border-red-500/60 shadow-red-950/40 shadow-lg";
   if (score >= 40) return "border-orange-500/50 shadow-orange-950/20 shadow-md";
   if (score >= 20) return "border-yellow-500/30";
@@ -349,7 +349,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
       {data.raw_score >= 60 && (
         <div className={cn(
           "absolute inset-0 rounded-xl pointer-events-none",
-          data.raw_score >= 80 ? "bg-rose-700/[0.09]" :
+          data.raw_score >= 80 ? "bg-red-900/[0.12]" :
           "bg-red-500/[0.07]"
         )} />
       )}
@@ -411,7 +411,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
-                  pct >= 80 ? "bg-rose-700" :
+                  pct >= 80 ? "bg-red-900" :
                   pct >= 60 ? "bg-red-400" :
                   pct >= 40 ? "bg-amber-400" :
                   pct >= 20 ? "bg-yellow-500" : "bg-green-500"
@@ -468,7 +468,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 8 ? "text-rose-300" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-yellow-300" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 8 ? "text-red-100" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-yellow-300" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );

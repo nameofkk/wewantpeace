@@ -62,11 +62,11 @@ function roundKScore(kscore: number): number {
 
 function getKScoreColor(kscore: number): string {
   const k = roundKScore(kscore);
-  if (k >= 8) return "#be123c";  // 극심 - crimson
+  if (k >= 8) return "#991b1b";  // 극심 - dark maroon
   if (k >= 6) return "#ef4444";  // 심각 - red
   if (k >= 4) return "#f97316";  // 경계 - orange
-  if (k >= 2) return "#eab308";  // 주의 - yellow
-  return "#22c55e";              // 안정 - green
+  if (k >= 2) return "#f59e0b";  // 주의 - amber
+  return "#10b981";              // 안정 - emerald
 }
 
 function getKScoreLabel(kscore: number, lang: Lang): string {
@@ -469,11 +469,11 @@ export default function MapPage() {
   const spikeCount = clusters.filter((c) => c.is_spike).length;
 
   const LEGEND = [
-    [t(lang, "map_level_stable"), "#22c55e"],
-    [t(lang, "map_level_caution"), "#eab308"],
+    [t(lang, "map_level_stable"), "#10b981"],
+    [t(lang, "map_level_caution"), "#f59e0b"],
     [t(lang, "map_level_alert"), "#f97316"],
     [t(lang, "map_level_severe"), "#ef4444"],
-    [t(lang, "map_level_extreme"), "#be123c"],
+    [t(lang, "map_level_extreme"), "#991b1b"],
   ] as const;
 
   return (

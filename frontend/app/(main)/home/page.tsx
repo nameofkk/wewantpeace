@@ -37,11 +37,11 @@ function roundKScore(kscore: number): number {
 function kscoreAccent(kscore?: number): string {
   if (!kscore) return "border-l-border";
   const k = roundKScore(kscore);
-  if (k >= 8) return "border-l-rose-700";
+  if (k >= 8) return "border-l-red-900";
   if (k >= 6) return "border-l-red-500";
   if (k >= 4) return "border-l-orange-500";
-  if (k >= 2) return "border-l-yellow-500";
-  return "border-l-green-600";
+  if (k >= 2) return "border-l-amber-500";
+  return "border-l-emerald-500";
 }
 
 // KScore 상태 뱃지 — 색상 + 라벨 (0-10 스케일, 5단계)
@@ -49,8 +49,8 @@ function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg:
   const k = roundKScore(kscore);
   if (k >= 8) return {
     label: lang === "ko" ? "극심" : "Extreme",
-    bg: "bg-rose-700/15", text: "text-rose-300",
-    glow: "shadow-rose-700/20 shadow-lg",
+    bg: "bg-red-900/20", text: "text-red-100",
+    glow: "shadow-red-900/30 shadow-lg",
   };
   if (k >= 6) return {
     label: lang === "ko" ? "심각" : "Severe",
@@ -64,12 +64,12 @@ function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg:
   };
   if (k >= 2) return {
     label: lang === "ko" ? "주의" : "Caution",
-    bg: "bg-yellow-500/10", text: "text-yellow-300",
+    bg: "bg-amber-500/10", text: "text-amber-300",
     glow: "",
   };
   return {
     label: lang === "ko" ? "안정" : "Stable",
-    bg: "bg-green-500/10", text: "text-green-400",
+    bg: "bg-emerald-500/10", text: "text-emerald-400",
     glow: "",
   };
 }
@@ -164,11 +164,11 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
       value: (item.severity ?? 0) / 100,
       display: String(item.severity ?? 0),
       color:
-        (item.severity ?? 0) >= 80 ? "bg-rose-700" :
+        (item.severity ?? 0) >= 80 ? "bg-red-900" :
         (item.severity ?? 0) >= 60 ? "bg-red-500" :
         (item.severity ?? 0) >= 40 ? "bg-orange-500" :
-        (item.severity ?? 0) >= 20 ? "bg-yellow-500" :
-        "bg-green-600",
+        (item.severity ?? 0) >= 20 ? "bg-amber-500" :
+        "bg-emerald-500",
       tooltip: t(lang, "signal_severity_tooltip"),
     },
     {

@@ -212,7 +212,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                         <span className="text-[10px] text-muted-foreground/60">·</span>
                         <span className={cn(
                           "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-                          event.severity >= 80 ? "bg-rose-700/20 text-rose-300" :
+                          event.severity >= 80 ? "bg-red-900/25 text-red-100" :
                           event.severity >= 60 ? "bg-red-500/20 text-red-400" :
                           event.severity >= 40 ? "bg-orange-500/20 text-orange-300" :
                           event.severity >= 20 ? "bg-yellow-500/20 text-yellow-300" :

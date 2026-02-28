@@ -70,18 +70,18 @@ const TENSION_LEVEL_LABELS: Record<number, string> = {
 
 const TENSION_ACCENT: Record<number, string> = {
   0: "bg-emerald-500",
-  1: "bg-yellow-500",
+  1: "bg-amber-500",
   2: "bg-orange-500",
   3: "bg-red-500",
-  4: "bg-rose-700",
+  4: "bg-red-900",
 };
 
 const TENSION_DOT: Record<number, string> = {
   0: "bg-emerald-400",
-  1: "bg-yellow-400",
+  1: "bg-amber-400",
   2: "bg-orange-400",
   3: "bg-red-400",
-  4: "bg-rose-400",
+  4: "bg-red-300",
 };
 
 // cluster_id 기반 중복 추적 (row id가 매번 바뀌는 문제 방지)

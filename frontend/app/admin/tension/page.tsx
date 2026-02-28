@@ -29,7 +29,7 @@ const LEVEL_COLORS = [
   "bg-yellow-500/20 text-yellow-300 border-yellow-400/60",
   "bg-orange-500/20 text-orange-300 border-orange-400/80",
   "bg-red-500/20 text-red-400 border-red-500/80",
-  "bg-rose-700/20 text-rose-300 border-rose-600/90",
+  "bg-red-900/25 text-red-100 border-red-800/90",
 ];
 
 const ROW_BG = [
@@ -37,7 +37,7 @@ const ROW_BG = [
   "",
   "bg-orange-500/[0.03]",
   "bg-red-500/[0.04]",
-  "bg-rose-700/[0.06]",
+  "bg-red-900/[0.08]",
 ];
 
 export default function AdminTensionPage() {
@@ -253,7 +253,7 @@ export default function AdminTensionPage() {
                           <div
                             className={cn(
                               "h-full rounded-full",
-                              row.percentile_30d >= 80 ? "bg-rose-700" : row.percentile_30d >= 60 ? "bg-red-400" : row.percentile_30d >= 40 ? "bg-amber-400" : row.percentile_30d >= 20 ? "bg-yellow-500" : "bg-green-500"
+                              row.percentile_30d >= 80 ? "bg-red-900" : row.percentile_30d >= 60 ? "bg-red-400" : row.percentile_30d >= 40 ? "bg-amber-400" : row.percentile_30d >= 20 ? "bg-yellow-500" : "bg-green-500"
                             )}
                             style={{ width: `${row.percentile_30d}%` }}
                           />
@@ -295,7 +295,7 @@ export default function AdminTensionPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-                    <div className={cn("h-full rounded-full", row.percentile_30d >= 80 ? "bg-rose-700" : row.percentile_30d >= 60 ? "bg-red-400" : row.percentile_30d >= 40 ? "bg-amber-400" : row.percentile_30d >= 20 ? "bg-yellow-500" : "bg-green-500")} style={{ width: `${row.percentile_30d}%` }} />
+                    <div className={cn("h-full rounded-full", row.percentile_30d >= 80 ? "bg-red-900" : row.percentile_30d >= 60 ? "bg-red-400" : row.percentile_30d >= 40 ? "bg-amber-400" : row.percentile_30d >= 20 ? "bg-yellow-500" : "bg-green-500")} style={{ width: `${row.percentile_30d}%` }} />
                   </div>
                   <span className="text-[10px] text-muted-foreground tabular-nums">{row.percentile_30d.toFixed(0)}%</span>
                 </div>

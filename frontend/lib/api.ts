@@ -130,11 +130,11 @@ export function useTensionHistory(countryCode: string, range: "7d" | "30d" | "90
 
 export function getTensionLevelColor(level: number): string {
   const colors: Record<number, string> = {
-    0: "#22c55e",
-    1: "#eab308",
+    0: "#10b981",
+    1: "#f59e0b",
     2: "#f97316",
     3: "#ef4444",
-    4: "#be123c",
+    4: "#991b1b",
   };
   return colors[level] ?? "#6b7280";
 }

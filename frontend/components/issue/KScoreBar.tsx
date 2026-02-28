@@ -9,11 +9,11 @@ interface KScoreBarProps {
 const KSCORE_MAX = 10.0;  // 바 100% 기준값
 
 function kscoreColor(k: number): string {
-  if (k >= 8) return "from-rose-700 to-rose-600";
+  if (k >= 8) return "from-red-900 to-red-800";
   if (k >= 6) return "from-red-500 to-red-400";
   if (k >= 4) return "from-orange-500 to-orange-400";
-  if (k >= 2) return "from-yellow-500 to-yellow-400";
-  return "from-green-500 to-green-400";
+  if (k >= 2) return "from-amber-500 to-amber-400";
+  return "from-emerald-500 to-emerald-400";
 }
 
 function kscoreLabel(k: number, rounded: number): string {

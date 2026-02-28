@@ -30,7 +30,7 @@ interface ClusterOut {
 }
 
 function getSeverityColor(severity: number): string {
-  if (severity >= 80) return "#be123c";   // 극심 - crimson
+  if (severity >= 80) return "#991b1b";   // 극심 - dark maroon
   if (severity >= 60) return "#ef4444";   // 심각 - red
   if (severity >= 40) return "#f97316";   // 경계 - orange
   if (severity >= 20) return "#eab308";   // 주의 - yellow
@@ -42,7 +42,7 @@ const TENSION_BG: Record<number, string> = {
   1: "bg-yellow-500/30 text-yellow-300",
   2: "bg-orange-500/40 text-orange-300",
   3: "bg-red-500/40 text-red-400",
-  4: "bg-rose-700/50 text-rose-300",
+  4: "bg-red-900/50 text-red-100",
 };
 
 export default function CountryIssuesPage() {
