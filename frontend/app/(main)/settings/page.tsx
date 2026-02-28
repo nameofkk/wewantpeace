@@ -1064,20 +1064,18 @@ export default function SettingsPage() {
           </h2>
           <div className="rounded-xl border border-border bg-card divide-y divide-border">
             <a
-              href="mailto:wewantpeace.app@gmail.com"
+              href="mailto:krshin7@naver.com"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
             >
               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1">
                 <p>{t(lang, "settings_support_email")}</p>
-                <p className="text-[11px] text-muted-foreground">wewantpeace.app@gmail.com</p>
+                <p className="text-[11px] text-muted-foreground">krshin7@naver.com</p>
               </div>
               <span className="text-muted-foreground text-xs">→</span>
             </a>
             <a
-              href="https://forms.gle/placeholder"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:krshin7@naver.com?subject=WeWantPeace%20의견"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
             >
               <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
