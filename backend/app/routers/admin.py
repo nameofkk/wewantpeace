@@ -250,6 +250,17 @@ async def update_user(
     if body.plan is not None:
         user.plan = body.plan
         changes["plan"] = body.plan
+        # 어드민이 free로 변경 시 활성 구독도 취소 (웹훅이 플랜 복원하는 버그 방지)
+        if body.plan == "free":
+            active_subs = await db.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user.id,
+                    Subscription.status == "active",
+                )
+            )
+            for sub in active_subs.scalars().all():
+                sub.status = "cancelled"
+                changes.setdefault("cancelled_subscriptions", []).append(str(sub.id))
     if body.status is not None:
         user.status = body.status
         changes["status"] = body.status
