@@ -700,6 +700,15 @@ def expire_subscriptions(self):
 
                 downgraded = 0
                 for user in users:
+                    # 구독 레코드가 아예 없으면 어드민이 수동 부여한 플랜 → 건드리지 않음
+                    any_sub_result = await db.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == user.id,
+                        ).limit(1)
+                    )
+                    if any_sub_result.scalar_one_or_none() is None:
+                        continue
+
                     # 아직 유효한(expires_at > now) 활성 구독이 있는지 확인
                     sub_result = await db.execute(
                         select(Subscription).where(
