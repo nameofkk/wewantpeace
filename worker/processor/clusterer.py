@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
 from worker.processor.trending_engine import _calc_kscore
+from worker.processor.ai_title import generate_ai_title
 
 logger = logging.getLogger(__name__)
 
@@ -228,16 +229,30 @@ async def assign_cluster(
             cluster.source_tiers = existing
         # 제목 승격: 현재 제목이 쓰레기이고 새 이벤트 제목이 더 나으면 교체
         if _is_junk_title(cluster.title) and not _is_junk_title(event.title):
-            cluster.title = event.title
-            cluster.title_ko = _make_cluster_title_ko(
-                event.title, event.topic, event.country_code or cluster.country_code,
+            ai = generate_ai_title(
+                [{"title": event.title}, {"title": cluster.title}],
+                event.topic, event.country_code or cluster.country_code,
             )
-            logger.info("클러스터 제목 승격: %s → %s", cluster.cluster_key, event.title[:50])
+            if ai:
+                cluster.title, cluster.title_ko = ai
+            else:
+                cluster.title = event.title
+                cluster.title_ko = _make_cluster_title_ko(
+                    event.title, event.topic, event.country_code or cluster.country_code,
+                )
+            logger.info("클러스터 제목 승격: %s → %s", cluster.cluster_key, cluster.title[:50])
         # 제목은 괜찮은데 title_ko가 없으면 재생성 시도
         elif cluster.title_ko is None and not _is_junk_title(cluster.title):
-            cluster.title_ko = _make_cluster_title_ko(
-                cluster.title, cluster.topic, cluster.country_code,
+            ai = generate_ai_title(
+                [{"title": cluster.title}],
+                cluster.topic, cluster.country_code,
             )
+            if ai:
+                cluster.title, cluster.title_ko = ai
+            else:
+                cluster.title_ko = _make_cluster_title_ko(
+                    cluster.title, cluster.topic, cluster.country_code,
+                )
         # geo: 아직 없으면 이벤트 것으로 채우기
         if cluster.lat is None and event.lat is not None:
             cluster.lat = event.lat
@@ -255,7 +270,14 @@ async def assign_cluster(
         )
         cluster.updated_at = now
     else:
-        title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
+        ai = generate_ai_title(
+            [{"title": event.title}], event.topic, event.country_code,
+        )
+        if ai:
+            ai_title_en, title_ko = ai
+        else:
+            ai_title_en = None
+            title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
         # KScore 즉시 계산
         initial_kscore = _calc_kscore(
             event_count=1,
@@ -273,7 +295,7 @@ async def assign_cluster(
             country_code=event.country_code,
             lat=event.lat,
             lon=event.lon,
-            title=event.title,
+            title=ai_title_en or event.title,
             title_ko=title_ko,
             event_count=1,
             severity=event.severity,
