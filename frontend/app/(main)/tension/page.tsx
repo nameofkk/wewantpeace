@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
-import { cn, TENSION_LEVELS, stripTitlePrefix } from "@/lib/utils";
+import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
@@ -457,9 +457,11 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
           </p>
           <div className="space-y-1.5">
             {data.top5_clusters.map((c, i) => {
-              const strippedTitle = stripTitlePrefix(lang === "en" ? c.title : (c.title_ko ?? c.title));
+              const rawTitle = lang === "en" ? c.title : (c.title_ko ?? c.title);
               const topicKey = `topic_${c.topic}` as Parameters<typeof t>[1];
-              const clusterTitle = strippedTitle || t(lang, topicKey);
+              const clusterTitle = isJunkTitle(rawTitle)
+                ? buildSmartTitle(c.title, c.topic, lang, getCountryName)
+                : (stripTitlePrefix(rawTitle) || t(lang, topicKey));
               return (
                 <Link
                   key={c.id}

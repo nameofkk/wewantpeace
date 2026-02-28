@@ -21,17 +21,75 @@ export const SOURCE_TIERS = {
 } as const;
 
 /**
- * 제목 정리: 접두어 제거 + 해시태그 전용 쓰레기 제목 감지.
- * 의미있는 제목이면 그대로, 쓰레기면 빈 문자열 반환.
+ * 제목 정리: "[국가] 토픽 · " 접두어 제거.
+ * "[미국] 무장 충돌 · 이란 공습" → "이란 공습"
+ * 일반 제목은 그대로 반환.
  */
 export function stripTitlePrefix(title: string): string {
-  // 1) "[국가] 토픽 · " 접두어 제거
-  let cleaned = title.replace(/^\[.+?\]\s*.+?\s*·\s*/, "");
-  // 2) 해시태그 제거
-  cleaned = cleaned.replace(/#\S+/g, "").trim();
-  // 3) 남은 글자가 4자 미만이면 쓰레기 → 빈 문자열
-  if (cleaned.length < 4) return "";
-  return cleaned;
+  return title.replace(/^\[.+?\]\s*.+?\s*·\s*/, "").trim();
+}
+
+/** 해시태그만으로 이루어진 쓰레기 제목인지 판별 */
+export function isJunkTitle(title: string): boolean {
+  const stripped = title.replace(/#\S+/g, "").trim();
+  return stripped.length < 4;
+}
+
+// 영어 국가명 → 국가코드 매핑 (해시태그에서 국가 추출용)
+const NAME_TO_CODE: Record<string, string> = {
+  USA: "US", Iran: "IR", Iraq: "IQ", Israel: "IL", Palestine: "PS",
+  Russia: "RU", Ukraine: "UA", China: "CN", Syria: "SY", Lebanon: "LB",
+  Yemen: "YE", Turkey: "TR", Pakistan: "PK", Afghanistan: "AF",
+  India: "IN", Japan: "JP", Korea: "KR", DPRK: "KP", Taiwan: "TW",
+  Myanmar: "MM", Somalia: "SO", Sudan: "SD", Libya: "LY", Niger: "NE",
+  Mali: "ML", Chad: "TD", Ethiopia: "ET", Eritrea: "ER", Congo: "CD",
+  Nigeria: "NG", Egypt: "EG", Mexico: "MX", Colombia: "CO", Venezuela: "VE",
+  Belarus: "BY", Georgia: "GE", Armenia: "AM", Azerbaijan: "AZ",
+  Serbia: "RS", Kosovo: "XK", Philippines: "PH", Indonesia: "ID",
+  Thailand: "TH", Vietnam: "VN", Cambodia: "KH", Laos: "LA",
+};
+
+/**
+ * 쓰레기 제목에서 국가명 추출 + 토픽 조합으로 의미있는 제목 생성.
+ * "#USA #Iran" + topic "conflict" → "미국·이란 무장 충돌" (ko) / "USA-Iran Conflict" (en)
+ */
+export function buildSmartTitle(
+  rawTitle: string,
+  topic: string,
+  lang: "ko" | "en",
+  getCountryNameFn: (code: string, lang: string) => string,
+): string {
+  // 해시태그에서 국가 추출
+  const tags = rawTitle.match(/#(\w+)/g)?.map((t) => t.slice(1)) || [];
+
+  const countryNames: string[] = [];
+  for (const tag of tags) {
+    // 직접 국가코드인 경우 (US, IR 등)
+    const upper = tag.toUpperCase();
+    if (upper.length === 2) {
+      countryNames.push(getCountryNameFn(upper, lang));
+      continue;
+    }
+    // 영어 국가명인 경우
+    const code = NAME_TO_CODE[tag] || NAME_TO_CODE[tag.charAt(0).toUpperCase() + tag.slice(1).toLowerCase()];
+    if (code) {
+      countryNames.push(getCountryNameFn(code, lang));
+    }
+  }
+
+  // 중복 제거
+  const unique = [...new Set(countryNames)];
+  const topicLabel = lang === "ko"
+    ? (TOPIC_LABELS[topic] || topic)
+    : (TOPIC_LABELS_EN[topic] || topic);
+
+  if (unique.length > 0) {
+    const sep = lang === "ko" ? "·" : "-";
+    return `${unique.join(sep)} ${topicLabel}`;
+  }
+
+  // 국가 추출 실패 시 토픽만
+  return topicLabel;
 }
 
 export const TOPIC_LABELS: Record<string, string> = {
@@ -46,4 +104,18 @@ export const TOPIC_LABELS: Record<string, string> = {
   disaster:  "재난·재해",
   health:    "감염병·보건",
   unknown:   "기타",
+};
+
+export const TOPIC_LABELS_EN: Record<string, string> = {
+  conflict:  "Conflict",
+  terror:    "Terror",
+  coup:      "Coup",
+  sanctions: "Sanctions",
+  cyber:     "Cyber",
+  protest:   "Protest",
+  diplomacy: "Diplomacy",
+  maritime:  "Maritime",
+  disaster:  "Disaster",
+  health:    "Health",
+  unknown:   "Other",
 };

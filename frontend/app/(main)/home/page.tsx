@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
-import { cn, TOPIC_LABELS, stripTitlePrefix } from "@/lib/utils";
+import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -317,16 +317,13 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
-  const stripped = stripTitlePrefix(lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword));
-  // 토픽 레이블
+  const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
   const topicKey = `topic_${topic}` as Parameters<typeof t>[1];
   const topicLabel = t(lang, topicKey) || topic;
-  // 쓰레기 제목 폴백: 국가명 + 토픽으로 의미있는 제목 생성
-  const displayTitle = stripped || (
-    item.country_codes.length > 0
-      ? `${item.country_codes.map((c: string) => getCountryName(c, lang)).join(lang === "ko" ? "·" : "-")} ${topicLabel}`
-      : topicLabel
-  );
+  // 쓰레기 제목(해시태그만): 국가명+토픽 조합 / 정상 제목: 접두어 제거
+  const displayTitle = isJunkTitle(rawTitle)
+    ? buildSmartTitle(item.keyword, topic, lang, getCountryName)
+    : (stripTitlePrefix(rawTitle) || topicLabel);
 
   return (
     <div

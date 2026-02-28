@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { cn, stripTitlePrefix } from "@/lib/utils";
+import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useClusterDetail } from "@/lib/api";
 import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
@@ -85,13 +85,11 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
     );
   }
 
-  const strippedTitle = stripTitlePrefix(lang === "en" ? issue.title : (issue.title_ko ?? issue.title));
+  const rawIssueTitle = lang === "en" ? issue.title : (issue.title_ko ?? issue.title);
   const issueTopicKey = `topic_${issue.topic}` as Parameters<typeof t>[1];
-  const displayTitle = strippedTitle || (
-    issue.country_code
-      ? `${getCountryName(issue.country_code, lang)} ${t(lang, issueTopicKey)}`
-      : t(lang, issueTopicKey)
-  );
+  const displayTitle = isJunkTitle(rawIssueTitle)
+    ? buildSmartTitle(issue.title, issue.topic, lang, getCountryName)
+    : (stripTitlePrefix(rawIssueTitle) || t(lang, issueTopicKey));
 
   const statusLabel = issue.confidence >= 0.70
     ? t(lang, "issue_status_confirmed")
@@ -186,12 +184,10 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                 const tier = event.source_tier ?? "C";
                 const eventNew = isNew(event.event_time);
                 const eventTopicKey = `topic_${event.topic}` as Parameters<typeof t>[1];
-                const eventStripped = stripTitlePrefix(lang === "en" ? event.title : (event.title_ko ?? event.title));
-                const eventTitle = eventStripped || (
-                  event.country_code
-                    ? `${getCountryName(event.country_code, lang)} ${t(lang, eventTopicKey)}`
-                    : t(lang, eventTopicKey)
-                );
+                const rawEventTitle = lang === "en" ? event.title : (event.title_ko ?? event.title);
+                const eventTitle = isJunkTitle(rawEventTitle)
+                  ? buildSmartTitle(event.title, event.topic, lang, getCountryName)
+                  : (stripTitlePrefix(rawEventTitle) || t(lang, eventTopicKey));
                 return (
                   <div key={event.id} className="flex gap-3">
                     <div className="flex flex-col items-center">
