@@ -27,13 +27,13 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "troops", "military", "war", "combat", "offensive", "drone", "strike",
         "killed", "casualties", "ceasefire", "battle", "forces", "shelling",
         "rocket", "mortar", "tank", "infantry", "navy", "airforce",
-        # 추가: 분쟁/전쟁 일반
+        # 분쟁/전쟁 일반
         "conflict", "warfare", "hostilities", "armed",
         "invasion", "invade", "invading", "invades",
         "occupation", "occupied", "occupying",
         "frontline", "front line", "war zone", "warzone",
         "siege", "ambush", "sniper", "gunfire", "firefight",
-        # 추가: 병력/무기
+        # 병력/무기
         "soldier", "soldiers", "fighter", "fighters", "combatant",
         "weapon", "weapons", "arms", "nuclear", "warhead",
         "nuclear weapon", "nuclear weapons", "ballistic",
@@ -43,12 +43,29 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "armed forces", "armed conflict", "armed group",
         "deployment", "deployed", "mobilization", "reinforcements",
         "war effort", "prolong", "prolonging",
+        # 전쟁 범죄 · 극단적 폭력
+        "war crime", "war crimes", "ethnic cleansing", "scorched earth",
+        "carpet bombing", "cluster bomb", "white phosphorus",
+        "indiscriminate", "civilian casualties", "collateral damage",
+        # WMD (대량살상무기)
+        "chemical attack", "nerve agent", "sarin", "mustard gas",
+        "dirty bomb", "radiological", "wmds", "weapons of mass destruction",
+        "intercontinental", "icbm", "hypersonic",
     ],
     "terror": [
         "terror", "terrorist", "hostage", "isis", "al-qaeda", "extremist",
         "jihadist", "suicide bomb", "attack on civilians", "beheading",
         "cartel", "drug lord", "drug trafficking", "organized crime", "gang",
         "assassination", "murder", "shooting", "stabbing", "kidnapping",
+        # 총기 · 폭탄
+        "mass shooting", "school shooting", "active shooter", "gunman",
+        "lone wolf", "vehicle attack", "ramming", "pipe bomb", "ied",
+        "improvised explosive", "car bomb", "truck bomb",
+        # 조직범죄 · 암살
+        "assassination attempt", "political assassination", "targeted killing",
+        "death squad", "execution", "extrajudicial",
+        "hostage crisis", "hostage situation", "bomb threat",
+        "domestic terrorism", "bioterrorism", "anthrax",
     ],
     "coup": [
         "coup", "overthrow", "junta", "seized power", "military takeover",
@@ -57,6 +74,11 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "arrested president", "arrested opposition", "imprisoned leader",
         "political prisoner", "opposition leader arrested", "former president arrested",
         "ex-president", "former leader arrested",
+        # 정변/체제 위기
+        "insurrection", "sedition", "storming", "power grab",
+        "authoritarian", "dictatorship", "autocratic",
+        "constitutional crisis", "government collapse", "failed state",
+        "regime change", "political purge", "political crackdown",
     ],
     "sanctions": [
         "sanctions", "embargo", "trade ban", "export control", "asset freeze",
@@ -68,14 +90,33 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "bank run", "bank holiday", "currency crisis", "default",
         "national emergency", "state of emergency", "emergency powers",
         "ieepa", "executive order", "capital controls",
+        # 경제 위기 확장
+        "recession", "depression", "economic meltdown", "fiscal crisis",
+        "debt crisis", "debt default", "sovereign default", "bailout",
+        "hyperinflation", "inflation crisis", "austerity",
+        "trade war", "currency manipulation", "supply chain crisis",
+        "oil embargo", "energy crisis", "gas crisis", "price shock",
+        "government shutdown", "budget crisis",
     ],
     "cyber": [
         "cyberattack", "hacked", "ransomware", "malware", "ddos",
         "data breach", "cyber", "phishing", "vulnerability", "exploit",
+        # 대규모 사이버 위협
+        "cyber warfare", "state-sponsored", "critical infrastructure",
+        "power grid attack", "internet shutdown", "internet blackout",
+        "communication blackout", "gps jamming", "satellite attack",
+        "deepfake", "disinformation campaign", "information warfare",
+        "election interference", "election hacking",
     ],
     "protest": [
         "protest", "demonstration", "rally", "riot", "crowd", "march",
         "unrest", "strike", "uprising", "demonstrators",
+        # 대규모 시민 저항
+        "civil disobedience", "general strike", "revolution",
+        "mass protest", "anti-government", "pro-democracy",
+        "crackdown", "tear gas", "water cannon", "rubber bullet",
+        "curfew", "internet cut", "media blackout",
+        "political unrest", "social unrest", "civil unrest",
     ],
     "diplomacy": [
         "diplomat", "embassy", "treaty", "agreement", "summit",
@@ -84,22 +125,30 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "ruling", "law", "policy", "administration", "parliament",
         "national assembly", "legislature", "congress", "senate",
         "opposition", "political crisis", "arrested", "detained",
-        # 외교/국제관계 추가
+        # 외교/국제관계
         "foreign affairs", "foreign minister", "foreign ministry",
         "international law", "diplomatic", "bilateral", "multilateral",
         "ending war", "end the war", "peace process", "peace effort",
         "war crimes", "accountability", "ceasefire talks",
         "rapid support forces", "rsf", "paramilitary",
         "flouting", "accuses", "accused of",
+        # 정치 위기
+        "impeachment", "impeached", "indictment", "indicted",
+        "resignation", "expelled", "recalled ambassador",
+        "diplomatic crisis", "severed ties", "recalled envoy",
+        "persona non grata", "expelled diplomats",
     ],
     "maritime": [
         "naval", "ship", "vessel", "strait", "blockade", "coast guard",
         "maritime", "submarine", "fleet", "tanker",
-        # 이주/난민 해상 사망 (지중해·에게해·홍해 등)
+        # 이주/난민 해상 사망
         "mediterranean", "aegean", "english channel", "migrant", "migrants",
         "refugee", "refugees", "drowned", "drowning", "crossing",
         "boat capsized", "capsized", "shipwreck", "rescue at sea",
         "died trying to cross", "crossing deaths", "smuggled",
+        # 해상 위기
+        "piracy", "hijacked ship", "seized vessel", "oil spill",
+        "shipping disruption", "port blockade", "canal blocked",
     ],
     "disaster": [
         "flood", "flooding", "floods", "flash flood",
@@ -112,6 +161,19 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "natural disaster", "catastrophe",
         "evacuation", "rescue operation", "emergency declared",
         "missing persons", "disaster relief",
+        # 산업재해 · 인프라 사고
+        "nuclear meltdown", "radiation leak", "reactor",
+        "chemical spill", "chemical leak", "toxic", "contamination",
+        "industrial accident", "factory explosion", "refinery",
+        "mine collapse", "building collapse", "bridge collapse",
+        "dam burst", "dam failure", "levee breach",
+        "power outage", "blackout", "grid failure",
+        "train derailment", "plane crash", "aviation disaster",
+        "sinkhole", "infrastructure failure",
+        # 인도주의 위기
+        "humanitarian crisis", "humanitarian disaster", "mass displacement",
+        "refugee crisis", "food shortage", "water crisis", "water shortage",
+        "shelter in place", "evacuation order",
     ],
     "health": [
         # 전염병·감염
@@ -119,6 +181,8 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "measles", "cholera", "ebola", "mpox", "monkeypox", "dengue",
         "malaria", "tuberculosis", "polio", "typhoid", "hepatitis",
         "covid", "coronavirus", "influenza", "flu outbreak",
+        "bird flu", "avian flu", "h5n1", "h1n1", "sars", "mers",
+        "plague", "yellow fever", "zika", "nipah",
         # 보건 기관·조치
         "public health", "health ministry", "health alert", "health emergency",
         "quarantine", "lockdown", "contact tracing", "vaccination campaign",
@@ -127,6 +191,9 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         # 사망·확산
         "cases confirmed", "deaths from", "hospitalized", "health workers",
         "health authorities", "spreading", "contagious", "contagion",
+        # 의약품 · 생물안보
+        "drug shortage", "vaccine shortage", "antibiotic resistance",
+        "superbug", "lab leak", "biosecurity", "gain of function",
     ],
 }
 
@@ -149,49 +216,91 @@ TOPIC_BASE_SEVERITY: dict[str, int] = {
 # ── Severity 보정 키워드 ─────────────────────────────────────────────────────
 
 SEVERITY_UP: list[tuple[str, int]] = [
-    # 사상자
+    # ── 사상자 ──
     ("killed", 10), ("dead", 10), ("casualties", 8), ("deaths", 10),
     ("wounded", 6), ("injured", 5), ("massacre", 15), ("genocide", 20),
-    # 무기/공격
+    ("mass killing", 15), ("mass grave", 15), ("ethnic cleansing", 20),
+    ("war crime", 15), ("crimes against humanity", 18),
+    ("exterminated", 18), ("slaughter", 15), ("atrocity", 15),
+    # ── 무기/공격 ──
     ("airstrike", 10), ("air strike", 10), ("missile strike", 12), ("explosion", 7),
     ("bomb", 6), ("bombing", 10), ("bombardment", 12),
     ("rocket", 6), ("artillery", 7), ("drone strike", 10), ("shelling", 7),
     ("missile launch", 12), ("missile fired", 12), ("missile attack", 12),
     ("chemical weapon", 18), ("biological weapon", 18), ("nuclear", 20),
-    # 대규모 군사 작전 (침공/전쟁 선포 급)
+    ("chemical attack", 18), ("nerve agent", 18), ("sarin", 18),
+    ("dirty bomb", 15), ("icbm", 18), ("hypersonic", 12),
+    ("cluster bomb", 12), ("white phosphorus", 12), ("napalm", 12),
+    ("carpet bombing", 15), ("indiscriminate", 10),
+    # ── 대규모 군사 작전 ──
     ("invasion", 18), ("invading", 18), ("invade", 18),
     ("full-scale", 12), ("all-out", 12), ("total war", 18),
     ("declaration of war", 18), ("declared war", 18), ("act of war", 15),
     ("joint attack", 12), ("joint strike", 12), ("joint operation", 10),
     ("ground offensive", 15), ("ground invasion", 18),
     ("preemptive strike", 15), ("retaliatory strike", 12),
-    # 속보/긴급 (높은 긴장도 신호)
+    ("scorched earth", 12), ("siege warfare", 10),
+    # ── 속보/긴급 ──
     ("breaking", 5), ("breaking news", 8), ("just in", 5),
     ("launches attack", 12), ("launched attack", 12), ("opens fire", 10),
     ("military offensive", 12), ("commenced", 8), ("underway", 6),
-    # 국가비상사태 · 금융위기
+    # ── 국가비상사태 · 금융위기 ──
     ("national emergency", 15), ("state of emergency", 12),
     ("emergency powers", 12), ("ieepa", 12),
     ("trading halt", 10), ("trading suspension", 10), ("market shutdown", 12),
     ("market crash", 10), ("market collapse", 12), ("financial crisis", 10),
     ("stock market crash", 12), ("bank run", 10), ("bank holiday", 8),
-    ("currency crisis", 10), ("sovereign default", 15), ("default", 6),
+    ("currency crisis", 10), ("sovereign default", 15),
     ("capital controls", 8), ("economic collapse", 12),
-    # 인프라
-    ("power grid", 8), ("hospital", 6), ("school", 5), ("market", 4),
+    ("hyperinflation", 10), ("debt default", 12), ("bailout", 6),
+    ("government shutdown", 8), ("fiscal cliff", 8),
+    # ── 인프라 · 재난 ──
+    ("power grid", 8), ("hospital", 6), ("school", 5),
     ("dam", 8), ("nuclear plant", 15), ("nuclear facility", 15),
     ("water supply", 7),
-    # 규모/범위
+    ("nuclear meltdown", 20), ("radiation leak", 15), ("reactor breach", 15),
+    ("chemical spill", 10), ("toxic", 6), ("contamination", 8),
+    ("building collapse", 10), ("bridge collapse", 10), ("dam burst", 12),
+    ("mine collapse", 8), ("factory explosion", 10),
+    ("train derailment", 8), ("plane crash", 10), ("aviation disaster", 12),
+    ("power outage", 6), ("blackout", 6), ("grid failure", 10),
+    ("infrastructure failure", 8),
+    # ── 규모/범위 ──
     ("massive", 6), ("large-scale", 6), ("widespread", 5), ("unprecedented", 8),
     ("catastrophic", 10), ("devastating", 8), ("major offensive", 10),
-    # 정치/법
+    ("deadliest", 10), ("worst ever", 8), ("record-breaking", 6),
+    ("historic", 5), ("never before", 8),
+    # ── 정치 위기 · 쿠데타 ──
     ("martial law", 15), ("mobilization", 12), ("emergency", 6),
     ("coup", 8), ("overthrow", 10), ("seized power", 12),
-    # 긴박성
+    ("insurrection", 15), ("sedition", 12), ("government collapse", 12),
+    ("constitutional crisis", 10), ("impeachment", 8), ("impeached", 8),
+    ("political assassination", 15), ("assassination attempt", 12),
+    ("regime change", 8), ("failed state", 10), ("political purge", 10),
+    # ── 긴박성 ──
     ("escalating", 5), ("intensifying", 5), ("imminent", 6), ("erupted", 6),
     ("siege", 8), ("surrounded", 6), ("blockade", 7), ("encircled", 7),
-    # 민간인
+    ("on the brink", 8), ("war footing", 10), ("defcon", 12),
+    ("red alert", 8), ("maximum alert", 8),
+    # ── 민간인 · 인도주의 ──
     ("civilian", 5), ("capital", 4), ("city center", 4),
+    ("humanitarian crisis", 10), ("humanitarian disaster", 12),
+    ("mass displacement", 8), ("refugee crisis", 8),
+    ("famine", 10), ("food shortage", 8), ("starvation", 10),
+    ("water crisis", 8), ("shelter in place", 6), ("evacuation order", 6),
+    ("curfew", 5),
+    # ── 테러 · 총기 ──
+    ("mass shooting", 12), ("school shooting", 15), ("active shooter", 10),
+    ("hostage crisis", 10), ("bomb threat", 6), ("suicide attack", 12),
+    ("car bomb", 10), ("truck bomb", 12), ("ied", 8),
+    # ── 사이버 · 통신 ──
+    ("internet shutdown", 8), ("communication blackout", 10),
+    ("cyber warfare", 10), ("critical infrastructure", 8),
+    ("election interference", 8),
+    # ── 보건 ──
+    ("pandemic declared", 15), ("global health emergency", 12),
+    ("new variant", 6), ("drug resistant", 8), ("superbug", 8),
+    ("lab leak", 8), ("biosecurity", 6),
 ]
 
 SEVERITY_DOWN: list[tuple[str, int]] = [
@@ -199,13 +308,22 @@ SEVERITY_DOWN: list[tuple[str, int]] = [
     ("alleged", -8), ("unconfirmed", -10), ("rumor", -12),
     ("reportedly", -5), ("claims", -6), ("possibly", -7),
     ("denied", -5), ("false alarm", -15), ("hoax", -15),
+    ("satire", -15), ("parody", -15), ("fictional", -15),
     # 완화
     ("ceasefire", -10), ("truce", -10), ("peace deal", -12),
     ("de-escalat", -10), ("withdrawal", -7), ("retreat", -5),
     ("diplomatic solution", -10), ("agreement reached", -8),
+    ("tensions eased", -8), ("stand down", -8), ("stepped back", -6),
     # 소규모
     ("minor", -6), ("small-scale", -6), ("limited", -5), ("contained", -5),
     ("isolated incident", -8), ("under control", -8),
+    # 훈련/연습 (실제 공격과 혼동 방지)
+    ("military exercise", -10), ("drill", -8), ("simulation", -10),
+    ("routine patrol", -8), ("scheduled exercise", -10), ("war games", -8),
+    ("training exercise", -10), ("annual exercise", -8),
+    # 과거 사건 (현재 위협 아님)
+    ("anniversary", -6), ("memorial", -6), ("years ago", -8),
+    ("looking back", -8), ("retrospective", -8),
 ]
 
 # ── 사상자 수 기반 추가 보정 ────────────────────────────────────────────────
@@ -548,27 +666,52 @@ def _translate_to_korean(text: str) -> Optional[str]:
 _STRONG_KEYWORDS: dict[str, set[str]] = {
     "conflict":  {"missile", "airstrike", "artillery", "ceasefire", "shelling",
                   "rocket", "mortar", "offensive", "bombardment", "warplane",
-                  # 추가 강력 키워드
                   "nuclear weapon", "nuclear weapons", "warhead", "ballistic missile",
                   "invasion", "invade", "armed conflict", "military conflict",
                   "weapons transfer", "arms transfer",
-                  "nuclear", "explosion", "troops deployed", "war zone"},
+                  "nuclear", "explosion", "troops deployed", "war zone",
+                  # WMD · 극단적 폭력
+                  "icbm", "hypersonic", "chemical attack", "nerve agent",
+                  "dirty bomb", "ethnic cleansing", "genocide", "massacre",
+                  "carpet bombing", "cluster bomb", "white phosphorus",
+                  "scorched earth", "war crime", "crimes against humanity"},
     "terror":    {"terrorist", "suicide bomb", "isis", "al-qaeda", "jihadist",
                   "beheading", "cartel", "drug lord", "hostage",
-                  "shooting", "assassination", "kidnapping", "murder"},
-    "protest":   {"protest", "protests", "riot", "riots", "uprising", "demonstration"},
+                  "shooting", "assassination", "kidnapping", "murder",
+                  "mass shooting", "school shooting", "active shooter",
+                  "car bomb", "truck bomb", "ied", "hostage crisis",
+                  "assassination attempt", "bioterrorism", "anthrax"},
+    "protest":   {"protest", "protests", "riot", "riots", "uprising", "demonstration",
+                  "revolution", "general strike", "civil disobedience"},
     "diplomacy": {"summit", "peace deal", "peace process", "treaty", "bilateral",
-                  "diplomatic", "foreign minister", "foreign ministry"},
+                  "diplomatic", "foreign minister", "foreign ministry",
+                  "impeachment", "impeached", "diplomatic crisis"},
     "coup":      {"coup", "junta", "seized power", "military takeover",
-                  "martial law", "deposed", "detained president"},
-    "sanctions": {"sanctions", "embargo", "trade ban", "asset freeze", "blacklist"},
-    "cyber":     {"cyberattack", "ransomware", "malware", "ddos", "data breach"},
-    "maritime":  {"naval", "strait", "blockade", "submarine", "fleet"},
+                  "martial law", "deposed", "detained president",
+                  "insurrection", "sedition", "constitutional crisis",
+                  "government collapse", "failed state"},
+    "sanctions": {"sanctions", "embargo", "trade ban", "asset freeze", "blacklist",
+                  "national emergency", "state of emergency", "ieepa",
+                  "market crash", "market collapse", "trading halt",
+                  "financial crisis", "economic crisis", "sovereign default",
+                  "hyperinflation", "debt default", "capital controls",
+                  "government shutdown"},
+    "cyber":     {"cyberattack", "ransomware", "malware", "ddos", "data breach",
+                  "cyber warfare", "internet shutdown", "election hacking",
+                  "critical infrastructure"},
+    "maritime":  {"naval", "strait", "blockade", "submarine", "fleet",
+                  "piracy", "hijacked ship", "oil spill"},
     "disaster":  {"earthquake", "tsunami", "typhoon", "hurricane", "volcanic eruption",
-                  "flash flood", "landslide", "mudslide", "avalanche"},
+                  "flash flood", "landslide", "mudslide", "avalanche",
+                  "nuclear meltdown", "radiation leak", "chemical spill",
+                  "building collapse", "dam burst", "dam failure",
+                  "train derailment", "plane crash", "humanitarian crisis",
+                  "famine", "refugee crisis"},
     "health":    {"outbreak", "epidemic", "pandemic", "measles", "cholera", "ebola",
                   "mpox", "monkeypox", "dengue", "covid", "coronavirus",
-                  "community transmission", "disease outbreak", "health emergency"},
+                  "community transmission", "disease outbreak", "health emergency",
+                  "bird flu", "h5n1", "sars", "mers", "plague", "nipah",
+                  "global health emergency", "lab leak", "superbug"},
 }
 
 
