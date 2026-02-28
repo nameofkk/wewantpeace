@@ -127,7 +127,7 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
 # ── Severity 기본값 ──────────────────────────────────────────────────────────
 
 TOPIC_BASE_SEVERITY: dict[str, int] = {
-    "conflict":  55,
+    "conflict":  60,
     "terror":    60,
     "coup":      65,
     "sanctions": 45,
@@ -147,17 +147,22 @@ SEVERITY_UP: list[tuple[str, int]] = [
     ("killed", 10), ("dead", 10), ("casualties", 8), ("deaths", 10),
     ("wounded", 6), ("injured", 5), ("massacre", 15), ("genocide", 20),
     # 무기/공격
-    ("airstrike", 8), ("air strike", 8), ("missile strike", 10), ("explosion", 7),
-    ("bomb", 6), ("bombing", 8), ("bombardment", 10),
-    ("rocket", 6), ("artillery", 7), ("drone strike", 8), ("shelling", 7),
+    ("airstrike", 10), ("air strike", 10), ("missile strike", 12), ("explosion", 7),
+    ("bomb", 6), ("bombing", 10), ("bombardment", 12),
+    ("rocket", 6), ("artillery", 7), ("drone strike", 10), ("shelling", 7),
+    ("missile launch", 12), ("missile fired", 12), ("missile attack", 12),
     ("chemical weapon", 18), ("biological weapon", 18), ("nuclear", 20),
     # 대규모 군사 작전 (침공/전쟁 선포 급)
-    ("invasion", 15), ("invading", 15), ("invade", 15),
-    ("full-scale", 10), ("all-out", 10), ("total war", 15),
-    ("declaration of war", 15), ("declared war", 15), ("act of war", 12),
-    ("joint attack", 10), ("joint strike", 10), ("joint operation", 8),
-    ("ground offensive", 12), ("ground invasion", 15),
-    ("preemptive strike", 12), ("retaliatory strike", 10),
+    ("invasion", 18), ("invading", 18), ("invade", 18),
+    ("full-scale", 12), ("all-out", 12), ("total war", 18),
+    ("declaration of war", 18), ("declared war", 18), ("act of war", 15),
+    ("joint attack", 12), ("joint strike", 12), ("joint operation", 10),
+    ("ground offensive", 15), ("ground invasion", 18),
+    ("preemptive strike", 15), ("retaliatory strike", 12),
+    # 속보/긴급 (높은 긴장도 신호)
+    ("breaking", 5), ("breaking news", 8), ("just in", 5),
+    ("launches attack", 12), ("launched attack", 12), ("opens fire", 10),
+    ("military offensive", 12), ("commenced", 8), ("underway", 6),
     # 인프라
     ("power grid", 8), ("hospital", 6), ("school", 5), ("market", 4),
     ("dam", 8), ("nuclear plant", 15), ("nuclear facility", 15),
@@ -728,10 +733,10 @@ def _calculate_severity(text: str, topic: str) -> int:
     base = TOPIC_BASE_SEVERITY.get(topic, 25)
     text_lower = text.lower()
 
-    # 키워드 보정 (누적 상한 ±30)
+    # 키워드 보정 (누적 상한 ±40)
     keyword_delta = sum(delta for kw, delta in SEVERITY_UP if kw in text_lower)
     keyword_delta += sum(delta for kw, delta in SEVERITY_DOWN if kw in text_lower)
-    keyword_delta = max(-30, min(30, keyword_delta))
+    keyword_delta = max(-40, min(40, keyword_delta))
 
     # 사상자 수 기반 추가 보정 (별도 상한, _casualty_bonus 내부에서 max 30)
     modifier = keyword_delta + _casualty_bonus(text_lower)

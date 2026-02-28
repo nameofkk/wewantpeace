@@ -4,7 +4,7 @@ Celery 태스크 정의.
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from worker.celery_app import app
 from backend.app.core.database import AsyncSessionLocal
@@ -322,15 +322,84 @@ def calculate_tension(self):
     max_retries=2,
 )
 def calculate_trending(self):
-    """트렌딩 키워드 계산 (15분마다)."""
+    """트렌딩 키워드 계산 (15분마다). 분산 클러스터 자동 병합 포함."""
+
+    async def _merge_fragmented_clusters(db):
+        """같은 국가+토픽의 고심각도 클러스터를 하나로 병합."""
+        from collections import defaultdict
+        from sqlalchemy import select, text
+        from backend.app.models.issue_cluster import IssueCluster
+        from worker.processor.trending_engine import _calc_kscore
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+        result = await db.execute(
+            select(IssueCluster).where(
+                IssueCluster.last_event_at >= cutoff,
+                IssueCluster.severity >= 50,
+                IssueCluster.topic.in_(["conflict", "terror", "coup"]),
+                IssueCluster.country_code != None,
+            ).order_by(
+                IssueCluster.country_code,
+                IssueCluster.topic,
+                IssueCluster.kscore.desc(),
+            )
+        )
+        clusters = result.scalars().all()
+
+        groups: dict[str, list] = defaultdict(list)
+        for c in clusters:
+            groups[f"{c.country_code}:{c.topic}"].append(c)
+
+        merged_total = 0
+        for key, group in groups.items():
+            if len(group) <= 1:
+                continue
+            winner = group[0]
+            for loser in group[1:]:
+                winner.event_count += loser.event_count
+                winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
+                if loser.severity > winner.severity:
+                    winner.severity = loser.severity
+                winner.confidence = round(max(winner.confidence, loser.confidence), 3)
+                existing = list(winner.source_tiers or [])
+                existing.extend(loser.source_tiers or [])
+                winner.source_tiers = existing
+                if loser.first_event_at < winner.first_event_at:
+                    winner.first_event_at = loser.first_event_at
+                if loser.last_event_at > winner.last_event_at:
+                    winner.last_event_at = loser.last_event_at
+                    winner.window_end = loser.last_event_at + timedelta(minutes=60)
+                # cluster_events 재할당
+                await db.execute(
+                    text("UPDATE cluster_events SET cluster_id = :w WHERE cluster_id = :l"),
+                    {"w": winner.id, "l": loser.id},
+                )
+                loser.severity = 0
+                loser.kscore = 0
+                merged_total += 1
+
+            winner.kscore = _calc_kscore(
+                event_count=winner.event_count,
+                is_spike=winner.is_spike,
+                confidence=winner.confidence,
+                severity=winner.severity,
+                independent_sources=winner.independent_sources or 1,
+                source_tiers=winner.source_tiers or [],
+            )
+            winner.updated_at = datetime.now(timezone.utc)
+
+        if merged_total:
+            logger.info("분산 클러스터 %d개 병합 완료", merged_total)
+        return merged_total
 
     async def _run():
         from worker.processor.trending_engine import calculate_global_trending
         async with AsyncSessionLocal() as db:
             async with db.begin():
+                merged = await _merge_fragmented_clusters(db)
                 results = await calculate_global_trending(db)
-                logger.info("트렌딩 계산 완료: %d개", len(results))
-                return {"status": "ok", "count": len(results)}
+                logger.info("트렌딩 계산 완료: %d개 (클러스터 %d개 병합)", len(results), merged)
+                return {"status": "ok", "count": len(results), "merged": merged}
 
     try:
         return run_async(_run())
@@ -357,7 +426,7 @@ def reprocess_orphans(self):
         from worker.processor.clusterer import assign_cluster
         from worker.processor.spike_detector import evaluate_spike
         from backend.app.core.redis import get_redis
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timezone, timedelta, timedelta
 
         reassigned = 0
         skipped = 0
