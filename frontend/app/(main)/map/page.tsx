@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, stripTitlePrefix } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useClusters, useMe } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -161,7 +161,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
   const color = getKScoreColor(cluster.kscore);
   const kLabel = getKScoreLabel(cluster.kscore, lang);
   // 영어 모드: 원문 / 한국어 모드: 번역본 우선
-  const displayTitle = lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title);
+  const displayTitle = stripTitlePrefix(lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title));
 
   return (
     <div className="w-full rounded-xl border bg-card p-4 shadow-2xl" style={{ borderColor: `${color}40` }}>
@@ -288,7 +288,7 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
     >
       <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: getKScoreColor(c.kscore) }} />
       <span className="text-[11px] text-slate-300/80">
-        {lang === "en" ? c.title : (c.title_ko ?? c.title)}
+        {stripTitlePrefix(lang === "en" ? c.title : (c.title_ko ?? c.title))}
       </span>
     </span>
   ));

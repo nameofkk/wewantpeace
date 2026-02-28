@@ -20,6 +20,11 @@ export const SOURCE_TIERS = {
   D: { label: "미확인", color: "text-gray-500", bg: "bg-gray-500/10" },
 } as const;
 
+/** 기존 "[국가] 토픽 · " 접두어를 제거하고 순수 제목만 반환 */
+export function stripTitlePrefix(title: string): string {
+  return title.replace(/^\[.+?\]\s*.+?\s*·\s*/, "");
+}
+
 export const TOPIC_LABELS: Record<string, string> = {
   conflict:  "분쟁",
   terror:    "테러",

@@ -95,36 +95,41 @@ def _translate_cached(text: str) -> str | None:
         return None
 
 
+def _is_junk_title(title: str) -> bool:
+    """해시태그만 있거나 의미 없는 제목인지 판별."""
+    import re
+    stripped = re.sub(r'#\w+', '', title).strip()
+    # 해시태그 제거 후 남은 글자가 5자 미만이면 쓰레기 제목
+    return len(stripped) < 5
+
+
 def _make_cluster_title_ko(
     title: str,
     topic: str,
     country_code: str | None,
 ) -> str | None:
     """
-    클러스터 홈 카드용 직관적 제목 생성.
-    형식: "[국가] 유형 · 번역된 핵심 제목"
-    예: "[미국] 폭력·테러 · 트럼프 클럽 총기 용의자 사살"
+    클러스터 홈 카드용 한국어 제목 생성.
+    UI에서 토픽·국기를 별도 표시하므로 번역된 핵심 제목만 반환.
+    해시태그만 있는 저품질 제목은 None 반환 (프론트에서 영어 원문 폴백).
     """
+    # 해시태그만 있는 쓰레기 제목 → 번역하지 않음
+    if _is_junk_title(title):
+        return None
+
     title_ko = _translate_cached(title)
     if title_ko is None:
         logger.debug("한국어 번역 실패: %s", title[:50])
+        return None
 
-    topic_label = _TOPIC_LABELS_KO.get(topic, "이슈")
-    country_name = _COUNTRY_NAMES_KO.get(country_code or "", "") if country_code else ""
+    short = title_ko.strip()
+    if not short:
+        return None
 
-    if country_name:
-        prefix = f"[{country_name}] {topic_label}"
-    else:
-        prefix = topic_label
-
-    if title_ko and title_ko.strip():
-        short = title_ko.strip()
-        combined = f"{prefix} · {short}"
-        if len(combined) > 70:
-            combined = combined[:68] + "…"
-        return combined
-
-    return prefix or None
+    # 70자 초과 시 자르기
+    if len(short) > 70:
+        short = short[:68] + "…"
+    return short
 
 
 def _cluster_key(event: "NormalizedEvent") -> str:

@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, stripTitlePrefix } from "@/lib/utils";
 import { useClusterDetail } from "@/lib/api";
 import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
@@ -84,7 +84,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
     );
   }
 
-  const displayTitle = lang === "en" ? issue.title : (issue.title_ko ?? issue.title);
+  const displayTitle = stripTitlePrefix(lang === "en" ? issue.title : (issue.title_ko ?? issue.title));
 
   const statusLabel = issue.confidence >= 0.70
     ? t(lang, "issue_status_confirmed")
@@ -179,7 +179,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                 const tier = event.source_tier ?? "C";
                 const eventNew = isNew(event.event_time);
                 const eventTopicKey = `topic_${event.topic}` as Parameters<typeof t>[1];
-                const eventTitle = lang === "en" ? event.title : (event.title_ko ?? event.title);
+                const eventTitle = stripTitlePrefix(lang === "en" ? event.title : (event.title_ko ?? event.title));
                 return (
                   <div key={event.id} className="flex gap-3">
                     <div className="flex flex-col items-center">

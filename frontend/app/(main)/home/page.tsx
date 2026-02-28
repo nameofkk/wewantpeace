@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
-import { cn, TOPIC_LABELS } from "@/lib/utils";
+import { cn, TOPIC_LABELS, stripTitlePrefix } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -317,7 +317,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
-  const displayTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
+  const displayTitle = stripTitlePrefix(lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword));
   // 토픽 레이블
   const topicKey = `topic_${topic}` as Parameters<typeof t>[1];
   const topicLabel = t(lang, topicKey) || topic;
