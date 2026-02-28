@@ -179,23 +179,38 @@ def _tension_to_out(t: TensionIndex, top5: list[ClusterSummary]) -> TensionOut:
 # ── 기본 모니터링 국가 ─────────────────────────────────────────────────────────
 
 DEFAULT_COUNTRIES = [
-    # 주요국
-    "US", "GB", "FR", "DE", "JP", "AU",
     # 유럽·코카서스
-    "UA", "RU", "BY", "MD", "RS", "GE", "AM", "AZ",
+    "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
+    "GB", "FR", "DE", "IE", "IS", "LU", "LI", "MC", "MT", "AL",
+    "MK", "ME", "SK", "SI", "BG", "LT", "LV", "CY", "AD", "SM",
+    "IT", "ES", "PT", "NL", "BE", "SE", "NO", "DK", "CH", "AT",
+    "GR", "CZ", "HU", "HR", "FI", "PL", "RO", "EE",
     # 중동
     "PS", "IL", "IR", "IQ", "SY", "LB", "YE", "SA", "TR", "EG",
+    "JO", "AE", "QA", "BH", "KW", "OM",
     # 동아시아
-    "KP", "TW", "CN", "KR",
+    "KP", "KR", "TW", "CN", "JP", "MN",
     # 동남아
-    "MM", "PH", "VN", "ID", "TH",
-    # 남아시아·중앙아시아
-    "PK", "AF", "IN", "BD", "KZ", "TJ", "KG",
+    "MM", "PH", "VN", "ID", "TH", "MY", "KH", "LA", "BN", "TL", "SG",
+    # 남아시아
+    "PK", "AF", "IN", "BD", "LK", "NP", "BT", "MV",
+    # 중앙아시아
+    "KZ", "TJ", "KG", "UZ", "TM",
     # 아프리카
-    "SD", "SS", "ET", "SO", "LY", "ML", "BF", "NE", "NG", "CM",
-    "CF", "CD", "MZ", "TD", "GN", "ER", "DZ", "TN", "MA",
-    # 아메리카
-    "VE", "HT", "CO", "EC", "MX", "NI", "CU", "GT", "HN",
+    "SD", "SS", "ET", "SO", "ER", "LY", "ML", "BF", "NE", "TD",
+    "NG", "CM", "CF", "CD", "CG", "MZ", "ZW", "MA", "DZ", "TN",
+    "GN", "GW", "SL", "MR", "AO", "BJ", "BW", "BI", "CV", "DJ",
+    "GQ", "GA", "GM", "KE", "LS", "LR", "MG", "MW", "MU", "NA",
+    "RW", "ST", "SC", "ZA", "SZ", "TG", "TZ", "UG", "ZM", "KM", "CI", "SN", "GH",
+    # 남미
+    "VE", "HT", "CO", "EC", "PE", "BO", "BR", "GY", "PY", "SR", "UY", "CL", "AR",
+    # 중미·카리브
+    "MX", "GT", "HN", "SV", "NI", "CU", "CR", "DO", "JM", "PA",
+    "TT", "AG", "BB", "BS", "BZ", "DM", "GD", "KN", "LC", "VC",
+    # 북미
+    "US", "CA",
+    # 오세아니아
+    "AU", "FJ", "KI", "MH", "FM", "NR", "PW", "PG", "WS", "SB", "TO", "TV", "VU", "NZ",
 ]
 
 

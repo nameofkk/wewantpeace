@@ -524,7 +524,8 @@ export default function TensionPage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const [viewMode, setViewMode] = useState<"mine" | "all">("all");
+  const [viewMode, _setViewMode] = useState<"mine" | "all">("all");
+  const setViewMode = (m: "mine" | "all") => { _setViewMode(m); setVisibleCount(30); };
 
   const targetCountries = viewMode === "all"
     ? ALL_MONITORED_COUNTRIES
@@ -541,6 +542,7 @@ export default function TensionPage() {
   );
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
   const [spinning, setSpinning] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   // hydrate 후 관심지역이 있으면 "mine" 탭으로 전환
   const [autoSwitched, setAutoSwitched] = useState(false);
@@ -787,9 +789,24 @@ export default function TensionPage() {
             </div>
           )}
 
-          {!isLoading && !isError && tensions && tensions.length > 0 && tensions.map((item, i) => (
-            <TensionCard key={item.country_code} data={item} userPlan={userPlan} index={i} lang={lang} />
-          ))}
+          {!isLoading && !isError && tensions && tensions.length > 0 && (
+            <>
+              {tensions.slice(0, visibleCount).map((item, i) => (
+                <TensionCard key={item.country_code} data={item} userPlan={userPlan} index={i} lang={lang} />
+              ))}
+              {visibleCount < tensions.length && (
+                <button
+                  onClick={() => setVisibleCount((v) => v + 30)}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary/50 py-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  {lang === "ko"
+                    ? `더보기 (${Math.min(visibleCount, tensions.length)}/${tensions.length})`
+                    : `Load more (${Math.min(visibleCount, tensions.length)}/${tensions.length})`}
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -117,6 +117,126 @@ export const ALL_COUNTRIES: CountryInfo[] = [
   { code: "FR", name: "프랑스",          flag: "🇫🇷", region: "유럽" },
   { code: "DE", name: "독일",            flag: "🇩🇪", region: "유럽" },
   { code: "AU", name: "호주",            flag: "🇦🇺", region: "오세아니아" },
+
+  // ── 유럽 (추가) ──────────────────────────────────────────────
+  { code: "IE", name: "아일랜드",        flag: "🇮🇪", region: "유럽" },
+  { code: "IS", name: "아이슬란드",      flag: "🇮🇸", region: "유럽" },
+  { code: "LU", name: "룩셈부르크",      flag: "🇱🇺", region: "유럽" },
+  { code: "LI", name: "리히텐슈타인",    flag: "🇱🇮", region: "유럽" },
+  { code: "MC", name: "모나코",          flag: "🇲🇨", region: "유럽" },
+  { code: "MT", name: "몰타",            flag: "🇲🇹", region: "유럽" },
+  { code: "AL", name: "알바니아",        flag: "🇦🇱", region: "유럽" },
+  { code: "MK", name: "북마케도니아",    flag: "🇲🇰", region: "유럽" },
+  { code: "ME", name: "몬테네그로",      flag: "🇲🇪", region: "유럽" },
+  { code: "SK", name: "슬로바키아",      flag: "🇸🇰", region: "유럽" },
+  { code: "SI", name: "슬로베니아",      flag: "🇸🇮", region: "유럽" },
+  { code: "BG", name: "불가리아",        flag: "🇧🇬", region: "유럽" },
+  { code: "LT", name: "리투아니아",      flag: "🇱🇹", region: "유럽" },
+  { code: "LV", name: "라트비아",        flag: "🇱🇻", region: "유럽" },
+  { code: "CY", name: "키프로스",        flag: "🇨🇾", region: "유럽" },
+  { code: "AD", name: "안도라",          flag: "🇦🇩", region: "유럽" },
+  { code: "SM", name: "산마리노",        flag: "🇸🇲", region: "유럽" },
+  { code: "IT", name: "이탈리아",        flag: "🇮🇹", region: "유럽" },
+  { code: "ES", name: "스페인",          flag: "🇪🇸", region: "유럽" },
+  { code: "PT", name: "포르투갈",        flag: "🇵🇹", region: "유럽" },
+  { code: "NL", name: "네덜란드",        flag: "🇳🇱", region: "유럽" },
+  { code: "BE", name: "벨기에",          flag: "🇧🇪", region: "유럽" },
+  { code: "SE", name: "스웨덴",          flag: "🇸🇪", region: "유럽" },
+  { code: "NO", name: "노르웨이",        flag: "🇳🇴", region: "유럽" },
+  { code: "DK", name: "덴마크",          flag: "🇩🇰", region: "유럽" },
+  { code: "CH", name: "스위스",          flag: "🇨🇭", region: "유럽" },
+  { code: "AT", name: "오스트리아",      flag: "🇦🇹", region: "유럽" },
+  { code: "GR", name: "그리스",          flag: "🇬🇷", region: "유럽" },
+  { code: "CZ", name: "체코",            flag: "🇨🇿", region: "유럽" },
+  { code: "HU", name: "헝가리",          flag: "🇭🇺", region: "유럽" },
+  { code: "HR", name: "크로아티아",      flag: "🇭🇷", region: "유럽" },
+  { code: "FI", name: "핀란드",          flag: "🇫🇮", region: "유럽" },
+  { code: "PL", name: "폴란드",          flag: "🇵🇱", region: "유럽" },
+  { code: "RO", name: "루마니아",        flag: "🇷🇴", region: "유럽" },
+  { code: "EE", name: "에스토니아",      flag: "🇪🇪", region: "유럽" },
+
+  // ── 북미 (추가) ──────────────────────────────────────────────
+  { code: "CA", name: "캐나다",          flag: "🇨🇦", region: "북미" },
+
+  // ── 중동 (추가) ──────────────────────────────────────────────
+  { code: "BH", name: "바레인",          flag: "🇧🇭", region: "중동" },
+  { code: "KW", name: "쿠웨이트",        flag: "🇰🇼", region: "중동" },
+  { code: "OM", name: "오만",            flag: "🇴🇲", region: "중동" },
+
+  // ── 아프리카 (추가) ──────────────────────────────────────────
+  { code: "AO", name: "앙골라",          flag: "🇦🇴", region: "아프리카" },
+  { code: "BJ", name: "베냉",            flag: "🇧🇯", region: "아프리카" },
+  { code: "BW", name: "보츠와나",        flag: "🇧🇼", region: "아프리카" },
+  { code: "BI", name: "부룬디",          flag: "🇧🇮", region: "아프리카" },
+  { code: "CV", name: "카보베르데",      flag: "🇨🇻", region: "아프리카" },
+  { code: "DJ", name: "지부티",          flag: "🇩🇯", region: "아프리카" },
+  { code: "GQ", name: "적도기니",        flag: "🇬🇶", region: "아프리카" },
+  { code: "GA", name: "가봉",            flag: "🇬🇦", region: "아프리카" },
+  { code: "GM", name: "감비아",          flag: "🇬🇲", region: "아프리카" },
+  { code: "KE", name: "케냐",            flag: "🇰🇪", region: "아프리카" },
+  { code: "LS", name: "레소토",          flag: "🇱🇸", region: "아프리카" },
+  { code: "LR", name: "라이베리아",      flag: "🇱🇷", region: "아프리카" },
+  { code: "MG", name: "마다가스카르",    flag: "🇲🇬", region: "아프리카" },
+  { code: "MW", name: "말라위",          flag: "🇲🇼", region: "아프리카" },
+  { code: "MU", name: "모리셔스",        flag: "🇲🇺", region: "아프리카" },
+  { code: "NA", name: "나미비아",        flag: "🇳🇦", region: "아프리카" },
+  { code: "RW", name: "르완다",          flag: "🇷🇼", region: "아프리카" },
+  { code: "ST", name: "상투메프린시페",  flag: "🇸🇹", region: "아프리카" },
+  { code: "SC", name: "세이셸",          flag: "🇸🇨", region: "아프리카" },
+  { code: "ZA", name: "남아공",          flag: "🇿🇦", region: "아프리카" },
+  { code: "SZ", name: "에스와티니",      flag: "🇸🇿", region: "아프리카" },
+  { code: "TG", name: "토고",            flag: "🇹🇬", region: "아프리카" },
+  { code: "TZ", name: "탄자니아",        flag: "🇹🇿", region: "아프리카" },
+  { code: "UG", name: "우간다",          flag: "🇺🇬", region: "아프리카" },
+  { code: "ZM", name: "잠비아",          flag: "🇿🇲", region: "아프리카" },
+  { code: "KM", name: "코모로",          flag: "🇰🇲", region: "아프리카" },
+  { code: "CI", name: "코트디부아르",    flag: "🇨🇮", region: "아프리카" },
+  { code: "SN", name: "세네갈",          flag: "🇸🇳", region: "아프리카" },
+  { code: "GH", name: "가나",            flag: "🇬🇭", region: "아프리카" },
+
+  // ── 남미·중미·카리브 (추가) ──────────────────────────────────
+  { code: "CR", name: "코스타리카",          flag: "🇨🇷", region: "중미" },
+  { code: "DO", name: "도미니카공화국",      flag: "🇩🇴", region: "중미" },
+  { code: "GY", name: "가이아나",            flag: "🇬🇾", region: "남미" },
+  { code: "JM", name: "자메이카",            flag: "🇯🇲", region: "중미" },
+  { code: "PA", name: "파나마",              flag: "🇵🇦", region: "중미" },
+  { code: "PY", name: "파라과이",            flag: "🇵🇾", region: "남미" },
+  { code: "SR", name: "수리남",              flag: "🇸🇷", region: "남미" },
+  { code: "TT", name: "트리니다드토바고",    flag: "🇹🇹", region: "중미" },
+  { code: "UY", name: "우루과이",            flag: "🇺🇾", region: "남미" },
+  { code: "CL", name: "칠레",               flag: "🇨🇱", region: "남미" },
+  { code: "AR", name: "아르헨티나",          flag: "🇦🇷", region: "남미" },
+  { code: "AG", name: "앤티가바부다",        flag: "🇦🇬", region: "중미" },
+  { code: "BB", name: "바베이도스",          flag: "🇧🇧", region: "중미" },
+  { code: "BS", name: "바하마",              flag: "🇧🇸", region: "중미" },
+  { code: "BZ", name: "벨리즈",              flag: "🇧🇿", region: "중미" },
+  { code: "DM", name: "도미니카",            flag: "🇩🇲", region: "중미" },
+  { code: "GD", name: "그레나다",            flag: "🇬🇩", region: "중미" },
+  { code: "KN", name: "세인트키츠네비스",    flag: "🇰🇳", region: "중미" },
+  { code: "LC", name: "세인트루시아",        flag: "🇱🇨", region: "중미" },
+  { code: "VC", name: "세인트빈센트그레나딘", flag: "🇻🇨", region: "중미" },
+
+  // ── 아시아 (추가) ────────────────────────────────────────────
+  { code: "BN", name: "브루나이",        flag: "🇧🇳", region: "동남아" },
+  { code: "BT", name: "부탄",            flag: "🇧🇹", region: "남아시아" },
+  { code: "MV", name: "몰디브",          flag: "🇲🇻", region: "남아시아" },
+  { code: "TL", name: "동티모르",        flag: "🇹🇱", region: "동남아" },
+  { code: "SG", name: "싱가포르",        flag: "🇸🇬", region: "동남아" },
+
+  // ── 오세아니아 (추가) ────────────────────────────────────────
+  { code: "FJ", name: "피지",            flag: "🇫🇯", region: "오세아니아" },
+  { code: "KI", name: "키리바시",        flag: "🇰🇮", region: "오세아니아" },
+  { code: "MH", name: "마셜제도",        flag: "🇲🇭", region: "오세아니아" },
+  { code: "FM", name: "미크로네시아",    flag: "🇫🇲", region: "오세아니아" },
+  { code: "NR", name: "나우루",          flag: "🇳🇷", region: "오세아니아" },
+  { code: "PW", name: "팔라우",          flag: "🇵🇼", region: "오세아니아" },
+  { code: "PG", name: "파푸아뉴기니",    flag: "🇵🇬", region: "오세아니아" },
+  { code: "WS", name: "사모아",          flag: "🇼🇸", region: "오세아니아" },
+  { code: "SB", name: "솔로몬제도",      flag: "🇸🇧", region: "오세아니아" },
+  { code: "TO", name: "통가",            flag: "🇹🇴", region: "오세아니아" },
+  { code: "TV", name: "투발루",          flag: "🇹🇻", region: "오세아니아" },
+  { code: "VU", name: "바누아투",        flag: "🇻🇺", region: "오세아니아" },
+  { code: "NZ", name: "뉴질랜드",        flag: "🇳🇿", region: "오세아니아" },
 ];
 
 export const COUNTRY_MAP = Object.fromEntries(ALL_COUNTRIES.map((c) => [c.code, c]));
@@ -253,25 +373,120 @@ export const COUNTRY_CENTERS: Record<string, { lat: number; lon: number }> = {
   // 북미·오세아니아
   US: { lat: 38.91, lon: -77.04 }, // 워싱턴DC
   AU: { lat: -35.28, lon: 149.13 },// 캔버라
+  // ── 유럽 (추가) ──
+  IE: { lat: 53.35, lon: -6.26 },  // 더블린
+  IS: { lat: 64.15, lon: -21.94 }, // 레이캬비크
+  LU: { lat: 49.61, lon: 6.13 },   // 룩셈부르크시
+  LI: { lat: 47.14, lon: 9.52 },   // 파두츠
+  MC: { lat: 43.73, lon: 7.42 },   // 모나코
+  MT: { lat: 35.90, lon: 14.51 },  // 발레타
+  AL: { lat: 41.33, lon: 19.82 },  // 티라나
+  MK: { lat: 41.99, lon: 21.43 },  // 스코페
+  ME: { lat: 42.44, lon: 19.26 },  // 포드고리차
+  SK: { lat: 48.15, lon: 17.11 },  // 브라티슬라바
+  SI: { lat: 46.06, lon: 14.51 },  // 류블랴나
+  BG: { lat: 42.70, lon: 23.32 },  // 소피아
+  LT: { lat: 54.69, lon: 25.28 },  // 빌뉴스
+  LV: { lat: 56.95, lon: 24.11 },  // 리가
+  CY: { lat: 35.17, lon: 33.36 },  // 니코시아
+  AD: { lat: 42.51, lon: 1.52 },   // 안도라라베야
+  SM: { lat: 43.94, lon: 12.45 },  // 산마리노시
+  IT: { lat: 41.90, lon: 12.50 },  // 로마
+  ES: { lat: 40.42, lon: -3.70 },  // 마드리드
+  PT: { lat: 38.72, lon: -9.14 },  // 리스본
+  NL: { lat: 52.37, lon: 4.90 },   // 암스테르담
+  BE: { lat: 50.85, lon: 4.35 },   // 브뤼셀
+  SE: { lat: 59.33, lon: 18.07 },  // 스톡홀름
+  NO: { lat: 59.91, lon: 10.75 },  // 오슬로
+  DK: { lat: 55.68, lon: 12.57 },  // 코펜하겐
+  CH: { lat: 46.95, lon: 7.45 },   // 베른
+  AT: { lat: 48.21, lon: 16.37 },  // 빈
+  GR: { lat: 37.98, lon: 23.73 },  // 아테네
+  CZ: { lat: 50.08, lon: 14.42 },  // 프라하
+  HU: { lat: 47.50, lon: 19.04 },  // 부다페스트
+  HR: { lat: 45.81, lon: 15.98 },  // 자그레브
+  FI: { lat: 60.17, lon: 24.94 },  // 헬싱키
+  PL: { lat: 52.23, lon: 21.01 },  // 바르샤바
+  RO: { lat: 44.43, lon: 26.10 },  // 부쿠레슈티
+  EE: { lat: 59.44, lon: 24.75 },  // 탈린
+  // ── 북미 (추가) ──
+  CA: { lat: 45.42, lon: -75.70 }, // 오타와
+  // ── 중동 (추가) ──
+  BH: { lat: 26.23, lon: 50.58 },  // 마나마
+  KW: { lat: 29.38, lon: 47.99 },  // 쿠웨이트시티
+  OM: { lat: 23.59, lon: 58.54 },  // 무스카트
+  // ── 아프리카 (추가) ──
+  AO: { lat: -8.84, lon: 13.23 },  // 루안다
+  BJ: { lat: 6.50, lon: 2.60 },    // 포르토노보
+  BW: { lat: -24.65, lon: 25.91 }, // 가보로네
+  BI: { lat: -3.38, lon: 29.36 },  // 기테가
+  CV: { lat: 14.93, lon: -23.51 }, // 프라이아
+  DJ: { lat: 11.59, lon: 43.15 },  // 지부티시
+  GQ: { lat: 3.75, lon: 8.78 },    // 말라보
+  GA: { lat: 0.39, lon: 9.45 },    // 리브르빌
+  GM: { lat: 13.45, lon: -16.58 }, // 반줄
+  KE: { lat: -1.29, lon: 36.82 },  // 나이로비
+  LS: { lat: -29.31, lon: 27.48 }, // 마세루
+  LR: { lat: 6.30, lon: -10.80 },  // 먼로비아
+  MG: { lat: -18.88, lon: 47.51 }, // 안타나나리보
+  MW: { lat: -13.97, lon: 33.79 }, // 릴롱궤
+  MU: { lat: -20.16, lon: 57.50 }, // 포트루이스
+  NA: { lat: -22.56, lon: 17.08 }, // 빈트후크
+  RW: { lat: -1.94, lon: 29.87 },  // 키갈리
+  ST: { lat: 0.34, lon: 6.73 },    // 상투메
+  SC: { lat: -4.62, lon: 55.45 },  // 빅토리아
+  ZA: { lat: -25.75, lon: 28.19 }, // 프리토리아
+  SZ: { lat: -26.31, lon: 31.13 }, // 음바바네
+  TG: { lat: 6.17, lon: 1.23 },    // 로메
+  TZ: { lat: -6.16, lon: 35.75 },  // 도도마
+  UG: { lat: 0.35, lon: 32.58 },   // 캄팔라
+  ZM: { lat: -15.39, lon: 28.32 }, // 루사카
+  KM: { lat: -11.70, lon: 43.26 }, // 모로니
+  CI: { lat: 6.85, lon: -5.29 },   // 야무수크로
+  SN: { lat: 14.69, lon: -17.44 }, // 다카르
+  GH: { lat: 5.56, lon: -0.19 },   // 아크라
+  // ── 남미·중미·카리브 (추가) ──
+  CR: { lat: 9.93, lon: -84.08 },  // 산호세
+  DO: { lat: 18.47, lon: -69.90 }, // 산토도밍고
+  GY: { lat: 6.80, lon: -58.16 },  // 조지타운
+  JM: { lat: 18.00, lon: -76.79 }, // 킹스턴
+  PA: { lat: 8.98, lon: -79.52 },  // 파나마시티
+  PY: { lat: -25.26, lon: -57.58 },// 아순시온
+  SR: { lat: 5.87, lon: -55.17 },  // 파라마리보
+  TT: { lat: 10.66, lon: -61.51 }, // 포트오브스페인
+  UY: { lat: -34.88, lon: -56.17 },// 몬테비데오
+  CL: { lat: -33.45, lon: -70.67 },// 산티아고
+  AR: { lat: -34.60, lon: -58.38 },// 부에노스아이레스
+  AG: { lat: 17.12, lon: -61.85 }, // 세인트존스
+  BB: { lat: 13.10, lon: -59.61 }, // 브리지타운
+  BS: { lat: 25.05, lon: -77.35 }, // 나소
+  BZ: { lat: 17.25, lon: -88.77 }, // 벨모판
+  DM: { lat: 15.30, lon: -61.39 }, // 로조
+  GD: { lat: 12.05, lon: -61.75 }, // 세인트조지스
+  KN: { lat: 17.30, lon: -62.72 }, // 바스테르
+  LC: { lat: 14.01, lon: -60.99 }, // 캐스트리스
+  VC: { lat: 13.16, lon: -61.23 }, // 킹스타운
+  // ── 아시아 (추가) ──
+  BN: { lat: 4.93, lon: 114.95 },  // 반다르스리브가완
+  BT: { lat: 27.47, lon: 89.64 },  // 팀부
+  MV: { lat: 4.18, lon: 73.51 },   // 말레
+  TL: { lat: -8.56, lon: 125.57 }, // 딜리
+  SG: { lat: 1.35, lon: 103.82 },  // 싱가포르
+  // ── 오세아니아 (추가) ──
+  FJ: { lat: -18.14, lon: 178.44 },// 수바
+  KI: { lat: 1.45, lon: 173.00 },  // 타라와
+  MH: { lat: 7.09, lon: 171.38 },  // 마주로
+  FM: { lat: 6.92, lon: 158.16 },  // 팔리키르
+  NR: { lat: -0.55, lon: 166.92 }, // 야렌
+  PW: { lat: 7.50, lon: 134.62 },  // 응에룰무드
+  PG: { lat: -6.21, lon: 155.96 }, // 포트모르즈비
+  WS: { lat: -13.83, lon: -171.76 },// 아피아
+  SB: { lat: -9.43, lon: 160.03 }, // 호니아라
+  TO: { lat: -21.21, lon: -175.20 },// 누쿠알로파
+  TV: { lat: -8.52, lon: 179.20 }, // 푸나푸티
+  VU: { lat: -17.73, lon: 168.32 },// 포트빌라
+  NZ: { lat: -41.29, lon: 174.78 },// 웰링턴
 };
 
-/** 긴장도 계산 대상 전체 국가 (분쟁·갈등·지정학적 위험 기준) */
-export const ALL_MONITORED_COUNTRIES = [
-  // 주요국
-  "US", "GB", "FR", "DE", "JP", "AU",
-  // 유럽·코카서스
-  "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
-  // 중동
-  "PS", "IL", "IR", "IQ", "SY", "LB", "YE", "SA", "TR", "EG",
-  // 동아시아
-  "KP", "TW", "CN", "KR",
-  // 동남아
-  "MM", "PH", "VN", "ID", "TH",
-  // 남아시아·중앙아시아
-  "PK", "AF", "IN", "BD", "KZ", "TJ", "KG",
-  // 아프리카
-  "SD", "SS", "ET", "SO", "LY", "ML", "BF", "NE", "NG", "CM",
-  "CF", "CD", "MZ", "TD", "GN", "ER", "DZ", "TN", "MA",
-  // 아메리카
-  "VE", "HT", "CO", "EC", "MX", "NI", "CU", "GT", "HN",
-];
+/** 긴장도 계산 대상 전체 국가 — ALL_COUNTRIES 에서 자동 생성 */
+export const ALL_MONITORED_COUNTRIES = ALL_COUNTRIES.map(c => c.code);
