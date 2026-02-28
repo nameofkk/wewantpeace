@@ -965,6 +965,139 @@ async def update_source(
     return {"status": "ok"}
 
 
+# ── 이벤트 재처리 (severity 재계산 + 클러스터 병합) ──────────────────────────
+
+@router.post("/reprocess-events")
+async def reprocess_events(
+    country: Optional[str] = Query(None, description="국가 코드 (예: IR). 미지정 시 최근 24h 전체"),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    severity 키워드 변경 후 기존 이벤트의 severity 재계산.
+    분산된 고심각도 클러스터를 하나로 병합.
+    """
+    import logging
+    _logger = logging.getLogger(__name__)
+    from worker.processor.normalizer import _classify_topic, _calculate_severity
+    from worker.processor.trending_engine import _calc_kscore
+
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+
+        # 1) normalized_events severity 재계산
+        q = select(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
+        if country:
+            q = q.where(NormalizedEvent.country_code == country.upper())
+        result = await db.execute(q)
+        events = result.scalars().all()
+
+        sev_updated = 0
+        for ev in events:
+            text = f"{ev.title or ''} {ev.body or ''}"
+            new_topic = _classify_topic(text)
+            new_sev = _calculate_severity(text, new_topic)
+            if new_sev != ev.severity or new_topic != ev.topic:
+                ev.severity = new_sev
+                ev.topic = new_topic
+                sev_updated += 1
+
+        await db.flush()
+
+        # 2) 분산 클러스터 병합: 같은 country+topic에서 severity>=50인 것들을 하나로
+        cq = select(IssueCluster).where(
+            IssueCluster.last_event_at >= cutoff,
+            IssueCluster.severity >= 50,
+        )
+        if country:
+            cq = cq.where(IssueCluster.country_code == country.upper())
+        cq = cq.order_by(IssueCluster.country_code, IssueCluster.topic, IssueCluster.kscore.desc())
+        cresult = await db.execute(cq)
+        clusters = cresult.scalars().all()
+
+        # country+topic 별로 그룹핑
+        from collections import defaultdict
+        groups: dict[str, list] = defaultdict(list)
+        for c in clusters:
+            if c.country_code and c.topic in ("conflict", "terror", "coup"):
+                groups[f"{c.country_code}:{c.topic}"].append(c)
+
+        merged_count = 0
+        for key, group in groups.items():
+            if len(group) <= 1:
+                continue
+            # kscore 최고인 것을 winner로, 나머지 흡수
+            winner = group[0]
+            for loser in group[1:]:
+                winner.event_count += loser.event_count
+                winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
+                if loser.severity > winner.severity:
+                    winner.severity = loser.severity
+                winner.confidence = round(
+                    max(winner.confidence, loser.confidence), 3
+                )
+                # source_tiers 병합
+                existing = list(winner.source_tiers or [])
+                existing.extend(loser.source_tiers or [])
+                winner.source_tiers = existing
+                # 시간 범위 확장
+                if loser.first_event_at < winner.first_event_at:
+                    winner.first_event_at = loser.first_event_at
+                if loser.last_event_at > winner.last_event_at:
+                    winner.last_event_at = loser.last_event_at
+                    winner.window_end = loser.last_event_at + timedelta(minutes=60)
+                # cluster_events 재할당
+                from backend.app.models.issue_cluster import ClusterEvent
+                await db.execute(
+                    text("UPDATE cluster_events SET cluster_id = :winner WHERE cluster_id = :loser"),
+                    {"winner": winner.id, "loser": loser.id},
+                )
+                # loser 비활성화 (severity=0)
+                loser.severity = 0
+                loser.kscore = 0
+                merged_count += 1
+
+            # winner kscore 재계산
+            winner.kscore = _calc_kscore(
+                event_count=winner.event_count,
+                is_spike=winner.is_spike,
+                confidence=winner.confidence,
+                severity=winner.severity,
+                independent_sources=winner.independent_sources or 1,
+                source_tiers=winner.source_tiers or [],
+            )
+            winner.updated_at = datetime.now(timezone.utc)
+
+        await db.flush()
+        await _log_action(db, admin, "reprocess_events", detail={
+            "country": country,
+            "severity_updated": sev_updated,
+            "clusters_merged": merged_count,
+        })
+
+        # 3) 트렌딩 재계산
+        from backend.app.core.database import AsyncSessionLocal
+        trending_count = 0
+        try:
+            async with AsyncSessionLocal() as calc_db:
+                async with calc_db.begin():
+                    from worker.processor.trending_engine import calculate_global_trending
+                    results = await calculate_global_trending(calc_db)
+                    trending_count = len(results)
+        except Exception as e:
+            _logger.warning("트렌딩 재계산 실패: %s", e)
+
+        return {
+            "status": "ok",
+            "severity_updated": sev_updated,
+            "clusters_merged": merged_count,
+            "trending_recalculated": trending_count,
+        }
+    except Exception as e:
+        _logger.error("reprocess_events 실패: %s", e, exc_info=True)
+        raise HTTPException(500, detail=f"재처리 실패: {str(e)}")
+
+
 # ── 피드백 조회 (읽기 전용) ─────────────────────────────────────────────────
 
 @router.get("/feedbacks")
