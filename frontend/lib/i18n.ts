@@ -178,7 +178,7 @@ export const translations = {
 
     // 긴장도 카드 내부
     tension_score_label: "긴장점수",
-    tension_gauge_tooltip: "게이지 색상은 절대 긴장점수 기준. 배지(안정/주의/경계/위기)는 절대값과 30일 퍼센타일 중 높은 쪽 — 낮은 점수라도 역사적 급등이면 상위 단계가 될 수 있음.",
+    tension_gauge_tooltip: "게이지 색상은 절대 긴장점수 기준. 배지(안정/주의/경계/심각/극심)는 절대값과 30일 퍼센타일 중 높은 쪽 — 낮은 점수라도 역사적 급등이면 상위 단계가 될 수 있음.",
     tension_breakdown_title: "점수 구성",
     tension_breakdown_tooltip: "긴장도 = 이벤트(55%) + 가속도(35%) + 파급(10%). 각 항목은 0~100 범위이며 가중합산 후 30일 분포로 정규화.",
     tension_breakdown_event: "이벤트",
@@ -927,7 +927,7 @@ export const translations = {
 
     // tension card internals
     tension_score_label: "Tension Score",
-    tension_gauge_tooltip: "Gauge color reflects the absolute tension score. Badges (Normal/Watch/Alert/Crisis) use whichever is higher — the absolute score or the 30-day percentile. A low score can still be 'Crisis' if historically unprecedented.",
+    tension_gauge_tooltip: "Gauge color reflects the absolute tension score. Badges (Stable/Caution/Alert/Severe/Extreme) use whichever is higher — the absolute score or the 30-day percentile. A low score can still be 'Extreme' if historically unprecedented.",
     tension_breakdown_title: "Score Breakdown",
     tension_breakdown_tooltip: "Tension = Events (55%) + Acceleration (35%) + Spillover (10%). Each is 0–100, weighted and normalized against the 30-day distribution.",
     tension_breakdown_event: "Events",

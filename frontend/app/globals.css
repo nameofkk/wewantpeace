@@ -148,18 +148,18 @@
 
 /* ── 5단계 차등 카드 애니메이션 ─────────────────────── */
 
-/* 극심(4): 강한 흔들림 + 빠른 적색 글로우 + 테두리 펄스 */
+/* 극심(4): 강한 흔들림(3초 주기) + 빠른 마룬 글로우 */
 @keyframes shake-extreme {
-  0%, 100% { transform: translateX(0); }
-  10%      { transform: translateX(-2px) rotate(-0.5deg); }
-  20%      { transform: translateX(2px) rotate(0.5deg); }
-  30%      { transform: translateX(-1.5px); }
-  40%      { transform: translateX(1.5px); }
-  50%      { transform: translateX(-1px) rotate(-0.3deg); }
-  60%      { transform: translateX(1px) rotate(0.3deg); }
-  70%      { transform: translateX(-0.5px); }
-  80%      { transform: translateX(0.5px); }
-  90%      { transform: translateX(0); }
+  0%, 20%, 100% { transform: translateX(0); }
+  2%  { transform: translateX(-2px) rotate(-0.5deg); }
+  4%  { transform: translateX(2px) rotate(0.5deg); }
+  6%  { transform: translateX(-1.5px); }
+  8%  { transform: translateX(1.5px); }
+  10% { transform: translateX(-1px) rotate(-0.3deg); }
+  12% { transform: translateX(1px) rotate(0.3deg); }
+  14% { transform: translateX(-0.5px); }
+  16% { transform: translateX(0.5px); }
+  18% { transform: translateX(0); }
 }
 @keyframes glow-extreme {
   0%, 100% { box-shadow: 0 0 4px 1px rgba(153, 27, 27, 0.2); }
@@ -168,16 +168,17 @@
 .card-pulse-extreme {
   animation:
     slide-up 0.35s ease forwards,
-    shake-extreme 0.6s ease-in-out 0.8s,
+    shake-extreme 3s ease-in-out 0.8s infinite,
     glow-extreme 1.5s ease-in-out 0.35s infinite;
 }
 
-/* 심각(3): 중간 펄스 글로우 + 미세 흔들림 */
+/* 심각(3): 미세 흔들림(4초 주기) + 적색 글로우 */
 @keyframes shake-severe {
-  0%, 100% { transform: translateX(0); }
-  25%      { transform: translateX(-1px); }
-  50%      { transform: translateX(1px); }
-  75%      { transform: translateX(-0.5px); }
+  0%, 15%, 100% { transform: translateX(0); }
+  3%  { transform: translateX(-1px); }
+  6%  { transform: translateX(1px); }
+  9%  { transform: translateX(-0.5px); }
+  12% { transform: translateX(0); }
 }
 @keyframes glow-severe {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
@@ -186,7 +187,7 @@
 .card-pulse-severe {
   animation:
     slide-up 0.35s ease forwards,
-    shake-severe 0.8s ease-in-out 1s,
+    shake-severe 4s ease-in-out 1s infinite,
     glow-severe 2s ease-in-out 0.35s infinite;
 }
 
@@ -242,18 +243,18 @@
 }
 
 /* ── 긴장도 카드 테두리 펄스 (극심/심각/경계) ─────── */
-/* 극심: 강한 흔들림 + 무거운 글로우 */
+/* 극심: 강한 흔들림(3초 주기) + 무거운 글로우 */
 .alert-pulse-extreme {
   animation:
     slide-up 0.35s ease forwards,
-    shake-extreme 0.6s ease-in-out 0.8s,
+    shake-extreme 3s ease-in-out 0.8s infinite,
     glow-extreme 1.5s ease-in-out 0.35s infinite;
 }
-/* 심각: 미세 흔들림 + 적색 글로우 */
+/* 심각: 미세 흔들림(4초 주기) + 적색 글로우 */
 .alert-pulse-critical {
   animation:
     slide-up 0.35s ease forwards,
-    shake-severe 0.8s ease-in-out 1s,
+    shake-severe 4s ease-in-out 1s infinite,
     glow-severe 2s ease-in-out 0.35s infinite;
 }
 /* 경계: 약한 글로우 호흡 */
