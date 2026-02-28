@@ -14,11 +14,12 @@ KScore (v4, 0-10 스케일):
 """
 import logging
 import math
+import re
 import uuid as uuid_lib
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.issue_cluster import IssueCluster
@@ -110,6 +111,9 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     if not clusters:
         return []
 
+    # ── 쓰레기 제목 자동 수정 ──────────────────────────────────────────────
+    await _fix_junk_titles(db, clusters)
+
     # KScore 계산
     scored = []
     for c in clusters:
@@ -197,6 +201,59 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
 
     logger.info("트렌딩 계산 완료: 클러스터 %d개 → scored %d개 (top %d개)", len(clusters), len(scored), len(top))
     return top
+
+
+def _is_junk_title(title: str) -> bool:
+    """해시태그만 있거나 의미 없는 제목인지 판별."""
+    stripped = re.sub(r'#\w+', '', title).strip()
+    return len(stripped) < 5
+
+
+def _translate_cached(title: str) -> str | None:
+    try:
+        from deep_translator import GoogleTranslator
+        result = GoogleTranslator(source="en", target="ko").translate(title[:200])
+        return result[:70] if result else None
+    except Exception:
+        return None
+
+
+async def _fix_junk_titles(db: AsyncSession, clusters: list[IssueCluster]) -> None:
+    """트렌딩 계산 시 쓰레기 제목 클러스터를 이벤트에서 좋은 제목으로 교체."""
+    fixed = 0
+    for c in clusters:
+        if not _is_junk_title(c.title):
+            continue
+
+        # 같은 토픽+국가+시간범위의 이벤트에서 좋은 제목 찾기
+        ev_result = await db.execute(
+            sa_text("""
+                SELECT title FROM normalized_events
+                WHERE topic = :topic
+                  AND (:cc IS NULL OR country_code = :cc)
+                  AND event_time BETWEEN :ws AND :we
+                ORDER BY severity DESC, confidence DESC
+                LIMIT 20
+            """),
+            {"topic": c.topic, "cc": c.country_code,
+             "ws": c.window_start, "we": c.window_end},
+        )
+        events = ev_result.fetchall()
+
+        best = None
+        for ev in events:
+            if not _is_junk_title(ev[0]) and len(ev[0]) > len(best or ""):
+                best = ev[0]
+
+        if not best:
+            continue
+
+        c.title = best
+        c.title_ko = _translate_cached(best)
+        fixed += 1
+
+    if fixed:
+        logger.info("쓰레기 제목 %d개 자동 수정", fixed)
 
 
 def _make_reason(cluster: IssueCluster, kscore: float) -> str:
