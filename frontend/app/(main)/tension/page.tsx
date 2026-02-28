@@ -457,8 +457,9 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
           </p>
           <div className="space-y-1.5">
             {data.top5_clusters.map((c, i) => {
-              const clusterTitle = stripTitlePrefix(lang === "en" ? c.title : (c.title_ko ?? c.title));
+              const strippedTitle = stripTitlePrefix(lang === "en" ? c.title : (c.title_ko ?? c.title));
               const topicKey = `topic_${c.topic}` as Parameters<typeof t>[1];
+              const clusterTitle = strippedTitle || t(lang, topicKey);
               return (
                 <Link
                   key={c.id}

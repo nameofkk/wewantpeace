@@ -20,9 +20,18 @@ export const SOURCE_TIERS = {
   D: { label: "미확인", color: "text-gray-500", bg: "bg-gray-500/10" },
 } as const;
 
-/** 기존 "[국가] 토픽 · " 접두어를 제거하고 순수 제목만 반환 */
+/**
+ * 제목 정리: 접두어 제거 + 해시태그 전용 쓰레기 제목 감지.
+ * 의미있는 제목이면 그대로, 쓰레기면 빈 문자열 반환.
+ */
 export function stripTitlePrefix(title: string): string {
-  return title.replace(/^\[.+?\]\s*.+?\s*·\s*/, "");
+  // 1) "[국가] 토픽 · " 접두어 제거
+  let cleaned = title.replace(/^\[.+?\]\s*.+?\s*·\s*/, "");
+  // 2) 해시태그 제거
+  cleaned = cleaned.replace(/#\S+/g, "").trim();
+  // 3) 남은 글자가 4자 미만이면 쓰레기 → 빈 문자열
+  if (cleaned.length < 4) return "";
+  return cleaned;
 }
 
 export const TOPIC_LABELS: Record<string, string> = {

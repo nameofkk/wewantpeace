@@ -9,6 +9,7 @@ import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
+import { getCountryName } from "@/lib/countries";
 
 function isNew(isoString: string): boolean {
   return Date.now() - new Date(isoString).getTime() < 2 * 60 * 60 * 1000;
@@ -84,7 +85,13 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
     );
   }
 
-  const displayTitle = stripTitlePrefix(lang === "en" ? issue.title : (issue.title_ko ?? issue.title));
+  const strippedTitle = stripTitlePrefix(lang === "en" ? issue.title : (issue.title_ko ?? issue.title));
+  const issueTopicKey = `topic_${issue.topic}` as Parameters<typeof t>[1];
+  const displayTitle = strippedTitle || (
+    issue.country_code
+      ? `${getCountryName(issue.country_code, lang)} ${t(lang, issueTopicKey)}`
+      : t(lang, issueTopicKey)
+  );
 
   const statusLabel = issue.confidence >= 0.70
     ? t(lang, "issue_status_confirmed")
@@ -179,7 +186,12 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                 const tier = event.source_tier ?? "C";
                 const eventNew = isNew(event.event_time);
                 const eventTopicKey = `topic_${event.topic}` as Parameters<typeof t>[1];
-                const eventTitle = stripTitlePrefix(lang === "en" ? event.title : (event.title_ko ?? event.title));
+                const eventStripped = stripTitlePrefix(lang === "en" ? event.title : (event.title_ko ?? event.title));
+                const eventTitle = eventStripped || (
+                  event.country_code
+                    ? `${getCountryName(event.country_code, lang)} ${t(lang, eventTopicKey)}`
+                    : t(lang, eventTopicKey)
+                );
                 return (
                   <div key={event.id} className="flex gap-3">
                     <div className="flex flex-col items-center">

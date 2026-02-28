@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { COUNTRY_MAP } from "@/lib/countries";
+import { COUNTRY_MAP, getCountryName } from "@/lib/countries";
 import { cn, stripTitlePrefix } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
@@ -104,7 +104,12 @@ export default function CountryIssuesPage() {
           const level = (cluster.severity >= 80 ? 4 : cluster.severity >= 60 ? 3 : cluster.severity >= 40 ? 2 : cluster.severity >= 20 ? 1 : 0) as 0 | 1 | 2 | 3 | 4;
           const levelLabel = getTensionLevelLabel(level, lang);
           const topicKey = `topic_${cluster.topic}` as Parameters<typeof t>[1];
-          const clusterTitle = stripTitlePrefix(lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title));
+          const strippedCluster = stripTitlePrefix(lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title));
+          const clusterTitle = strippedCluster || (
+            cluster.country_code
+              ? `${getCountryName(cluster.country_code, lang)} ${t(lang, topicKey)}`
+              : t(lang, topicKey)
+          );
           const locale = lang === "en" ? "en-US" : "ko-KR";
 
           function formatTime(iso: string): string {

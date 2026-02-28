@@ -317,10 +317,16 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
-  const displayTitle = stripTitlePrefix(lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword));
+  const stripped = stripTitlePrefix(lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword));
   // 토픽 레이블
   const topicKey = `topic_${topic}` as Parameters<typeof t>[1];
   const topicLabel = t(lang, topicKey) || topic;
+  // 쓰레기 제목 폴백: 국가명 + 토픽으로 의미있는 제목 생성
+  const displayTitle = stripped || (
+    item.country_codes.length > 0
+      ? `${item.country_codes.map((c: string) => getCountryName(c, lang)).join(lang === "ko" ? "·" : "-")} ${topicLabel}`
+      : topicLabel
+  );
 
   return (
     <div
