@@ -474,7 +474,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 8 ? "text-red-100" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-300" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 8 ? "text-red-300" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-300" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );
@@ -603,22 +603,24 @@ export default function TensionPage() {
           {/* 오른쪽 */}
           <div className="flex items-center justify-end gap-1.5">
             {crisisCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+              <span className="flex items-center gap-0.5 rounded-full bg-red-900/25 px-1.5 py-0.5 text-[9px] font-bold text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {crisisCount}
               </span>
             )}
-            {crisisCount === 0 && severeCount > 0 && (
+            {severeCount - crisisCount > 0 && (
               <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
                 <AlertTriangle className="h-2.5 w-2.5" />
-                {severeCount}
+                {severeCount - crisisCount}
               </span>
             )}
-            {crisisCount === 0 && severeCount === 0 && warningCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-400">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {warningCount}
-              </span>
+            {(crisisCount > 0 || severeCount > 0) && (
+              <InfoTooltip
+                direction="down"
+                text={lang === "ko"
+                  ? `🔴 극심 ${crisisCount}개국 (긴장도 80+)\n🟠 위기 ${severeCount - crisisCount}개국 (긴장도 60~80)`
+                  : `🔴 ${crisisCount} Extreme (Score 80+)\n🟠 ${severeCount - crisisCount} Severe (Score 60-80)`}
+              />
             )}
             <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button

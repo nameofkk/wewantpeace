@@ -573,8 +573,9 @@ export default function HomePage() {
   }, [items]);
   const elapsed = useElapsed(lastFetchedAt, lang);
 
-  // 스파이크 카운트
-  const spikeCount = (items ?? []).filter((i) => i.is_spike).length;
+  // 레벨별 카운트 (KScore 기준)
+  const extremeCount = (items ?? []).filter((i) => roundKScore(i.kscore) >= 8).length;
+  const crisisCount = (items ?? []).filter((i) => { const k = roundKScore(i.kscore); return k >= 6 && k < 8; }).length;
 
   const handleRefresh = useCallback(async () => {
     setSpinning(true);
@@ -602,11 +603,25 @@ export default function HomePage() {
           </div>
           {/* 오른쪽 */}
           <div className="flex items-center justify-end gap-1.5">
-            {spikeCount > 0 && (
+            {extremeCount > 0 && (
+              <span className="flex items-center gap-0.5 rounded-full bg-red-900/25 px-1.5 py-0.5 text-[9px] font-bold text-red-300 border border-red-800/40">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                {extremeCount}
+              </span>
+            )}
+            {crisisCount > 0 && (
               <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
                 <AlertTriangle className="h-2.5 w-2.5" />
-                {spikeCount}
+                {crisisCount}
               </span>
+            )}
+            {(extremeCount > 0 || crisisCount > 0) && (
+              <InfoTooltip
+                direction="down"
+                text={lang === "ko"
+                  ? `🔴 극심 ${extremeCount}건 (KScore 8+)\n🟠 심각 ${crisisCount}건 (KScore 6~8)`
+                  : `🔴 ${extremeCount} Extreme (KScore 8+)\n🟠 ${crisisCount} Severe (KScore 6-8)`}
+              />
             )}
             <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button
