@@ -49,7 +49,7 @@ function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg:
   const k = roundKScore(kscore);
   if (k >= 8) return {
     label: lang === "ko" ? "극심" : "Extreme",
-    bg: "bg-red-900/20", text: "text-red-100",
+    bg: "bg-red-900/20", text: "text-red-300",
     glow: "shadow-red-900/30 shadow-lg",
   };
   if (k >= 6) return {
@@ -538,7 +538,9 @@ function LoadingSkeleton() {
 export default function HomePage() {
   const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan } = useAppStore();
   const { data: me } = useMe();
-  const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
+  const meObj = me as { plan?: string; role?: string } | undefined;
+  const userPlan = meObj?.plan ?? "free";
+  const isAdmin = meObj?.role === "admin";
 
   // 서버 plan → store 동기화
   useEffect(() => {
@@ -756,7 +758,7 @@ export default function HomePage() {
 
             {!isLoading && !isError && items && items.length > 0 &&
               items.map((item, i) => (
-                <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={(me as { role?: string } | undefined)?.role === "admin"} />
+                <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={isAdmin} />
               ))
             }
           </div>
