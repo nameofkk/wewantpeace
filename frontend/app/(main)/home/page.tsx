@@ -311,7 +311,8 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
   const [showHistory, setShowHistory] = useState(false);
   const topic = item.topic ?? "unknown";
   const k = roundKScore(item.kscore);
-  const isCritical = k >= 6;
+  const isExtreme = k >= 8;
+  const isSevere = k >= 6;
   const isAlert = k >= 4;
   const badge = getKScoreBadge(item.kscore, lang);
   const clusterId = item.cluster_ids?.[0];
@@ -329,26 +330,21 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
         clusterId && "cursor-pointer",
         kscoreAccent(item.kscore),
         badge.glow,
-        isCritical && "kscore-crisis-pulse",
-        isAlert && !isCritical && "card-glow-pulse",
+        isExtreme && "card-pulse-extreme",
+        isSevere && !isExtreme && "card-pulse-severe",
+        isAlert && !isSevere && "card-pulse-alert",
       )}
       style={{ animationDelay: `${delay}ms` }}
       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
     >
-      {/* 외부 퍼지는 글로우 링 (경계/위기만) */}
-      {isAlert && (
-        <div className={cn(
-          "absolute -inset-[1px] rounded-xl pointer-events-none",
-          isCritical ? "card-outer-pulse-red" : "card-outer-pulse-orange",
-        )} />
-      )}
-
-      {/* 배경 글로우 (경계/위기만) */}
+      {/* 배경 글로우 (경계 이상) */}
       {isAlert && (
         <div
           className="absolute inset-0 rounded-xl pointer-events-none"
           style={{
-            background: isCritical
+            background: isExtreme
+              ? "linear-gradient(135deg, rgba(153,27,27,0.12) 0%, transparent 50%)"
+              : isSevere
               ? "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, transparent 60%)"
               : "linear-gradient(135deg, rgba(249,115,22,0.05) 0%, transparent 60%)",
           }}
@@ -370,7 +366,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free" }: { item: Tren
             <span className={cn(
               "inline-flex items-center h-5 rounded-full px-2 text-[10px] font-bold leading-none",
               badge.bg, badge.text,
-              isCritical && "animate-pulse",
+              isSevere && "animate-pulse",
             )}>
               {badge.label}
             </span>

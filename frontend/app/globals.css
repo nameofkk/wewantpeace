@@ -146,44 +146,57 @@
   animation: slide-up 0.35s ease forwards;
 }
 
-/* ── KScore 위기 카드 펄스 (slide-up 포함 — card-enter 덮어쓰기 방지) ── */
-@keyframes crisis-border {
-  0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
-  50%      { border-color: rgba(239, 68, 68, 0.6); }
+/* ── 5단계 차등 카드 애니메이션 ─────────────────────── */
+
+/* 극심(4): 강한 흔들림 + 빠른 적색 글로우 + 테두리 펄스 */
+@keyframes shake-extreme {
+  0%, 100% { transform: translateX(0); }
+  10%      { transform: translateX(-2px) rotate(-0.5deg); }
+  20%      { transform: translateX(2px) rotate(0.5deg); }
+  30%      { transform: translateX(-1.5px); }
+  40%      { transform: translateX(1.5px); }
+  50%      { transform: translateX(-1px) rotate(-0.3deg); }
+  60%      { transform: translateX(1px) rotate(0.3deg); }
+  70%      { transform: translateX(-0.5px); }
+  80%      { transform: translateX(0.5px); }
+  90%      { transform: translateX(0); }
 }
-.kscore-crisis-pulse {
-  animation: slide-up 0.35s ease forwards, crisis-border 2s ease-in-out 0.35s infinite;
+@keyframes glow-extreme {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(153, 27, 27, 0.2); }
+  50%      { box-shadow: 0 0 20px 6px rgba(153, 27, 27, 0.45); }
+}
+.card-pulse-extreme {
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-extreme 0.6s ease-in-out 0.8s,
+    glow-extreme 1.5s ease-in-out 0.35s infinite;
 }
 
-/* ── 경계 카드 글로우 호흡 (slide-up 포함) ────────────── */
-@keyframes glow-pulse {
+/* 심각(3): 중간 펄스 글로우 + 미세 흔들림 */
+@keyframes shake-severe {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-1px); }
+  50%      { transform: translateX(1px); }
+  75%      { transform: translateX(-0.5px); }
+}
+@keyframes glow-severe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50%      { box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25); }
+}
+.card-pulse-severe {
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-severe 0.8s ease-in-out 1s,
+    glow-severe 2s ease-in-out 0.35s infinite;
+}
+
+/* 경계(2): 약한 글로우 호흡 (흔들림 없음) */
+@keyframes glow-alert {
   0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
-  50%      { box-shadow: 0 0 16px 2px rgba(249, 115, 22, 0.12); }
+  50%      { box-shadow: 0 0 10px 2px rgba(249, 115, 22, 0.12); }
 }
-.card-glow-pulse {
-  animation: slide-up 0.35s ease forwards, glow-pulse 2.5s ease-in-out 0.35s infinite;
-}
-
-/* ── 카드 외부 퍼지는 링 (위기) ──────────────────────── */
-@keyframes outer-pulse-red {
-  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25); }
-  70%  { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-.card-outer-pulse-red {
-  animation: outer-pulse-red 2s ease-out infinite;
-  border-radius: inherit;
-}
-
-/* ── 카드 외부 퍼지는 링 (경계) ──────────────────────── */
-@keyframes outer-pulse-orange {
-  0%   { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.15); }
-  70%  { box-shadow: 0 0 0 5px rgba(249, 115, 22, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
-}
-.card-outer-pulse-orange {
-  animation: outer-pulse-orange 2.8s ease-out infinite;
-  border-radius: inherit;
+.card-pulse-alert {
+  animation: slide-up 0.35s ease forwards, glow-alert 2.8s ease-in-out 0.35s infinite;
 }
 
 /* ── LIVE 글로우 ─────────────────────────────────────── */
@@ -228,18 +241,24 @@
   animation: spike-pulse 2.2s ease-in-out infinite;
 }
 
-/* ── 긴장도 카드 테두리 펄스 (위기/경계) ────────────── */
-@keyframes alert-border-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-color); }
-  50%      { box-shadow: 0 0 12px 3px var(--pulse-color); }
+/* ── 긴장도 카드 테두리 펄스 (극심/심각/경계) ─────── */
+/* 극심: 강한 흔들림 + 무거운 글로우 */
+.alert-pulse-extreme {
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-extreme 0.6s ease-in-out 0.8s,
+    glow-extreme 1.5s ease-in-out 0.35s infinite;
 }
+/* 심각: 미세 흔들림 + 적색 글로우 */
 .alert-pulse-critical {
-  --pulse-color: rgba(239,68,68,0.35);
-  animation: slide-up 0.35s ease forwards, alert-border-pulse 2s ease-in-out 0.35s infinite;
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-severe 0.8s ease-in-out 1s,
+    glow-severe 2s ease-in-out 0.35s infinite;
 }
+/* 경계: 약한 글로우 호흡 */
 .alert-pulse-warning {
-  --pulse-color: rgba(249,115,22,0.25);
-  animation: slide-up 0.35s ease forwards, alert-border-pulse 2.5s ease-in-out 0.35s infinite;
+  animation: slide-up 0.35s ease forwards, glow-alert 2.8s ease-in-out 0.35s infinite;
 }
 
 /* 배너 프로그레스 바 축소 */

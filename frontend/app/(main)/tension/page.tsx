@@ -329,6 +329,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
   const displayLevel = scoreLevel(data.raw_score);
   const info = TENSION_LEVELS[displayLevel];
   const label = getCountryName(data.country_code, lang);
+  const isExtreme = displayLevel >= 4;
   const isCritical = displayLevel >= 3;
   const isSpike = data.percentile_30d >= 75 && displayLevel < 3;
 
@@ -340,7 +341,8 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
       className={cn(
         "relative card-enter rounded-xl border bg-card p-4 transition-all",
         scoreBorderStyle(data.raw_score),
-        displayLevel >= 3 && "alert-pulse-critical",
+        isExtreme && "alert-pulse-extreme",
+        isCritical && !isExtreme && "alert-pulse-critical",
         displayLevel === 2 && "alert-pulse-warning",
       )}
       style={{ animationDelay: `${index * 100}ms` }}
@@ -382,7 +384,8 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
         <span className={cn(
           "rounded-full px-3 py-1 text-xs font-bold border badge-pop",
           info.bg, info.color, info.border,
-          displayLevel >= 3 && "shadow-red-900/60 shadow-md",
+          isExtreme && "shadow-red-950/70 shadow-lg",
+          isCritical && !isExtreme && "shadow-red-900/60 shadow-md",
           displayLevel === 2 && "shadow-orange-900/40 shadow-sm",
         )}>
           {getTensionLevelLabel(displayLevel, lang)}

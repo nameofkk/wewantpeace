@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppStore } from "@/lib/store";
+
 interface KScoreBarProps {
   kscore: number;   // 0 ~ 10 스케일
   showLabel?: boolean;
@@ -16,19 +18,26 @@ function kscoreColor(k: number): string {
   return "from-emerald-500 to-emerald-400";
 }
 
-function kscoreLabel(k: number, rounded: number): string {
-  if (rounded >= 8) return "극심";
-  if (rounded >= 6) return "심각";
-  if (rounded >= 4) return "경계";
-  if (rounded >= 2) return "주의";
-  return "안정";
+const LABELS = {
+  ko: ["안정", "주의", "경계", "심각", "극심"],
+  en: ["Stable", "Caution", "Alert", "Severe", "Extreme"],
+} as const;
+
+function kscoreLabel(rounded: number, lang: "ko" | "en"): string {
+  const l = LABELS[lang];
+  if (rounded >= 8) return l[4];
+  if (rounded >= 6) return l[3];
+  if (rounded >= 4) return l[2];
+  if (rounded >= 2) return l[1];
+  return l[0];
 }
 
 export function KScoreBar({ kscore, showLabel = true, className = "" }: KScoreBarProps) {
+  const lang = useAppStore((s) => s.lang);
   const rounded = Math.round(kscore * 10) / 10;
   const pct = Math.min(100, Math.round((kscore / KSCORE_MAX) * 100));
   const gradient = kscoreColor(rounded);
-  const label = kscoreLabel(kscore, rounded);
+  const label = kscoreLabel(rounded, lang);
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
