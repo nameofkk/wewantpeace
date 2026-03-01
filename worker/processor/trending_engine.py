@@ -245,18 +245,30 @@ async def _fix_junk_titles(db: AsyncSession, clusters: list[IssueCluster]) -> No
             continue
 
         # 같은 토픽+국가+시간범위의 이벤트에서 좋은 제목 찾기
-        ev_result = await db.execute(
-            sa_text("""
-                SELECT title FROM normalized_events
-                WHERE topic = :topic
-                  AND (:cc IS NULL OR country_code = :cc)
-                  AND event_time BETWEEN :ws AND :we
-                ORDER BY severity DESC, confidence DESC
-                LIMIT 20
-            """),
-            {"topic": c.topic, "cc": c.country_code,
-             "ws": c.window_start, "we": c.window_end},
-        )
+        if c.country_code:
+            ev_result = await db.execute(
+                sa_text("""
+                    SELECT title FROM normalized_events
+                    WHERE topic = :topic AND country_code = :cc
+                      AND event_time BETWEEN :ws AND :we
+                    ORDER BY severity DESC, confidence DESC
+                    LIMIT 20
+                """),
+                {"topic": c.topic, "cc": c.country_code,
+                 "ws": c.window_start, "we": c.window_end},
+            )
+        else:
+            ev_result = await db.execute(
+                sa_text("""
+                    SELECT title FROM normalized_events
+                    WHERE topic = :topic
+                      AND event_time BETWEEN :ws AND :we
+                    ORDER BY severity DESC, confidence DESC
+                    LIMIT 20
+                """),
+                {"topic": c.topic,
+                 "ws": c.window_start, "we": c.window_end},
+            )
         events = ev_result.fetchall()
 
         best = None
