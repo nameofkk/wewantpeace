@@ -14,16 +14,19 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1) DROP existing CHECK constraint, recreate with 'notice' added
-    op.drop_constraint("ck_posts_type", "posts", type_="check")
-    op.create_check_constraint(
-        "ck_posts_type",
-        "posts",
-        "post_type IN ('discussion','question','analysis','notice')",
-    )
+    conn = op.get_bind()
 
-    # 2) Add is_pinned column
-    op.add_column("posts", sa.Column("is_pinned", sa.Boolean(), nullable=False, server_default="false"))
+    # 1) CHECK 제약 교체 (이미 적용돼 있으면 DROP 후 재생성)
+    conn.execute(sa.text("ALTER TABLE posts DROP CONSTRAINT IF EXISTS ck_posts_type"))
+    conn.execute(sa.text(
+        "ALTER TABLE posts ADD CONSTRAINT ck_posts_type "
+        "CHECK (post_type IN ('discussion','question','analysis','notice'))"
+    ))
+
+    # 2) is_pinned 컬럼 (이미 있으면 무시)
+    conn.execute(sa.text(
+        "ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE"
+    ))
 
 
 def downgrade() -> None:
