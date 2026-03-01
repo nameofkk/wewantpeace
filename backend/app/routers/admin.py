@@ -915,6 +915,74 @@ async def push_stats(
     }
 
 
+# ── 테스트 푸시 ──────────────────────────────────────────────────────────────
+
+class TestPushRequest(BaseModel):
+    title: str = "🔔 WeWantPeace 테스트"
+    body: str = "푸시 알림이 정상적으로 도착했습니다!"
+
+
+@router.post("/test-push")
+async def test_push(
+    payload: TestPushRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """관리자 본인에게만 테스트 푸시 발송."""
+    result = await db.execute(
+        select(UserPushToken).where(UserPushToken.user_id == admin.id)
+    )
+    tokens = result.scalars().all()
+    if not tokens:
+        raise HTTPException(status_code=404, detail="등록된 FCM 토큰이 없습니다.")
+
+    sent = 0
+    errors = []
+    try:
+        import firebase_admin.messaging as messaging
+
+        for token_obj in tokens:
+            try:
+                if token_obj.platform in ("android", "ios"):
+                    msg = messaging.Message(
+                        token=token_obj.fcm_token,
+                        notification=messaging.Notification(
+                            title=payload.title,
+                            body=payload.body,
+                        ),
+                        data={"type": "test", "admin": "true"},
+                        android=messaging.AndroidConfig(
+                            priority="high",
+                            notification=messaging.AndroidNotification(
+                                channel_id="wwp_alerts",
+                                priority="high",
+                            ),
+                        ),
+                    )
+                else:
+                    msg = messaging.Message(
+                        token=token_obj.fcm_token,
+                        data={
+                            "title": payload.title,
+                            "body": payload.body,
+                            "type": "test",
+                        },
+                        webpush=messaging.WebpushConfig(headers={"Urgency": "high"}),
+                    )
+                messaging.send(msg)
+                sent += 1
+            except Exception as e:
+                errors.append(f"{token_obj.platform}: {str(e)[:100]}")
+    except ImportError:
+        raise HTTPException(status_code=500, detail="firebase_admin 미설치")
+
+    return {
+        "sent": sent,
+        "total_tokens": len(tokens),
+        "errors": errors,
+    }
+
+
 # ── 소스 채널 관리 ─────────────────────────────────────────────────────────
 
 class SourcePatch(BaseModel):
