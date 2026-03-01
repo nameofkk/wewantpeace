@@ -250,7 +250,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
         {isPreview ? (
           <div
             className="w-full rounded-lg py-2.5 text-xs font-bold text-center"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.3)", cursor: "default" }}
+            style={{ background: "var(--lock-btn-bg, rgba(255,255,255,0.05))", border: "1px solid var(--lock-btn-border, rgba(255,255,255,0.1))", color: "var(--lock-btn-text, rgba(255,255,255,0.3))", cursor: "default" }}
           >
             {lang === "ko" ? "🔒 상세보기 — Pro 플랜 전용" : "🔒 Details — Pro plan only"}
           </div>

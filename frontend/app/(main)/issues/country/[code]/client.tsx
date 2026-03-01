@@ -38,11 +38,11 @@ function getSeverityColor(severity: number): string {
 }
 
 const TENSION_BG: Record<number, string> = {
-  0: "bg-green-500/20 text-green-400",
-  1: "bg-amber-500/30 text-amber-300",
-  2: "bg-orange-500/40 text-orange-300",
-  3: "bg-red-500/40 text-red-400",
-  4: "bg-red-900/50 text-red-100",
+  0: "bg-green-500/20 text-green-700 dark:text-green-400",
+  1: "bg-amber-500/30 text-amber-700 dark:text-amber-300",
+  2: "bg-orange-500/40 text-orange-700 dark:text-orange-300",
+  3: "bg-red-500/40 text-red-600 dark:text-red-400",
+  4: "bg-red-900/50 text-red-800 dark:text-red-100",
 };
 
 export default function CountryIssuesPage() {

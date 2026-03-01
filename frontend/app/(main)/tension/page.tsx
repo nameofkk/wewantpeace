@@ -255,8 +255,7 @@ function HistorySection({
       {/* 잠긴 범위 플랜 안내 */}
       {userLevel < (PLAN_ORDER["pro_plus"] ?? 2) && (
         <div
-          className="mb-3 flex items-center justify-between rounded-lg px-3 py-2"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+          className="mb-3 flex items-center justify-between rounded-lg px-3 py-2 bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08]"
         >
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0" />
@@ -474,7 +473,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
                   <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
                   <span className={cn(
                     "text-[10px] font-bold tabular-nums",
-                    (c.kscore ?? 0) >= 8 ? "text-red-300" : (c.kscore ?? 0) >= 6 ? "text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-300" : "text-muted-foreground"
+                    (c.kscore ?? 0) >= 8 ? "text-red-700 dark:text-red-300" : (c.kscore ?? 0) >= 6 ? "text-red-600 dark:text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-600 dark:text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground"
                   )}>K{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );
@@ -606,13 +605,13 @@ export default function TensionPage() {
           {/* 오른쪽 */}
           <div className="flex items-center justify-end gap-1.5">
             {crisisCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-900/25 px-1.5 py-0.5 text-[9px] font-bold text-red-300 border border-red-800/40">
+              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {crisisCount}
               </span>
             )}
             {severeCount - crisisCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-500/15 px-1.5 text-[9px] font-bold text-red-600 dark:text-red-400 border border-red-500/30">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {severeCount - crisisCount}
               </span>

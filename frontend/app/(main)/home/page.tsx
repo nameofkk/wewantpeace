@@ -14,16 +14,16 @@ import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
 
 const TOPIC_COLORS: Record<string, string> = {
-  conflict:  "bg-red-500/20 text-red-400",
-  terror:    "bg-red-700/20 text-red-600",
-  coup:      "bg-purple-500/20 text-purple-400",
-  sanctions: "bg-blue-500/20 text-blue-400",
-  cyber:     "bg-cyan-500/20 text-cyan-400",
-  protest:   "bg-orange-500/20 text-orange-400",
-  diplomacy: "bg-green-500/20 text-green-400",
-  maritime:  "bg-teal-500/20 text-teal-400",
-  disaster:  "bg-sky-500/20 text-sky-400",
-  health:    "bg-emerald-500/20 text-emerald-400",
+  conflict:  "bg-red-500/20 text-red-600 dark:text-red-400",
+  terror:    "bg-red-700/20 text-red-700 dark:text-red-600",
+  coup:      "bg-purple-500/20 text-purple-600 dark:text-purple-400",
+  sanctions: "bg-blue-500/20 text-blue-600 dark:text-blue-400",
+  cyber:     "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400",
+  protest:   "bg-orange-500/20 text-orange-600 dark:text-orange-400",
+  diplomacy: "bg-green-500/20 text-green-600 dark:text-green-400",
+  maritime:  "bg-teal-500/20 text-teal-600 dark:text-teal-400",
+  disaster:  "bg-sky-500/20 text-sky-600 dark:text-sky-400",
+  health:    "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
   unknown:   "bg-muted text-muted-foreground",
 };
 
@@ -49,27 +49,27 @@ function getKScoreBadge(kscore: number, lang: "ko" | "en"): { label: string; bg:
   const k = roundKScore(kscore);
   if (k >= 8) return {
     label: lang === "ko" ? "극심" : "Extreme",
-    bg: "bg-red-900/20", text: "text-red-300",
+    bg: "bg-red-900/20", text: "text-red-700 dark:text-red-300",
     glow: "shadow-red-900/30 shadow-lg",
   };
   if (k >= 6) return {
     label: lang === "ko" ? "심각" : "Severe",
-    bg: "bg-red-500/15", text: "text-red-400",
+    bg: "bg-red-500/15", text: "text-red-600 dark:text-red-400",
     glow: "shadow-red-500/20 shadow-lg",
   };
   if (k >= 4) return {
     label: lang === "ko" ? "경계" : "Alert",
-    bg: "bg-orange-500/15", text: "text-orange-300",
+    bg: "bg-orange-500/15", text: "text-orange-600 dark:text-orange-300",
     glow: "shadow-orange-500/15 shadow-md",
   };
   if (k >= 2) return {
     label: lang === "ko" ? "주의" : "Caution",
-    bg: "bg-amber-500/10", text: "text-amber-300",
+    bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-300",
     glow: "",
   };
   return {
     label: lang === "ko" ? "안정" : "Stable",
-    bg: "bg-emerald-500/10", text: "text-emerald-400",
+    bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400",
     glow: "",
   };
 }
@@ -272,8 +272,7 @@ function KScoreHistorySection({
       {/* 잠긴 범위 플랜 안내 */}
       {userLevel < (PLAN_ORDER["pro_plus"] ?? 2) && (
         <div
-          className="mb-3 flex items-center justify-between rounded-lg px-3 py-2"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+          className="mb-3 flex items-center justify-between rounded-lg px-3 py-2 bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.08] dark:border-white/[0.08]"
         >
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0" />
@@ -594,7 +593,7 @@ export default function HomePage() {
             <h1 className="text-sm font-bold truncate">{t(lang, "home_title")}</h1>
             <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
-              <span className="text-[9px] font-bold text-red-400">LIVE</span>
+              <span className="text-[9px] font-bold text-red-600 dark:text-red-400">LIVE</span>
             </span>
           </div>
           {/* 중앙 — 로고 (항상 정중앙) */}
@@ -604,13 +603,13 @@ export default function HomePage() {
           {/* 오른쪽 */}
           <div className="flex items-center justify-end gap-1.5">
             {extremeCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-900/25 px-1.5 py-0.5 text-[9px] font-bold text-red-300 border border-red-800/40">
+              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {extremeCount}
               </span>
             )}
             {crisisCount > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-500/15 px-1.5 text-[9px] font-bold text-red-600 dark:text-red-400 border border-red-500/30">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {crisisCount}
               </span>
@@ -737,14 +736,6 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {!isLoading && !isError && items && items.length > 0 && (
-              <p className="text-[11px] text-muted-foreground px-1">
-                {trendingTab === "global"
-                  ? t(lang, "home_global_count", { n: items.length })
-                  : t(lang, "home_mine_count", { n: items.length })}
-              </p>
-            )}
-
             {isLoading && <LoadingSkeleton />}
 
             {isError && (
