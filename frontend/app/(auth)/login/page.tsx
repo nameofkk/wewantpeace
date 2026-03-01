@@ -202,8 +202,6 @@ export default function LoginPage() {
         setTab("google-register");
       }
     } catch (e: unknown) {
-      // signInWithRedirect는 페이지 이동이므로 에러가 아님
-      if (e instanceof Error && e.message === "redirect") return;
       const err = e as { message?: string };
       setError(err.message || "Google login failed.");
     } finally {

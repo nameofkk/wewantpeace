@@ -26,9 +26,7 @@ export function LoginModal({ onClose, message }: LoginModalProps) {
     try {
       await signInWithGoogle();
       onClose();
-    } catch (e) {
-      // signInWithRedirect는 페이지 이동이므로 에러가 아님
-      if (e instanceof Error && e.message === "redirect") return;
+    } catch {
       router.push("/login");
     }
   }

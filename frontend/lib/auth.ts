@@ -6,8 +6,6 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithCustomToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -54,16 +52,7 @@ export async function signInWithGoogle(): Promise<FirebaseUser> {
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-
-  // React Native WebView에서는 signInWithPopup 불가 → signInWithRedirect 사용
-  if (typeof window !== "undefined" && window.__REACT_NATIVE__) {
-    await signInWithRedirect(auth, provider);
-    // redirect 후 자동으로 onIdTokenChanged가 트리거됨
-    // signInWithRedirect는 resolve 없이 페이지가 리다이렉트되므로
-    // 여기까지 오지 않지만, 타입 안전을 위해 throw
-    throw new Error("redirect");
-  }
-
+  // WebView user-agent를 Chrome으로 설정했으므로 signInWithPopup 정상 동작
   const result = await signInWithPopup(auth, provider);
   return result.user;
 }
@@ -173,11 +162,6 @@ export function useAuth() {
       setLoading(false);
       return;
     }
-    // React Native WebView: signInWithRedirect 결과 처리
-    if (typeof window !== "undefined" && window.__REACT_NATIVE__) {
-      getRedirectResult(auth).catch(() => {});
-    }
-
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
       if (u) {
