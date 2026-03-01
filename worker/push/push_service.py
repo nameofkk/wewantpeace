@@ -5,7 +5,7 @@ PushService: FCM Multicast 푸시 발송.
   Verified 레인: is_verified=True AND notify_verified=True 사용자
   Fast    레인: notify_fast=True 사용자 (Pro만 해당, 미확인 포함)
 
-쿨다운: 동일 cluster_id 1시간 (Redis key)
+쿨다운: severity >= 90 → 30분, 그 외 → 1시간 (Redis key)
 필터:
   - topics: 사용자가 선택한 토픽에 해당 이슈 topic이 포함된 경우만 발송
   - quiet_hours: 사용자 현지 시각이 조용한 시간 범위이면 발송 제외
@@ -23,7 +23,8 @@ from backend.app.models.notification import Notification
 
 logger = logging.getLogger(__name__)
 
-COOLDOWN_SECONDS = 3600  # 1시간
+COOLDOWN_SECONDS = 3600  # 1시간 (기본)
+COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
 _COOLDOWN_KEY_PREFIX = "push:cooldown:"
 
 
@@ -35,8 +36,10 @@ async def _is_in_cooldown(cluster_id: str, redis) -> bool:
     return bool(await redis.exists(_cooldown_key(cluster_id)))
 
 
-async def _set_cooldown(cluster_id: str, redis):
-    await redis.setex(_cooldown_key(cluster_id), COOLDOWN_SECONDS, "1")
+async def _set_cooldown(cluster_id: str, redis, severity: int = 0):
+    """쿨다운 설정. severity >= 90이면 30분, 그 외 1시간."""
+    ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
+    await redis.setex(_cooldown_key(cluster_id), ttl, "1")
 
 
 def _is_in_quiet_hours(current: dt_time, start: dt_time, end: dt_time) -> bool:
@@ -197,7 +200,7 @@ async def send_spike_alert(
         data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
     )
 
-    await _set_cooldown(cluster_id, redis)
+    await _set_cooldown(cluster_id, redis, severity=severity)
 
     return {
         "status": "sent",
@@ -239,7 +242,8 @@ async def send_verified_alert(
         data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
     )
 
-    await redis.setex(cooldown_key, COOLDOWN_SECONDS, "1")
+    ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
+    await redis.setex(cooldown_key, ttl, "1")
 
     return {
         "status": "sent",

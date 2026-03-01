@@ -7,7 +7,7 @@ SpikeDetector: Redis 카운터 기반 스파이크 감지.
   b10 = 7일 시즌성 기준선 (없으면 EWMA 6h, alpha=0.3)
 
 트리거: (c1 >= 4 OR c10 >= 12) AND ratio >= 4.0 AND severity >= 35
-쿨다운: 동일 cluster 15분 (Redis key로 관리)
+쿨다운: severity >= 90 → 30분, 그 외 → 1시간
 """
 import logging
 import math
@@ -20,7 +20,8 @@ C1_THRESHOLD = 4
 C10_THRESHOLD = 12
 RATIO_THRESHOLD = 4.0
 SEVERITY_MIN = 35
-COOLDOWN_SECONDS = 3600  # 1시간
+COOLDOWN_SECONDS = 3600  # 1시간 (기본)
+COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
 EWMA_ALPHA = 0.3
 
 # Redis 키 패턴
@@ -94,14 +95,15 @@ async def update_baseline(cluster_key: str, c10: int, redis) -> float:
 
 
 async def is_in_cooldown(cluster_id: str, redis) -> bool:
-    """15분 쿨다운 중이면 True."""
+    """쿨다운 중이면 True."""
     val = await redis.exists(_key_cooldown(cluster_id))
     return bool(val)
 
 
-async def set_cooldown(cluster_id: str, redis):
-    """쿨다운 설정 (15분)."""
-    await redis.setex(_key_cooldown(cluster_id), COOLDOWN_SECONDS, "1")
+async def set_cooldown(cluster_id: str, redis, severity: int = 0):
+    """쿨다운 설정. severity >= 90이면 30분, 그 외 1시간."""
+    ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
+    await redis.setex(_key_cooldown(cluster_id), ttl, "1")
 
 
 def _key_sources(cluster_id: str) -> str:
@@ -171,6 +173,6 @@ async def evaluate_spike(
     )
 
     if triggered:
-        await set_cooldown(cluster_id, redis)
+        await set_cooldown(cluster_id, redis, severity=severity)
 
     return triggered
