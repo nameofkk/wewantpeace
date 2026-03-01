@@ -190,7 +190,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                   : (stripTitlePrefix(rawEventTitle) || t(lang, eventTopicKey));
                 return (
                   <div key={event.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center w-7 shrink-0">
                       <SourceBadge tier={tier} className="shrink-0" showDesc />
                       {idx < arr.length - 1 && (
                         <div className="flex-1 w-px bg-border mt-1" />

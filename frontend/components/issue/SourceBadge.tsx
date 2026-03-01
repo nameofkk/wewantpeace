@@ -21,19 +21,28 @@ export function SourceBadge({ tier, className = "", showDesc = false }: SourceBa
   const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG] ?? TIER_CONFIG.D;
   const desc = t(lang, config.descKey);
 
-  return (
-    <span className={showDesc ? "inline-flex flex-col items-center gap-0.5" : "inline-flex"}>
+  if (!showDesc) {
+    return (
       <span
         className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-bold leading-none ${config.color} ${className}`}
         title={`Tier ${tier}: ${desc}`}
       >
         {tier}
       </span>
-      {showDesc && (
-        <span className="text-[9px] text-muted-foreground leading-none whitespace-nowrap">
-          {desc}
-        </span>
-      )}
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-col items-center gap-0.5 w-7">
+      <span
+        className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-bold leading-none ${config.color} ${className}`}
+        title={`Tier ${tier}: ${desc}`}
+      >
+        {tier}
+      </span>
+      <span className="text-[8px] text-muted-foreground leading-none text-center truncate w-full">
+        {desc}
+      </span>
     </span>
   );
 }
