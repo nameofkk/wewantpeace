@@ -109,9 +109,9 @@ export default function App() {
     });
 
     return () => {
-      unsubOpen();
-      unsubFg();
-      unsubRefresh();
+      try { unsubOpen(); } catch {}
+      try { unsubFg(); } catch {}
+      try { unsubRefresh(); } catch {}
     };
   }, []);
 

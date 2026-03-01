@@ -89,8 +89,8 @@ export async function registerTokenWithBackend(
 export function setupTokenRefreshListener(
   onNewToken: (token: string) => void,
 ): () => void {
-  return messaging().onTokenRefresh((token) => {
-    AsyncStorage.setItem(FCM_TOKEN_KEY, token);
+  return messaging().onTokenRefresh(async (token) => {
+    await AsyncStorage.setItem(FCM_TOKEN_KEY, token);
     onNewToken(token);
   });
 }

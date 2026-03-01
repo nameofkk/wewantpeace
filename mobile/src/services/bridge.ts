@@ -58,9 +58,11 @@ export function sendToWebView(
   webViewRef: RefObject<WebView | null>,
   message: NativeToWebMessage,
 ): void {
+  // JSON.parse를 사용하여 XSS 방지 (직접 JS 컨텍스트에 삽입하지 않음)
+  const encoded = JSON.stringify(JSON.stringify(message));
   const js = `
     if (window.__handleNativeMessage) {
-      window.__handleNativeMessage(${JSON.stringify(message)});
+      window.__handleNativeMessage(JSON.parse(${encoded}));
     }
     true;
   `;

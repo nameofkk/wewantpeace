@@ -35,6 +35,7 @@ interface AppWebViewProps {
 export const webViewRef = React.createRef<WebView>();
 
 // Google/Firebase OAuth 인증에 필요한 도메인
+// OAuth/인증에 필요한 외부 도메인
 const AUTH_DOMAINS = [
   "accounts.google.com",
   "apis.google.com",
@@ -43,6 +44,8 @@ const AUTH_DOMAINS = [
   "googleapis.com",
   "gstatic.com",
   "google.com/recaptcha",
+  "kauth.kakao.com",
+  "accounts.kakao.com",
 ];
 
 // Google OAuth는 WebView(user-agent에 "wv" 포함)를 차단함.
@@ -172,7 +175,7 @@ export default function AppWebView({
         allowsBackForwardNavigationGestures={Platform.OS === "ios"}
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
-        mixedContentMode="compatibility"
+        mixedContentMode="never"
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         cacheEnabled
