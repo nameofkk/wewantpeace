@@ -98,16 +98,18 @@ function groupByPixelProximity(clusters: Cluster[], map: any, threshold: number)
   const assigned = new Array(clusters.length).fill(-1);
   const groups: number[][] = [];
   const order = clusters.map((c, i) => ({ i, score: repScore(c) })).sort((a, b) => b.score - a.score).map((x) => x.i);
+  const thresholdSq = threshold * threshold; // 제곱 거리 비교 (Math.sqrt 제거)
   for (const i of order) {
     if (assigned[i] !== -1) continue;
     const gi = groups.length;
     groups.push([i]);
     assigned[i] = gi;
+    const px = positions[i].x, py = positions[i].y;
     for (const j of order) {
       if (assigned[j] !== -1 || i === j) continue;
-      const dx = positions[i].x - positions[j].x;
-      const dy = positions[i].y - positions[j].y;
-      if (Math.sqrt(dx * dx + dy * dy) < threshold) { groups[gi].push(j); assigned[j] = gi; }
+      const dx = px - positions[j].x;
+      const dy = py - positions[j].y;
+      if (dx * dx + dy * dy < thresholdSq) { groups[gi].push(j); assigned[j] = gi; }
     }
   }
   return groups.map((indices) => {
@@ -327,9 +329,10 @@ export default function MapPage() {
   const markersRef = useRef<any[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
-  const [mapZoom, setMapZoom] = useState(1.5);
-  // 줌 레벨 <4 여부만 추적 — 이 경계를 넘을 때만 마커 재생성 (줌마다 재생성 방지)
-  const [isCountryZoom, setIsCountryZoom] = useState(true);
+  // 줌 레벨 <4 여부만 추적 — ref로 관리하여 불필요한 re-render 방지
+  const isCountryZoomRef = useRef(true);
+  const [markerVersion, setMarkerVersion] = useState(0); // 국가줌 경계 변경 시만 증가
+  const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mapViewport, setMapViewport, lang, userPlan } = useAppStore();
   const { data: me, isLoading: meLoading } = useMe();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
@@ -385,14 +388,22 @@ export default function MapPage() {
       map.on("moveend", () => {
         const center = map.getCenter();
         const zoom = map.getZoom();
-        setMapViewport({ longitude: center.lng, latitude: center.lat, zoom });
-        setMapZoom(zoom);
-        setIsCountryZoom(zoom < 4);
+        // viewport persist를 debounce (300ms) — 줌/팬 중 연속 호출 방지
+        if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
+        viewportTimerRef.current = setTimeout(() => {
+          setMapViewport({ longitude: center.lng, latitude: center.lat, zoom });
+        }, 300);
+        // 국가줌 경계(zoom=4)를 넘을 때만 마커 재그룹핑 트리거
+        const newIsCountry = zoom < 4;
+        if (newIsCountry !== isCountryZoomRef.current) {
+          isCountryZoomRef.current = newIsCountry;
+          setMarkerVersion((v) => v + 1);
+        }
       });
       map.on("click", () => setSelectedCluster(null));
       map.on("load", () => { mapRef.current = map; setIsMapReady(true); });
     });
-    return () => { mapRef.current?.remove(); mapRef.current = null; setIsMapReady(false); };
+    return () => { if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current); mapRef.current?.remove(); mapRef.current = null; setIsMapReady(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -417,7 +428,7 @@ export default function MapPage() {
       );
       let displayClusters: Cluster[];
       try {
-        const countryGrouped = isCountryZoom ? groupClustersByCountry(withCoords) : withCoords;
+        const countryGrouped = isCountryZoomRef.current ? groupClustersByCountry(withCoords) : withCoords;
         displayClusters = groupByPixelProximity(countryGrouped, currentMap, 40);
       } catch {
         displayClusters = withCoords;
@@ -438,15 +449,15 @@ export default function MapPage() {
         // 마커들이 normal flow에 남아 줌 시 위치가 틀어짐
         markerEl.style.cssText = `width:${size}px;height:${size}px;`;
         const innerEl = document.createElement("div");
-        innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s, box-shadow 0.15s;opacity:1;position:relative;`;
+        innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s;opacity:1;position:relative;will-change:transform;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter marker-pulse" + (cluster.is_spike ? " marker-spike" : "");
+          innerEl.className = "marker-enter" + (cluster.is_spike ? " marker-spike" : "");
         });
         innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
         markerEl.appendChild(innerEl);
-        innerEl.addEventListener("mouseenter", () => { innerEl.style.transform = "scale(1.2)"; innerEl.style.boxShadow = `0 0 12px ${color}80`; });
-        innerEl.addEventListener("mouseleave", () => { innerEl.style.transform = "scale(1)"; innerEl.style.boxShadow = ""; });
+        innerEl.addEventListener("mouseenter", () => { innerEl.style.transform = "scale(1.2)"; });
+        innerEl.addEventListener("mouseleave", () => { innerEl.style.transform = ""; });
         innerEl.addEventListener("click", (e) => {
           e.stopPropagation();
           setSelectedCluster(cluster);  // 미리보기에서도 팝업은 열림
@@ -471,7 +482,8 @@ export default function MapPage() {
     } else {
       import("maplibre-gl").then((ml) => { maplibreRef.current = ml; doRender(ml); });
     }
-  }, [clusters, isMapReady, isCountryZoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clusters, isMapReady, markerVersion]);
 
   useEffect(() => { renderMarkers(); }, [renderMarkers]);
 

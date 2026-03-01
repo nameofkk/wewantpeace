@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -317,7 +317,7 @@ function scoreBorderStyle(score: number): string {
   return "border-border";
 }
 
-function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userPlan: string; index: number; lang: Lang }) {
+const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userPlan: string; index: number; lang: Lang }) {
   const [showHistory, setShowHistory] = useState(false);
   const [pctFilled, setPctFilled] = useState(false);
   useEffect(() => {
@@ -344,7 +344,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
         isCritical && !isExtreme && "alert-pulse-critical",
         displayLevel === 2 && "alert-pulse-warning",
       )}
-      style={{ animationDelay: `${index * 100}ms` }}
+      style={{ animationDelay: `${Math.min(index * 60, 500)}ms` }}
     >
       {/* 경각심 컬러 오버레이 (5단계) */}
       {data.raw_score >= 60 && (
@@ -497,7 +497,7 @@ function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userP
       {showHistory && <HistorySection countryCode={data.country_code} userPlan={userPlan} lang={lang} />}
     </div>
   );
-}
+});
 
 function LoadingSkeleton() {
   return (

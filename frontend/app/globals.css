@@ -95,14 +95,21 @@
   animation: marker-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* 스파이크: 빨간 링 퍼짐 */
+/* 스파이크: 빨간 링 퍼짐 (transform+opacity 기반 — GPU 가속) */
 @keyframes spike-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 0 0 0 rgba(239,68,68,0.3); }
-  70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0), 0 0 0 18px rgba(239,68,68,0); }
-  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0), 0 0 0 0 rgba(239,68,68,0); }
+  0%   { transform: scale(1);   opacity: 0.7; }
+  70%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
-.marker-spike {
+.marker-spike::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid rgba(239,68,68,0.6);
   animation: spike-ring 1.4s ease-out infinite;
+  pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* 모든 마커 파동 효과 */
@@ -156,7 +163,7 @@
 
 /* ── 5단계 차등 카드 애니메이션 ─────────────────────── */
 
-/* 극심(4): 흔들림(4초 주기) + 마룬 글로우 */
+/* 흔들림 키프레임 (transform 기반 — GPU 가속) */
 @keyframes shake-extreme {
   0%, 16%, 100% { transform: translateX(0); }
   2%  { transform: translateX(-1px) rotate(-0.3deg); }
@@ -167,42 +174,68 @@
   12% { transform: translateX(0.5px) rotate(0.15deg); }
   14% { transform: translateX(0); }
 }
-@keyframes glow-extreme {
-  0%, 100% { box-shadow: 0 0 4px 1px rgba(153, 27, 27, 0.2); }
-  50%      { box-shadow: 0 0 20px 6px rgba(153, 27, 27, 0.45); }
-}
-.card-pulse-extreme {
-  animation:
-    slide-up 0.35s ease forwards,
-    shake-extreme 4s ease-in-out 0.8s infinite,
-    glow-extreme 1.5s ease-in-out 0.35s infinite;
-}
-
-/* 심각(3): 미세 흔들림(5초 주기) + 적색 글로우 */
 @keyframes shake-severe {
   0%, 12%, 100% { transform: translateX(0); }
   3%  { transform: translateX(-0.5px); }
   6%  { transform: translateX(0.5px); }
   9%  { transform: translateX(-0.3px); }
 }
-@keyframes glow-severe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-  50%      { box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25); }
-}
-.card-pulse-severe {
-  animation:
-    slide-up 0.35s ease forwards,
-    shake-severe 5s ease-in-out 1s infinite,
-    glow-severe 2s ease-in-out 0.35s infinite;
+
+/* 글로우 호흡 (opacity 기반 — GPU 가속) */
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
 }
 
-/* 경계(2): 약한 글로우 호흡 (흔들림 없음) */
-@keyframes glow-alert {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
-  50%      { box-shadow: 0 0 10px 2px rgba(249, 115, 22, 0.12); }
+/* 극심(4): 흔들림 + 마룬 글로우 (pseudo-element) */
+.card-pulse-extreme {
+  will-change: transform;
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-extreme 4s ease-in-out 0.8s infinite;
 }
+.card-pulse-extreme::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 20px 6px rgba(153, 27, 27, 0.45);
+  pointer-events: none;
+  animation: glow-breathe 1.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* 심각(3): 미세 흔들림 + 적색 글로우 (pseudo-element) */
+.card-pulse-severe {
+  will-change: transform;
+  animation:
+    slide-up 0.35s ease forwards,
+    shake-severe 5s ease-in-out 1s infinite;
+}
+.card-pulse-severe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25);
+  pointer-events: none;
+  animation: glow-breathe 2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+/* 경계(2): 약한 글로우 호흡 (흔들림 없음, pseudo-element) */
 .card-pulse-alert {
-  animation: slide-up 0.35s ease forwards, glow-alert 2.8s ease-in-out 0.35s infinite;
+  animation: slide-up 0.35s ease forwards;
+}
+.card-pulse-alert::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 10px 2px rgba(249, 115, 22, 0.12);
+  pointer-events: none;
+  animation: glow-breathe 2.8s ease-in-out infinite;
+  will-change: opacity;
 }
 
 /* ── LIVE 글로우 ─────────────────────────────────────── */
@@ -240,31 +273,62 @@
 }
 
 @keyframes spike-pulse {
-  0%, 100% { opacity: 1;   box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
-  50%       { opacity: 0.85; box-shadow: 0 0 0 5px rgba(245,158,11,0);  }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
 }
 .spike-pulse {
   animation: spike-pulse 2.2s ease-in-out infinite;
+  will-change: opacity;
 }
 
 /* ── 긴장도 카드 테두리 펄스 (극심/심각/경계) ─────── */
-/* 극심: 흔들림(4초 주기) + 무거운 글로우 */
+/* 극심: 흔들림 + 글로우 (pseudo-element) */
 .alert-pulse-extreme {
+  will-change: transform;
   animation:
     slide-up 0.35s ease forwards,
-    shake-extreme 4s ease-in-out 0.8s infinite,
-    glow-extreme 1.5s ease-in-out 0.35s infinite;
+    shake-extreme 4s ease-in-out 0.8s infinite;
 }
-/* 심각: 미세 흔들림(4초 주기) + 적색 글로우 */
+.alert-pulse-extreme::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 20px 6px rgba(153, 27, 27, 0.45);
+  pointer-events: none;
+  animation: glow-breathe 1.5s ease-in-out infinite;
+  will-change: opacity;
+}
+/* 심각: 미세 흔들림 + 적색 글로우 (pseudo-element) */
 .alert-pulse-critical {
+  will-change: transform;
   animation:
     slide-up 0.35s ease forwards,
-    shake-severe 5s ease-in-out 1s infinite,
-    glow-severe 2s ease-in-out 0.35s infinite;
+    shake-severe 5s ease-in-out 1s infinite;
 }
-/* 경계: 약한 글로우 호흡 */
+.alert-pulse-critical::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25);
+  pointer-events: none;
+  animation: glow-breathe 2s ease-in-out infinite;
+  will-change: opacity;
+}
+/* 경계: 약한 글로우 호흡 (pseudo-element) */
 .alert-pulse-warning {
-  animation: slide-up 0.35s ease forwards, glow-alert 2.8s ease-in-out 0.35s infinite;
+  animation: slide-up 0.35s ease forwards;
+}
+.alert-pulse-warning::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 10px 2px rgba(249, 115, 22, 0.12);
+  pointer-events: none;
+  animation: glow-breathe 2.8s ease-in-out infinite;
+  will-change: opacity;
 }
 
 /* 배너 프로그레스 바 축소 */

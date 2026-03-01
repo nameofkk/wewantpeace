@@ -65,11 +65,12 @@ export default function LoginPage() {
   const [findError, setFindError] = useState<string | null>(null);
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
+  const [checkingRedirect, setCheckingRedirect] = useState(true);
 
   // React Native WebView: Google 리다이렉트 로그인 결과 확인
   useEffect(() => {
     checkGoogleRedirectResult().then(async (user) => {
-      if (!user) return;
+      if (!user) { setCheckingRedirect(false); return; }
       try {
         const token = await user.getIdToken();
         const meRes = await fetch(`${API_BASE}/me`, {
@@ -78,6 +79,7 @@ export default function LoginPage() {
         if (meRes.ok) {
           localStorage.setItem("onboarding_done", "true");
           router.push("/home");
+          return; // 홈으로 이동 중 — 로딩 유지
         } else {
           setGoogleUser(user);
           setTab("google-register");
@@ -85,7 +87,8 @@ export default function LoginPage() {
       } catch {
         // 무시 — 리다이렉트 결과 없음
       }
-    });
+      setCheckingRedirect(false);
+    }).catch(() => setCheckingRedirect(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -450,6 +453,20 @@ export default function LoginPage() {
     { key: "privacy" as const, label: t(lang, "login_privacy_label"), required: true, href: "/privacy" as string | null, value: agreedPrivacy, setter: setAgreedPrivacy },
     { key: "marketing" as const, label: t(lang, "login_marketing_label"), required: false, href: null as string | null, value: agreedMarketing, setter: setAgreedMarketing },
   ];
+
+  if (checkingRedirect) {
+    return (
+      <div className="rounded-2xl border border-border bg-card shadow-xl p-8 flex flex-col items-center justify-center min-h-[300px]">
+        <div className="relative h-7 w-16 mb-4">
+          <Image src="/logo-eye.png" alt="WeWantPeace" fill className="object-contain" priority />
+        </div>
+        <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
+        <p className="text-sm text-muted-foreground">
+          {lang === "en" ? "Signing in..." : "로그인 중..."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-xl p-8">

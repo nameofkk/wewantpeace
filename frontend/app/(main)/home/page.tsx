@@ -304,7 +304,7 @@ function KScoreHistorySection({
 }
 
 // ── 트렌딩 카드 ──────────────────────────────────────────────────────────
-function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = false }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string; isAdmin?: boolean }) {
+const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = false }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string; isAdmin?: boolean }) {
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
   const [showHistory, setShowHistory] = useState(false);
@@ -507,7 +507,7 @@ function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = fals
       )}
     </div>
   );
-}
+});
 
 function LoadingSkeleton() {
   return (
@@ -796,7 +796,7 @@ export default function HomePage() {
             {!isLoading && !isError && items && items.length > 0 && (
               <>
                 {items.slice(0, visibleCount).map((item, i) => (
-                  <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={isAdmin} />
+                  <TrendingCard key={item.id} item={item} rank={i + 1} delay={Math.min(i * 50, 500)} userPlan={userPlan} isAdmin={isAdmin} />
                 ))}
                 {items.length > visibleCount && (
                   <button
