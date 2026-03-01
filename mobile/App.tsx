@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { SafeAreaView, StyleSheet, Platform, StatusBar } from "react-native";
+import { SafeAreaView, StyleSheet, Platform, StatusBar, Linking } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import AppWebView, {
   sendMessageToWeb,
@@ -220,6 +220,12 @@ export default function App() {
           authTokenRef.current = msg.payload.authToken;
           // react-native-iap의 getAvailablePurchases()로 복원
           // 현재는 미구현 (필요시 추가)
+          break;
+        }
+
+        case "OPEN_URL": {
+          // mailto:/tel: 등 WebView에서 직접 열 수 없는 URL → OS 기본 앱
+          Linking.openURL(msg.payload.url).catch(() => {});
           break;
         }
       }

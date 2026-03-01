@@ -15,7 +15,8 @@ export type WebToNativeMessage =
   | { type: "GET_PRODUCTS"; payload: Record<string, never> }
   | { type: "GET_FCM_TOKEN"; payload: Record<string, never> }
   | { type: "RESTORE_PURCHASES"; payload: { authToken: string } }
-  | { type: "REGISTER_FCM_TOKEN"; payload: { token: string; authToken: string } };
+  | { type: "REGISTER_FCM_TOKEN"; payload: { token: string; authToken: string } }
+  | { type: "OPEN_URL"; payload: { url: string } };
 
 // ── Native → Web 메시지 타입 ──
 export type NativeToWebMessage =
@@ -46,6 +47,17 @@ export function getInjectedJavaScript(): string {
         // 이벤트 디스패치 → 웹 코드에서 addEventListener로 수신
         window.dispatchEvent(new CustomEvent('nativeMessage', { detail: msg }));
       };
+      // mailto/tel 링크 클릭 → 네이티브에서 처리 (Android WebView에서 직접 못 열음)
+      document.addEventListener('click', function(e) {
+        var el = e.target;
+        while (el && el.tagName !== 'A') el = el.parentElement;
+        if (el && el.href && (el.href.startsWith('mailto:') || el.href.startsWith('tel:'))) {
+          e.preventDefault();
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OPEN_URL', payload: { url: el.href } }));
+          }
+        }
+      }, true);
     })();
     true;
   `;

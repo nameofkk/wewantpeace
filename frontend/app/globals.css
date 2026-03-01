@@ -112,29 +112,7 @@
   will-change: transform, opacity;
 }
 
-/* 모든 마커 파동 효과 (DOM 자식 요소 기반) */
-@keyframes marker-pulse-ring {
-  0%   { transform: scale(1);   opacity: 0.5; }
-  100% { transform: scale(2.2); opacity: 0; }
-}
-.pulse-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  animation: marker-pulse-ring 2s ease-out infinite;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-.pulse-ring-delayed {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  animation: marker-pulse-ring 2s ease-out 1s infinite;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
+/* 마커 파동: Web Animations API로 구현 (globals.css의 CSS 클래스 불필요) */
 
 /* ── 뉴스 티커 ──────────────────────────────────────── */
 @keyframes ticker-scroll {
