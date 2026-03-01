@@ -181,7 +181,7 @@ export default function AppWebView({
         cacheEnabled
         cacheMode="LOAD_DEFAULT"
         setSupportMultipleWindows={false}
-        androidLayerType="hardware"
+        androidLayerType="none"
         overScrollMode="never"
         originWhitelist={["https://*", "http://*"]}
       />

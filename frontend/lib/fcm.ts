@@ -58,6 +58,11 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
         resolve(null);
       }, 10_000);
       window.__nativeBridge!.postToNative("GET_FCM_TOKEN", {});
+    }).then((token) => {
+      if (token) {
+        localStorage.setItem(FCM_TOKEN_KEY, token);
+      }
+      return token;
     });
   }
 

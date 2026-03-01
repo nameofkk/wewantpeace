@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Map, Activity, MessageSquare, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -9,6 +10,7 @@ import { t } from "@/lib/i18n";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const lang = useAppStore((s) => s.lang);
 
   const NAV_ITEMS = [
@@ -18,6 +20,13 @@ export function BottomNav() {
     { href: "/community", icon: MessageSquare, label: t(lang, "nav_community") },
     { href: "/settings", icon: Settings, label: t(lang, "nav_settings") },
   ];
+
+  // 모든 탭 라우트를 미리 프리페치 (첫 진입 지연 제거)
+  useEffect(() => {
+    ["/home", "/map", "/tension", "/community", "/settings"].forEach((href) => {
+      router.prefetch(href);
+    });
+  }, [router]);
 
   if (pathname === "/onboarding" || pathname.startsWith("/login") || pathname.startsWith("/admin")) return null;
 
