@@ -39,7 +39,8 @@ async def main():
               AND (title_ko IS NULL
                    OR title_ko = ''
                    OR title_ko = title
-                   OR title_ko ~ E'^\\[.+\\]'
+                   OR title_ko LIKE '[%'
+                   OR title_ko LIKE '#%'
                    OR title_ko LIKE '%습니다%'
                    OR title_ko LIKE '%입니다%'
                    OR length(title_ko) > 50)
@@ -102,6 +103,31 @@ async def main():
             await db.commit()
 
     print(f"\n완료: 총={total}, 업데이트={updated}, 실패={failed}, 건너뜀={skipped}")
+
+    # trending_keywords 동기화 (keyword/keyword_ko를 issue_clusters와 맞춤)
+    if not DRY_RUN and updated > 0:
+        async with AsyncSessionLocal() as db:
+            r = await db.execute(text(
+                "UPDATE trending_keywords tk "
+                "SET keyword_ko = ic.title_ko, keyword = ic.title "
+                "FROM issue_clusters ic "
+                "WHERE ic.id = (tk.cluster_ids)[1] "
+                "  AND (tk.keyword_ko IS DISTINCT FROM ic.title_ko "
+                "       OR tk.keyword IS DISTINCT FROM ic.title) "
+                "RETURNING tk.id"
+            ))
+            synced = len(r.fetchall())
+            await db.commit()
+            print(f"trending_keywords 동기화: {synced}건")
+
+        # Redis 캐시 삭제 (즉시 반영)
+        try:
+            from backend.app.core.redis import get_redis
+            redis = get_redis()
+            await redis.delete("trending:global:v1")
+            print("Redis 캐시 삭제 완료")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
