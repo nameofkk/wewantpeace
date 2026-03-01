@@ -236,7 +236,11 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A1A2E" />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#1A1A2E"
+        translucent={false}
+      />
       <AppWebView
         initialPath={initialPath}
         onNativeMessage={handleNativeMessage}
@@ -250,5 +254,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#1A1A2E",
+    // Android SafeAreaView는 StatusBar를 처리하지 않으므로 수동 패딩
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 });

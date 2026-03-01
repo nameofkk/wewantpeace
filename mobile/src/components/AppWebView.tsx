@@ -179,7 +179,10 @@ export default function AppWebView({
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         cacheEnabled
+        cacheMode="LOAD_DEFAULT"
         setSupportMultipleWindows={false}
+        androidLayerType="hardware"
+        overScrollMode="never"
         originWhitelist={["https://*", "http://*"]}
       />
       {initialLoading && (
