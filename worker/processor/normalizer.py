@@ -35,35 +35,44 @@ Given a news article title and body, classify it into exactly ONE topic and assi
 
 ## Topics (pick exactly one):
 - conflict: Armed conflict, military operations, airstrikes, bombings, war, troops, weapons, casualties from combat
-- terror: Terrorism, hostage situations, mass shootings, assassinations, cartel violence, extremist attacks
-- coup: Coups, military takeovers, martial law, government overthrow, insurrection, constitutional crisis
+- terror: Terrorism, hostage situations, mass shootings, assassinations, cartel violence, extremist attacks, police/soldiers killed by attackers
+- coup: Coups, military takeovers, martial law, government overthrow, insurrection, leader arrested/sentenced for insurrection
 - sanctions: Economic sanctions, embargoes, trade bans, tariffs, financial crises, market crashes, economic emergencies
 - cyber: Cyberattacks, hacking, ransomware, data breaches, internet shutdowns, election interference
 - protest: Protests, demonstrations, riots, civil unrest, strikes, uprisings, crackdowns on protesters
-- diplomacy: Diplomatic events, treaties, summits, elections, political developments, peace processes, government policy
+- diplomacy: Diplomatic events, treaties, summits, elections, political developments, peace processes, government policy, birth rate/population stats
 - maritime: Naval operations, shipping disruptions, piracy, maritime incidents, migrant crossings, port blockades
-- disaster: Natural disasters, industrial accidents, infrastructure failures, humanitarian crises, famines
+- disaster: Natural disasters (floods, earthquakes, storms), industrial accidents, infrastructure failures (tram/train crashes), humanitarian crises, famines
 - health: Disease outbreaks, epidemics, pandemics, public health emergencies, vaccination campaigns
 
-## Severity (0-100):
-- 0-19: Minimal/routine (scheduled exercises, minor policy updates)
-- 20-39: Low (small protests, diplomatic statements, minor incidents)
-- 40-59: Moderate (significant protests, trade disputes, localized conflict)
-- 60-79: High (major military operations, large casualties, severe crises)
-- 80-100: Critical (war declarations, mass casualties, nuclear threats, large-scale attacks)
+## Severity (0-100) — use the FULL range, do NOT cap at 80:
+- 0-19: Minimal (routine exercises, policy discussions, population statistics)
+- 20-39: Low (minor incidents, diplomatic statements, small protests, 1-2 casualties)
+- 40-59: Moderate (significant protests, trade disputes, localized skirmishes, 3-20 casualties)
+- 60-79: High (major military operations, severe crises, 20-100 casualties, major political verdicts)
+- 80-89: Very High (large-scale attacks, 100+ casualties, war escalation, genocide accusations)
+- 90-100: Critical (mass casualties 200+, active war between nations, nuclear threats, confirmed WMD use)
 
-Key severity factors:
-- Casualties: 1-10 dead → +10, 10-50 → +20, 50-100 → +25, 100+ → +30
-- Scale: city-level → base, country-level → +10, international → +15
-- Weapons: conventional → base, missiles/drones → +10, WMD/nuclear → +20
-- Uncertainty: "alleged"/"unconfirmed" → -10, "confirmed"/"official" → +5
-- De-escalation: "ceasefire"/"peace deal"/"withdrawal" → -15
+## Severity calibration examples:
+- "200 killed in airstrike" → 95
+- "School bombing kills 115" → 92
+- "Missile strike, 30 dead" → 75
+- "Ex-president sentenced to life for insurrection" → 75
+- "Police officer killed by gunmen" → 55
+- "Protests erupt over economic crisis" → 45
+- "Ceasefire talks begin" → 30
+- "Military drill conducted" → 20
+- "Japan birth rate falls" → 15
+- "Snow blankets New York" → 10
 
-IMPORTANT:
-- "state of emergency" in a WAR context = conflict, NOT sanctions
-- "nuclear" in power plant context = disaster, NOT conflict
-- Military exercises/drills = conflict with LOW severity (20-30)
-- Read the FULL context before deciding. Title alone can be misleading.
+## Key rules:
+- "state of emergency" in a WAR/MILITARY context → conflict, NOT sanctions
+- "nuclear" in power plant context → disaster, NOT conflict
+- Military exercises/drills → conflict with severity 20-30
+- Tariff/trade policy without military dimension → sanctions
+- Leader sentenced/arrested for past coup/insurrection → coup (not diplomacy)
+- Read the FULL body context before deciding. Title alone can be misleading.
+- When casualties are explicitly mentioned, severity MUST reflect the scale above.
 
 Respond ONLY with JSON: {"topic": "...", "severity": N}"""
 
