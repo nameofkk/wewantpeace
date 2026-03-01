@@ -27,16 +27,20 @@ async def main():
     failed = 0
 
     async with AsyncSessionLocal() as db:
-        # 활성 클러스터 조회 (severity > 0)
+        # 아직 AI 제목이 적용되지 않은 클러스터만 조회
+        # (title_ko가 title과 다르고 한글이 포함된 경우 이미 처리된 것)
         r = await db.execute(text("""
             SELECT id, title, title_ko, topic, country_code
             FROM issue_clusters
             WHERE severity > 0
+              AND (title_ko IS NULL
+                   OR title_ko = ''
+                   OR title_ko = title)
             ORDER BY id
         """))
         clusters = r.fetchall()
         total = len(clusters)
-        print(f"총 {total}개 클러스터 처리 시작 (dry_run={DRY_RUN})")
+        print(f"미처리 {total}개 클러스터 처리 시작 (dry_run={DRY_RUN})")
 
         for i, row in enumerate(clusters):
             cid, title, title_ko, topic, country_code = row
@@ -53,7 +57,6 @@ async def main():
             event_titles = [{"title": r[0]} for r in ev_r.fetchall() if r[0]]
 
             if not event_titles:
-                # 이벤트 제목이 없으면 클러스터 제목만 사용
                 event_titles = [{"title": title}] if title else []
 
             if not event_titles:
@@ -76,9 +79,7 @@ async def main():
                         SET title = :title_en, title_ko = :title_ko
                         WHERE id = :cid
                     """), {"title_en": new_en, "title_ko": new_ko, "cid": cid})
-                    if (i + 1) % 50 == 0:
-                        await db.commit()
-                        print(f"  [{i+1}/{total}] 커밋 완료")
+                    await db.commit()
                 updated += 1
             else:
                 failed += 1
@@ -87,7 +88,7 @@ async def main():
             if (i + 1) % 10 == 0:
                 time.sleep(0.5)
 
-            if (i + 1) % 100 == 0:
+            if (i + 1) % 50 == 0:
                 print(f"  진행: {i+1}/{total} (성공={updated}, 실패={failed}, 건너뜀={skipped})")
 
         if not DRY_RUN:
