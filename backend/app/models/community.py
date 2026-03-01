@@ -24,12 +24,13 @@ class Post(Base):
     comment_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     like_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     dislike_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     images: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-        CheckConstraint("post_type IN ('discussion','question','analysis')", name="ck_posts_type"),
+        CheckConstraint("post_type IN ('discussion','question','analysis','notice')", name="ck_posts_type"),
         CheckConstraint("status IN ('active','hidden','deleted')", name="ck_posts_status"),
     )
 

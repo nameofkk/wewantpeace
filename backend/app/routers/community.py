@@ -68,6 +68,7 @@ class PostOut(BaseModel):
     comment_count: int
     like_count: int
     dislike_count: int
+    is_pinned: bool = False
     images: list[str]
     created_at: str
     updated_at: str
@@ -130,6 +131,7 @@ def _post_to_out(
         comment_count=p.comment_count,
         like_count=p.like_count,
         dislike_count=p.dislike_count,
+        is_pinned=p.is_pinned,
         images=imgs,
         created_at=p.created_at.isoformat(),
         updated_at=p.updated_at.isoformat(),
@@ -188,6 +190,35 @@ async def upload_image(
 
 
 # ── 게시글 ────────────────────────────────────────────────────────────────────
+
+@router.get("/pinned-notices", response_model=list[PostOut])
+async def pinned_notices(
+    db: AsyncSession = Depends(get_db),
+):
+    """상단고정 공지사항 (최대 5개)"""
+    q = (
+        select(Post)
+        .where(Post.status == "active", Post.post_type == "notice", Post.is_pinned == True)  # noqa: E712
+        .order_by(Post.created_at.desc())
+        .limit(5)
+    )
+    result = await db.execute(q)
+    posts = result.scalars().all()
+
+    user_ids = [p.user_id for p in posts if p.user_id]
+    nicknames: dict[str, str] = {}
+    plans: dict[str, str] = {}
+    if user_ids:
+        ur = await db.execute(select(User.id, User.nickname, User.plan).where(User.id.in_(user_ids)))
+        for row in ur.fetchall():
+            nicknames[str(row[0])] = row[1] or "관리자"
+            plans[str(row[0])] = row[2]
+
+    return [
+        _post_to_out(p, nicknames.get(str(p.user_id)), None, plans.get(str(p.user_id)))
+        for p in posts
+    ]
+
 
 @router.get("/posts", response_model=list[PostOut])
 async def list_posts(
@@ -262,7 +293,7 @@ async def hot_topics(
     """
     today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
 
-    q = select(Post).where(Post.status == "active", Post.created_at >= today_start)
+    q = select(Post).where(Post.status == "active", Post.created_at >= today_start, Post.post_type != "notice")
     if post_type:
         q = q.where(Post.post_type == post_type)
 
@@ -322,8 +353,11 @@ async def create_post(
     if not current_user.is_active():
         raise HTTPException(403, detail="계정이 정지되었습니다.")
 
-    if body.post_type not in ("discussion", "question", "analysis"):
+    if body.post_type not in ("discussion", "question", "analysis", "notice"):
         raise HTTPException(422, detail="유효하지 않은 게시글 유형입니다.")
+
+    if body.post_type == "notice" and not current_user.is_admin():
+        raise HTTPException(403, detail="공지사항은 관리자만 작성할 수 있습니다.")
 
     cluster_uuid = None
     if body.cluster_id:
@@ -340,6 +374,7 @@ async def create_post(
         title=body.title[:200],
         content=body.content,
         post_type=body.post_type,
+        is_pinned=body.post_type == "notice",
         images=images_val,
     )
     db.add(post)
@@ -419,7 +454,7 @@ async def update_post(
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(404, detail="게시글을 찾을 수 없습니다.")
-    if str(post.user_id) != str(current_user.id):
+    if str(post.user_id) != str(current_user.id) and not current_user.is_admin():
         raise HTTPException(403, detail="수정 권한이 없습니다.")
 
     post.title = body.title[:200]
@@ -451,6 +486,31 @@ async def delete_post(
 
     post.status = "deleted"
     await db.flush()
+
+
+@router.patch("/posts/{post_id}/pin", status_code=200)
+async def toggle_pin(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """공지 상단고정 토글 (어드민 전용)"""
+    if not current_user.is_admin():
+        raise HTTPException(403, detail="관리자만 고정/해제할 수 있습니다.")
+
+    try:
+        pid = uuid.UUID(post_id)
+    except ValueError:
+        raise HTTPException(422, detail="유효하지 않은 post_id입니다.")
+
+    result = await db.execute(select(Post).where(Post.id == pid))
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404, detail="게시글을 찾을 수 없습니다.")
+
+    post.is_pinned = not post.is_pinned
+    await db.flush()
+    return {"is_pinned": post.is_pinned}
 
 
 @router.post("/posts/{post_id}/react", status_code=200)

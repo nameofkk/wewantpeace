@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X } from "lucide-react";
+import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X, Megaphone, Pin } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, useMe } from "@/lib/api";
 
 function relativeTime(iso: string, lang: Lang): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -47,6 +47,7 @@ interface Post {
   comment_count: number;
   like_count: number;
   dislike_count: number;
+  is_pinned: boolean;
   images: string[];
   cluster_id: string | null;
   cluster_title: string | null;      // English
@@ -204,6 +205,9 @@ export default function PostDetailPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const lang = useAppStore((s) => s.lang);
+
+  const { data: me } = useMe();
+  const isAdmin = (me as { role?: string } | undefined)?.role === "admin";
 
   const { data: myUserId } = useQuery<string | null>({
     queryKey: ["my-user-id", user?.uid],
@@ -405,9 +409,18 @@ export default function PostDetailPage() {
       {/* 게시글 */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center gap-2 mb-3">
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium">
+          <span className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-medium",
+            post.post_type === "notice" ? "bg-yellow-500/20 text-yellow-500" : "bg-secondary"
+          )}>
+            {post.post_type === "notice" && <Megaphone className="inline h-2.5 w-2.5 mr-0.5" />}
             {t(lang, typeKey) || post.post_type}
           </span>
+          {post.is_pinned && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-yellow-500">
+              <Pin className="h-2.5 w-2.5" />
+            </span>
+          )}
           {post.cluster_id && (
             <Link href={`/issues/${post.cluster_id}`} className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400 hover:underline max-w-[200px] truncate inline-block">
               {lang === "en"
@@ -473,7 +486,7 @@ export default function PostDetailPage() {
             <MessageSquare className="h-4 w-4" />
             <span>{post.comment_count}</span>
           </span>
-          {isMyPost && (
+          {(isMyPost || isAdmin) && (
             <div className="ml-auto flex items-center gap-2">
               <Link
                 href={`/community/${postId}/edit`}

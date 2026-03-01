@@ -9,9 +9,9 @@ import { useAuth } from "@/lib/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, useMe } from "@/lib/api";
 
-type PostType = "discussion" | "analysis" | "question";
+type PostType = "discussion" | "analysis" | "question" | "notice";
 
 const POST_TYPE_IDS: PostType[] = ["discussion", "analysis", "question"];
 
@@ -42,6 +42,8 @@ export default function NewPostPage() {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const lang = useAppStore((s) => s.lang);
+  const { data: me } = useMe();
+  const isAdmin = (me as { role?: string } | undefined)?.role === "admin";
   const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -249,7 +251,7 @@ export default function NewPostPage() {
 
         {/* 게시글 유형 */}
         <div className="flex gap-2">
-          {POST_TYPE_IDS.map((id) => (
+          {(isAdmin ? [...POST_TYPE_IDS, "notice" as PostType] : POST_TYPE_IDS).map((id) => (
             <button
               key={id}
               type="button"
@@ -257,7 +259,9 @@ export default function NewPostPage() {
               className={cn(
                 "flex-1 rounded-xl border py-2 text-xs font-medium transition-colors",
                 postType === id
-                  ? "border-primary bg-primary/10 text-primary"
+                  ? id === "notice"
+                    ? "border-yellow-500 bg-yellow-500/10 text-yellow-500"
+                    : "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground"
               )}
             >

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, Eye, ThumbsUp, ThumbsDown, Plus, FileText, HelpCircle, TrendingUp, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
+import { MessageSquare, Eye, ThumbsUp, ThumbsDown, Plus, FileText, HelpCircle, TrendingUp, ChevronDown, ChevronUp, ArrowUpDown, Megaphone, Pin } from "lucide-react";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -12,13 +12,14 @@ import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 
-type PostType = "all" | "discussion" | "analysis" | "question";
+type PostType = "all" | "discussion" | "analysis" | "question" | "notice";
 type SortBy = "latest" | "popular";
 
 const POST_TYPE_ICONS = {
   discussion: MessageSquare,
   analysis: FileText,
   question: HelpCircle,
+  notice: Megaphone,
 };
 
 interface Post {
@@ -35,6 +36,7 @@ interface Post {
   comment_count: number;
   like_count: number;
   dislike_count: number;
+  is_pinned?: boolean;
 }
 
 function relativeTime(iso: string, lang: Lang): string {
@@ -60,19 +62,31 @@ function PlanBadge({ plan }: { plan?: string | null }) {
 function PostCard({ post, index = 0, lang }: { post: Post; index?: number; lang: Lang }) {
   const Icon = POST_TYPE_ICONS[post.post_type as keyof typeof POST_TYPE_ICONS] || MessageSquare;
   const typeKey = `community_type_${post.post_type}` as Parameters<typeof t>[1];
+  const isNotice = post.post_type === "notice";
   return (
     <Link href={`/community/${post.id}`}>
       <div
-        className="card-enter rounded-xl border border-border bg-card p-4 hover:bg-card/80 transition-colors cursor-pointer"
+        className={cn(
+          "card-enter rounded-xl border p-4 hover:bg-card/80 transition-colors cursor-pointer",
+          isNotice ? "border-yellow-500/40 bg-yellow-500/5" : "border-border bg-card"
+        )}
         style={{ animationDelay: `${index * 60}ms` }}
       >
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium">
+              <span className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                isNotice ? "bg-yellow-500/20 text-yellow-500" : "bg-secondary"
+              )}>
                 <Icon className="h-2.5 w-2.5" />
                 {t(lang, typeKey) || post.post_type}
               </span>
+              {post.is_pinned && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-yellow-500">
+                  <Pin className="h-2.5 w-2.5" />
+                </span>
+              )}
               {post.cluster_id && (
                 <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] text-blue-400 max-w-[180px] truncate">
                   {lang === "en"
@@ -134,11 +148,23 @@ export default function CommunityPage() {
     staleTime: 60000,
   });
 
+  const { data: pinnedNotices } = useQuery<Post[]>({
+    queryKey: ["pinned-notices"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/community/pinned-notices`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60000,
+    enabled: activeType !== "notice",
+  });
+
   const tabs: { key: PostType; label: string }[] = [
     { key: "all", label: t(lang, "community_type_all") },
     { key: "discussion", label: t(lang, "community_type_discussion") },
     { key: "analysis", label: t(lang, "community_type_analysis") },
     { key: "question", label: t(lang, "community_type_question") },
+    { key: "notice", label: t(lang, "community_type_notice") },
   ];
 
   return (
@@ -200,6 +226,21 @@ export default function CommunityPage() {
 
       {/* 게시글 목록 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+
+        {/* 상단고정 공지 */}
+        {activeType !== "notice" && pinnedNotices && pinnedNotices.length > 0 && (
+          <div className="space-y-2">
+            {pinnedNotices.map((notice) => (
+              <Link key={notice.id} href={`/community/${notice.id}`}>
+                <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 hover:bg-yellow-500/10 transition-colors cursor-pointer">
+                  <Megaphone className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+                  <span className="text-sm font-medium truncate flex-1">{notice.title}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{relativeTime(notice.created_at, lang)}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* 핫토픽 섹션 */}
         {hotTopics && hotTopics.length > 0 && (
