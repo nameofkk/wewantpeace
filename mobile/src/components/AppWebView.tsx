@@ -106,6 +106,12 @@ export default function AppWebView({
     (event: { url: string }): boolean => {
       const { url } = event;
 
+      // mailto / tel 링크 → OS 기본 앱으로 열기
+      if (url.startsWith("mailto:") || url.startsWith("tel:")) {
+        Linking.openURL(url).catch(() => {});
+        return false;
+      }
+
       // 내부 도메인 (www / non-www 모두 허용)
       if (
         url.startsWith("https://wewantpeace.live") ||

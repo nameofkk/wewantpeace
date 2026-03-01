@@ -450,12 +450,24 @@ export default function MapPage() {
         markerEl.style.cssText = `width:${size}px;height:${size}px;`;
         const innerEl = document.createElement("div");
         innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s;opacity:1;position:relative;will-change:transform;`;
+        // 펄스 링 DOM 요소 추가 (CSS pseudo-element는 동적 DOM에서 작동하지 않음)
+        const ring1 = document.createElement("span");
+        ring1.className = "pulse-ring";
+        ring1.style.color = color;
+        innerEl.appendChild(ring1);
+        const ring2 = document.createElement("span");
+        ring2.className = "pulse-ring-delayed";
+        ring2.style.color = color;
+        innerEl.appendChild(ring2);
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter marker-pulse"
+          innerEl.className = "marker-enter"
             + (cluster.is_spike ? " marker-spike" : "");
         });
-        innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
+        const label = document.createElement("span");
+        label.style.cssText = "position:relative;z-index:1;";
+        label.textContent = displayCount > 99 ? "99+" : String(displayCount);
+        innerEl.appendChild(label);
         markerEl.appendChild(innerEl);
         innerEl.addEventListener("mouseenter", () => { innerEl.style.transform = "scale(1.2)"; });
         innerEl.addEventListener("mouseleave", () => { innerEl.style.transform = ""; });
