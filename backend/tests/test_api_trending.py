@@ -2,10 +2,13 @@
 /trending/* /issues/* /tension/* API 통합 테스트.
 FastAPI dependency_overrides로 테스트 DB 주입.
 """
+import os
 import pytest
 from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
 
 from backend.app.main import app
 from backend.app.core.database import Base
@@ -56,6 +59,7 @@ async def client(test_db):
 # ── /trending/global ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(_is_sqlite, reason="DISTINCT ON은 PostgreSQL 전용 문법")
 async def test_global_trending_empty_returns_list(client):
     """트렌딩 데이터 없어도 200 + 빈 배열."""
     resp = await client.get("/trending/global")
@@ -64,6 +68,7 @@ async def test_global_trending_empty_returns_list(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(_is_sqlite, reason="DISTINCT ON은 PostgreSQL 전용 문법")
 async def test_global_trending_returns_cached(client, test_db):
     """캐시된 trending_keyword 반환."""
     now = datetime.now(timezone.utc)
@@ -89,6 +94,7 @@ async def test_global_trending_returns_cached(client, test_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(_is_sqlite, reason="DISTINCT ON은 PostgreSQL 전용 문법")
 async def test_trending_item_schema(client, test_db):
     """응답 필드 확인."""
     now = datetime.now(timezone.utc)

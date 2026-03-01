@@ -3,9 +3,12 @@
 핵심 엔드포인트가 올바른 스키마로 응답하는지 확인.
 실제 데이터 없이도 통과해야 함 (빈 리스트/404 허용).
 """
+import os
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
 
 from backend.app.main import app
 from backend.app.core.database import Base
@@ -77,6 +80,7 @@ async def test_smoke_root(client):
 # ── /trending ────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(_is_sqlite, reason="DISTINCT ON은 PostgreSQL 전용 문법")
 async def test_smoke_trending_global(client):
     """/trending/global → 200, list 반환."""
     resp = await client.get("/trending/global")
@@ -85,6 +89,7 @@ async def test_smoke_trending_global(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(_is_sqlite, reason="DISTINCT ON은 PostgreSQL 전용 문법")
 async def test_smoke_trending_global_schema(client):
     """트렌딩 아이템 스키마 검증 (데이터 있을 때)."""
     resp = await client.get("/trending/global")

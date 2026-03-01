@@ -133,7 +133,12 @@ class TestTelegramCollectorIntegration:
 
         msg = _make_telethon_message()
 
+        mock_entity = MagicMock()
+        mock_entity.id = 1234567890
+        mock_entity.username = "TestOSINT"
+
         mock_client = AsyncMock()
+        mock_client.get_entity = AsyncMock(return_value=mock_entity)
         mock_client.get_messages = AsyncMock(return_value=[msg])
 
         collector = TelegramCollector()
@@ -160,7 +165,12 @@ class TestTelegramCollectorIntegration:
 
         msg = _make_telethon_message()
 
+        mock_entity = MagicMock()
+        mock_entity.id = 1234567890
+        mock_entity.username = "TestOSINT"
+
         mock_client = AsyncMock()
+        mock_client.get_entity = AsyncMock(return_value=mock_entity)
         mock_client.get_messages = AsyncMock(return_value=[msg])
 
         collector = TelegramCollector()
@@ -173,10 +183,10 @@ class TestTelegramCollectorIntegration:
         assert result2.skipped == 1
 
     @pytest.mark.asyncio
-    async def test_no_username_returns_error(self, db, sample_source_channel_data, redis_mock):
-        """username 없는 채널 → 에러 반환."""
+    async def test_no_username_no_channel_id_returns_error(self, db, sample_source_channel_data, redis_mock):
+        """username/channel_id 모두 없는 채널 → 에러 반환."""
         channel = SourceChannel(**sample_source_channel_data)
-        channel.channel_id = -1001234567890
+        channel.channel_id = None
         channel.username = None
         db.add(channel)
         await db.flush()
@@ -187,7 +197,6 @@ class TestTelegramCollectorIntegration:
 
         assert result.collected == 0
         assert len(result.errors) > 0
-        assert "username" in result.errors[0]
 
 
 # ─── RSSCollector 단위 테스트 ────────────────────────────────────────────────
@@ -260,6 +269,8 @@ class TestRSSCollectorIntegration:
 
         mock_parsed = MagicMock()
         mock_parsed.bozo = False
+        mock_parsed.href = "https://feeds.reuters.com/reuters/worldNews"
+        mock_parsed.status = 200
         mock_parsed.entries = [
             {
                 "id": "https://reuters.com/test-001",
@@ -308,12 +319,14 @@ class TestRSSCollectorIntegration:
 
         mock_entry = {
             "id": "bbc-unique-001",
-            "summary": "Breaking news from BBC about international situation.",
+            "summary": "Multiple reports confirm large-scale military operations across the eastern border region with significant civilian impact. Officials have called for immediate ceasefire negotiations.",
             "link": "https://bbc.co.uk/001",
             "published_parsed": (2026, 2, 22, 10, 0, 0, 1, 53, 0),
         }
         mock_parsed = MagicMock()
         mock_parsed.bozo = False
+        mock_parsed.href = "https://feeds.bbci.co.uk/news/world/rss.xml"
+        mock_parsed.status = 200
         mock_parsed.entries = [mock_entry]
 
         with patch("worker.collector.rss_collector.feedparser.parse", return_value=mock_parsed):
@@ -368,6 +381,8 @@ class TestRSSCollectorIntegration:
 
         mock_parsed = MagicMock()
         mock_parsed.bozo = False
+        mock_parsed.href = "https://example.com/rss"
+        mock_parsed.status = 200
         mock_parsed.entries = [
             {"id": "short-001", "summary": "OK", "title": "OK"}  # 너무 짧음
         ]

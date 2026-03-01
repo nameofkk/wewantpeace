@@ -234,7 +234,7 @@ async def delete_area(
     if not area:
         raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
 
-    db.delete(area)
+    await db.delete(area)
     await db.flush()
 
 

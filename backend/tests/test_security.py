@@ -4,9 +4,12 @@
 - XSS 입력 → Content-Type application/json 확인
 - 인증 필요 엔드포인트 → 401
 """
+import os
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
 
 from backend.app.main import app
 from backend.app.core.database import Base
@@ -104,7 +107,10 @@ async def test_xss_in_query_param_not_reflected_raw(anon_client):
 @pytest.mark.asyncio
 async def test_api_response_content_type_is_json(anon_client):
     """모든 API 응답이 application/json인지 확인 (HTML 오류 페이지 반환 금지)."""
-    for path in ["/health", "/trending/global", "/issues"]:
+    paths = ["/health", "/issues"]
+    if not _is_sqlite:
+        paths.append("/trending/global")  # DISTINCT ON은 PostgreSQL 전용
+    for path in paths:
         resp = await anon_client.get(path)
         ct = resp.headers.get("content-type", "")
         assert "application/json" in ct, f"{path} → Content-Type: {ct}"

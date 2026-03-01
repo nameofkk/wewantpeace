@@ -9,6 +9,7 @@ from worker.processor.spike_detector import (
     set_cooldown,
     update_baseline,
     get_baseline,
+    track_source,
     C1_THRESHOLD,
     C10_THRESHOLD,
     RATIO_THRESHOLD,
@@ -49,8 +50,8 @@ async def test_baseline_starts_at_zero(redis_mock):
 @pytest.mark.asyncio
 async def test_baseline_updates(redis_mock):
     b = await update_baseline(CLUSTER_KEY, 10, redis_mock)
-    # alpha=0.3: 0.3*10 + 0.7*0 = 3.0
-    assert b == pytest.approx(3.0)
+    # 첫 관측(obs_count<5) alpha=0.5: 0.5*10 + 0.5*0 = 5.0
+    assert b == pytest.approx(5.0)
 
 
 @pytest.mark.asyncio
@@ -87,6 +88,9 @@ async def test_spike_triggers_on_c1_threshold(redis_mock):
     # c1을 4 이상으로 만들기 위해 3번 미리 증가
     for _ in range(3):
         await increment_event_counters(cid, redis_mock)
+    # 최소 2개 독립 소스 필요
+    await track_source(cid, "src-a", redis_mock)
+    await track_source(cid, "src-b", redis_mock)
     # 4번째 호출 (evaluate_spike 내부에서 1회 더 증가)
     result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
     assert result is True
@@ -100,6 +104,9 @@ async def test_spike_triggers_on_c10_threshold(redis_mock):
     # 11번 미리 증가
     for _ in range(11):
         await increment_event_counters(cid, redis_mock)
+    # 최소 2개 독립 소스 필요
+    await track_source(cid, "src-a", redis_mock)
+    await track_source(cid, "src-b", redis_mock)
     result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
     assert result is True
 

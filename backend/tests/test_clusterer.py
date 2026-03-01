@@ -47,10 +47,11 @@ async def test_new_cluster_created(db):
     db.add(event)
     await db.flush()
 
-    cluster = await assign_cluster(event, db)
+    cluster, _ = await assign_cluster(event, db)
     assert cluster.id is not None
     assert cluster.event_count == 1
-    assert cluster.cluster_key == "u8c3m:conflict"
+    # country_code 우선 클러스터 키: {country_code}:{topic}
+    assert cluster.cluster_key == "UA:conflict"
     assert cluster.severity == 55
     assert cluster.confidence == pytest.approx(0.70)
 
@@ -62,13 +63,13 @@ async def test_same_window_merges(db):
     db.add(e1)
     await db.flush()
 
-    c1 = await assign_cluster(e1, db)
+    c1, _ = await assign_cluster(e1, db)
 
     e2 = _make_event(event_time=BASE_TIME + timedelta(minutes=30))
     db.add(e2)
     await db.flush()
 
-    c2 = await assign_cluster(e2, db)
+    c2, _ = await assign_cluster(e2, db)
 
     assert c1.id == c2.id
     assert c2.event_count == 2
@@ -80,14 +81,14 @@ async def test_outside_window_creates_new(db):
     e1 = _make_event(event_time=BASE_TIME)
     db.add(e1)
     await db.flush()
-    c1 = await assign_cluster(e1, db)
+    c1, _ = await assign_cluster(e1, db)
 
     # 윈도우 초과: e1.event_time + 61분 → window_cutoff가 e1보다 늦음
     late_time = BASE_TIME + timedelta(minutes=WINDOW_MINUTES + 1)
     e2 = _make_event(event_time=late_time)
     db.add(e2)
     await db.flush()
-    c2 = await assign_cluster(e2, db)
+    c2, _ = await assign_cluster(e2, db)
 
     assert c1.id != c2.id
 
@@ -98,15 +99,15 @@ async def test_different_topic_creates_new(db):
     e1 = _make_event(topic="conflict")
     db.add(e1)
     await db.flush()
-    c1 = await assign_cluster(e1, db)
+    c1, _ = await assign_cluster(e1, db)
 
     e2 = _make_event(topic="protest")
     db.add(e2)
     await db.flush()
-    c2 = await assign_cluster(e2, db)
+    c2, _ = await assign_cluster(e2, db)
 
     assert c1.id != c2.id
-    assert c2.cluster_key == "u8c3m:protest"
+    assert c2.cluster_key == "UA:protest"
 
 
 @pytest.mark.asyncio
@@ -115,12 +116,12 @@ async def test_severity_max_maintained(db):
     e1 = _make_event(severity=40)
     db.add(e1)
     await db.flush()
-    c1 = await assign_cluster(e1, db)
+    c1, _ = await assign_cluster(e1, db)
 
     e2 = _make_event(severity=80, event_time=BASE_TIME + timedelta(minutes=10))
     db.add(e2)
     await db.flush()
-    c2 = await assign_cluster(e2, db)
+    c2, _ = await assign_cluster(e2, db)
 
     assert c2.severity == 80
 
@@ -131,12 +132,12 @@ async def test_confidence_moving_average(db):
     e1 = _make_event(confidence=0.60)
     db.add(e1)
     await db.flush()
-    c = await assign_cluster(e1, db)
+    c, _ = await assign_cluster(e1, db)
 
     e2 = _make_event(confidence=0.80, event_time=BASE_TIME + timedelta(minutes=5))
     db.add(e2)
     await db.flush()
-    c = await assign_cluster(e2, db)
+    c, _ = await assign_cluster(e2, db)
 
     # (0.60 * 1 + 0.80) / 2 = 0.70
     assert c.confidence == pytest.approx(0.70, abs=0.01)
@@ -144,13 +145,14 @@ async def test_confidence_moving_average(db):
 
 @pytest.mark.asyncio
 async def test_no_geohash_uses_default(db):
-    """geohash5 없으면 '00000' 사용."""
+    """geohash5 없으면 country_code 기반 키 사용."""
     e = _make_event(geohash5=None)
     db.add(e)
     await db.flush()
 
-    c = await assign_cluster(e, db)
-    assert c.cluster_key == "00000:conflict"
+    c, _ = await assign_cluster(e, db)
+    # country_code가 "UA"이므로 country_code 우선
+    assert c.cluster_key == "UA:conflict"
 
 
 @pytest.mark.asyncio
@@ -163,7 +165,7 @@ async def test_cluster_event_link_created(db):
     db.add(e)
     await db.flush()
 
-    c = await assign_cluster(e, db)
+    c, _ = await assign_cluster(e, db)
 
     res = await db.execute(
         select(ClusterEvent).where(

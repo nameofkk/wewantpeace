@@ -25,10 +25,19 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
 )
-from sqlalchemy import event
+from sqlalchemy import event, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 
 from backend.app.core.database import Base
 import backend.app.models  # noqa: F401 — 모든 모델을 Base.metadata에 등록
+
+# ─── SQLite에서 PostgreSQL JSONB 타입 호환 ────────────────────────────────────
+# SQLite는 JSONB를 지원하지 않으므로 JSON으로 매핑
+from sqlalchemy.ext.compiler import compiles
+
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_sqlite(type_, compiler, **kw):
+    return compiler.visit_JSON(JSON(), **kw)
 
 
 # ─── 비동기 DB 픽스처 ───────────────────────────────────────────────────────

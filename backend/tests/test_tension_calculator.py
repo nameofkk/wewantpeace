@@ -14,45 +14,40 @@ from worker.processor.tension_calculator import (
 )
 
 
-# ── tension_level 분류 (6단계) ────────────────────────────────────────────────
+# ── tension_level 분류 (5단계) ────────────────────────────────────────────────
 
 class TestTensionLevel:
     def test_stable(self):
-        # raw_score 기반: 0~14 → 0 (안정)
+        # raw_score 기반: 0~19 → 0 (안정)
         assert _tension_level(0, 0) == 0
-        assert _tension_level(14, 14) == 0
-
-    def test_interest(self):
-        # raw_score 기반: 15~29 → 1 (관심)
-        assert _tension_level(15, 15) == 1
-        assert _tension_level(29, 29) == 1
+        assert _tension_level(19, 19) == 0
 
     def test_caution(self):
-        # raw_score 기반: 30~49 → 2 (주의)
-        assert _tension_level(30, 30) == 2
-        assert _tension_level(49, 49) == 2
+        # raw_score 기반: 20~39 → 1 (주의)
+        assert _tension_level(20, 20) == 1
+        assert _tension_level(39, 39) == 1
 
     def test_alert(self):
-        # raw_score 기반: 50~69 → 3 (경계)
-        assert _tension_level(50, 50) == 3
-        assert _tension_level(69, 69) == 3
+        # raw_score 기반: 40~59 → 2 (경계)
+        assert _tension_level(40, 40) == 2
+        assert _tension_level(59, 59) == 2
 
     def test_severe(self):
-        # raw_score 기반: 70~84 → 4 (심각)
-        assert _tension_level(70, 70) == 4
-        assert _tension_level(84, 84) == 4
+        # raw_score 기반: 60~79 → 3 (심각)
+        assert _tension_level(60, 60) == 3
+        assert _tension_level(79, 79) == 3
 
-    def test_crisis(self):
-        # raw_score 기반: 85~100 → 5 (위기)
-        assert _tension_level(85, 85) == 5
-        assert _tension_level(100, 100) == 5
+    def test_extreme(self):
+        # raw_score 기반: 80~100 → 4 (극심)
+        assert _tension_level(80, 80) == 4
+        assert _tension_level(100, 100) == 4
 
     def test_floor_low_raw_score(self):
-        """raw_score < 15이면 퍼센타일이 높아도 레벨 0."""
+        """raw_score < 20이면 퍼센타일이 높아도 레벨 0."""
         assert _tension_level(90, 10) == 0
 
     def test_floor_medium_raw_score(self):
-        """raw_score < 30이면 max_level=1."""
+        """raw_score < 40이면 max_level=1."""
         assert _tension_level(90, 25) == 1
 
 
