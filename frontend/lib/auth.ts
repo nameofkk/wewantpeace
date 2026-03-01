@@ -6,6 +6,8 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithCustomToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -43,6 +45,11 @@ function getFirebaseAuth(): Auth | null {
   return _auth;
 }
 
+/** React Native WebView 환경인지 확인 */
+function isReactNativeWebView(): boolean {
+  return typeof window !== "undefined" && !!window.__REACT_NATIVE__;
+}
+
 // Google 로그인
 export async function signInWithGoogle(): Promise<FirebaseUser> {
   const auth = getFirebaseAuth();
@@ -53,9 +60,33 @@ export async function signInWithGoogle(): Promise<FirebaseUser> {
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  // WebView user-agent를 Chrome으로 설정했으므로 signInWithPopup 정상 동작
+
+  if (isReactNativeWebView()) {
+    // React Native WebView: signInWithPopup은 같은 창에서 열려 빈 화면 발생
+    // signInWithRedirect 사용 → 리다이렉트 후 getRedirectResult로 결과 확인
+    await signInWithRedirect(auth, provider);
+    // signInWithRedirect는 페이지를 리다이렉트하므로 여기에 도달하지 않음
+    throw new Error("redirect");
+  }
+
+  // 웹 브라우저: signInWithPopup 사용 (정상 팝업)
   const result = await signInWithPopup(auth, provider);
   return result.user;
+}
+
+/**
+ * Google 리다이렉트 로그인 결과 확인 (React Native WebView 전용).
+ * 로그인 페이지 마운트 시 호출하여 리다이렉트 후 복귀한 경우 인증 결과를 처리.
+ */
+export async function checkGoogleRedirectResult(): Promise<FirebaseUser | null> {
+  const auth = getFirebaseAuth();
+  if (!auth) return null;
+  try {
+    const result = await getRedirectResult(auth);
+    return result?.user ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // 카카오 로그인

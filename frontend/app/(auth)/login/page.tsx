@@ -13,6 +13,7 @@ import {
   createEmailUser,
   sendPasswordResetEmail,
   getFirebaseAuth,
+  checkGoogleRedirectResult,
 } from "@/lib/auth";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -64,6 +65,29 @@ export default function LoginPage() {
   const [findError, setFindError] = useState<string | null>(null);
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
+
+  // React Native WebView: Google 리다이렉트 로그인 결과 확인
+  useEffect(() => {
+    checkGoogleRedirectResult().then(async (user) => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const meRes = await fetch(`${API_BASE}/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (meRes.ok) {
+          localStorage.setItem("onboarding_done", "true");
+          router.push("/home");
+        } else {
+          setGoogleUser(user);
+          setTab("google-register");
+        }
+      } catch {
+        // 무시 — 리다이렉트 결과 없음
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 실시간 검증 상태
   const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -190,6 +214,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const user = await signInWithGoogle();
+      // signInWithRedirect (React Native)는 여기에 도달하지 않음 → catch로 이동
       const token = await user.getIdToken();
       const meRes = await fetch(`${API_BASE}/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -203,6 +228,8 @@ export default function LoginPage() {
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
+      // signInWithRedirect 후 페이지가 리다이렉트되므로 "redirect" 에러는 무시
+      if (err.message === "redirect") return;
       setError(err.message || "Google login failed.");
     } finally {
       setLoading(false);

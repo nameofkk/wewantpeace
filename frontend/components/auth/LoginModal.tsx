@@ -23,6 +23,13 @@ export function LoginModal({ onClose, message }: LoginModalProps) {
   }, [onClose]);
 
   async function handleGoogle() {
+    // React Native WebView: signInWithRedirect 사용 → /login 페이지로 이동
+    const isRN = typeof window !== "undefined" && !!window.__REACT_NATIVE__;
+    if (isRN) {
+      onClose();
+      router.push("/login");
+      return;
+    }
     try {
       await signInWithGoogle();
       onClose();
