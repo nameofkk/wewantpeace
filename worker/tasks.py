@@ -325,15 +325,27 @@ def calculate_trending(self):
     """트렌딩 키워드 계산 (15분마다). 분산 클러스터 자동 병합 포함."""
 
     async def _merge_fragmented_clusters(db):
-        """같은 cluster_key의 분산된 클러스터를 하나로 병합."""
+        """같은 cluster_key의 분산된 클러스터를 병합 (보수적).
+
+        병합 조건:
+        - conflict/terror/coup 토픽만 (diplomacy/protest 등은 너무 광범위)
+        - cluster_key가 '0000'으로 시작하지 않을 것 (위치 미상 = 혼합 위험)
+        - winner의 event_count가 30 이하일 때만
+        - loser의 last_event_at이 winner 기준 48시간 이내
+        """
         from collections import defaultdict
         from sqlalchemy import select, text
         from backend.app.models.issue_cluster import IssueCluster
         from worker.processor.trending_engine import _calc_kscore
 
+        _MERGE_TOPICS = {"conflict", "terror", "coup"}
+        _MAX_EVENTS = 30
+        _TIME_WINDOW = timedelta(hours=48)
+
         result = await db.execute(
             select(IssueCluster).where(
                 IssueCluster.severity > 0,
+                IssueCluster.topic.in_(_MERGE_TOPICS),
             ).order_by(
                 IssueCluster.cluster_key,
                 IssueCluster.kscore.desc(),
@@ -343,7 +355,8 @@ def calculate_trending(self):
 
         groups: dict[str, list] = defaultdict(list)
         for c in clusters:
-            groups[c.cluster_key].append(c)
+            if c.cluster_key and not c.cluster_key.startswith("0000"):
+                groups[c.cluster_key].append(c)
 
         merged_total = 0
         for key, group in groups.items():
@@ -351,6 +364,12 @@ def calculate_trending(self):
                 continue
             winner = group[0]
             for loser in group[1:]:
+                if winner.event_count >= _MAX_EVENTS:
+                    break
+                if (winner.last_event_at and loser.last_event_at
+                        and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _TIME_WINDOW.total_seconds()):
+                    continue
+
                 winner.event_count += loser.event_count
                 winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
                 if loser.severity > winner.severity:
@@ -359,12 +378,11 @@ def calculate_trending(self):
                 existing = list(winner.source_tiers or [])
                 existing.extend(loser.source_tiers or [])
                 winner.source_tiers = existing
-                if loser.first_event_at < winner.first_event_at:
+                if loser.first_event_at and (not winner.first_event_at or loser.first_event_at < winner.first_event_at):
                     winner.first_event_at = loser.first_event_at
-                if loser.last_event_at > winner.last_event_at:
+                if loser.last_event_at and (not winner.last_event_at or loser.last_event_at > winner.last_event_at):
                     winner.last_event_at = loser.last_event_at
                     winner.window_end = loser.last_event_at + timedelta(minutes=60)
-                # cluster_events 재할당
                 await db.execute(
                     text("UPDATE cluster_events SET cluster_id = :w WHERE cluster_id = :l"),
                     {"w": winner.id, "l": loser.id},
