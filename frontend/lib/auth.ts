@@ -14,7 +14,8 @@ import {
   onIdTokenChanged,
   User as FirebaseUser,
 } from "firebase/auth";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -151,6 +152,8 @@ export async function getIdToken(): Promise<string | null> {
 export function useAuth() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(IS_FIREBASE_CONFIGURED); // 미설정이면 즉시 false
+  const queryClient = useQueryClient();
+  const prevUid = useRef<string | null>(null);
 
   useEffect(() => {
     if (!IS_FIREBASE_CONFIGURED) {
@@ -164,16 +167,23 @@ export function useAuth() {
     }
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
+      const uid = u?.uid ?? null;
       if (u) {
         const token = await u.getIdToken();
         localStorage.setItem("firebase_token", token);
       } else {
         localStorage.removeItem("firebase_token");
       }
+      // 로그인/로그아웃 시 사용자 관련 캐시 즉시 무효화
+      if (uid !== prevUid.current) {
+        prevUid.current = uid;
+        queryClient.invalidateQueries({ queryKey: ["me"] });
+        queryClient.invalidateQueries({ queryKey: ["tension"] });
+      }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [queryClient]);
 
   const getToken = useCallback(async () => {
     if (!user) return null;
