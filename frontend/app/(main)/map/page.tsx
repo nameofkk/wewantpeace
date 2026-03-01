@@ -281,7 +281,11 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
 // ── 뉴스 티커 ─────────────────────────────────────────────────────────────
 function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPreview?: boolean }) {
   const lang = useAppStore((s) => s.lang);
-  const items = clusters.filter((c) => c.title_ko ?? c.title);
+  const items = clusters.filter((c) =>
+    (c.title_ko ?? c.title) &&
+    c.severity > 0 &&
+    !(c.topic === "unknown" && !c.country_code)
+  );
   if (items.length === 0) return null;
 
   const content = items.map((c) => (
@@ -406,7 +410,11 @@ export default function MapPage() {
       markersRef.current = [];
 
       // 클러스터 그룹핑 — 원본 로직 복원
-      const withCoords = clusters.filter((c) => c.lat != null && c.lon != null);
+      const withCoords = clusters.filter((c) =>
+        c.lat != null && c.lon != null &&
+        c.severity > 0 &&
+        !(c.topic === "unknown" && !c.country_code)
+      );
       let displayClusters: Cluster[];
       try {
         const countryGrouped = isCountryZoom ? groupClustersByCountry(withCoords) : withCoords;

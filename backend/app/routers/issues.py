@@ -142,7 +142,7 @@ async def list_clusters(
     bbox: Optional[str] = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     topic: Optional[str] = Query(None),
     country_code: Optional[str] = Query(None, description="국가 코드 필터 (예: US, KR)"),
-    severity_min: int = Query(0, ge=0, le=100),
+    severity_min: int = Query(1, ge=0, le=100),
     limit: int = Query(2000, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
 ):

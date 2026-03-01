@@ -99,10 +99,13 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=48)  # 48시간 윈도우 (KScore 계산 범위)
 
-    # 최근 48시간 활성 클러스터 조회
+    # 최근 48시간 활성 클러스터 조회 (severity > 0: 비활성 노이즈 제외)
     result = await db.execute(
         select(IssueCluster)
-        .where(IssueCluster.last_event_at >= cutoff)
+        .where(
+            IssueCluster.last_event_at >= cutoff,
+            IssueCluster.severity > 0,
+        )
         .order_by(IssueCluster.event_count.desc())
         .limit(200)
     )
@@ -168,15 +171,31 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
         )
         db.add(kw)
 
-    # 히스토리 보관: 90일 이전 레코드만 삭제
-    # valid_until은 현재 트렌딩 표시용 (24h), calculated_at 기준으로 90일 보관.
+    # 히스토리 보관: 90일 이전 레코드 삭제 + 시간별 중복 제거
     # Pro+ 사용자가 90일 KScore 히스토리를 조회할 수 있어야 함.
     history_cutoff = now - timedelta(days=91)
     await db.flush()
+    # 1) 90일 이전 삭제
     await db.execute(
         delete(TrendingKeyword).where(
             TrendingKeyword.calculated_at < history_cutoff,
         )
+    )
+    # 2) 1시간 이상 된 엔트리 중 시간별 1개만 남기고 정리 (bloat 방지)
+    #    최근 1시간은 원본 유지 (실시간 표시용)
+    one_hour_ago = now - timedelta(hours=1)
+    await db.execute(
+        sa_text("""
+            DELETE FROM trending_keywords
+            WHERE id NOT IN (
+                SELECT DISTINCT ON (normalized_kw, DATE_TRUNC('hour', calculated_at)) id
+                FROM trending_keywords
+                WHERE calculated_at < :cutoff
+                ORDER BY normalized_kw, DATE_TRUNC('hour', calculated_at), calculated_at DESC
+            )
+            AND calculated_at < :cutoff
+        """),
+        {"cutoff": one_hour_ago},
     )
 
     # issue_clusters.kscore 업데이트:
