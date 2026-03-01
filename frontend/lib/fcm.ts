@@ -55,7 +55,7 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
         if (perm !== "granted") return null;
       } catch {
         // Edge: requestPermission이 타임아웃되어도 설정에서 허용했으면 granted일 수 있음
-        if (Notification.permission !== "granted") return null;
+        if ((Notification.permission as string) !== "granted") return null;
       }
     }
     if (Notification.permission !== "granted") return null;
