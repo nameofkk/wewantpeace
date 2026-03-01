@@ -28,7 +28,11 @@ import {
 import type { WebToNativeMessage } from "./src/services/bridge";
 
 // 백그라운드 메시지 핸들러 (앱 외부)
-registerBackgroundHandler();
+try {
+  registerBackgroundHandler();
+} catch (e) {
+  console.warn("[App] 백그라운드 핸들러 등록 실패:", e);
+}
 
 // 스플래시 자동 숨김 방지
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -233,7 +237,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F1729" />
+      <StatusBar barStyle="light-content" backgroundColor="#1A1A2E" />
       <AppWebView
         initialPath={initialPath}
         onNativeMessage={handleNativeMessage}
@@ -245,6 +249,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F1729",
+    backgroundColor: "#1A1A2E",
   },
 });

@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { WebView, type WebViewNavigation } from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
-import { WEB_URL } from "../utils/constants";
+import { WEB_URL, API_BASE } from "../utils/constants";
 import {
   getInjectedJavaScript,
   parseWebMessage,
@@ -78,15 +78,17 @@ export default function AppWebView({
 
   /**
    * 외부 링크는 시스템 브라우저로 열기.
-   * wewantpeace.live 도메인만 WebView 내부에서 로드.
+   * wewantpeace.live 도메인(www 포함)만 WebView 내부에서 로드.
    */
   const handleShouldStartLoad = useCallback(
     (event: { url: string }): boolean => {
       const { url } = event;
 
-      // 내부 도메인
+      // 내부 도메인 (www / non-www 모두 허용)
       if (
-        url.startsWith(WEB_URL) ||
+        url.startsWith("https://wewantpeace.live") ||
+        url.startsWith("https://www.wewantpeace.live") ||
+        url.startsWith(API_BASE) ||
         url.startsWith("about:") ||
         url.startsWith("data:")
       ) {
@@ -100,6 +102,15 @@ export default function AppWebView({
     [],
   );
 
+  // 로딩 타임아웃: 15초 후 강제 로딩 오버레이 제거
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   return (
     <View style={styles.container}>
       <WebView
@@ -112,6 +123,14 @@ export default function AppWebView({
         onShouldStartLoadWithRequest={handleShouldStartLoad}
         onLoadStart={() => setLoading(true)}
         onLoadEnd={() => setLoading(false)}
+        onError={(syntheticEvent) => {
+          console.warn("[WebView] 로드 에러:", syntheticEvent.nativeEvent);
+          setLoading(false);
+        }}
+        onHttpError={(syntheticEvent) => {
+          console.warn("[WebView] HTTP 에러:", syntheticEvent.nativeEvent.statusCode);
+          setLoading(false);
+        }}
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState={false}
@@ -143,15 +162,15 @@ export function sendMessageToWeb(message: NativeToWebMessage): void {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F1729",
+    backgroundColor: "#1A1A2E",
   },
   webview: {
     flex: 1,
-    backgroundColor: "#0F1729",
+    backgroundColor: "#1A1A2E",
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0F1729",
+    backgroundColor: "#1A1A2E",
     justifyContent: "center",
     alignItems: "center",
   },

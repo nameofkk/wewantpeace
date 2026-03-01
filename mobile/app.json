@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F1729"
+      "backgroundColor": "#1A1A2E"
     },
     "ios": {
       "supportsTablet": false,
@@ -22,8 +22,8 @@
       "package": "com.wewantpeace.app",
       "versionCode": 7,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#0F1729"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A1A2E"
       },
       "googleServicesFile": "./google-services.json",
       "permissions": ["POST_NOTIFICATIONS"]
