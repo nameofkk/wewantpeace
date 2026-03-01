@@ -43,12 +43,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 export async function requestAndGetFCMToken(): Promise<string | null> {
   // React Native 환경: 네이티브 브릿지로 토큰 요청
   if (typeof window !== "undefined" && window.__REACT_NATIVE__ && window.__nativeBridge) {
-    return new Promise((resolve) => {
+    return new Promise<string | null>((resolve) => {
       const handler = (e: Event) => {
         const msg = (e as CustomEvent).detail;
         if (msg?.type === "FCM_TOKEN") {
           window.removeEventListener("nativeMessage", handler);
-          resolve(msg.payload.token || null);
+          const token: string | null = msg.payload.token || null;
+          if (token) localStorage.setItem(FCM_TOKEN_KEY, token);
+          resolve(token);
         }
       };
       window.addEventListener("nativeMessage", handler);
@@ -58,11 +60,6 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
         resolve(null);
       }, 10_000);
       window.__nativeBridge!.postToNative("GET_FCM_TOKEN", {});
-    }).then((token) => {
-      if (token) {
-        localStorage.setItem(FCM_TOKEN_KEY, token);
-      }
-      return token;
     });
   }
 
