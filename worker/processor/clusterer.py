@@ -229,7 +229,7 @@ async def assign_cluster(
         # 제목 승격: 현재 제목이 쓰레기이고 새 이벤트 제목이 더 나으면 교체
         if _is_junk_title(cluster.title) and not _is_junk_title(event.title):
             ai = generate_ai_title(
-                [{"title": event.title}, {"title": cluster.title}],
+                [{"title": event.title, "body": event.body or ""}, {"title": cluster.title}],
                 event.topic, event.country_code or cluster.country_code,
             )
             if ai:
@@ -243,7 +243,7 @@ async def assign_cluster(
         # 제목은 괜찮은데 title_ko가 없으면 재생성 시도
         elif cluster.title_ko is None and not _is_junk_title(cluster.title):
             ai = generate_ai_title(
-                [{"title": cluster.title}],
+                [{"title": cluster.title, "body": event.body or ""}],
                 cluster.topic, cluster.country_code,
             )
             if ai:
@@ -270,7 +270,7 @@ async def assign_cluster(
         cluster.updated_at = now
     else:
         ai = generate_ai_title(
-            [{"title": event.title}], event.topic, event.country_code,
+            [{"title": event.title, "body": event.body or ""}], event.topic, event.country_code,
         )
         if ai:
             ai_title_en, title_ko = ai

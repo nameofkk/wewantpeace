@@ -1,7 +1,7 @@
 """
 GPT-4o-mini 기반 클러스터 AI 제목 생성.
 
-이벤트 제목들을 종합하여 한/영 최적화 제목을 생성한다.
+이벤트 제목 + 본문을 종합하여 한/영 최적화 제목을 생성한다.
 실패 시 기존 Google Translate 폴백.
 """
 import json
@@ -14,14 +14,16 @@ _OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
 
 _SYSTEM_PROMPT = """\
 You are a concise news headline writer for a global conflict/crisis monitoring app.
-Given a list of event titles about the same issue, write ONE best headline in both English and Korean.
+Given event titles and article bodies about the same issue, write ONE best headline in both English and Korean.
 
 Rules:
 - English: max 80 chars, AP style, no quotes
 - Korean: max 40 chars, 뉴스 헤드라인 스타일, 간결체
-- Focus on WHAT happened, WHERE
+- Read the article body carefully to understand the full context before writing the headline
+- Focus on WHAT happened, WHERE — be specific and accurate
 - No hashtags, no emojis, no commentary
-- If titles are all junk/hashtags, infer from topic and country
+- Never start with "Recap", "Summary", "Breaking" or similar prefixes
+- If titles are all junk/hashtags, infer from body content, topic and country
 
 Respond ONLY with JSON: {"title_en": "...", "title_ko": "..."}"""
 
@@ -30,6 +32,7 @@ def _build_user_prompt(
     titles: list[str],
     topic: str,
     country_code: str | None,
+    bodies: list[str] | None = None,
 ) -> str:
     lines = [f"Topic: {topic}"]
     if country_code:
@@ -37,6 +40,11 @@ def _build_user_prompt(
     lines.append("Event titles:")
     for i, t in enumerate(titles[:5], 1):
         lines.append(f"  {i}. {t[:200]}")
+    if bodies:
+        lines.append("\nArticle bodies (for context):")
+        for i, b in enumerate(bodies[:3], 1):
+            # 본문은 300자까지만 (토큰 절약)
+            lines.append(f"  [{i}] {b[:300]}")
     return "\n".join(lines)
 
 
@@ -49,7 +57,7 @@ def generate_ai_title(
     GPT-4o-mini로 클러스터 제목 생성.
 
     Args:
-        events: [{"title": "..."}, ...] 소속 이벤트 (최대 5개)
+        events: [{"title": "...", "body": "..."}, ...] 소속 이벤트 (최대 5개)
         topic: 클러스터 토픽
         country_code: 국가 코드 (ISO-2)
 
@@ -64,6 +72,9 @@ def generate_ai_title(
     if not titles:
         return None
 
+    # 본문 수집 (있는 것만, 최대 3개)
+    bodies = [e["body"] for e in events if e.get("body")][:3]
+
     try:
         from openai import OpenAI
 
@@ -72,7 +83,7 @@ def generate_ai_title(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": _build_user_prompt(titles, topic, country_code)},
+                {"role": "user", "content": _build_user_prompt(titles, topic, country_code, bodies or None)},
             ],
             temperature=0.3,
             max_tokens=200,
