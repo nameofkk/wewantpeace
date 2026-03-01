@@ -191,7 +191,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
                 return (
                   <div key={event.id} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <SourceBadge tier={tier} className="shrink-0" />
+                      <SourceBadge tier={tier} className="shrink-0" showDesc />
                       {idx < arr.length - 1 && (
                         <div className="flex-1 w-px bg-border mt-1" />
                       )}

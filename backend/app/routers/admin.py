@@ -1239,3 +1239,285 @@ async def fix_junk_titles(
     await db.commit()
     await _log_action(db, admin, "fix_junk_titles", detail={"count": len(fixed)})
     return {"fixed": len(fixed), "details": fixed}
+
+
+# ── 댓글 관리 ─────────────────────────────────────────────────────────────────
+
+from backend.app.models.community import Comment
+
+@router.get("/comments")
+async def list_admin_comments(
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(Comment)
+    if status:
+        q = q.where(Comment.status == status)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(Comment.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    comments = result.scalars().all()
+
+    # author + post title 조회
+    user_ids = list({c.user_id for c in comments if c.user_id})
+    post_ids = list({c.post_id for c in comments if c.post_id})
+
+    nickname_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        ur = await db.execute(select(User.id, User.nickname).where(User.id.in_(user_ids)))
+        nickname_map = {row.id: row.nickname for row in ur.all()}
+
+    post_title_map: dict[uuid.UUID, str] = {}
+    if post_ids:
+        pr = await db.execute(select(Post.id, Post.title).where(Post.id.in_(post_ids)))
+        post_title_map = {row.id: row.title for row in pr.all()}
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(c.id),
+                "post_id": str(c.post_id),
+                "post_title": post_title_map.get(c.post_id, ""),
+                "content": c.content,
+                "author_nickname": nickname_map.get(c.user_id) if c.user_id else None,
+                "status": c.status,
+                "like_count": c.like_count,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in comments
+        ],
+    }
+
+
+@router.patch("/comments/{comment_id}/hide")
+async def hide_comment(
+    comment_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Comment).where(Comment.id == uuid.UUID(comment_id)))
+    comment = result.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(404)
+    comment.status = "hidden" if comment.status == "active" else "active"
+    await db.flush()
+    await _log_action(db, admin, "hide_comment", "comment", comment_id, {"new_status": comment.status})
+    return {"status": comment.status}
+
+
+# ── 어드민 로그 조회 ──────────────────────────────────────────────────────────
+
+@router.get("/logs")
+async def list_admin_logs(
+    page: int = Query(1, ge=1),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(AdminLog)
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(AdminLog.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    logs = result.scalars().all()
+
+    admin_ids = list({l.admin_id for l in logs if l.admin_id})
+    nickname_map: dict[uuid.UUID, str] = {}
+    if admin_ids:
+        ur = await db.execute(select(User.id, User.nickname).where(User.id.in_(admin_ids)))
+        nickname_map = {row.id: row.nickname for row in ur.all()}
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": l.id,
+                "admin_nickname": nickname_map.get(l.admin_id) if l.admin_id else None,
+                "action": l.action,
+                "target_type": l.target_type,
+                "target_id": l.target_id,
+                "detail": l.detail,
+                "created_at": l.created_at.isoformat(),
+            }
+            for l in logs
+        ],
+    }
+
+
+# ── 마케팅 동의 관리 ──────────────────────────────────────────────────────────
+
+from backend.app.models.community import MarketingEmailLog
+
+@router.get("/marketing")
+async def list_marketing_users(
+    page: int = Query(1, ge=1),
+    plan: Optional[str] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(User).where(User.marketing_agreed_at != None, User.status != "deleted")
+    if plan:
+        q = q.where(User.plan == plan)
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(User.marketing_agreed_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    users = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "nickname": u.nickname,
+                "plan": u.plan,
+                "marketing_agreed_at": u.marketing_agreed_at.isoformat() if u.marketing_agreed_at else None,
+            }
+            for u in users
+        ],
+    }
+
+
+@router.get("/marketing/export-csv")
+async def export_marketing_csv(
+    plan: Optional[str] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from fastapi.responses import StreamingResponse
+    import io, csv
+
+    q = select(User.email, User.nickname, User.plan).where(
+        User.marketing_agreed_at != None, User.status != "deleted", User.email != None
+    )
+    if plan:
+        q = q.where(User.plan == plan)
+    result = await db.execute(q)
+    rows = result.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["email", "nickname", "plan"])
+    for row in rows:
+        writer.writerow([row.email, row.nickname or "", row.plan])
+
+    await _log_action(db, admin, "export_marketing_csv", detail={"count": len(rows)})
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=marketing_users.csv"},
+    )
+
+
+class SendEmailBody(BaseModel):
+    subject: str
+    body: str
+    plan_filter: Optional[str] = None
+
+
+@router.post("/marketing/send-email")
+async def send_marketing_email(
+    body: SendEmailBody,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """SMTP로 마케팅 이메일 발송."""
+    from backend.app.core.config import settings
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(503, detail="SMTP 설정이 되어 있지 않습니다.")
+
+    # 대상 유저 조회
+    q = select(User.email).where(
+        User.marketing_agreed_at != None, User.status != "deleted", User.email != None
+    )
+    if body.plan_filter:
+        q = q.where(User.plan == body.plan_filter)
+    result = await db.execute(q)
+    emails = [row.email for row in result.all() if row.email]
+
+    if not emails:
+        raise HTTPException(400, detail="발송 대상이 없습니다.")
+
+    # 로그 생성
+    log = MarketingEmailLog(
+        admin_id=admin.id,
+        subject=body.subject,
+        body=body.body,
+        sent_count=0,
+        failed_count=0,
+        status="sending",
+    )
+    db.add(log)
+    await db.flush()
+
+    # SMTP 발송
+    sent = 0
+    failed = 0
+    try:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+
+        for email in emails:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["From"] = settings.smtp_user
+                msg["To"] = email
+                msg["Subject"] = body.subject
+                msg.attach(MIMEText(body.body, "html", "utf-8"))
+                smtp.sendmail(settings.smtp_user, email, msg.as_string())
+                sent += 1
+            except Exception:
+                failed += 1
+
+        smtp.quit()
+    except Exception as e:
+        log.status = "failed"
+        log.failed_count = len(emails)
+        await db.flush()
+        raise HTTPException(500, detail=f"SMTP 연결 실패: {str(e)}")
+
+    log.sent_count = sent
+    log.failed_count = failed
+    log.status = "completed"
+    await db.flush()
+    await _log_action(db, admin, "send_marketing_email", detail={"sent": sent, "failed": failed})
+
+    return {"status": "ok", "sent": sent, "failed": failed}
+
+
+@router.get("/marketing/email-logs")
+async def list_email_logs(
+    page: int = Query(1, ge=1),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(MarketingEmailLog)
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(MarketingEmailLog.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    logs = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": l.id,
+                "subject": l.subject,
+                "sent_count": l.sent_count,
+                "failed_count": l.failed_count,
+                "status": l.status,
+                "created_at": l.created_at.isoformat(),
+            }
+            for l in logs
+        ],
+    }

@@ -34,6 +34,32 @@ CURRENT_TERMS_VERSION = "2.0"
 CURRENT_PRIVACY_VERSION = "2.0"
 CURRENT_YEAR = 2026
 
+# ── 닉네임 검증 (공통) ─────────────────────────────────────────────────────
+
+_FORBIDDEN_NICKNAMES = [
+    # 관리자 사칭
+    "admin", "administrator", "관리자", "운영자", "운영진", "매니저",
+    "support", "system", "moderator", "mod", "staff", "official",
+    "wewantpeace", "wwp", "공식", "어드민",
+    # 기본 욕설·비속어
+    "시발", "씨발", "병신", "지랄", "닥쳐", "꺼져", "fuck", "shit",
+    "bitch", "asshole", "bastard", "damn",
+]
+
+
+def _validate_nickname_value(v: str) -> str:
+    """닉네임 공통 검증: 길이, 문자, 금칙어(부분 일치)."""
+    v = v.strip()
+    if len(v) < 2 or len(v) > 20:
+        raise ValueError("닉네임은 2~20자여야 합니다.")
+    if not re.match(r"^[가-힣a-zA-Z0-9_]+$", v):
+        raise ValueError("닉네임은 한글, 영문, 숫자, 언더스코어만 가능합니다.")
+    low = v.lower()
+    for word in _FORBIDDEN_NICKNAMES:
+        if word in low:
+            raise ValueError("사용할 수 없는 닉네임입니다.")
+    return v
+
 
 # ── 스키마 ──────────────────────────────────────────────────────────────────
 
@@ -50,15 +76,7 @@ class RegisterBody(BaseModel):
     @field_validator("nickname")
     @classmethod
     def validate_nickname(cls, v: str) -> str:
-        v = v.strip()
-        if len(v) < 2 or len(v) > 20:
-            raise ValueError("닉네임은 2~20자여야 합니다.")
-        if not re.match(r"^[가-힣a-zA-Z0-9_]+$", v):
-            raise ValueError("닉네임은 한글, 영문, 숫자, 언더스코어만 가능합니다.")
-        forbidden = ["admin", "관리자", "운영자", "support", "system"]
-        if v.lower() in forbidden:
-            raise ValueError("사용할 수 없는 닉네임입니다.")
-        return v
+        return _validate_nickname_value(v)
 
 
 class ProfilePatch(BaseModel):
@@ -66,6 +84,13 @@ class ProfilePatch(BaseModel):
     display_name: Optional[str] = None
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
+
+    @field_validator("nickname")
+    @classmethod
+    def validate_nickname(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return _validate_nickname_value(v)
 
 
 class UserOut(BaseModel):

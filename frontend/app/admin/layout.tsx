@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Users, Layers, Activity, FileText,
   Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
   CreditCard, MessageSquare, TrendingUp, MessageCircleQuestion,
+  Mail, ScrollText,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
@@ -15,20 +16,67 @@ import { t, type Lang } from "@/lib/i18n";
 import { useAuth, signOut } from "@/lib/auth";
 import { API_BASE } from "@/lib/admin-utils";
 
-const NAV_ITEMS = [
-  { href: "/admin", icon: LayoutDashboard, labelKey: "admin_dashboard" as const, exact: true },
-  { href: "/admin/users", icon: Users, labelKey: "admin_users" as const },
-  { href: "/admin/clusters", icon: Layers, labelKey: "admin_clusters" as const },
-  { href: "/admin/tension", icon: Activity, labelKey: "admin_tension" as const },
-  { href: "/admin/kscore", icon: TrendingUp, labelKey: "admin_kscore" as const },
-  { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" as const },
-  { href: "/admin/events", icon: FileText, labelKey: "admin_events" as const },
-  { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" as const },
-  { href: "/admin/subscriptions", icon: CreditCard, labelKey: "admin_subscriptions" as const },
-  { href: "/admin/posts", icon: MessageSquare, labelKey: "admin_posts" as const },
-  { href: "/admin/feedbacks", icon: MessageCircleQuestion, labelKey: "admin_feedbacks" as const },
-  { href: "/admin/settings", icon: Settings, labelKey: "admin_settings" as const },
+interface NavItem {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  labelKey: Parameters<typeof t>[1];
+  exact?: boolean;
+}
+
+interface NavGroup {
+  labelKey: Parameters<typeof t>[1];
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    labelKey: "admin_group_overview",
+    items: [
+      { href: "/admin", icon: LayoutDashboard, labelKey: "admin_dashboard", exact: true },
+    ],
+  },
+  {
+    labelKey: "admin_group_users",
+    items: [
+      { href: "/admin/users", icon: Users, labelKey: "admin_users" },
+      { href: "/admin/subscriptions", icon: CreditCard, labelKey: "admin_subscriptions" },
+      { href: "/admin/marketing", icon: Mail, labelKey: "admin_marketing" },
+    ],
+  },
+  {
+    labelKey: "admin_group_content",
+    items: [
+      { href: "/admin/posts", icon: MessageSquare, labelKey: "admin_posts" },
+      { href: "/admin/comments", icon: ScrollText, labelKey: "admin_comments" },
+      { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" },
+      { href: "/admin/feedbacks", icon: MessageCircleQuestion, labelKey: "admin_feedbacks" },
+    ],
+  },
+  {
+    labelKey: "admin_group_data",
+    items: [
+      { href: "/admin/clusters", icon: Layers, labelKey: "admin_clusters" },
+      { href: "/admin/events", icon: FileText, labelKey: "admin_events" },
+      { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" },
+    ],
+  },
+  {
+    labelKey: "admin_group_analytics",
+    items: [
+      { href: "/admin/kscore", icon: TrendingUp, labelKey: "admin_trending" },
+      { href: "/admin/tension", icon: Activity, labelKey: "admin_tension" },
+    ],
+  },
+  {
+    labelKey: "admin_group_system",
+    items: [
+      { href: "/admin/settings", icon: Settings, labelKey: "admin_settings" },
+      { href: "/admin/logs", icon: ScrollText, labelKey: "admin_logs" },
+    ],
+  },
 ];
+
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
 function Sidebar({
   lang,
@@ -66,26 +114,40 @@ function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-2 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, icon: Icon, labelKey, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 mx-2 rounded-lg text-sm transition-colors",
-                active
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">{t(lang, labelKey)}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 py-2 overflow-y-auto">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi}>
+            {!collapsed && (
+              <p className="px-5 pt-3 pb-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                {t(lang, group.labelKey)}
+              </p>
+            )}
+            {collapsed && gi > 0 && (
+              <div className="mx-3 my-1 border-t border-border/40" />
+            )}
+            <div className="space-y-0.5">
+              {group.items.map(({ href, icon: Icon, labelKey, exact }) => {
+                const active = exact ? pathname === href : pathname.startsWith(href + "/") || pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 mx-2 rounded-lg text-sm transition-colors",
+                      active
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span className="truncate">{t(lang, labelKey)}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
@@ -187,7 +249,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </button>
         <span className="text-sm font-bold text-primary">
           {(() => {
-            const nav = NAV_ITEMS.find((n) => n.exact ? pathname === n.href : pathname.startsWith(n.href + "/") || pathname === n.href);
+            const nav = ALL_NAV_ITEMS.find((n) => n.exact ? pathname === n.href : pathname.startsWith(n.href + "/") || pathname === n.href);
             return nav ? t(lang, nav.labelKey) : t(lang, "admin_title");
           })()}
         </span>

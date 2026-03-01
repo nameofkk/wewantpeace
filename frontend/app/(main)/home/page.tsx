@@ -558,6 +558,7 @@ export default function HomePage() {
   );
 
   const [spinning, setSpinning] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const items    = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
   const isLoading = trendingTab === "global" ? globalLoading : mineLoading;
@@ -642,7 +643,7 @@ export default function HomePage() {
           {(["global", "mine"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setTrendingTab(tab)}
+              onClick={() => { setTrendingTab(tab); setVisibleCount(10); }}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 trendingTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -762,11 +763,22 @@ export default function HomePage() {
               </div>
             )}
 
-            {!isLoading && !isError && items && items.length > 0 &&
-              items.map((item, i) => (
-                <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={isAdmin} />
-              ))
-            }
+            {!isLoading && !isError && items && items.length > 0 && (
+              <>
+                {items.slice(0, visibleCount).map((item, i) => (
+                  <TrendingCard key={item.id} item={item} rank={i + 1} delay={i * 70} userPlan={userPlan} isAdmin={isAdmin} />
+                ))}
+                {items.length > visibleCount && (
+                  <button
+                    onClick={() => setVisibleCount((v) => v + 10)}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                    {t(lang, "home_load_more")}
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
     </div>

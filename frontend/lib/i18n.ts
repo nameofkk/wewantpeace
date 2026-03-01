@@ -796,6 +796,28 @@ export const translations = {
     // 관리자 피드백
     admin_feedbacks: "피드백 관리",
 
+    // 소스 신뢰도 등급 설명
+    source_tier_A_desc: "공식·주요언론",
+    source_tier_B_desc: "신뢰도 높음",
+    source_tier_C_desc: "중립",
+    source_tier_D_desc: "미검증",
+
+    // 어드민 신규 메뉴
+    admin_group_overview: "개요",
+    admin_group_users: "사용자 관리",
+    admin_group_content: "콘텐츠 관리",
+    admin_group_data: "데이터 관리",
+    admin_group_analytics: "분석",
+    admin_group_system: "시스템",
+    admin_marketing: "마케팅",
+    admin_comments: "댓글 관리",
+    admin_logs: "어드민 로그",
+    admin_trending: "트렌딩",
+
+    // 홈 더보기
+    home_load_more: "더보기",
+    home_no_more: "모두 표시됨",
+
     // PWA 설치 배너
     pwa_install_title: "WeWantPeace 앱 설치",
     pwa_install_desc: "실시간 알림과 빠른 접근을 위해 설치하세요",
@@ -1593,6 +1615,28 @@ export const translations = {
 
     // admin feedback
     admin_feedbacks: "Feedbacks",
+
+    // source tier descriptions
+    source_tier_A_desc: "Official / Major Media",
+    source_tier_B_desc: "High Credibility",
+    source_tier_C_desc: "Neutral",
+    source_tier_D_desc: "Unverified",
+
+    // admin new menus
+    admin_group_overview: "Overview",
+    admin_group_users: "User Mgmt",
+    admin_group_content: "Content Mgmt",
+    admin_group_data: "Data Mgmt",
+    admin_group_analytics: "Analytics",
+    admin_group_system: "System",
+    admin_marketing: "Marketing",
+    admin_comments: "Comments",
+    admin_logs: "Admin Logs",
+    admin_trending: "Trending",
+
+    // home load more
+    home_load_more: "Load More",
+    home_no_more: "All displayed",
 
     // PWA install banner
     pwa_install_title: "Install WeWantPeace App",

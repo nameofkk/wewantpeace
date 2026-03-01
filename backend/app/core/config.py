@@ -103,5 +103,11 @@ class Settings(BaseSettings):
     toss_decryption_key: str = ""      # 유저 정보 복호화 키 (AES-256-GCM)
     toss_decryption_aad: str = ""      # 복호화 AAD
 
+    # SMTP (마케팅 메일링)
+    smtp_host: str = "smtp.naver.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
 
 settings = Settings()

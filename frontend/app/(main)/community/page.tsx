@@ -229,7 +229,7 @@ export default function CommunityPage() {
 
         {/* 상단고정 공지 */}
         {activeType !== "notice" && pinnedNotices && pinnedNotices.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-2 pb-3 border-b border-yellow-500/20">
             {pinnedNotices.map((notice) => (
               <Link key={notice.id} href={`/community/${notice.id}`}>
                 <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 hover:bg-yellow-500/10 transition-colors cursor-pointer">
