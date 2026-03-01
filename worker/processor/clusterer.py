@@ -136,24 +136,20 @@ def _make_cluster_title_ko(
 def _cluster_key(event: "NormalizedEvent") -> str:
     """
     클러스터 키 생성 전략 (우선순위):
-    0. 고심각도(>=50) conflict/terror/coup → {country_code}:{topic}
-       (속보: 이란 공습 등 전국적 사건은 도시별로 쪼개면 안 됨)
-    1. geohash 4자리 있으면 → {geohash4}:{topic}  (지역별 격리)
-    2. country_code 있으면 → {country_code}:{topic}
+    1. country_code 있으면 → {country_code}:{topic}  (국가별 격리)
+    2. geohash 4자리 있으면 → {geohash4}:{topic}  (좌표만 있는 경우)
     3. 없으면 → 0000:{topic}
-    """
-    # 고심각도 군사/테러/쿠데타 이벤트는 국가 단위로 클러스터링
-    # 전국적 사건(공습, 침공 등)이 도시별로 분산되는 것을 방지
-    if (event.severity >= 50
-        and event.topic in ("conflict", "terror", "coup")
-        and event.country_code):
-        return f"{event.country_code}:{event.topic}"
 
+    이전 버전은 geohash4를 우선해서 다른 나라 이벤트가
+    같은 geohash 버킷에 혼입되는 문제가 있었음 (dqcj:diplomacy 등).
+    국가 코드를 항상 우선하고, 같은 국가 내 다른 이슈는
+    title_overlap 검사로 분리한다.
+    """
+    if event.country_code:
+        return f"{event.country_code}:{event.topic}"
     geo4 = (event.geohash5 or "")[:4]
     if geo4:
         return f"{geo4}:{event.topic}"
-    if event.country_code:
-        return f"{event.country_code}:{event.topic}"
     return f"0000:{event.topic}"
 
 

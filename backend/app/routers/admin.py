@@ -444,38 +444,56 @@ async def hide_post(
 @router.get("/subscriptions")
 async def list_subscriptions(
     page: int = Query(1, ge=1),
-    status: Optional[str] = Query(None),
     plan: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Subscription)
-    if status:
-        q = q.where(Subscription.status == status)
-    if plan:
-        q = q.where(Subscription.plan == plan)
+    """유료 플랜 사용자 목록 (결제 구독 + 어드민 부여 모두 포함)."""
+    from sqlalchemy.orm import aliased
+    Sub = aliased(Subscription)
 
-    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
-    q = q.order_by(Subscription.created_at.desc()).offset((page - 1) * 20).limit(20)
+    # users.plan != 'free' 인 유저 조회, 최신 구독 정보 LEFT JOIN
+    q = (
+        select(User, Subscription)
+        .outerjoin(
+            Subscription,
+            (Subscription.user_id == User.id) & (Subscription.status == "active"),
+        )
+        .where(User.plan != "free")
+    )
+    if plan:
+        q = q.where(User.plan == plan)
+
+    total = (await db.execute(
+        select(func.count()).select_from(
+            select(User.id).where(User.plan != "free")
+            .where(User.plan == plan if plan else True)
+            .subquery()
+        )
+    )).scalar() or 0
+
+    q = q.order_by(User.created_at.desc()).offset((page - 1) * 20).limit(20)
     result = await db.execute(q)
-    subs = result.scalars().all()
+    rows = result.all()
     return {
         "total": total,
         "items": [
             {
-                "id": str(s.id),
-                "user_id": str(s.user_id),
-                "plan": s.plan,
-                "status": s.status,
-                "amount": s.amount,
-                "currency": s.currency,
-                "platform": s.platform,
-                "started_at": s.started_at.isoformat(),
-                "expires_at": s.expires_at.isoformat() if s.expires_at else None,
-                "next_billing_at": s.next_billing_at.isoformat() if s.next_billing_at else None,
-                "created_at": s.created_at.isoformat(),
+                "id": str(u.id),
+                "user_id": str(u.id),
+                "email": u.email,
+                "nickname": u.nickname,
+                "plan": u.plan,
+                "status": s.status if s else "admin_granted",
+                "amount": s.amount if s else 0,
+                "currency": s.currency if s else "KRW",
+                "platform": s.platform if s else "admin",
+                "started_at": (s.started_at.isoformat() if s else u.created_at.isoformat()),
+                "expires_at": (s.expires_at.isoformat() if s and s.expires_at else None),
+                "next_billing_at": (s.next_billing_at.isoformat() if s and s.next_billing_at else None),
+                "created_at": u.created_at.isoformat(),
             }
-            for s in subs
+            for u, s in rows
         ],
     }
 

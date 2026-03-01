@@ -12,8 +12,10 @@ import { API_BASE } from "@/lib/admin-utils";
 interface SubscriptionItem {
   id: string;
   user_id: string;
+  email: string | null;
+  nickname: string | null;
   plan: string;
-  status: string; // active, cancelled, expired, trial, grace_period
+  status: string; // active, cancelled, expired, trial, grace_period, admin_granted
   amount: number;
   currency: string;
   platform: string;
@@ -25,6 +27,7 @@ interface SubscriptionItem {
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-500/20 text-green-400",
+  admin_granted: "bg-indigo-500/20 text-indigo-400",
   cancelled: "bg-yellow-500/20 text-yellow-400",
   expired: "bg-red-500/20 text-red-400",
   trial: "bg-blue-500/20 text-blue-400",
@@ -38,6 +41,7 @@ const PLAN_BADGE: Record<string, string> = {
 
 const STATUS_LABEL_KEY: Record<string, string> = {
   active: "admin_sub_active",
+  admin_granted: "admin_sub_granted",
   cancelled: "admin_sub_cancelled",
   expired: "admin_sub_expired",
   trial: "admin_sub_trial",
@@ -48,15 +52,15 @@ export default function AdminSubscriptionsPage() {
   const { user } = useAuth();
   const { lang } = useAppStore();
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
 
   const { data, isLoading } = useQuery<{ items: SubscriptionItem[]; total: number }>({
-    queryKey: ["admin-subscriptions", page],
+    queryKey: ["admin-subscriptions", page, planFilter],
     queryFn: async () => {
       if (!user) throw new Error("Unauthorized");
       const token = await user.getIdToken();
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
+      const params = new URLSearchParams({ page: String(page) });
+      if (planFilter !== "all") params.append("plan", planFilter);
       const res = await fetch(`${API_BASE}/admin/subscriptions?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -68,12 +72,7 @@ export default function AdminSubscriptionsPage() {
 
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
-  // Client-side filtering
-  const filtered = (data?.items ?? []).filter((item) => {
-    if (statusFilter !== "all" && item.status !== statusFilter) return false;
-    if (planFilter !== "all" && item.plan !== planFilter) return false;
-    return true;
-  });
+  const filtered = data?.items ?? [];
 
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
 
@@ -100,28 +99,18 @@ export default function AdminSubscriptionsPage() {
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
-        >
-          <option value="all">{t(lang, "admin_sub_status")}: {t(lang, "admin_all")}</option>
-          <option value="active">{t(lang, "admin_sub_active")}</option>
-          <option value="cancelled">{t(lang, "admin_sub_cancelled")}</option>
-          <option value="expired">{t(lang, "admin_sub_expired")}</option>
-          <option value="trial">{t(lang, "admin_sub_trial")}</option>
-          <option value="grace_period">{t(lang, "admin_sub_grace_period")}</option>
-        </select>
-
-        <select
-          value={planFilter}
-          onChange={(e) => setPlanFilter(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary"
-        >
-          <option value="all">{t(lang, "admin_sub_plan")}: {t(lang, "admin_all")}</option>
-          <option value="pro">Pro</option>
-          <option value="pro_plus">Pro+</option>
-        </select>
+        {["all", "pro", "pro_plus"].map((p) => (
+          <button
+            key={p}
+            onClick={() => { setPlanFilter(p); setPage(1); }}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+              planFilter === p ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {p === "all" ? t(lang, "admin_all") : p === "pro_plus" ? "Pro+" : "Pro"}
+          </button>
+        ))}
       </div>
 
       {/* Loading skeleton */}
@@ -159,22 +148,20 @@ export default function AdminSubscriptionsPage() {
             <table className="w-full text-sm">
               <thead className="bg-secondary/50">
                 <tr>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">User ID</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_email")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_nickname")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_plan")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_status")}</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_amount")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_platform")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_started")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_expires")}</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_next_billing")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((item) => (
                   <tr key={item.id} className="hover:bg-secondary/20">
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {item.user_id.slice(0, 8)}...
-                    </td>
+                    <td className="px-4 py-3 text-xs">{item.email ?? "-"}</td>
+                    <td className="px-4 py-3 text-xs">{item.nickname ?? "-"}</td>
                     <td className="px-4 py-3">
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", PLAN_BADGE[item.plan] || "bg-secondary")}>
                         {item.plan.toUpperCase()}
@@ -185,9 +172,6 @@ export default function AdminSubscriptionsPage() {
                         {t(lang, STATUS_LABEL_KEY[item.status] as any) || item.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs">
-                      {formatAmount(item.amount, item.currency)}
-                    </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {item.platform}
                     </td>
@@ -196,9 +180,6 @@ export default function AdminSubscriptionsPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {formatDate(item.expires_at)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {formatDate(item.next_billing_at)}
                     </td>
                   </tr>
                 ))}
@@ -210,11 +191,12 @@ export default function AdminSubscriptionsPage() {
           <div className="md:hidden space-y-3">
             {filtered.map((item) => (
               <div key={item.id} className="rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {item.user_id.slice(0, 8)}...
-                  </span>
-                  <div className="flex gap-1.5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium truncate">{item.nickname ?? item.email ?? "-"}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{item.email ?? "-"}</p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", PLAN_BADGE[item.plan] || "bg-secondary")}>
                       {item.plan.toUpperCase()}
                     </span>
@@ -223,11 +205,7 @@ export default function AdminSubscriptionsPage() {
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-y-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">{t(lang, "admin_sub_amount")}</span>
-                    <p className="font-medium">{formatAmount(item.amount, item.currency)}</p>
-                  </div>
+                <div className="grid grid-cols-3 gap-y-2 text-xs">
                   <div>
                     <span className="text-muted-foreground">{t(lang, "admin_sub_platform")}</span>
                     <p className="font-medium">{item.platform}</p>
@@ -239,10 +217,6 @@ export default function AdminSubscriptionsPage() {
                   <div>
                     <span className="text-muted-foreground">{t(lang, "admin_sub_expires")}</span>
                     <p className="font-medium">{formatDate(item.expires_at)}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">{t(lang, "admin_sub_next_billing")}</span>
-                    <p className="font-medium">{formatDate(item.next_billing_at)}</p>
                   </div>
                 </div>
               </div>
