@@ -70,6 +70,8 @@ app.conf.beat_schedule = {
 
 @worker_ready.connect
 def on_worker_ready(**kwargs):
-    """워커 시작 시 긴장도·트렌딩 즉시 계산 (beat 스케줄 대기 없이)."""
+    """워커 시작 시 Firebase 초기화 + 긴장도·트렌딩 즉시 계산."""
+    from backend.app.core.firebase_init import init_firebase
+    init_firebase()
     app.send_task("worker.tasks.calculate_tension", queue="process")
     app.send_task("worker.tasks.calculate_trending", queue="process")
