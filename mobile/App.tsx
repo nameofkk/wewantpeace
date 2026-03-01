@@ -43,22 +43,43 @@ export default function App() {
   // ── 초기화 ──
   useEffect(() => {
     async function init() {
-      // 1. Android 알림 채널
-      await createNotificationChannels();
+      try {
+        // 1. Android 알림 채널
+        await createNotificationChannels();
+      } catch (e) {
+        console.warn("[App] 알림 채널 생성 실패:", e);
+      }
 
-      // 2. IAP 초기화
-      await initIAP();
+      try {
+        // 2. IAP 초기화 (타임아웃 5초)
+        await Promise.race([
+          initIAP(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("IAP timeout")), 5000),
+          ),
+        ]);
+      } catch (e) {
+        console.warn("[App] IAP 초기화 실패/타임아웃:", e);
+      }
 
-      // 3. 앱 종료 상태 알림으로 열림 → initialUrl
-      const notifUrl = await getInitialNotificationUrl();
-      if (notifUrl) {
-        setInitialPath(notifUrl);
+      try {
+        // 3. 앱 종료 상태 알림으로 열림 → initialUrl
+        const notifUrl = await getInitialNotificationUrl();
+        if (notifUrl) {
+          setInitialPath(notifUrl);
+        }
+      } catch (e) {
+        console.warn("[App] 초기 알림 URL 확인 실패:", e);
       }
 
       setReady(true);
 
       // 4. 스플래시 숨기기
-      await SplashScreen.hideAsync();
+      try {
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn("[App] 스플래시 숨기기 실패:", e);
+      }
     }
 
     init();
