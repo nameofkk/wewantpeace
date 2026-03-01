@@ -219,8 +219,8 @@ async def assign_cluster(
         # severity: 최대값 유지
         if event.severity > cluster.severity:
             cluster.severity = event.severity
-        # independent_sources: 이벤트마다 +1 (각 이벤트 = 독립 보도 1건)
-        cluster.independent_sources = (cluster.independent_sources or 1) + 1
+        # independent_sources: trending_engine에서 실제 독립출처 수로 갱신
+        # (여기서는 source_channel 중복 확인 불가 → 5분 주기 배치에서 정확히 계산)
         # source_tiers: 새 tier 추가
         if event.source_tier:
             existing = list(cluster.source_tiers or [])

@@ -114,6 +114,9 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     if not clusters:
         return []
 
+    # ── 독립출처 수 정확히 계산 (source_channel 기반) ────────────────────
+    await _sync_independent_sources(db, clusters)
+
     # ── 쓰레기 제목 자동 수정 ──────────────────────────────────────────────
     await _fix_junk_titles(db, clusters)
 
@@ -220,6 +223,37 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
 
     logger.info("트렌딩 계산 완료: 클러스터 %d개 → scored %d개 (top %d개)", len(clusters), len(scored), len(top))
     return top
+
+
+async def _sync_independent_sources(db: AsyncSession, clusters: list[IssueCluster]) -> None:
+    """각 클러스터의 실제 독립출처 수(distinct source_channel)를 계산하여 동기화."""
+    cluster_ids = [c.id for c in clusters]
+    if not cluster_ids:
+        return
+
+    # 배치로 조회: cluster_id별 독립 source_channel 수
+    result = await db.execute(
+        sa_text("""
+            SELECT ce.cluster_id, COUNT(DISTINCT re.source_channel_id) as src_count
+            FROM cluster_events ce
+            JOIN normalized_events ne ON ne.id = ce.event_id
+            JOIN raw_events re ON re.id = ne.raw_event_id
+            WHERE ce.cluster_id = ANY(:ids)
+            GROUP BY ce.cluster_id
+        """),
+        {"ids": cluster_ids},
+    )
+    src_map = {row[0]: row[1] for row in result.fetchall()}
+
+    updated = 0
+    for c in clusters:
+        actual = src_map.get(c.id, 1)
+        if c.independent_sources != actual:
+            c.independent_sources = actual
+            updated += 1
+
+    if updated:
+        logger.info("독립출처 수 동기화: %d개 클러스터 업데이트", updated)
 
 
 _JUNK_TITLE_PATTERNS = [
