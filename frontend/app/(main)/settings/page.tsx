@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -1095,6 +1095,17 @@ export default function SettingsPage() {
             {t(lang, "settings_support")}
           </h2>
           <div className="rounded-xl border border-border bg-card divide-y divide-border">
+            <a
+              href="/settings/glossary"
+              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
+            >
+              <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <p>{t(lang, "settings_glossary")}</p>
+                <p className="text-[11px] text-muted-foreground">{t(lang, "settings_glossary_sub")}</p>
+              </div>
+              <span className="text-muted-foreground text-xs">→</span>
+            </a>
             <a
               href="mailto:krshin7@naver.com"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
