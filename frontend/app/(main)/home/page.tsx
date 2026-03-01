@@ -574,7 +574,7 @@ export default function HomePage() {
         reason: "",
         calculated_at: c.last_event_at,
         first_event_at: c.first_event_at,
-        independent_sources: 1,
+        independent_sources: c.independent_sources ?? 1,
       })) as TrendingItem[];
   }, [clusterData]);
   const globalLoading = clusterLoading;

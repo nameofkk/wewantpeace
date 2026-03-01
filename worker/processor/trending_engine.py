@@ -222,10 +222,25 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     return top
 
 
+_JUNK_TITLE_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in [
+        r"^recap\b",
+        r"good morning.{0,30}(reader|subscriber|viewer)",
+        r"^world news in brief\b",
+        r"^(daily|morning|evening|weekly)\s+(recap|roundup|digest|briefing|brief)\b",
+    ]
+]
+
+
 def _is_junk_title(title: str) -> bool:
     """해시태그만 있거나 의미 없는 제목인지 판별."""
     stripped = re.sub(r'#\w+', '', title).strip()
-    return len(stripped) < 5
+    if len(stripped) < 5:
+        return True
+    for pat in _JUNK_TITLE_PATTERNS:
+        if pat.search(title):
+            return True
+    return False
 
 
 def _translate_cached(title: str) -> str | None:

@@ -57,6 +57,13 @@ _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"(속보|일일|무료).{0,10}(이메일|앱|팟캐스트|뉴스레터).{0,20}(받으세요|신청|구독|다운로드)",
     r"(구독|알림|푸시).{0,10}(신청|설정|받기)",
     r"(앱|어플).{0,10}(다운로드|설치)",
+    # 뉴스레터/요약 기사 (노이즈)
+    r"^recap\b",
+    r"good morning.{0,30}(reader|subscriber|viewer)",
+    r"^world news in brief\b",
+    r"^news in brief\b",
+    r"^daily (recap|roundup|digest|briefing)\b",
+    r"^(morning|evening|weekly) (brief|briefing|update|roundup)\b",
     # 광고성 문구
     r"(sponsored|advertisement|advertorial|paid content|promoted)",
     r"(privacy policy|cookie policy|terms of (use|service))$",

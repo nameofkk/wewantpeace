@@ -39,6 +39,7 @@ class ClusterOut(BaseModel):
     is_spike: bool
     is_verified: bool
     kscore: float
+    independent_sources: int = 0
     first_event_at: str
     last_event_at: str
 
