@@ -141,6 +141,8 @@ def _send_fcm_multicast(tokens: list[str], title: str, body: str, data: dict) ->
             message = messaging.MulticastMessage(
                 tokens=batch,
                 data=msg_data,
+                android=messaging.AndroidConfig(priority="high"),
+                webpush=messaging.WebpushConfig(headers={"Urgency": "high"}),
             )
             response = messaging.send_each_for_multicast(message)
             total_success += response.success_count

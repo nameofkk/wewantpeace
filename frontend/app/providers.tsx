@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
+import { setupForegroundListener } from "@/lib/fcm";
 
 function ThemeSync() {
   const theme = useAppStore((s) => s.theme);
@@ -12,6 +13,13 @@ function ThemeSync() {
     html.classList.toggle("dark", theme === "dark");
     html.classList.toggle("light", theme === "light");
   }, [theme]);
+  return null;
+}
+
+function FCMForegroundInit() {
+  useEffect(() => {
+    setupForegroundListener();
+  }, []);
   return null;
 }
 
@@ -33,6 +41,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeSync />
+      <FCMForegroundInit />
       {children}
       {process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />

@@ -100,6 +100,48 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
   }
 }
 
+/** 포그라운드 메시지 수신 리스너 등록 (탭이 활성 상태일 때) */
+export async function setupForegroundListener(): Promise<void> {
+  if (!isPushSupported()) return;
+  if (Notification.permission !== "granted") return;
+
+  try {
+    const { initializeApp, getApps } = await import("firebase/app");
+    const { getMessaging, onMessage } = await import("firebase/messaging");
+
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+
+    onMessage(messaging, (payload) => {
+      const data = payload.data || {};
+      const title = data.title || payload.notification?.title || "WeWantPeace";
+      const body = data.body || payload.notification?.body || "";
+
+      // Service Worker를 통해 시스템 알림 표시
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(title, {
+          body,
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-96.png",
+          tag: data.cluster_id || "wwp-fg-notification",
+          data: { url: data.cluster_id && data.cluster_id !== "test" ? `/issues/${data.cluster_id}` : "/" },
+        });
+      });
+    });
+  } catch (e) {
+    console.warn("[FCM] 포그라운드 리스너 설정 실패:", e);
+  }
+}
+
 /** 저장된 FCM 토큰 반환 */
 export function getStoredFCMToken(): string | null {
   if (typeof window === "undefined") return null;
