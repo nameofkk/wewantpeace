@@ -130,7 +130,7 @@ export function setupForegroundMessageHandler(
         body,
         android: {
           channelId,
-          smallIcon: "ic_notification",
+          smallIcon: "notification_icon",
           pressAction: { id: "default" },
         },
         data: data || {},

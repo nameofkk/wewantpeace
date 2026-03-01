@@ -200,7 +200,7 @@ def _send_fcm_for_native(
                     notification=messaging.AndroidNotification(
                         channel_id=channel_id,
                         priority="high" if severity < 90 else "max",
-                        icon="ic_notification",
+                        icon="notification_icon",
                     ),
                 ),
                 apns=messaging.APNSConfig(
