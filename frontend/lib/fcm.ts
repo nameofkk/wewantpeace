@@ -43,15 +43,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 export async function requestAndGetFCMToken(): Promise<string | null> {
   if (!isPushSupported()) return null;
 
-  // 알림 권한 요청 (인앱브라우저에서 무한 대기 방지: 10초 타임아웃)
+  // 알림 권한 확인 + 요청
   try {
     if (Notification.permission === "default") {
-      const perm = await withTimeout(
-        Notification.requestPermission(),
-        10_000,
-        "Notification.requestPermission",
-      );
-      if (perm !== "granted") return null;
+      try {
+        const perm = await withTimeout(
+          Notification.requestPermission(),
+          10_000,
+          "Notification.requestPermission",
+        );
+        if (perm !== "granted") return null;
+      } catch {
+        // Edge: requestPermission이 타임아웃되어도 설정에서 허용했으면 granted일 수 있음
+        if (Notification.permission !== "granted") return null;
+      }
     }
     if (Notification.permission !== "granted") return null;
   } catch (e) {
