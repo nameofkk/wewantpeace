@@ -3,20 +3,124 @@ EventNormalizer: RawEvent 텍스트 → NormalizedEvent 변환.
 
 처리 순서:
 1. 언어 감지 (langdetect)
-2. Topic 분류 (키워드 매칭)
-3. Severity 계산 (0~100)
+2. Topic 분류 (AI 우선, 실패 시 키워드 폴백)
+3. Severity 계산 (AI 우선, 실패 시 키워드 폴백)
 4. Confidence 계산 (source tier 기반)
 5. dedup_key 생성 (정규화 텍스트 MD5)
 6. Geo 정보 추출 (국가 키워드 → 좌표 → geohash5)
 """
 import hashlib
+import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
+
+_OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+
+_VALID_TOPICS = frozenset([
+    "conflict", "terror", "coup", "sanctions", "cyber",
+    "protest", "diplomacy", "maritime", "disaster", "health",
+])
+
+_AI_CLASSIFY_PROMPT = """\
+You are a crisis/conflict event classifier for a global monitoring system.
+Given a news article title and body, classify it into exactly ONE topic and assign a severity score.
+
+## Topics (pick exactly one):
+- conflict: Armed conflict, military operations, airstrikes, bombings, war, troops, weapons, casualties from combat
+- terror: Terrorism, hostage situations, mass shootings, assassinations, cartel violence, extremist attacks
+- coup: Coups, military takeovers, martial law, government overthrow, insurrection, constitutional crisis
+- sanctions: Economic sanctions, embargoes, trade bans, tariffs, financial crises, market crashes, economic emergencies
+- cyber: Cyberattacks, hacking, ransomware, data breaches, internet shutdowns, election interference
+- protest: Protests, demonstrations, riots, civil unrest, strikes, uprisings, crackdowns on protesters
+- diplomacy: Diplomatic events, treaties, summits, elections, political developments, peace processes, government policy
+- maritime: Naval operations, shipping disruptions, piracy, maritime incidents, migrant crossings, port blockades
+- disaster: Natural disasters, industrial accidents, infrastructure failures, humanitarian crises, famines
+- health: Disease outbreaks, epidemics, pandemics, public health emergencies, vaccination campaigns
+
+## Severity (0-100):
+- 0-19: Minimal/routine (scheduled exercises, minor policy updates)
+- 20-39: Low (small protests, diplomatic statements, minor incidents)
+- 40-59: Moderate (significant protests, trade disputes, localized conflict)
+- 60-79: High (major military operations, large casualties, severe crises)
+- 80-100: Critical (war declarations, mass casualties, nuclear threats, large-scale attacks)
+
+Key severity factors:
+- Casualties: 1-10 dead → +10, 10-50 → +20, 50-100 → +25, 100+ → +30
+- Scale: city-level → base, country-level → +10, international → +15
+- Weapons: conventional → base, missiles/drones → +10, WMD/nuclear → +20
+- Uncertainty: "alleged"/"unconfirmed" → -10, "confirmed"/"official" → +5
+- De-escalation: "ceasefire"/"peace deal"/"withdrawal" → -15
+
+IMPORTANT:
+- "state of emergency" in a WAR context = conflict, NOT sanctions
+- "nuclear" in power plant context = disaster, NOT conflict
+- Military exercises/drills = conflict with LOW severity (20-30)
+- Read the FULL context before deciding. Title alone can be misleading.
+
+Respond ONLY with JSON: {"topic": "...", "severity": N}"""
+
+
+def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, int]]:
+    """
+    GPT-4o-mini로 토픽 + severity 분류.
+
+    Returns:
+        (topic, severity) 또는 실패 시 None
+    """
+    if not _OPENAI_KEY:
+        return None
+
+    # 빈 입력 방어
+    if not title and not body:
+        return None
+
+    user_text = f"Title: {title[:200]}\n\nBody: {body[:500]}"
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=_OPENAI_KEY, timeout=10.0)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _AI_CLASSIFY_PROMPT},
+                {"role": "user", "content": user_text},
+            ],
+            temperature=0,
+            max_tokens=60,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content
+        if not raw:
+            return None
+
+        data = json.loads(raw)
+
+        topic = data.get("topic", "").strip().lower()
+        severity = data.get("severity")
+
+        # 유효성 검증
+        if topic not in _VALID_TOPICS:
+            logger.warning("AI 토픽 유효하지 않음: %s (원문: %s)", topic, raw[:100])
+            return None
+        if not isinstance(severity, (int, float)) or severity < 0 or severity > 100:
+            logger.warning("AI severity 범위 초과: %s (원문: %s)", severity, raw[:100])
+            return None
+
+        severity = max(0, min(100, int(severity)))
+        return topic, severity
+
+    except Exception:
+        logger.exception("AI 분류 실패 (제목: %s)", title[:80])
+        return None
 
 # ── Topic 분류 키워드 ────────────────────────────────────────────────────────
 
@@ -1664,15 +1768,22 @@ def normalize(
     if lang not in ("en", "unknown") and text_for_analysis == raw_text:
         translation_status = "failed"
 
-    topic = _classify_topic(text_for_analysis)
+    # AI 우선 분류 (토픽 + severity 동시), 실패 시 기존 규칙 폴백
+    _title_for_ai = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else _make_title(text_for_analysis)
+    ai_result = _classify_with_ai(_title_for_ai, text_for_analysis)
 
-    # C3: 번역 실패 시 원문 언어 키워드로 토픽 분류 재시도
-    if topic == "unknown" and lang not in ("en", "unknown"):
-        multilang_topic = _classify_topic_multilang(raw_text, lang)
-        if multilang_topic:
-            topic = multilang_topic
-
-    severity = _calculate_severity(text_for_analysis, topic)
+    if ai_result is not None:
+        topic, severity = ai_result
+        logger.debug("AI 분류: topic=%s, severity=%d (제목: %s)", topic, severity, _title_for_ai[:60])
+    else:
+        # 폴백: 기존 키워드 기반 분류
+        topic = _classify_topic(text_for_analysis)
+        if topic == "unknown" and lang not in ("en", "unknown"):
+            multilang_topic = _classify_topic_multilang(raw_text, lang)
+            if multilang_topic:
+                topic = multilang_topic
+        severity = _calculate_severity(text_for_analysis, topic)
+        logger.debug("규칙 폴백: topic=%s, severity=%d (제목: %s)", topic, severity, _title_for_ai[:60])
     # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
     country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
