@@ -14,12 +14,13 @@ def _get_android_publisher_service():
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
-    key_path = settings.google_play_service_account_key_path
-    if not key_path:
-        raise RuntimeError("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_PATH not configured")
+    sa_json = settings.google_play_service_account_json
+    if not sa_json:
+        raise RuntimeError("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON not configured")
 
-    credentials = service_account.Credentials.from_service_account_file(
-        key_path,
+    service_account_info = json.loads(sa_json)
+    credentials = service_account.Credentials.from_service_account_info(
+        service_account_info,
         scopes=["https://www.googleapis.com/auth/androidpublisher"],
     )
     return build("androidpublisher", "v3", credentials=credentials, cache_discovery=False)

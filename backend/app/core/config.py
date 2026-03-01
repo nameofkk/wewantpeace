@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     trending_calc_interval: int = 900      # 15분 (초)
 
     # Google Play Billing
-    google_play_service_account_key_path: str = ""
+    google_play_service_account_json: str = ""  # JSON 문자열 (Railway 환경변수)
     google_rtdn_webhook_token: str = ""  # Pub/Sub push URL의 ?token= 파라미터 검증용
 
     # Apple StoreKit / App Store Server API
