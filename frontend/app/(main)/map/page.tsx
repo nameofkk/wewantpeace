@@ -451,11 +451,9 @@ export default function MapPage() {
         const innerEl = document.createElement("div");
         innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s;opacity:1;position:relative;will-change:transform;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
-        // 펄스: kscore >= 4 (경계 이상)만 적용하여 GPU 부담 절감
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter"
-            + (cluster.is_spike ? " marker-spike" : "")
-            + (cluster.kscore >= 4 ? " marker-pulse" : "");
+          innerEl.className = "marker-enter marker-pulse"
+            + (cluster.is_spike ? " marker-spike" : "");
         });
         innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
         markerEl.appendChild(innerEl);
