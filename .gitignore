@@ -42,6 +42,7 @@ frontend/public/workbox-*.js.map
 *.log
 /tmp/*.log
 logs/
+!frontend/app/admin/logs/
 
 # ── 업로드 파일 ──────────────────────────────────────────────────────────────
 media/uploads/
