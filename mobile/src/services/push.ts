@@ -7,6 +7,7 @@
  */
 
 import messaging from "@react-native-firebase/messaging";
+import notifee, { AndroidImportance } from "@notifee/react-native";
 import { Platform, PermissionsAndroid } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CHANNEL_ALERTS, CHANNEL_CRITICAL, API_BASE } from "../utils/constants";
@@ -14,16 +15,26 @@ import { CHANNEL_ALERTS, CHANNEL_CRITICAL, API_BASE } from "../utils/constants";
 const FCM_TOKEN_KEY = "@wwp_fcm_token";
 
 /**
- * Android 알림 채널 생성
+ * Android 알림 채널 생성 (Notifee 사용)
  */
 export async function createNotificationChannels(): Promise<void> {
   if (Platform.OS !== "android") return;
 
-  // react-native-firebase v21+에서는 messaging().android가 없으므로
-  // Notifee 없이 네이티브 채널은 expo prebuild의 AndroidManifest에서 설정하거나
-  // 여기서는 Firebase messaging이 default channel을 사용하도록 둡니다.
-  // 실제 채널 설정은 android/app/src/main/java 네이티브 코드 또는 expo config plugin에서 처리.
-  // 아래는 firebase messaging의 default notification channel 설정.
+  await notifee.createChannel({
+    id: CHANNEL_ALERTS,
+    name: "WeWantPeace Alerts",
+    importance: AndroidImportance.HIGH,
+    vibration: true,
+    badge: true,
+  });
+
+  await notifee.createChannel({
+    id: CHANNEL_CRITICAL,
+    name: "WeWantPeace Critical",
+    importance: AndroidImportance.HIGH,
+    vibration: true,
+    badge: true,
+  });
 }
 
 /**
@@ -98,14 +109,36 @@ export function setupTokenRefreshListener(
 /**
  * 포그라운드 메시지 수신 리스너
  * 포그라운드에서는 notification 필드가 자동 표시되지 않으므로
- * 로컬 알림으로 직접 표시해야 함.
- * (여기서는 콜백으로 위임)
+ * Notifee를 사용해 로컬 알림으로 직접 표시.
  */
 export function setupForegroundMessageHandler(
   onMessage: (data: Record<string, string>) => void,
 ): () => void {
   return messaging().onMessage(async (remoteMessage) => {
     const data = remoteMessage.data as Record<string, string> | undefined;
+    const notification = remoteMessage.notification;
+
+    // Notifee로 로컬 알림 표시 (heads-up)
+    const title = data?.title || notification?.title || "WeWantPeace";
+    const body = data?.body || notification?.body || "";
+    const severity = parseInt(data?.severity || "0", 10);
+    const channelId = severity >= 90 ? CHANNEL_CRITICAL : CHANNEL_ALERTS;
+
+    try {
+      await notifee.displayNotification({
+        title,
+        body,
+        android: {
+          channelId,
+          smallIcon: "ic_notification",
+          pressAction: { id: "default" },
+        },
+        data: data || {},
+      });
+    } catch (e) {
+      console.warn("[Push] 포그라운드 알림 표시 실패:", e);
+    }
+
     if (data) {
       onMessage(data);
     }

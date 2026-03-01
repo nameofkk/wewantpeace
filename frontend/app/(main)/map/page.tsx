@@ -451,8 +451,11 @@ export default function MapPage() {
         const innerEl = document.createElement("div");
         innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s;opacity:1;position:relative;will-change:transform;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
+        // 펄스: kscore >= 4 (경계 이상)만 적용하여 GPU 부담 절감
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter" + (cluster.is_spike ? " marker-spike" : "");
+          innerEl.className = "marker-enter"
+            + (cluster.is_spike ? " marker-spike" : "")
+            + (cluster.kscore >= 4 ? " marker-pulse" : "");
         });
         innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
         markerEl.appendChild(innerEl);
@@ -510,7 +513,7 @@ export default function MapPage() {
       <div ref={mapContainerRef} className="h-full w-full" />
 
       {/* ── 상단 헤더 바 ─────────────────────────────────────────── */}
-      <div className="absolute top-3 left-3 right-3 z-10">
+      <div className="absolute left-3 right-3 z-10" style={{ top: "calc(12px + env(safe-area-inset-top, 0px))" }}>
         <div className="rounded-xl border border-border bg-background/90 px-3 py-2 backdrop-blur-sm space-y-1.5">
           {/* Row 1: LIVE + 이슈/스파이크 (왼쪽) | 새로고침 + 경과시간 (오른쪽) */}
           <div className="flex items-center justify-between gap-2">
