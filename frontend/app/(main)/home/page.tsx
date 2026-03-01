@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
@@ -552,13 +552,43 @@ export default function HomePage() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
 
-  const { data: globalData, isLoading: globalLoading, isFetching: globalFetching, isError: globalError, refetch: refetchGlobal } = useGlobalTrending();
+  // 글로벌: /issues API로 전체 활성 클러스터 조회 → TrendingItem 변환
+  const { data: clusterData, isLoading: clusterLoading, isFetching: clusterFetching, isError: clusterError, refetch: refetchClusters } = useClusters({ limit: "2000" });
+  const globalData = React.useMemo(() => {
+    if (!clusterData || !Array.isArray(clusterData)) return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (clusterData as any[])
+      .filter((c) => c.severity > 0 && c.kscore > 0)
+      .sort((a, b) => b.kscore - a.kscore || b.severity - a.severity)
+      .map((c, i) => ({
+        id: i,
+        keyword: c.title,
+        keyword_ko: c.title_ko,
+        kscore: c.kscore,
+        topic: c.topic,
+        country_codes: c.country_code ? [c.country_code] : [],
+        cluster_ids: [c.id],
+        is_spike: c.is_spike,
+        event_count: c.event_count,
+        severity: c.severity,
+        reason: "",
+        calculated_at: c.last_event_at,
+        first_event_at: c.first_event_at,
+        independent_sources: 1,
+      })) as TrendingItem[];
+  }, [clusterData]);
+  const globalLoading = clusterLoading;
+  const globalFetching = clusterFetching;
+  const globalError = clusterError;
+  const refetchGlobal = refetchClusters;
+
   const { data: mineData, isLoading: mineLoading, isFetching: mineFetching, isError: mineError, refetch: refetchMine } = useMineTrending(
     hydrated ? myCountries : null
   );
 
   const [spinning, setSpinning] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const items    = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
   const isLoading = trendingTab === "global" ? globalLoading : mineLoading;
@@ -770,11 +800,29 @@ export default function HomePage() {
                 ))}
                 {items.length > visibleCount && (
                   <button
-                    onClick={() => setVisibleCount((v) => v + 30)}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
+                    onClick={() => {
+                      setLoadingMore(true);
+                      requestAnimationFrame(() => {
+                        setVisibleCount((v) => v + 30);
+                        setLoadingMore(false);
+                      });
+                    }}
+                    disabled={loadingMore}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors disabled:opacity-60"
                   >
-                    <ChevronDown className="h-4 w-4" />
-                    {t(lang, "home_load_more")}
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {lang === "ko" ? "불러오는 중…" : "Loading…"}
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        {lang === "ko"
+                          ? `더보기 (${Math.min(visibleCount, items.length)}/${items.length})`
+                          : `Load more (${Math.min(visibleCount, items.length)}/${items.length})`}
+                      </>
+                    )}
                   </button>
                 )}
               </>
