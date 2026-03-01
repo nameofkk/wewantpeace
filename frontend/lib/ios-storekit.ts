@@ -42,6 +42,19 @@ if (typeof window !== "undefined") {
 
 function postToStoreKit(message: Record<string, unknown>): boolean {
   if (typeof window === "undefined") return false;
+
+  // React Native 환경: 네이티브 브릿지 사용
+  if (window.__REACT_NATIVE__ && window.__nativeBridge) {
+    const action = message.action as string;
+    window.__nativeBridge.postToNative(
+      action === "purchase" ? "PURCHASE_REQUEST" :
+      action === "restore" ? "RESTORE_PURCHASES" :
+      action === "getProducts" ? "GET_PRODUCTS" : action,
+      message,
+    );
+    return true;
+  }
+
   const handler = window.webkit?.messageHandlers?.storekit;
   if (!handler) return false;
   handler.postMessage(message);

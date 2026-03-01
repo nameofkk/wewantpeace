@@ -1,8 +1,8 @@
 /**
- * 플랫폼 감지: web / android-twa / ios-app
+ * 플랫폼 감지: web / android-twa / android-native / ios-native / ios-app
  */
 
-export type AppPlatform = "web" | "android-twa" | "ios-app";
+export type AppPlatform = "web" | "android-twa" | "android-native" | "ios-native" | "ios-app";
 
 declare global {
   interface Window {
@@ -15,6 +15,15 @@ declare global {
       };
     };
     __IOS_APP__?: boolean;
+    __REACT_NATIVE__?: boolean;
+    __NATIVE_PLATFORM__?: "android" | "ios";
+    ReactNativeWebView?: {
+      postMessage: (data: string) => void;
+    };
+    __nativeBridge?: {
+      postToNative: (type: string, payload?: unknown) => void;
+    };
+    __handleNativeMessage?: (msg: unknown) => void;
   }
 }
 
@@ -25,6 +34,16 @@ export function detectPlatform(): AppPlatform {
 
   if (typeof window === "undefined") {
     _cachedPlatform = "web";
+    return _cachedPlatform;
+  }
+
+  // React Native WebView (최우선 감지)
+  if (window.__REACT_NATIVE__) {
+    if (window.__NATIVE_PLATFORM__ === "ios") {
+      _cachedPlatform = "ios-native";
+    } else {
+      _cachedPlatform = "android-native";
+    }
     return _cachedPlatform;
   }
 
@@ -49,7 +68,12 @@ export function detectPlatform(): AppPlatform {
 
 export function isNativeApp(): boolean {
   const platform = detectPlatform();
-  return platform === "android-twa" || platform === "ios-app";
+  return platform === "android-twa" || platform === "android-native" || platform === "ios-native" || platform === "ios-app";
+}
+
+export function isReactNative(): boolean {
+  const platform = detectPlatform();
+  return platform === "android-native" || platform === "ios-native";
 }
 
 /**

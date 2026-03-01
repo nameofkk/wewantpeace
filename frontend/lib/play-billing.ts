@@ -49,8 +49,38 @@ export async function getProductDetails(productIds: string[]): Promise<ItemDetai
 /**
  * Play Billing으로 구독 결제
  * @returns purchaseToken (성공 시) 또는 null (취소/실패)
+ *
+ * React Native 환경에서는 네이티브 브릿지를 통해 결제를 처리합니다.
  */
-export async function purchaseSubscription(productId: string): Promise<string | null> {
+export async function purchaseSubscription(
+  productId: string,
+  authToken?: string,
+): Promise<string | null> {
+  // React Native 환경: 네이티브 브릿지로 결제 요청
+  if (typeof window !== "undefined" && window.__REACT_NATIVE__ && window.__nativeBridge) {
+    return new Promise((resolve, reject) => {
+      const handler = (e: Event) => {
+        const msg = (e as CustomEvent).detail;
+        if (msg?.type === "PURCHASE_RESULT") {
+          window.removeEventListener("nativeMessage", handler);
+          if (msg.payload.success) {
+            resolve(msg.payload.purchaseToken || msg.payload.transactionId || "native");
+          } else if (msg.payload.cancelled) {
+            resolve(null);
+          } else {
+            reject(new Error(msg.payload.error || "결제 실패"));
+          }
+        }
+      };
+      window.addEventListener("nativeMessage", handler);
+      window.__nativeBridge!.postToNative("PURCHASE_REQUEST", {
+        productId,
+        authToken: authToken || "",
+      });
+    });
+  }
+
+  // TWA 환경: Digital Goods API
   const service = await getService();
   if (!service) {
     throw new Error("Digital Goods API를 사용할 수 없습니다.");

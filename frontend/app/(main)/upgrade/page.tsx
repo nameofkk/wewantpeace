@@ -186,9 +186,9 @@ export default function UpgradePage() {
     setError(null);
 
     try {
-      if (platform === "android-twa") {
+      if (platform === "android-native" || platform === "android-twa") {
         await handleAndroidPurchase(planId);
-      } else if (platform === "ios-app") {
+      } else if (platform === "ios-native" || platform === "ios-app") {
         await handleIOSPurchase(planId);
       }
     } catch (e: unknown) {
@@ -231,18 +231,29 @@ export default function UpgradePage() {
 
   async function handleAndroidPurchase(planId: string) {
     const { purchaseSubscription } = await import("@/lib/play-billing");
+    const { isReactNative } = await import("@/lib/platform-detect");
     const productId = GOOGLE_PRODUCT_IDS[planId];
     if (!productId) throw new Error("Invalid plan");
 
+    const authToken = await user!.getIdToken();
+
+    // React Native: 브릿지를 통해 결제 (네이티브가 검증까지 처리)
+    if (isReactNative()) {
+      const result = await purchaseSubscription(productId, authToken);
+      if (!result) return; // 취소
+      window.location.href = "/settings";
+      return;
+    }
+
+    // TWA: Digital Goods API
     const purchaseToken = await purchaseSubscription(productId);
     if (!purchaseToken) return;
 
-    const token = await user!.getIdToken();
     const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId }),
     });
@@ -256,10 +267,22 @@ export default function UpgradePage() {
   }
 
   async function handleIOSPurchase(planId: string) {
-    const { purchaseViaStoreKit } = await import("@/lib/ios-storekit");
+    const { isReactNative } = await import("@/lib/platform-detect");
     const productId = APPLE_PRODUCT_IDS[planId];
     if (!productId) throw new Error("Invalid plan");
 
+    // React Native iOS: 브릿지를 통해 결제 (네이티브가 검증까지 처리)
+    if (isReactNative()) {
+      const { purchaseSubscription } = await import("@/lib/play-billing");
+      const authToken = await user!.getIdToken();
+      const result = await purchaseSubscription(productId, authToken);
+      if (!result) return;
+      window.location.href = "/settings";
+      return;
+    }
+
+    // WKWebView StoreKit 브릿지
+    const { purchaseViaStoreKit } = await import("@/lib/ios-storekit");
     const result = await purchaseViaStoreKit(productId);
     if (!result) return;
 

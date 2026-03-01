@@ -41,6 +41,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 /** 알림 권한 요청 → FCM 토큰 획득 */
 export async function requestAndGetFCMToken(): Promise<string | null> {
+  // React Native 환경: 네이티브 브릿지로 토큰 요청
+  if (typeof window !== "undefined" && window.__REACT_NATIVE__ && window.__nativeBridge) {
+    return new Promise((resolve) => {
+      const handler = (e: Event) => {
+        const msg = (e as CustomEvent).detail;
+        if (msg?.type === "FCM_TOKEN") {
+          window.removeEventListener("nativeMessage", handler);
+          resolve(msg.payload.token || null);
+        }
+      };
+      window.addEventListener("nativeMessage", handler);
+      // 10초 타임아웃
+      setTimeout(() => {
+        window.removeEventListener("nativeMessage", handler);
+        resolve(null);
+      }, 10_000);
+      window.__nativeBridge!.postToNative("GET_FCM_TOKEN", {});
+    });
+  }
+
   if (!isPushSupported()) return null;
 
   // 알림 권한 확인 + 요청
@@ -102,6 +122,9 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
 
 /** 포그라운드 메시지 수신 리스너 등록 (탭이 활성 상태일 때) */
 export async function setupForegroundListener(): Promise<void> {
+  // React Native 환경: 네이티브가 포그라운드 메시지를 처리하므로 skip
+  if (typeof window !== "undefined" && window.__REACT_NATIVE__) return;
+
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;
 

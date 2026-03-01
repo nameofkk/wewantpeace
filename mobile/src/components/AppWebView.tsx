@@ -1,0 +1,158 @@
+/**
+ * 메인 WebView 컴포넌트.
+ * - wewantpeace.live 로드
+ * - Native 브릿지 주입
+ * - 외부 링크 시스템 브라우저 열기
+ * - Android 뒤로가기 지원
+ */
+
+import React, { useRef, useCallback, useEffect, useState } from "react";
+import {
+  BackHandler,
+  Platform,
+  Linking,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+} from "react-native";
+import { WebView, type WebViewNavigation } from "react-native-webview";
+import type { WebViewMessageEvent } from "react-native-webview";
+import { WEB_URL } from "../utils/constants";
+import {
+  getInjectedJavaScript,
+  parseWebMessage,
+  sendToWebView,
+  type WebToNativeMessage,
+  type NativeToWebMessage,
+} from "../services/bridge";
+
+interface AppWebViewProps {
+  initialPath?: string;
+  onNativeMessage: (msg: WebToNativeMessage) => void;
+}
+
+export const webViewRef = React.createRef<WebView>();
+
+export default function AppWebView({
+  initialPath,
+  onNativeMessage,
+}: AppWebViewProps) {
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const startUrl = initialPath
+    ? `${WEB_URL}${initialPath}`
+    : WEB_URL;
+
+  // Android 뒤로가기 처리
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (canGoBack && webViewRef.current) {
+        webViewRef.current.goBack();
+        return true;
+      }
+      return false;
+    });
+
+    return () => handler.remove();
+  }, [canGoBack]);
+
+  const handleNavigationStateChange = useCallback(
+    (navState: WebViewNavigation) => {
+      setCanGoBack(navState.canGoBack);
+    },
+    [],
+  );
+
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      const msg = parseWebMessage(event.nativeEvent.data);
+      if (msg) {
+        onNativeMessage(msg);
+      }
+    },
+    [onNativeMessage],
+  );
+
+  /**
+   * 외부 링크는 시스템 브라우저로 열기.
+   * wewantpeace.live 도메인만 WebView 내부에서 로드.
+   */
+  const handleShouldStartLoad = useCallback(
+    (event: { url: string }): boolean => {
+      const { url } = event;
+
+      // 내부 도메인
+      if (
+        url.startsWith(WEB_URL) ||
+        url.startsWith("about:") ||
+        url.startsWith("data:")
+      ) {
+        return true;
+      }
+
+      // 외부 링크 → 시스템 브라우저
+      Linking.openURL(url).catch(() => {});
+      return false;
+    },
+    [],
+  );
+
+  return (
+    <View style={styles.container}>
+      <WebView
+        ref={webViewRef}
+        source={{ uri: startUrl }}
+        style={styles.webview}
+        injectedJavaScriptBeforeContentLoaded={getInjectedJavaScript()}
+        onNavigationStateChange={handleNavigationStateChange}
+        onMessage={handleMessage}
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
+        onLoadStart={() => setLoading(true)}
+        onLoadEnd={() => setLoading(false)}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState={false}
+        allowsBackForwardNavigationGestures={Platform.OS === "ios"}
+        mediaPlaybackRequiresUserAction={false}
+        allowsInlineMediaPlayback
+        mixedContentMode="compatibility"
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        cacheEnabled
+        originWhitelist={["https://*", "http://*"]}
+      />
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * 외부에서 WebView로 메시지 전송 헬퍼
+ */
+export function sendMessageToWeb(message: NativeToWebMessage): void {
+  sendToWebView(webViewRef, message);
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0F1729",
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "#0F1729",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0F1729",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

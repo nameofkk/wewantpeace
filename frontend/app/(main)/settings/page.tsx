@@ -397,18 +397,27 @@ export default function SettingsPage() {
         try { await deleteToken.mutateAsync({ fcm_token: token }); } catch {}
       }
     } else {
-      if (!isPushSupported()) { setNotifStatus("unsupported"); return; }
+      // React Native 환경에서는 isPushSupported가 false를 반환하므로 별도 처리
+      const isRN = typeof window !== "undefined" && !!window.__REACT_NATIVE__;
+      if (!isRN && !isPushSupported()) { setNotifStatus("unsupported"); return; }
       // 즉시 UI 반영
       setNotifStatus("done");
       try {
         const token = await requestAndGetFCMToken();
         if (!token) {
-          const perm = typeof window !== "undefined" && "Notification" in window
-            ? Notification.permission : "default";
-          setNotifStatus(perm === "denied" ? "denied" : "idle");
+          if (isRN) {
+            setNotifStatus("idle");
+          } else {
+            const perm = typeof window !== "undefined" && "Notification" in window
+              ? Notification.permission : "default";
+            setNotifStatus(perm === "denied" ? "denied" : "idle");
+          }
           return;
         }
-        await registerToken.mutateAsync({ fcm_token: token, platform: "web" });
+        const pushPlatform = isRN
+          ? (window.__NATIVE_PLATFORM__ === "ios" ? "ios" : "android")
+          : "web";
+        await registerToken.mutateAsync({ fcm_token: token, platform: pushPlatform });
       } catch {
         setNotifStatus("idle");
       }

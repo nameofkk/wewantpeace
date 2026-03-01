@@ -9,6 +9,10 @@ PushService: FCM Multicast 푸시 발송.
 필터:
   - topics: 사용자가 선택한 토픽에 해당 이슈 topic이 포함된 경우만 발송
   - quiet_hours: 사용자 현지 시각이 조용한 시간 범위이면 발송 제외
+
+플랫폼별 분리:
+  - web: data-only 메시지 (SW onBackgroundMessage에서 표시)
+  - android/ios: notification + data 메시지 (시스템 트레이 자동 표시, 상단 배너)
 """
 import logging
 from datetime import datetime, timezone, time as dt_time
@@ -52,15 +56,24 @@ def _is_in_quiet_hours(current: dt_time, start: dt_time, end: dt_time) -> bool:
         return current >= start or current <= end
 
 
-async def _get_target_tokens(
+# ── 토큰 타입 (플랫폼 포함) ──
+class _TokenInfo:
+    __slots__ = ("fcm_token", "platform")
+
+    def __init__(self, fcm_token: str, platform: str):
+        self.fcm_token = fcm_token
+        self.platform = platform  # "web" | "android" | "ios"
+
+
+async def _get_target_tokens_by_platform(
     country_code: Optional[str],
     notify_fast: bool,
     kscore: float,
     cluster_topic: Optional[str],
     db: AsyncSession,
-) -> list[str]:
+) -> list[_TokenInfo]:
     """
-    해당 국가에 관심 설정한 사용자의 FCM 토큰 수집.
+    해당 국가에 관심 설정한 사용자의 FCM 토큰 + 플랫폼 수집.
     notify_fast=True: fast 레인 (notify_fast=True 사용자)
     notify_fast=False: verified 레인 (notify_verified=True 사용자)
     kscore: 사용자 min_kscore 이하인 경우만 발송
@@ -84,6 +97,7 @@ async def _get_target_tokens(
     result = await db.execute(
         select(
             UserPushToken.fcm_token,
+            UserPushToken.platform,
             UserPreference.topics,
             UserPreference.quiet_hours_start,
             UserPreference.quiet_hours_end,
@@ -97,7 +111,7 @@ async def _get_target_tokens(
 
     now_utc = datetime.now(timezone.utc)
     tokens = []
-    for fcm_token, topics, qh_start, qh_end, tz_name in rows:
+    for fcm_token, platform, topics, qh_start, qh_end, tz_name in rows:
         # topics 필터: cluster_topic이 사용자가 구독한 topic 목록에 없으면 스킵
         if cluster_topic and topics and cluster_topic not in topics:
             continue
@@ -112,7 +126,7 @@ async def _get_target_tokens(
             except (ZoneInfoNotFoundError, Exception):
                 pass  # timezone 파싱 실패 시 조용한 시간 무시
 
-        tokens.append(fcm_token)
+        tokens.append(_TokenInfo(fcm_token, platform or "web"))
 
     return tokens
 
@@ -120,21 +134,18 @@ async def _get_target_tokens(
 FCM_BATCH_SIZE = 500  # FCM MulticastMessage 최대 토큰 수
 
 
-def _send_fcm_multicast(tokens: list[str], title: str, body: str, data: dict) -> int:
+def _send_fcm_for_web(tokens: list[str], title: str, body: str, data: dict) -> int:
     """
-    Firebase FCM Multicast 발송 (500개 배치).
-    firebase_admin SDK 없으면 로깅만.
-    Returns: 성공 수
+    웹 토큰용 FCM 발송: data-only 메시지 (SW onBackgroundMessage에서 표시).
+    notification 필드 없음 → 중복 알림 방지.
     """
     if not tokens:
         return 0
     total_success = 0
-    # FCM API 제한: 한 번에 최대 500개 토큰
     for i in range(0, len(tokens), FCM_BATCH_SIZE):
         batch = tokens[i:i + FCM_BATCH_SIZE]
         try:
             import firebase_admin.messaging as messaging
-            # data-only 메시지: SW onBackgroundMessage에서 표시 (notification 필드 제거 → 중복 알림 방지)
             msg_data = {k: str(v) for k, v in data.items()}
             msg_data["title"] = title
             msg_data["body"] = body
@@ -146,15 +157,89 @@ def _send_fcm_multicast(tokens: list[str], title: str, body: str, data: dict) ->
             )
             response = messaging.send_each_for_multicast(message)
             total_success += response.success_count
-            logger.info("FCM 배치[%d~%d]: %d/%d 성공", i, i + len(batch), response.success_count, len(batch))
+            logger.info("FCM 웹 배치[%d~%d]: %d/%d 성공", i, i + len(batch), response.success_count, len(batch))
         except ImportError:
             logger.warning(
                 "FCM 미설치 (firebase_admin 없음): tokens=%d 미발송 title=%r",
                 len(batch), title,
             )
         except Exception as e:
-            logger.error("FCM 발송 오류 (배치 %d): %s", i // FCM_BATCH_SIZE, e)
+            logger.error("FCM 웹 발송 오류 (배치 %d): %s", i // FCM_BATCH_SIZE, e)
     return total_success
+
+
+def _send_fcm_for_native(
+    tokens: list[str],
+    title: str,
+    body: str,
+    data: dict,
+    severity: int = 0,
+) -> int:
+    """
+    Android/iOS 네이티브 토큰용 FCM 발송: notification + data 메시지.
+    시스템 트레이에 자동 표시 + 상단 배너 (HIGH importance 채널).
+    """
+    if not tokens:
+        return 0
+    total_success = 0
+    channel_id = "wwp_critical" if severity >= 90 else "wwp_alerts"
+    for i in range(0, len(tokens), FCM_BATCH_SIZE):
+        batch = tokens[i:i + FCM_BATCH_SIZE]
+        try:
+            import firebase_admin.messaging as messaging
+            msg_data = {k: str(v) for k, v in data.items()}
+            message = messaging.MulticastMessage(
+                tokens=batch,
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data=msg_data,
+                android=messaging.AndroidConfig(
+                    priority="high",
+                    notification=messaging.AndroidNotification(
+                        channel_id=channel_id,
+                        priority="high" if severity < 90 else "max",
+                        icon="ic_notification",
+                    ),
+                ),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound="default",
+                            badge=1,
+                        ),
+                    ),
+                ),
+            )
+            response = messaging.send_each_for_multicast(message)
+            total_success += response.success_count
+            logger.info("FCM 네이티브 배치[%d~%d]: %d/%d 성공", i, i + len(batch), response.success_count, len(batch))
+        except ImportError:
+            logger.warning(
+                "FCM 미설치 (firebase_admin 없음): tokens=%d 미발송 title=%r",
+                len(batch), title,
+            )
+        except Exception as e:
+            logger.error("FCM 네이티브 발송 오류 (배치 %d): %s", i // FCM_BATCH_SIZE, e)
+    return total_success
+
+
+def _split_and_send(
+    token_infos: list[_TokenInfo],
+    title: str,
+    body: str,
+    data: dict,
+    severity: int = 0,
+) -> int:
+    """토큰을 웹/네이티브로 분리하여 각각 발송."""
+    web_tokens = [t.fcm_token for t in token_infos if t.platform == "web"]
+    native_tokens = [t.fcm_token for t in token_infos if t.platform in ("android", "ios")]
+
+    sent_web = _send_fcm_for_web(web_tokens, title, body, data)
+    sent_native = _send_fcm_for_native(native_tokens, title, body, data, severity=severity)
+
+    return sent_web + sent_native
 
 
 async def send_spike_alert(
@@ -173,7 +258,7 @@ async def send_spike_alert(
     1. 쿨다운 확인
     2. Verified 레인: is_verified이면 발송
     3. Fast 레인: 항상 발송 (Pro 사용자, notify_fast=True)
-    topics/quiet_hours 필터는 _get_target_tokens 내부에서 적용됨.
+    topics/quiet_hours 필터는 _get_target_tokens_by_platform 내부에서 적용됨.
     """
     if await _is_in_cooldown(cluster_id, redis):
         logger.info("쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
@@ -184,25 +269,27 @@ async def send_spike_alert(
 
     # Verified 레인
     if is_verified:
-        tokens_v = await _get_target_tokens(
+        tokens_v = await _get_target_tokens_by_platform(
             country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
         )
-        sent_verified = _send_fcm_multicast(
-            tokens=tokens_v,
+        sent_verified = _split_and_send(
+            token_infos=tokens_v,
             title=f"⚠️ {cluster_title}",
             body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
             data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+            severity=severity,
         )
 
     # Fast 레인 (항상)
-    tokens_f = await _get_target_tokens(
+    tokens_f = await _get_target_tokens_by_platform(
         country_code, notify_fast=True, kscore=kscore, cluster_topic=cluster_topic, db=db
     )
-    sent_fast = _send_fcm_multicast(
-        tokens=tokens_f,
+    sent_fast = _split_and_send(
+        token_infos=tokens_f,
         title=f"🚨 {cluster_title}",
         body=f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림",
         data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
+        severity=severity,
     )
 
     await _set_cooldown(cluster_id, redis, severity=severity)
@@ -237,14 +324,15 @@ async def send_verified_alert(
         logger.info("Verified 쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
         return {"status": "cooldown", "sent": 0}
 
-    tokens_v = await _get_target_tokens(
+    tokens_v = await _get_target_tokens_by_platform(
         country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
     )
-    sent_verified = _send_fcm_multicast(
-        tokens=tokens_v,
+    sent_verified = _split_and_send(
+        token_infos=tokens_v,
         title=f"⚠️ {cluster_title}",
         body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
         data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+        severity=severity,
     )
 
     ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
@@ -278,14 +366,14 @@ async def save_in_app_notifications(
             UserArea.notify_verified == True,
         )
         title = f"⚠️ {cluster_title}"
-        body = f"공식 확인된 이슈입니다 / Verified issue"
+        body = "공식 확인된 이슈입니다 / Verified issue"
     else:
         area_filter = (
             UserArea.country_code == country_code,
             UserArea.notify_fast == True,
         )
         title = f"🚨 {cluster_title}"
-        body = f"속보 알림 / Breaking alert"
+        body = "속보 알림 / Breaking alert"
 
     # 대상 사용자 user_id 수집 (중복 제거)
     result = await db.execute(
