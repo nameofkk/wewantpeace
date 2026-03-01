@@ -325,22 +325,17 @@ def calculate_trending(self):
     """트렌딩 키워드 계산 (15분마다). 분산 클러스터 자동 병합 포함."""
 
     async def _merge_fragmented_clusters(db):
-        """같은 국가+토픽의 고심각도 클러스터를 하나로 병합."""
+        """같은 cluster_key의 분산된 클러스터를 하나로 병합."""
         from collections import defaultdict
         from sqlalchemy import select, text
         from backend.app.models.issue_cluster import IssueCluster
         from worker.processor.trending_engine import _calc_kscore
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
         result = await db.execute(
             select(IssueCluster).where(
-                IssueCluster.last_event_at >= cutoff,
-                IssueCluster.severity >= 50,
-                IssueCluster.topic.in_(["conflict", "terror", "coup"]),
-                IssueCluster.country_code != None,
+                IssueCluster.severity > 0,
             ).order_by(
-                IssueCluster.country_code,
-                IssueCluster.topic,
+                IssueCluster.cluster_key,
                 IssueCluster.kscore.desc(),
             )
         )
@@ -348,7 +343,7 @@ def calculate_trending(self):
 
         groups: dict[str, list] = defaultdict(list)
         for c in clusters:
-            groups[f"{c.country_code}:{c.topic}"].append(c)
+            groups[c.cluster_key].append(c)
 
         merged_total = 0
         for key, group in groups.items():

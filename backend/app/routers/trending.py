@@ -23,6 +23,46 @@ router = APIRouter(prefix="/trending", tags=["trending"])
 _TRENDING_CACHE_KEY = "trending:global:v1"
 _TRENDING_CACHE_TTL = 5 * 60  # 5분 (Celery beat 주기와 동기화)
 
+_STOP_WORDS = frozenset({
+    "the", "a", "an", "in", "on", "at", "to", "for", "of", "and", "or",
+    "is", "are", "was", "were", "be", "been", "has", "have", "had",
+    "with", "by", "from", "as", "its", "it", "this", "that", "after",
+    "amid", "over", "says", "new", "us", "uk",
+})
+
+
+def _title_words(title: str | None) -> set[str]:
+    if not title:
+        return set()
+    return {w for w in title.lower().split() if len(w) > 2 and w not in _STOP_WORDS}
+
+
+def _dedup_by_title(items: list, limit: int = 30) -> list:
+    """제목 단어 겹침이 50% 이상이면 중복으로 판단, KScore 높은 것만 유지."""
+    out: list = []
+    seen_words: list[set[str]] = []
+    for item in items:
+        kw = item.get("keyword") if isinstance(item, dict) else getattr(item, "keyword", "")
+        words = _title_words(kw)
+        if not words:
+            out.append(item)
+            seen_words.append(words)
+            continue
+        is_dup = False
+        for prev in seen_words:
+            if not prev:
+                continue
+            overlap = len(words & prev) / max(len(words | prev), 1)
+            if overlap >= 0.50:
+                is_dup = True
+                break
+        if not is_dup:
+            out.append(item)
+            seen_words.append(words)
+        if len(out) >= limit:
+            break
+    return out
+
 
 # ── Pydantic 스키마 ───────────────────────────────────────────────────────────
 
@@ -95,8 +135,9 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
     raw_rows = distinct_result.mappings().all()
 
     if raw_rows:
-        # kscore 내림차순 정렬 후 상위 20개
-        sorted_rows = sorted(raw_rows, key=lambda r: r["kscore"], reverse=True)[:30]
+        # kscore 내림차순 정렬 후 제목 유사도 중복 제거
+        sorted_rows = sorted(raw_rows, key=lambda r: r["kscore"], reverse=True)
+        sorted_rows = _dedup_by_title([dict(r) for r in sorted_rows], limit=30)
 
         # 클러스터 first_event_at 배치 조회
         import uuid as uuid_mod
@@ -194,7 +235,7 @@ async def global_trending(db: AsyncSession = Depends(get_db)):
         ))
 
     scored.sort(key=lambda x: x.kscore, reverse=True)
-    return scored[:30]
+    return _dedup_by_title(scored, limit=30)
 
 
 _MINE_COUNTRIES = ["UA", "PS", "IL", "IR", "KP", "KR", "TW", "SY", "MM"]
@@ -271,7 +312,7 @@ async def mine_trending(
         ))
 
     scored.sort(key=lambda x: x.kscore, reverse=True)
-    return scored[:20]
+    return _dedup_by_title(scored, limit=20)
 
 
 def _make_global_reason(cluster: IssueCluster, kscore: float) -> str:
