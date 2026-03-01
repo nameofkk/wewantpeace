@@ -17,17 +17,16 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  console.log("[FCM SW] 백그라운드 메시지:", payload);
-
-  const { title, body, icon } = payload.notification || {};
   const data = payload.data || {};
+  const title = data.title || payload.notification?.title || "WeWantPeace 알림";
+  const body = data.body || payload.notification?.body || "";
 
-  self.registration.showNotification(title || "WeWantPeace 알림", {
-    body: body || "",
-    icon: icon || "/icons/icon-192.png",
+  self.registration.showNotification(title, {
+    body,
+    icon: "/icons/icon-192.png",
     badge: "/icons/icon-96.png",
     tag: data.cluster_id || "wwp-notification",
-    data: { url: data.cluster_id ? `/issues/${data.cluster_id}` : "/" },
+    data: { url: data.cluster_id && data.cluster_id !== "test" ? `/issues/${data.cluster_id}` : "/" },
     actions: [
       { action: "view", title: "자세히 보기" },
       { action: "dismiss", title: "닫기" },

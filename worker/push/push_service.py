@@ -134,10 +134,13 @@ def _send_fcm_multicast(tokens: list[str], title: str, body: str, data: dict) ->
         batch = tokens[i:i + FCM_BATCH_SIZE]
         try:
             import firebase_admin.messaging as messaging
+            # data-only 메시지: SW onBackgroundMessage에서 표시 (notification 필드 제거 → 중복 알림 방지)
+            msg_data = {k: str(v) for k, v in data.items()}
+            msg_data["title"] = title
+            msg_data["body"] = body
             message = messaging.MulticastMessage(
                 tokens=batch,
-                notification=messaging.Notification(title=title, body=body),
-                data={k: str(v) for k, v in data.items()},
+                data=msg_data,
             )
             response = messaging.send_each_for_multicast(message)
             total_success += response.success_count
