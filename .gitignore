@@ -59,10 +59,12 @@ media/uploads/
 .DS_Store
 Thumbs.db
 
-# ── Firebase 서비스 계정 키 ───────────────────────────────────────────────────
+# ── Firebase ────────────────────────────────────────────────────────────────
 *-firebase-adminsdk-*.json
 serviceAccountKey.json
 firebase-credentials.json
+google-services.json
+GoogleService-Info.plist
 
 # ── 기타 ─────────────────────────────────────────────────────────────────────
 *.pem
