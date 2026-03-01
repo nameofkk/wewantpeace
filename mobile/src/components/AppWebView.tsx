@@ -45,6 +45,11 @@ const AUTH_DOMAINS = [
   "google.com/recaptcha",
 ];
 
+// Google OAuth는 WebView(user-agent에 "wv" 포함)를 차단함.
+// 표준 Chrome UA를 사용하여 우회.
+const CHROME_USER_AGENT =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.135 Mobile Safari/537.36";
+
 export default function AppWebView({
   initialPath,
   onNativeMessage,
@@ -148,6 +153,7 @@ export default function AppWebView({
         ref={webViewRef}
         source={{ uri: startUrl }}
         style={styles.webview}
+        userAgent={CHROME_USER_AGENT}
         injectedJavaScriptBeforeContentLoaded={getInjectedJavaScript()}
         onNavigationStateChange={handleNavigationStateChange}
         onMessage={handleMessage}
