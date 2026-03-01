@@ -93,6 +93,7 @@ def _cluster_to_out(c: IssueCluster) -> ClusterOut:
         is_spike=c.is_spike,
         is_verified=c.is_verified,
         kscore=round(c.kscore, 3),
+        independent_sources=c.independent_sources or 0,
         first_event_at=c.first_event_at.isoformat(),
         last_event_at=c.last_event_at.isoformat(),
     )
