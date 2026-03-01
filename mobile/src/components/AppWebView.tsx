@@ -29,16 +29,30 @@ import {
 interface AppWebViewProps {
   initialPath?: string;
   onNativeMessage: (msg: WebToNativeMessage) => void;
+  onFirstLoadComplete?: () => void;
 }
 
 export const webViewRef = React.createRef<WebView>();
 
+// Google/Firebase OAuth 인증에 필요한 도메인
+const AUTH_DOMAINS = [
+  "accounts.google.com",
+  "apis.google.com",
+  "firebaseapp.com",
+  "firebaseio.com",
+  "googleapis.com",
+  "gstatic.com",
+  "google.com/recaptcha",
+];
+
 export default function AppWebView({
   initialPath,
   onNativeMessage,
+  onFirstLoadComplete,
 }: AppWebViewProps) {
   const [canGoBack, setCanGoBack] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const firstLoadDone = useRef(false);
 
   const startUrl = initialPath
     ? `${WEB_URL}${initialPath}`
@@ -95,6 +109,11 @@ export default function AppWebView({
         return true;
       }
 
+      // Google/Firebase OAuth 도메인 → WebView 내부에서 로드
+      if (AUTH_DOMAINS.some((domain) => url.includes(domain))) {
+        return true;
+      }
+
       // 외부 링크 → 시스템 브라우저
       Linking.openURL(url).catch(() => {});
       return false;
@@ -104,12 +123,24 @@ export default function AppWebView({
 
   // 로딩 타임아웃: 15초 후 강제 로딩 오버레이 제거
   useEffect(() => {
-    if (!loading) return;
+    if (!initialLoading) return;
     const timer = setTimeout(() => {
-      setLoading(false);
+      setInitialLoading(false);
+      if (!firstLoadDone.current) {
+        firstLoadDone.current = true;
+        onFirstLoadComplete?.();
+      }
     }, 15000);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [initialLoading, onFirstLoadComplete]);
+
+  const handleLoadEnd = useCallback(() => {
+    if (!firstLoadDone.current) {
+      firstLoadDone.current = true;
+      setInitialLoading(false);
+      onFirstLoadComplete?.();
+    }
+  }, [onFirstLoadComplete]);
 
   return (
     <View style={styles.container}>
@@ -121,15 +152,13 @@ export default function AppWebView({
         onNavigationStateChange={handleNavigationStateChange}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={handleLoadEnd}
         onError={(syntheticEvent) => {
           console.warn("[WebView] 로드 에러:", syntheticEvent.nativeEvent);
-          setLoading(false);
+          handleLoadEnd();
         }}
         onHttpError={(syntheticEvent) => {
           console.warn("[WebView] HTTP 에러:", syntheticEvent.nativeEvent.statusCode);
-          setLoading(false);
         }}
         javaScriptEnabled
         domStorageEnabled
@@ -141,9 +170,10 @@ export default function AppWebView({
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         cacheEnabled
+        setSupportMultipleWindows={false}
         originWhitelist={["https://*", "http://*"]}
       />
-      {loading && (
+      {initialLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#3b82f6" />
         </View>

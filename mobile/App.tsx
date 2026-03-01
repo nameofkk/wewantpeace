@@ -77,13 +77,7 @@ export default function App() {
       }
 
       setReady(true);
-
-      // 4. 스플래시 숨기기
-      try {
-        await SplashScreen.hideAsync();
-      } catch (e) {
-        console.warn("[App] 스플래시 숨기기 실패:", e);
-      }
+      // 스플래시는 WebView 첫 로드 완료 시 숨김 (onFirstLoadComplete)
     }
 
     init();
@@ -233,6 +227,11 @@ export default function App() {
     [],
   );
 
+  // WebView 첫 로드 완료 → 스플래시 숨기기
+  const handleFirstLoadComplete = useCallback(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   if (!ready) return null;
 
   return (
@@ -241,6 +240,7 @@ export default function App() {
       <AppWebView
         initialPath={initialPath}
         onNativeMessage={handleNativeMessage}
+        onFirstLoadComplete={handleFirstLoadComplete}
       />
     </SafeAreaView>
   );
