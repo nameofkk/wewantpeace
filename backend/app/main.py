@@ -216,7 +216,9 @@ app.add_middleware(
 )
 
 
-app.mount("/media", StaticFiles(directory="media"), name="media")
+import os as _os
+if _os.path.isdir("media"):
+    app.mount("/media", StaticFiles(directory="media"), name="media")
 
 app.include_router(issues.router)
 app.include_router(trending.router)

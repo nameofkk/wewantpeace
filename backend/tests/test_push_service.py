@@ -14,7 +14,7 @@ from worker.push.push_service import (
     send_spike_alert,
     _is_in_cooldown,
     _set_cooldown,
-    _get_target_tokens,
+    _get_target_tokens_by_platform,
 )
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
 
@@ -74,7 +74,9 @@ async def test_send_skipped_during_cooldown(db, redis_mock):
         cluster_title="Test",
         country_code="UA",
         severity=70,
+        kscore=5.0,
         is_verified=True,
+        cluster_topic=None,
         db=db,
         redis=redis_mock,
     )
@@ -89,13 +91,15 @@ async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
     """notify_verified=True 사용자에게 Verified 레인 발송."""
     _, _, token = await _make_user_with_area(db, "UA", notify_verified=True, notify_fast=False)
 
-    with patch("worker.push.push_service._send_fcm_multicast", return_value=1) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=1) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Kyiv attack",
             country_code="UA",
             severity=75,
+            kscore=5.0,
             is_verified=True,
+            cluster_topic=None,
             db=db,
             redis=redis_mock,
         )
@@ -109,13 +113,15 @@ async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
     """is_verified=False이면 Verified 레인 발송 안됨."""
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._send_fcm_multicast", return_value=0) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=0) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
             country_code="UA",
             severity=60,
+            kscore=5.0,
             is_verified=False,  # ← Verified 레인 비활성
+            cluster_topic=None,
             db=db,
             redis=redis_mock,
         )
@@ -128,13 +134,15 @@ async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
     """notify_fast=True Pro 사용자에게 Fast 레인 발송."""
     await _make_user_with_area(db, "UA", notify_fast=True)
 
-    with patch("worker.push.push_service._send_fcm_multicast", return_value=1) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=1) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
             country_code="UA",
             severity=50,
+            kscore=5.0,
             is_verified=False,
+            cluster_topic=None,
             db=db,
             redis=redis_mock,
         )
@@ -147,7 +155,7 @@ async def test_notify_fast_false_no_fast_lane(db, redis_mock):
     """notify_fast=False 사용자는 Fast 레인 대상 아님."""
     await _make_user_with_area(db, "UA", notify_fast=False)
 
-    tokens = await _get_target_tokens("UA", notify_fast=True, db=db)
+    tokens = await _get_target_tokens_by_platform("UA", notify_fast=True, kscore=10.0, cluster_topic=None, db=db)
     assert len(tokens) == 0
 
 
@@ -157,13 +165,15 @@ async def test_cooldown_set_after_send(db, redis_mock):
     cluster_id = str(uuid.uuid4())
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._send_fcm_multicast", return_value=1):
+    with patch("worker.push.push_service._split_and_send", return_value=1):
         await send_spike_alert(
             cluster_id=cluster_id,
             cluster_title="Test",
             country_code="UA",
             severity=70,
+            kscore=5.0,
             is_verified=True,
+            cluster_topic=None,
             db=db,
             redis=redis_mock,
         )
@@ -176,5 +186,5 @@ async def test_no_tokens_for_different_country(db, redis_mock):
     """다른 국가 사용자에게 발송 안됨."""
     await _make_user_with_area(db, "KR", notify_verified=True)  # KR 등록
 
-    tokens = await _get_target_tokens("UA", notify_fast=False, db=db)  # UA 조회
+    tokens = await _get_target_tokens_by_platform("UA", notify_fast=False, kscore=10.0, cluster_topic=None, db=db)  # UA 조회
     assert len(tokens) == 0
