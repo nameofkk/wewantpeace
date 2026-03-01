@@ -558,7 +558,7 @@ export default function HomePage() {
   );
 
   const [spinning, setSpinning] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   const items    = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
   const isLoading = trendingTab === "global" ? globalLoading : mineLoading;
@@ -643,7 +643,7 @@ export default function HomePage() {
           {(["global", "mine"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => { setTrendingTab(tab); setVisibleCount(10); }}
+              onClick={() => { setTrendingTab(tab); setVisibleCount(30); }}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 trendingTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -770,7 +770,7 @@ export default function HomePage() {
                 ))}
                 {items.length > visibleCount && (
                   <button
-                    onClick={() => setVisibleCount((v) => v + 10)}
+                    onClick={() => setVisibleCount((v) => v + 30)}
                     className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-sm text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
                   >
                     <ChevronDown className="h-4 w-4" />

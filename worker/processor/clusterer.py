@@ -22,8 +22,8 @@ WINDOW_MINUTES = 60
 MAX_EVENTS_UNKNOWN_GEO = 2
 
 # 제목 단어 최소 겹침 비율 — 이 미만이면 같은 키라도 새 클러스터 생성
-# (미국 폭풍 + 미국 총기 사건이 같은 US:disaster 버킷에 혼입되는 문제 방지)
-MIN_TITLE_OVERLAP = 0.30
+# 국가+토픽 기반 클러스터링에서 같은 버킷 내 다른 이슈 분리
+MIN_TITLE_OVERLAP = 0.35
 
 
 def _title_overlap(title_a: str, title_b: str) -> float:
@@ -34,7 +34,10 @@ def _title_overlap(title_a: str, title_b: str) -> float:
     def _words(t: str) -> set[str]:
         import re
         tokens = re.findall(r"[a-zA-Z가-힣]+", t.lower())
-        return {w for w in tokens if w not in _stop and len(w) > 2}
+        # 한국어(가-힣)는 2글자 이상, 영어는 3글자 이상 유지
+        return {w for w in tokens if w not in _stop and (
+            len(w) >= 2 if any('\uac00' <= c <= '\ud7a3' for c in w) else len(w) > 2
+        )}
     a, b = _words(title_a), _words(title_b)
     if not a or not b:
         return 0.0
