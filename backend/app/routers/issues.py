@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -141,11 +141,13 @@ def _event_to_out(
 
 @router.get("", response_model=list[ClusterOut])
 async def list_clusters(
+    response: Response,
     bbox: Optional[str] = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     topic: Optional[str] = Query(None),
     country_code: Optional[str] = Query(None, description="국가 코드 필터 (예: US, KR)"),
     severity_min: int = Query(1, ge=0, le=100),
     limit: int = Query(2000, ge=1, le=5000),
+    sort_by: Optional[str] = Query(None, description="정렬 기준: kscore, severity, latest"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -154,13 +156,20 @@ async def list_clusters(
     - topic: conflict/terror/coup/sanctions/cyber/protest/diplomacy/maritime
     - country_code: 국가 코드 필터
     - severity_min: 최소 심각도 (0~100)
+    - sort_by: 정렬 기준 (kscore/severity/latest)
     """
+    response.headers["Cache-Control"] = "public, max-age=120"
     # 48시간 윈도우: 오래된 이슈가 지도에 표시되지 않도록 필터링
     cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    order = IssueCluster.last_event_at.desc()
+    if sort_by == "kscore":
+        order = IssueCluster.kscore.desc()
+    elif sort_by == "severity":
+        order = IssueCluster.severity.desc()
     stmt = select(IssueCluster).where(
         IssueCluster.severity >= severity_min,
         IssueCluster.last_event_at >= cutoff,
-    ).order_by(IssueCluster.last_event_at.desc()).limit(limit)
+    ).order_by(order).limit(limit)
 
     if topic:
         stmt = stmt.where(IssueCluster.topic == topic)

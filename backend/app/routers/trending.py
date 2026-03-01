@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,7 +94,8 @@ class KScoreHistoryPoint(BaseModel):
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.get("/global", response_model=list[TrendingItem])
-async def global_trending(db: AsyncSession = Depends(get_db)):
+async def global_trending(response: Response, db: AsyncSession = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=300"
     """
     글로벌 트렌딩 상위 20개 반환.
     Redis 15분 캐시 → trending_keywords 테이블 → 실시간 계산 순으로 폴백.
@@ -243,6 +244,7 @@ _MINE_COUNTRIES = ["UA", "PS", "IL", "IR", "KP", "KR", "TW", "SY", "MM"]
 
 @router.get("/mine", response_model=list[TrendingItem])
 async def mine_trending(
+    response: Response,
     countries: Optional[str] = Query(None, description="쉼표 구분 국가 코드 (예: UA,PS,IL)"),
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
@@ -251,6 +253,7 @@ async def mine_trending(
     내 관심지역 트렌딩 — countries 파라미터로 필터, 없으면 기본 8개국.
     실시간 KScore 계산. 로그인 사용자의 min_severity 설정 적용.
     """
+    response.headers["Cache-Control"] = "private, max-age=120"
     from worker.processor.trending_engine import _calc_kscore, KSCORE_MIN
 
     codes = [c.strip().upper() for c in countries.split(",") if c.strip()] if countries else _MINE_COUNTRIES

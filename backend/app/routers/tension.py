@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -283,6 +283,7 @@ async def peek_tension(
 
 @router.get("/mine", response_model=list[TensionOut])
 async def tension_mine(
+    response: Response,
     countries: Optional[str] = Query(None, description="쉼표 구분 국가 코드 (예: UA,PS,IL)"),
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
@@ -292,6 +293,7 @@ async def tension_mine(
     각 국가별 최신 값 + 원인 TOP5.
     로그인 사용자의 min_severity 설정을 TOP5 클러스터 필터에 적용.
     """
+    response.headers["Cache-Control"] = "private, max-age=120"
     from backend.app.models.user import UserPreference
     codes = [c.strip().upper() for c in countries.split(",") if c.strip()] if countries else DEFAULT_COUNTRIES
 
@@ -377,12 +379,14 @@ _HISTORY_PLAN_DAYS = {"7d": ("free", 7), "30d": ("pro", 30), "90d": ("pro_plus",
 
 @router.get("/country/{country_code}/history", response_model=list[TensionHistoryPoint])
 async def tension_history(
+    response: Response,
     country_code: str,
     range: str = Query("7d", description="7d / 30d / 90d"),
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """국가별 긴장도 히스토리 (비로그인/Free: 7일, Pro: 30일, Pro+: 90일)."""
+    response.headers["Cache-Control"] = "private, max-age=300"
     code = country_code.upper()
 
     # 플랜 게이팅 (30d는 Pro, 90d는 Pro+ 필요)

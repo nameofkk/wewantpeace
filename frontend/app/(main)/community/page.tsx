@@ -132,8 +132,7 @@ export default function CommunityPage() {
       if (!res.ok) throw new Error("게시글 로드 실패");
       return res.json();
     },
-    refetchOnMount: "always",
-    staleTime: 0,
+    staleTime: 60 * 1000,
   });
 
   const { data: hotTopics } = useQuery<Post[]>({
