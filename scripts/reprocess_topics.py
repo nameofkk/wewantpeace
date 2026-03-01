@@ -296,15 +296,18 @@ async def step6_refresh_cluster_title_prefix(db):
     title_ko 형식: "[국가] 토픽 · 번역된 제목"
     country_code나 topic이 재처리로 바뀌어도 title_ko는 고정된 채 남아있으므로
     접두사 부분만 다시 계산해 교체한다 (번역 API 재호출 없음).
+
+    주의: AI가 생성한 깔끔한 제목(" · " 구분자 없음)은 건드리지 않는다.
     """
     from worker.processor.clusterer import _COUNTRY_NAMES_KO, _TOPIC_LABELS_KO
 
-    print("[Step 6] 클러스터 title_ko 접두사 재생성")
+    print("[Step 6] 클러스터 title_ko 접두사 재생성 (AI 제목 보존)")
 
     r = await db.execute(text("""
         SELECT id, title_ko, topic, country_code
         FROM issue_clusters
         WHERE title_ko IS NOT NULL
+          AND title_ko LIKE '%·%'
     """))
     clusters = r.fetchall()
 
@@ -312,8 +315,10 @@ async def step6_refresh_cluster_title_prefix(db):
     for c in clusters:
         old = c.title_ko or ""
 
-        # " · " 뒤의 번역 본문 추출
-        translated = old.split(" · ", 1)[1] if " · " in old else None
+        # " · " 뒤의 번역 본문 추출 — 없으면 AI 제목이므로 스킵
+        if " · " not in old:
+            continue
+        translated = old.split(" · ", 1)[1]
 
         # 새 접두사 계산
         topic_label = _TOPIC_LABELS_KO.get(c.topic or "", "이슈")

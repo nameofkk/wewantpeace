@@ -27,20 +27,27 @@ async def main():
     failed = 0
 
     async with AsyncSessionLocal() as db:
-        # 아직 AI 제목이 적용되지 않은 클러스터만 조회
-        # (title_ko가 title과 다르고 한글이 포함된 경우 이미 처리된 것)
+        # 나쁜 품질 title_ko를 가진 클러스터 재처리:
+        # 1) title_ko 없음 / 비어있음 / 영문과 동일
+        # 2) [국가] 접두사 패턴 (reprocess_topics.py가 생성)
+        # 3) 직역체 종결어미 (습니다/입니다)
+        # 4) 50자 초과 (너무 김)
         r = await db.execute(text("""
             SELECT id, title, title_ko, topic, country_code
             FROM issue_clusters
             WHERE severity > 0
               AND (title_ko IS NULL
                    OR title_ko = ''
-                   OR title_ko = title)
+                   OR title_ko = title
+                   OR title_ko ~ E'^\\[.+\\]'
+                   OR title_ko LIKE '%습니다%'
+                   OR title_ko LIKE '%입니다%'
+                   OR length(title_ko) > 50)
             ORDER BY id
         """))
         clusters = r.fetchall()
         total = len(clusters)
-        print(f"미처리 {total}개 클러스터 처리 시작 (dry_run={DRY_RUN})")
+        print(f"재처리 대상 {total}개 클러스터 (dry_run={DRY_RUN})")
 
         for i, row in enumerate(clusters):
             cid, title, title_ko, topic, country_code = row
