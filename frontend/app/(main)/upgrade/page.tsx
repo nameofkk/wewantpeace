@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -159,6 +159,14 @@ function AppInstallPrompt({ lang }: { lang: Lang }) {
 }
 
 export default function UpgradePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <UpgradeContent />
+    </Suspense>
+  );
+}
+
+function UpgradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const source = searchParams.get("source");
