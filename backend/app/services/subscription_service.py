@@ -65,13 +65,16 @@ async def activate_store_subscription(
     existing_sub = existing_result.scalar_one_or_none()
 
     if existing_sub:
-        # 기존 구독 갱신
+        # 기존 구독 갱신 (플랜 변경 포함)
         existing_sub.status = "active"
+        existing_sub.plan = plan
+        existing_sub.store_product_id = product_id
         existing_sub.store_transaction_id = transaction_id
         existing_sub.expires_at = expires_at
         existing_sub.auto_renewing = auto_renewing
         existing_sub.updated_at = now
         existing_sub.next_billing_at = expires_at
+        existing_sub.amount = amount
         sub = existing_sub
     else:
         # 기존 활성 구독 취소

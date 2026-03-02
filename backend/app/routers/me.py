@@ -148,10 +148,10 @@ async def create_area(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # 플랜별 관심지역 개수 제한
+    # 플랜별 관심지역 개수 제한 (비활성 국가 제외)
     count_result = await db.execute(
         select(func.count()).select_from(UserArea)
-        .where(UserArea.user_id == current_user.id)
+        .where(UserArea.user_id == current_user.id, UserArea.is_active == True)
     )
     count = count_result.scalar() or 0
     plan = current_user.plan.lower()
