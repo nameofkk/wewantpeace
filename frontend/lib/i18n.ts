@@ -307,6 +307,11 @@ export const translations = {
     issue_timeline_showing: "(최근 {n}개 표시)",
     issue_severity_badge: "심각도 {n}",
     issue_confidence_badge: "신뢰도 {n}%",
+    confidence_label: "신뢰도",
+    confidence_high: "높음",
+    confidence_medium: "보통",
+    confidence_low: "낮음",
+    confidence_uncertain: "불확실",
     issue_source_fallback: "출처",
     issue_load_error: "이슈를 불러올 수 없습니다.",
 
@@ -674,6 +679,7 @@ export const translations = {
     admin_post_hidden: "숨김",
     admin_post_deleted: "삭제됨",
     admin_post_view_original: "원문 보기",
+    admin_edit_title: "제목 수정",
 
     // admin reports i18n
     admin_reports_title: "신고 관리",
@@ -1128,6 +1134,11 @@ export const translations = {
     issue_timeline_showing: "(showing latest {n})",
     issue_severity_badge: "Severity {n}",
     issue_confidence_badge: "Confidence {n}%",
+    confidence_label: "Confidence",
+    confidence_high: "High",
+    confidence_medium: "Medium",
+    confidence_low: "Low",
+    confidence_uncertain: "Uncertain",
     issue_source_fallback: "Source",
     issue_load_error: "Failed to load issue.",
 
@@ -1495,6 +1506,7 @@ export const translations = {
     admin_post_hidden: "Hidden",
     admin_post_deleted: "Deleted",
     admin_post_view_original: "View Original",
+    admin_edit_title: "Edit title",
 
     // admin reports i18n
     admin_reports_title: "Reports",

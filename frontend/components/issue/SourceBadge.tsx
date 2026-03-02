@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 interface SourceBadgeProps {
   tier: "A" | "B" | "C" | "D" | string;
@@ -23,11 +24,13 @@ export function SourceBadge({ tier, className = "", showDesc = false }: SourceBa
 
   if (!showDesc) {
     return (
-      <span
-        className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-bold leading-none ${config.color} ${className}`}
-        title={`Tier ${tier}: ${desc}`}
-      >
-        {tier}
+      <span className="inline-flex items-center gap-0.5">
+        <span
+          className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-bold leading-none ${config.color} ${className}`}
+        >
+          {tier}
+        </span>
+        <InfoTooltip text={`Tier ${tier}: ${desc}`} direction="up" />
       </span>
     );
   }
@@ -36,7 +39,6 @@ export function SourceBadge({ tier, className = "", showDesc = false }: SourceBa
     <span className="inline-flex flex-col items-center gap-0.5 w-7">
       <span
         className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 text-[10px] font-bold leading-none ${config.color} ${className}`}
-        title={`Tier ${tier}: ${desc}`}
       >
         {tier}
       </span>

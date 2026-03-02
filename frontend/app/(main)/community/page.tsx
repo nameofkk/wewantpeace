@@ -184,14 +184,14 @@ export default function CommunityPage() {
             <button
               onClick={() => setSortBy(sortBy === "latest" ? "popular" : "latest")}
               className={cn(
-                "flex items-center justify-center rounded-full border p-1.5 transition-colors",
+                "flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors",
                 sortBy === "popular"
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground hover:text-foreground"
               )}
-              title={sortBy === "latest" ? t(lang, "community_sort_latest") : t(lang, "community_sort_popular")}
             >
-              <ArrowUpDown className="h-3.5 w-3.5" />
+              <ArrowUpDown className="h-3 w-3" />
+              {sortBy === "latest" ? t(lang, "community_sort_latest") : t(lang, "community_sort_popular")}
             </button>
             <button
               onClick={() => user ? router.push("/community/new") : router.push("/login")}

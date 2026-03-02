@@ -448,7 +448,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
                 <button
                   onClick={handleEditStart}
                   className="shrink-0 rounded p-0.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
-                  title={lang === "ko" ? "제목 수정" : "Edit title"}
+                  title={t(lang, "admin_edit_title")}
                 >
                   <Pencil className="h-3 w-3" />
                 </button>
