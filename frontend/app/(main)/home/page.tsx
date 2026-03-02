@@ -2,12 +2,13 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2 } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes } from "@/lib/api";
+import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
@@ -548,6 +549,11 @@ export default function HomePage() {
     }
   }, [userPlan, storePlan, setUserPlan]);
 
+  // Sprint 3: 놓친 스파이크 배너
+  const { data: missedSpikes } = useMissedSpikes();
+  const missedCount = Array.isArray(missedSpikes) ? missedSpikes.length : 0;
+  const paywall = usePaywall("map_locked");
+
   // Zustand persist 수화 완료 전까지 mine 쿼리 비활성화
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
@@ -688,6 +694,23 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* ── Sprint 3: 놓친 알림 배너 (Free 유저만) ─────────────────── */}
+      {userPlan === "free" && missedCount > 0 && (
+        <button
+          onClick={() => paywall.show()}
+          className="w-full flex items-center gap-2 px-4 py-2.5 border-b border-border bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left"
+        >
+          <Bell className="h-4 w-4 text-amber-500 shrink-0" />
+          <span className="flex-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+            {t(lang, "missed_spike_banner", { n: missedCount })}
+          </span>
+          <span className="shrink-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-3 py-1 text-[10px] font-bold text-white">
+            {t(lang, "missed_spike_cta")}
+          </span>
+        </button>
+      )}
+      <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
 
       {/* ── 내 관심지역 국가 표시 바 ──────────────────────────────── */}
       {trendingTab === "mine" && hydrated && myCountries.length > 0 && (

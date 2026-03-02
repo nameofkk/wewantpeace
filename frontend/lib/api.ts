@@ -322,6 +322,24 @@ export function useMarkAllRead() {
   });
 }
 
+// --- 놓친 스파이크 훅 ---
+export interface MissedSpike {
+  id: string;
+  cluster_id: string;
+  reason: string;
+  created_at: string;
+}
+
+export function useMissedSpikes() {
+  return useQuery({
+    queryKey: ["me", "missed-spikes"],
+    queryFn: () => apiFetch<MissedSpike[]>("/me/missed-spikes"),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+  });
+}
+
 // --- 어드민: 클러스터 제목 수정 훅 ---
 export function usePatchCluster() {
   const qc = useQueryClient();

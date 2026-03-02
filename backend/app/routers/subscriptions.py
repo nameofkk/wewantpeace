@@ -138,3 +138,51 @@ async def cancel_subscription(
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "message": f"구독이 취소되었습니다. {sub.expires_at.strftime('%Y년 %m월 %d일') if sub.expires_at else '기간 종료'} 까지 서비스를 이용할 수 있습니다.",
     }
+
+
+@router.post("/start-trial")
+async def start_trial(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pro 7일 무료 체험. Pro만 가능, Pro+ 제외. 1회만."""
+    if current_user.plan != "free":
+        raise HTTPException(409, detail="이미 유료 플랜을 사용 중입니다.")
+
+    # 이전 trial 이력 확인 (trial_end IS NOT NULL)
+    existing = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.trial_end.isnot(None),
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, detail="무료 체험은 1회만 가능합니다.")
+
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+    trial_end = now + timedelta(days=7)
+
+    sub = Subscription(
+        user_id=current_user.id,
+        plan="pro",
+        status="trial",
+        amount=0,
+        platform="trial",
+        started_at=now,
+        trial_start=now,
+        trial_end=trial_end,
+        expires_at=trial_end,
+    )
+    db.add(sub)
+
+    current_user.plan = "pro"
+    await sync_area_activation(current_user.id, "pro", db)
+    await db.flush()
+
+    return {
+        "status": "ok",
+        "plan": "pro",
+        "trial_end": trial_end.isoformat(),
+    }

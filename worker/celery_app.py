@@ -70,6 +70,28 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=3),  # 매일 새벽 3시 UTC
         "options": {"queue": "process"},
     },
+    # ── Sprint 2: Delivery Integrity 배치 ──
+    "timeout-pending-deliveries": {
+        "task": "worker.tasks.timeout_pending_deliveries",
+        "schedule": crontab(minute="*/10"),  # 매 10분
+        "options": {"queue": "process"},
+    },
+    "build-missed-spike-summary": {
+        "task": "worker.tasks.build_missed_spike_summary",
+        "schedule": crontab(minute="*/30"),  # 매 30분
+        "options": {"queue": "process"},
+    },
+    "reconcile-delivery-logs": {
+        "task": "worker.tasks.reconcile_delivery_logs",
+        "schedule": crontab(minute=0, hour=4),  # 매일 04:00 UTC
+        "options": {"queue": "process"},
+    },
+    # ── Sprint 3: Trial 넛지 ──
+    "send-trial-nudges": {
+        "task": "worker.tasks.send_trial_nudges",
+        "schedule": crontab(minute=0, hour=9),  # 매일 09:00 UTC = KST 18:00
+        "options": {"queue": "process"},
+    },
 }
 
 

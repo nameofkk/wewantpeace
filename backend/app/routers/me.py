@@ -9,6 +9,7 @@ DELETE          /me/push-tokens    FCM 토큰 삭제
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone, time as dt_time
 from typing import Optional
 
 import structlog
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.auth import get_current_user, get_db, _PLAN_ORDER
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
 from backend.app.models.notification import Notification
+from backend.app.models.paywall_event import PaywallEvent
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -529,6 +531,44 @@ async def mark_all_read(
     return {"status": "ok"}
 
 
+# ── /me/paywall-cap ──────────────────────────────────────────────────────────
+
+DAILY_PAYWALL_CAP = 2
+
+
+class PaywallCapOut(BaseModel):
+    shown_today: int
+    daily_cap: int
+    remaining: int
+
+
+@router.get("/paywall-cap", response_model=PaywallCapOut)
+async def get_paywall_cap(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """오늘(UTC) paywall shown 횟수와 잔여 노출 가능 횟수 반환."""
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0,
+    )
+    result = await db.execute(
+        select(func.count())
+        .select_from(PaywallEvent)
+        .where(
+            PaywallEvent.user_id == current_user.id,
+            PaywallEvent.action == "shown",
+            PaywallEvent.created_at >= today_start,
+        )
+    )
+    shown_today = result.scalar() or 0
+    remaining = max(0, DAILY_PAYWALL_CAP - shown_today)
+    return PaywallCapOut(
+        shown_today=shown_today,
+        daily_cap=DAILY_PAYWALL_CAP,
+        remaining=remaining,
+    )
+
+
 # ── /me/events & /me/paywall-event ───────────────────────────────────────────
 
 logger = structlog.get_logger()
@@ -579,4 +619,65 @@ async def track_paywall_event(
     db.add(pe)
     await db.flush()
     logger.info("paywall_event", user_id=str(current_user.id), trigger=body.trigger, action=body.action)
+    return {"status": "ok"}
+
+
+# ── /me/missed-spikes ────────────────────────────────────────────────────
+
+class MissedSpikeOut(BaseModel):
+    id: str
+    cluster_id: str
+    reason: str
+    created_at: str
+
+
+@router.get("/missed-spikes", response_model=list[MissedSpikeOut])
+async def list_missed_spikes(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """놓친 스파이크 목록 (is_shown=False, 최근 30개)."""
+    from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+
+    result = await db.execute(
+        select(UserMissedSpikeSummary)
+        .where(
+            UserMissedSpikeSummary.user_id == current_user.id,
+            UserMissedSpikeSummary.is_shown == False,
+        )
+        .order_by(UserMissedSpikeSummary.created_at.desc())
+        .limit(30)
+    )
+    return [
+        MissedSpikeOut(
+            id=str(s.id),
+            cluster_id=str(s.cluster_id),
+            reason=s.reason,
+            created_at=s.created_at.isoformat(),
+        )
+        for s in result.scalars().all()
+    ]
+
+
+@router.patch("/missed-spikes/{spike_id}/shown")
+async def mark_missed_spike_shown(
+    spike_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """놓친 스파이크를 '확인 완료'로 표시."""
+    import uuid as _uuid
+    from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+
+    result = await db.execute(
+        select(UserMissedSpikeSummary).where(
+            UserMissedSpikeSummary.id == _uuid.UUID(spike_id),
+            UserMissedSpikeSummary.user_id == current_user.id,
+        )
+    )
+    summary = result.scalar_one_or_none()
+    if not summary:
+        raise HTTPException(status_code=401, detail="놓친 알림을 찾을 수 없습니다.")
+    summary.is_shown = True
+    await db.flush()
     return {"status": "ok"}

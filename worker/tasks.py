@@ -559,6 +559,7 @@ def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
                     cluster_topic=cluster.topic,
                     db=db,
                     redis=redis,
+                    spike_event_id=spike_event_id,
                 )
 
                 # 인앱 알림 저장
@@ -806,13 +807,43 @@ def expire_subscriptions(self):
                     )
                     valid_sub = sub_result.scalar_one_or_none()
                     if valid_sub is None:
-                        user.plan = "free"
-                        from backend.app.services.area_activation import sync_area_activation
-                        await sync_area_activation(user.id, "free", db)
-                        downgraded += 1
+                        # trial 활성 구독이 있는지도 확인
+                        trial_result = await db.execute(
+                            select(Subscription).where(
+                                Subscription.user_id == user.id,
+                                Subscription.status == "trial",
+                                Subscription.trial_end > now,
+                            ).limit(1)
+                        )
+                        valid_trial = trial_result.scalar_one_or_none()
+                        if valid_trial is None:
+                            user.plan = "free"
+                            from backend.app.services.area_activation import sync_area_activation
+                            await sync_area_activation(user.id, "free", db)
+                            downgraded += 1
 
-                logger.info("expire_subscriptions: %d명 → free 다운그레이드", downgraded)
-                return {"status": "ok", "downgraded": downgraded}
+                # Trial 만료 처리: status='trial' AND trial_end <= now
+                trial_expired_result = await db.execute(
+                    select(Subscription).where(
+                        Subscription.status == "trial",
+                        Subscription.trial_end <= now,
+                    )
+                )
+                trial_expired = 0
+                for sub in trial_expired_result.scalars().all():
+                    sub.status = "expired"
+                    user_result = await db.execute(
+                        select(User).where(User.id == sub.user_id)
+                    )
+                    trial_user = user_result.scalar_one_or_none()
+                    if trial_user and trial_user.plan != "free":
+                        trial_user.plan = "free"
+                        from backend.app.services.area_activation import sync_area_activation
+                        await sync_area_activation(trial_user.id, "free", db)
+                        trial_expired += 1
+
+                logger.info("expire_subscriptions: %d명 → free 다운그레이드, trial 만료 %d명", downgraded, trial_expired)
+                return {"status": "ok", "downgraded": downgraded, "trial_expired": trial_expired}
 
     try:
         return run_async(_run())
@@ -858,4 +889,282 @@ def cleanup_stale_tokens(self):
         return run_async(_run())
     except Exception as exc:
         logger.error("cleanup_stale_tokens 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+# ── Sprint 2: Delivery Integrity 배치 태스크 ──────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.timeout_pending_deliveries",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def timeout_pending_deliveries(self):
+    """5분 이상 pending인 delivery log를 failed(timeout)로 전환."""
+
+    async def _run():
+        from sqlalchemy import update as sa_update
+        from backend.app.models.alert_delivery_log import AlertDeliveryLog
+
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                result = await db.execute(
+                    sa_update(AlertDeliveryLog)
+                    .where(
+                        AlertDeliveryLog.decision == "pending",
+                        AlertDeliveryLog.created_at < cutoff,
+                    )
+                    .values(
+                        decision="failed",
+                        failure_reason="timeout",
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                )
+                logger.info("timeout_pending: %d건 failed(timeout) 처리", result.rowcount)
+                return {"timed_out": result.rowcount}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("timeout_pending 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.build_missed_spike_summary",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def build_missed_spike_summary(self):
+    """suppressed(plan_locked/dnd) 기록에서 missed spike 요약 생성. primary 모드만."""
+
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.alert_delivery_log import AlertDeliveryLog
+        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+
+        # pipeline_mode='primary'만 집계 (PRD 9)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                result = await db.execute(
+                    select(AlertDeliveryLog).where(
+                        AlertDeliveryLog.decision == "suppressed",
+                        AlertDeliveryLog.suppression_reason.in_(["plan_locked", "dnd"]),
+                        AlertDeliveryLog.pipeline_mode == "primary",
+                        AlertDeliveryLog.created_at >= cutoff,
+                    )
+                )
+                logs = result.scalars().all()
+
+                created = 0
+                for log in logs:
+                    # 중복 체크
+                    existing = await db.execute(
+                        select(UserMissedSpikeSummary).where(
+                            UserMissedSpikeSummary.user_id == log.user_id,
+                            UserMissedSpikeSummary.spike_event_id == log.spike_event_id,
+                        ).limit(1)
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    summary = UserMissedSpikeSummary(
+                        user_id=log.user_id,
+                        cluster_id=log.cluster_id,
+                        spike_event_id=log.spike_event_id,
+                        reason=log.suppression_reason,
+                    )
+                    db.add(summary)
+                    created += 1
+
+                logger.info("build_missed_spike: %d건 생성", created)
+                return {"created": created}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("build_missed_spike 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.reconcile_delivery_logs",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def reconcile_delivery_logs(self):
+    """sent 로그의 토큰 유효성 재확인, missed_spike 보정.
+
+    매일 04:00 UTC 실행.
+    - sent인데 해당 유저의 토큰이 모두 expired인 경우 -> failed로 보정
+    - suppressed(plan_locked/dnd) 중 missed_spike_summary에 누락된 건 보정
+    """
+
+    async def _run():
+        from sqlalchemy import select, update as sa_update, and_, exists, not_
+        from backend.app.models.alert_delivery_log import AlertDeliveryLog
+        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.user import UserPushToken
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+        fixed_sent = 0
+        fixed_missed = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 1. sent 로그 중 유저의 active 토큰이 없는 경우 -> failed(token_expired)
+                sent_logs = await db.execute(
+                    select(AlertDeliveryLog).where(
+                        AlertDeliveryLog.decision == "sent",
+                        AlertDeliveryLog.created_at >= cutoff,
+                    )
+                )
+                for log in sent_logs.scalars().all():
+                    active_token = await db.execute(
+                        select(UserPushToken.id).where(
+                            UserPushToken.user_id == log.user_id,
+                            UserPushToken.status == "active",
+                        ).limit(1)
+                    )
+                    if active_token.scalar_one_or_none() is None:
+                        log.decision = "failed"
+                        log.failure_reason = "token_expired"
+                        log.updated_at = now
+                        fixed_sent += 1
+
+                # 2. suppressed(plan_locked/dnd) 중 missed_spike_summary 누락 보정
+                suppressed_logs = await db.execute(
+                    select(AlertDeliveryLog).where(
+                        AlertDeliveryLog.decision == "suppressed",
+                        AlertDeliveryLog.suppression_reason.in_(["plan_locked", "dnd"]),
+                        AlertDeliveryLog.pipeline_mode == "primary",
+                        AlertDeliveryLog.created_at >= cutoff,
+                    )
+                )
+                for log in suppressed_logs.scalars().all():
+                    if log.spike_event_id is None:
+                        continue
+                    existing = await db.execute(
+                        select(UserMissedSpikeSummary).where(
+                            UserMissedSpikeSummary.user_id == log.user_id,
+                            UserMissedSpikeSummary.spike_event_id == log.spike_event_id,
+                        ).limit(1)
+                    )
+                    if existing.scalar_one_or_none() is None:
+                        summary = UserMissedSpikeSummary(
+                            user_id=log.user_id,
+                            cluster_id=log.cluster_id,
+                            spike_event_id=log.spike_event_id,
+                            reason=log.suppression_reason,
+                        )
+                        db.add(summary)
+                        fixed_missed += 1
+
+        logger.info(
+            "reconcile_delivery_logs: fixed_sent=%d, fixed_missed=%d",
+            fixed_sent, fixed_missed,
+        )
+        return {"status": "ok", "fixed_sent": fixed_sent, "fixed_missed": fixed_missed}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("reconcile_delivery_logs 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.send_trial_nudges",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_trial_nudges(self):
+    """Trial D3/D6 넛지 발송. 매일 09:00 UTC (KST 18:00)."""
+
+    async def _run():
+        from sqlalchemy import select
+        from sqlalchemy import func
+        from backend.app.models.subscription import Subscription
+        from backend.app.models.user import User
+        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.notification import Notification
+
+        now = datetime.now(timezone.utc)
+        results = {"d3": 0, "d6": 0}
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # D3 넛지: trial_start + 3일 이내이면서 오늘이 D3 (72시간~96시간)
+                d3_start = now - timedelta(hours=96)
+                d3_end = now - timedelta(hours=72)
+                d3_subs = await db.execute(
+                    select(Subscription).where(
+                        Subscription.status == "trial",
+                        Subscription.trial_start >= d3_start,
+                        Subscription.trial_start < d3_end,
+                    )
+                )
+                for sub in d3_subs.scalars().all():
+                    # missed spikes 카운트
+                    missed_result = await db.execute(
+                        select(func.count())
+                        .select_from(UserMissedSpikeSummary)
+                        .where(
+                            UserMissedSpikeSummary.user_id == sub.user_id,
+                            UserMissedSpikeSummary.is_shown == False,
+                        )
+                    )
+                    missed_count = missed_result.scalar() or 0
+
+                    if missed_count > 0:
+                        title = f"지난 72시간 스파이크 {missed_count}건 감지"
+                        body = "Pro에서 놓친 알림을 실시간으로 받아보세요"
+                    else:
+                        title = "Pro 체험 중: 상황 요약"
+                        body = "현재 관심 지역의 긴장도를 확인하세요"
+
+                    notif = Notification(
+                        user_id=sub.user_id,
+                        type="trial_nudge",
+                        title=title,
+                        body=body,
+                    )
+                    db.add(notif)
+                    results["d3"] += 1
+
+                # D6 넛지: trial 만료 1일 전 (144~168시간)
+                d6_start = now - timedelta(hours=168)
+                d6_end = now - timedelta(hours=144)
+                d6_subs = await db.execute(
+                    select(Subscription).where(
+                        Subscription.status == "trial",
+                        Subscription.trial_start >= d6_start,
+                        Subscription.trial_start < d6_end,
+                    )
+                )
+                for sub in d6_subs.scalars().all():
+                    notif = Notification(
+                        user_id=sub.user_id,
+                        type="trial_nudge",
+                        title="내일 체험이 종료됩니다",
+                        body="Pro 구독으로 전환하여 모든 기능을 계속 사용하세요",
+                    )
+                    db.add(notif)
+                    results["d6"] += 1
+
+        logger.info("send_trial_nudges: d3=%d, d6=%d", results["d3"], results["d6"])
+        return results
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_trial_nudges 오류: %s", exc)
         raise self.retry(exc=exc)
