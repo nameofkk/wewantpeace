@@ -129,7 +129,12 @@ export default function SettingsPage() {
   const registerToken = useRegisterPushToken();
   const deleteToken = useDeletePushToken();
 
+  // country_code → 대표 area (첫 번째) 매핑 + 중복 ID 목록
   const areasMap = Object.fromEntries((areas ?? []).map((a) => [a.country_code, a]));
+  const areasDupMap: Record<string, number[]> = {};
+  for (const a of areas ?? []) {
+    (areasDupMap[a.country_code] ??= []).push(a.id);
+  }
 
   // area가 없는 관심지역 자동 생성 (로그인 전에 추가했거나 API 실패 시 복구)
   useEffect(() => {
@@ -647,7 +652,9 @@ export default function SettingsPage() {
                           <button
                             onClick={() => {
                               removeMyCountry(code);
-                              if (area) deleteArea.mutate(area.id);
+                              // 중복 레코드 모두 삭제
+                              const ids = areasDupMap[code] ?? (area ? [area.id] : []);
+                              ids.forEach((id) => deleteArea.mutate(id));
                             }}
                             className="rounded-full p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           >

@@ -16,8 +16,8 @@ function CountrySync() {
 
   useEffect(() => {
     if (!areas || areas.length === 0) return;
-    // DB에 관심국가가 있는데 localStorage가 비어있으면 DB에서 복원
-    const dbCodes = areas.map((a) => a.country_code);
+    // DB에 관심국가가 있는데 localStorage가 비어있으면 DB에서 복원 (중복 제거)
+    const dbCodes = [...new Set(areas.map((a) => a.country_code))];
     if (myCountries.length === 0 && dbCodes.length > 0) {
       setMyCountries(dbCodes);
     }

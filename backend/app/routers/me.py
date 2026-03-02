@@ -177,10 +177,23 @@ async def create_area(
             detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "Fast 알림은 Pro 플랜 전용입니다."},
         )
 
+    # 중복 방지: 같은 country_code가 이미 있으면 기존 레코드 반환
+    cc = body.country_code.upper() if body.country_code else None
+    if cc:
+        existing = await db.execute(
+            select(UserArea).where(
+                UserArea.user_id == current_user.id,
+                UserArea.country_code == cc,
+            )
+        )
+        found = existing.scalar_one_or_none()
+        if found:
+            return _area_to_out(found)
+
     area = UserArea(
         user_id=current_user.id,
         area_type=body.area_type,
-        country_code=body.country_code.upper() if body.country_code else None,
+        country_code=cc,
         label=body.label,
         notify_verified=body.notify_verified,
         notify_fast=body.notify_fast,
