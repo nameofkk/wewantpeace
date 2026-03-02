@@ -1,0 +1,672 @@
+"use client";
+
+import { useState, useRef, useCallback } from "react";
+import { useAuth } from "@/lib/auth";
+import { useAppStore } from "@/lib/store";
+import { t, type Lang } from "@/lib/i18n";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Radio, FileText, Copy, Layers, Zap, TrendingUp,
+  Activity, Bell, RefreshCw, ChevronDown, ChevronUp,
+  AlertTriangle, CheckCircle, XCircle, Play, Send,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAdminToast } from "@/components/ui/admin-toast";
+import { adminFetch } from "@/lib/admin-utils";
+
+/* ─── types ─── */
+interface PipelineStats {
+  total_sources: number;
+  active_sources: number;
+  error_sources: number;
+  rss_count: number;
+  telegram_count: number;
+  events_24h: number;
+  unclassified_rate: number;
+  translation_fail_rate: number;
+  geo_fail_rate: number;
+  topic_distribution: { topic: string; count: number }[];
+  raw_24h: number;
+  duplicates_24h: number;
+  active_clusters: number;
+  noise_clusters: number;
+  spike_clusters: number;
+  push_tokens: number;
+  push_web: number;
+  push_android: number;
+  push_ios: number;
+  crisis_countries: number;
+}
+
+interface ClusterItem {
+  id: number;
+  title: string;
+  title_ko: string;
+  topic: string;
+  severity: number;
+  kscore: number;
+  country_code: string;
+  is_spike: boolean;
+}
+
+interface TrendingItem {
+  id: number;
+  keyword: string;
+  keyword_ko: string;
+  kscore: number;
+  event_count: number;
+}
+
+interface TensionItem {
+  country_code: string;
+  raw_score: number;
+  tension_level: number;
+}
+
+interface SourceItem {
+  id: number;
+  display_name: string;
+  source_type: string;
+  is_active: boolean;
+  collect_status: { status: string; error?: string } | null;
+}
+
+/* ─── health helpers ─── */
+type Health = "green" | "yellow" | "red";
+
+function getStageHealth(stats: PipelineStats | undefined, stage: number): Health {
+  if (!stats) return "green";
+  switch (stage) {
+    case 0: // collect
+      return stats.error_sources > 3 ? "red" : stats.error_sources > 0 ? "yellow" : "green";
+    case 1: // normalize
+      return stats.unclassified_rate > 0.1 ? "red" : stats.unclassified_rate > 0.05 ? "yellow" : "green";
+    case 2: // dedup
+      return "green";
+    case 3: // cluster
+      return stats.noise_clusters > 20 ? "red" : stats.noise_clusters > 10 ? "yellow" : "green";
+    case 4: // spike
+      return stats.spike_clusters > 5 ? "red" : stats.spike_clusters > 2 ? "yellow" : "green";
+    case 5: // kscore
+      return "green";
+    case 6: // tension
+      return stats.crisis_countries > 3 ? "red" : stats.crisis_countries > 1 ? "yellow" : "green";
+    case 7: // trending
+      return "green";
+    case 8: // push
+      return stats.push_tokens === 0 ? "red" : "green";
+    case 9: // orphan
+      return "green";
+    default:
+      return "green";
+  }
+}
+
+const HEALTH_COLORS: Record<Health, string> = {
+  green: "bg-green-500",
+  yellow: "bg-yellow-500",
+  red: "bg-red-500",
+};
+
+const HEALTH_RING: Record<Health, string> = {
+  green: "ring-green-500/30",
+  yellow: "ring-yellow-500/30",
+  red: "ring-red-500/30",
+};
+
+/* ─── stage labels ─── */
+const STAGE_KEYS = [
+  "pipeline_stage_collect",
+  "pipeline_stage_normalize",
+  "pipeline_stage_dedup",
+  "pipeline_stage_cluster",
+  "pipeline_stage_spike",
+  "pipeline_stage_kscore",
+  "pipeline_stage_tension",
+  "pipeline_stage_trending",
+  "pipeline_stage_push",
+  "pipeline_stage_orphan",
+] as const;
+
+const STAGE_ICONS = [Radio, FileText, Copy, Layers, Zap, TrendingUp, Activity, TrendingUp, Bell, RefreshCw];
+
+const ARROW_LABELS = [
+  "pipeline_label_raw",
+  "pipeline_label_normalized",
+  "pipeline_label_deduped",
+  "pipeline_label_clustered",
+  "pipeline_label_scored",
+  "pipeline_label_tension",
+  "pipeline_label_trending",
+  "pipeline_label_notification",
+  "pipeline_label_orphan",
+] as const;
+
+/* ─── stat pill ─── */
+function Pill({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
+  return (
+    <div className={cn(
+      "flex items-center justify-between px-3 py-1.5 rounded-lg text-xs",
+      warn ? "bg-red-500/10 text-red-400" : "bg-secondary"
+    )}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-semibold">{value}</span>
+    </div>
+  );
+}
+
+/* ─── arrow connector ─── */
+function Arrow({ label, lang }: { label: typeof ARROW_LABELS[number]; lang: Lang }) {
+  return (
+    <div className="flex flex-col items-center py-1">
+      <div className="w-px h-4 bg-border" />
+      <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+        {t(lang, label)}
+      </span>
+      <div className="w-px h-4 bg-border" />
+      <ChevronDown className="h-3 w-3 text-muted-foreground -mt-1" />
+    </div>
+  );
+}
+
+/* ─── stage card wrapper ─── */
+function StageCard({
+  index,
+  lang,
+  health,
+  sectionRef,
+  children,
+}: {
+  index: number;
+  lang: Lang;
+  health: Health;
+  sectionRef: (el: HTMLDivElement | null) => void;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  const Icon = STAGE_ICONS[index];
+
+  return (
+    <div ref={sectionRef} className="w-full max-w-xl mx-auto">
+      <div className={cn(
+        "border rounded-xl bg-card overflow-hidden",
+        health === "red" ? "border-red-500/40" : health === "yellow" ? "border-yellow-500/40" : "border-border"
+      )}>
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center w-full gap-3 px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
+        >
+          <div className={cn("h-2.5 w-2.5 rounded-full ring-2", HEALTH_COLORS[health], HEALTH_RING[health])} />
+          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-semibold flex-1">{t(lang, STAGE_KEYS[index])}</span>
+          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </button>
+        {open && <div className="px-4 pb-4 space-y-2 border-t border-border pt-3">{children}</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── action button ─── */
+function ActionBtn({
+  label,
+  onClick,
+  loading,
+  variant = "default",
+}: {
+  label: string;
+  onClick: () => void;
+  loading?: boolean;
+  variant?: "default" | "destructive";
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={cn(
+        "px-3 py-1.5 text-xs rounded-lg font-medium transition-colors disabled:opacity-50",
+        variant === "destructive"
+          ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+          : "bg-primary/10 text-primary hover:bg-primary/20"
+      )}
+    >
+      {loading ? <RefreshCw className="h-3 w-3 animate-spin inline mr-1" /> : null}
+      {label}
+    </button>
+  );
+}
+
+/* ═══ MAIN PAGE ═══ */
+export default function AdminPipelinePage() {
+  const { user } = useAuth();
+  const { lang } = useAppStore();
+  const queryClient = useQueryClient();
+  const { toast } = useAdminToast();
+  const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  /* ─── queries ─── */
+  const { data: stats, isLoading } = useQuery<PipelineStats>({
+    queryKey: ["pipeline-stats"],
+    queryFn: () => adminFetch("/admin/pipeline/stats"),
+    refetchInterval: 30_000,
+  });
+
+  const { data: trendingData } = useQuery<TrendingItem[]>({
+    queryKey: ["admin-trending-pipeline"],
+    queryFn: () => adminFetch("/admin/trending"),
+    refetchInterval: 60_000,
+  });
+
+  const { data: tensionData } = useQuery<TensionItem[]>({
+    queryKey: ["admin-tension-pipeline"],
+    queryFn: () => adminFetch("/admin/tension"),
+    refetchInterval: 60_000,
+  });
+
+  const { data: clustersData } = useQuery<{ items: ClusterItem[] }>({
+    queryKey: ["admin-clusters-pipeline"],
+    queryFn: () => adminFetch("/admin/clusters?limit=5"),
+    refetchInterval: 60_000,
+  });
+
+  const { data: sourcesData } = useQuery<{ items: SourceItem[] }>({
+    queryKey: ["admin-sources-pipeline"],
+    queryFn: () => adminFetch("/admin/sources?limit=100"),
+    refetchInterval: 60_000,
+  });
+
+  /* ─── mutations ─── */
+  const reprocessMut = useMutation({
+    mutationFn: () => adminFetch("/admin/reprocess-events", { method: "POST" }),
+    onSuccess: () => {
+      toast(lang === "ko" ? "재처리 완료" : "Reprocess complete", "success");
+      queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
+    },
+    onError: () => toast(lang === "ko" ? "재처리 실패" : "Reprocess failed", "error"),
+  });
+
+  const tensionRecalcMut = useMutation({
+    mutationFn: () => adminFetch("/admin/tension/recalculate", { method: "POST" }),
+    onSuccess: () => {
+      toast(lang === "ko" ? "긴장도 재계산 완료" : "Tension recalculated", "success");
+      queryClient.invalidateQueries({ queryKey: ["admin-tension-pipeline"] });
+    },
+    onError: () => toast(lang === "ko" ? "재계산 실패" : "Recalculation failed", "error"),
+  });
+
+  const trendingRecalcMut = useMutation({
+    mutationFn: () => adminFetch("/admin/trending/recalculate", { method: "POST" }),
+    onSuccess: () => {
+      toast(lang === "ko" ? "트렌딩 재계산 완료" : "Trending recalculated", "success");
+      queryClient.invalidateQueries({ queryKey: ["admin-trending-pipeline"] });
+    },
+    onError: () => toast(lang === "ko" ? "재계산 실패" : "Recalculation failed", "error"),
+  });
+
+  const testPushMut = useMutation({
+    mutationFn: () => adminFetch("/admin/test-push", { method: "POST", body: {} }),
+    onSuccess: () => toast(lang === "ko" ? "테스트 푸시 전송 완료" : "Test push sent", "success"),
+    onError: () => toast(lang === "ko" ? "테스트 푸시 실패" : "Test push failed", "error"),
+  });
+
+  const orphanMut = useMutation({
+    mutationFn: () => adminFetch("/admin/trigger-orphan-reprocess", { method: "POST" }),
+    onSuccess: (data: any) => {
+      toast(
+        lang === "ko"
+          ? `오펀 재처리 완료 (${data.reprocessed}건)`
+          : `Orphan reprocess done (${data.reprocessed})`,
+        "success"
+      );
+      queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
+    },
+    onError: () => toast(lang === "ko" ? "오펀 재처리 실패" : "Orphan reprocess failed", "error"),
+  });
+
+  const deactivateClusterMut = useMutation({
+    mutationFn: (id: number) =>
+      adminFetch(`/admin/clusters/${id}`, { method: "PATCH", body: { severity: 0 } }),
+    onSuccess: () => {
+      toast(t(lang, "admin_toast_updated"), "success");
+      queryClient.invalidateQueries({ queryKey: ["admin-clusters-pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
+    },
+  });
+
+  const patchSourceMut = useMutation({
+    mutationFn: (id: number) =>
+      adminFetch(`/admin/sources/${id}`, { method: "PATCH", body: { is_active: false } }),
+    onSuccess: () => {
+      toast(t(lang, "admin_toast_updated"), "success");
+      queryClient.invalidateQueries({ queryKey: ["admin-sources-pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
+    },
+  });
+
+  /* ─── inline editing state ─── */
+  const [editingCluster, setEditingCluster] = useState<number | null>(null);
+  const [editTopic, setEditTopic] = useState("");
+  const [editSeverity, setEditSeverity] = useState(0);
+
+  const patchClusterMut = useMutation({
+    mutationFn: ({ id, topic, severity }: { id: number; topic: string; severity: number }) =>
+      adminFetch(`/admin/clusters/${id}`, { method: "PATCH", body: { topic, severity } }),
+    onSuccess: () => {
+      setEditingCluster(null);
+      toast(t(lang, "admin_toast_updated"), "success");
+      queryClient.invalidateQueries({ queryKey: ["admin-clusters-pipeline"] });
+    },
+  });
+
+  const scrollTo = useCallback((idx: number) => {
+    sectionRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  /* ─── error sources list ─── */
+  const errorSources = sourcesData?.items?.filter(
+    (s) => s.is_active && s.collect_status?.status === "error"
+  ) ?? [];
+
+  const trending = trendingData ?? [];
+  const tensions = tensionData ?? [];
+  const clusters = clustersData?.items ?? [];
+  const spikeClusters = clusters.filter((c) => c.is_spike);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* ── Header ── */}
+      <h1 className="text-lg font-bold">{t(lang, "pipeline_title")}</h1>
+
+      {/* ── Health Bar ── */}
+      <div className="flex items-center gap-1.5 flex-wrap pb-2">
+        <span className="text-xs text-muted-foreground mr-1">{t(lang, "pipeline_health")}:</span>
+        {STAGE_KEYS.map((key, i) => {
+          const h = getStageHealth(stats, i);
+          return (
+            <button
+              key={i}
+              onClick={() => scrollTo(i)}
+              title={t(lang, key)}
+              className={cn(
+                "h-3.5 w-3.5 rounded-full ring-2 transition-transform hover:scale-125 cursor-pointer",
+                HEALTH_COLORS[h],
+                HEALTH_RING[h]
+              )}
+            />
+          );
+        })}
+      </div>
+
+      {/* ── Vertical Flow ── */}
+      <div className="flex flex-col items-center gap-0">
+        {/* Stage 0: 수집 */}
+        <StageCard index={0} lang={lang} health={getStageHealth(stats, 0)} sectionRef={(el) => (sectionRefs.current[0] = el)}>
+          <div className="grid grid-cols-2 gap-2">
+            <Pill label={t(lang, "pipeline_active_sources")} value={`${stats?.active_sources ?? 0} / ${stats?.total_sources ?? 0}`} />
+            <Pill label={t(lang, "pipeline_error_sources")} value={stats?.error_sources ?? 0} warn={(stats?.error_sources ?? 0) > 0} />
+            <Pill label="RSS" value={stats?.rss_count ?? 0} />
+            <Pill label="Telegram" value={stats?.telegram_count ?? 0} />
+          </div>
+          {errorSources.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-xs font-semibold text-red-400 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {lang === "ko" ? "오류 소스" : "Error Sources"}
+              </p>
+              {errorSources.slice(0, 5).map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-xs bg-red-500/5 px-3 py-1.5 rounded-lg">
+                  <span>{s.display_name} <span className="text-muted-foreground">({s.source_type})</span></span>
+                  <ActionBtn
+                    label={lang === "ko" ? "끄기" : "Disable"}
+                    variant="destructive"
+                    onClick={() => patchSourceMut.mutate(s.id)}
+                    loading={patchSourceMut.isPending}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </StageCard>
+
+        <Arrow label="pipeline_label_raw" lang={lang} />
+
+        {/* Stage 1: 정규화 */}
+        <StageCard index={1} lang={lang} health={getStageHealth(stats, 1)} sectionRef={(el) => (sectionRefs.current[1] = el)}>
+          <div className="grid grid-cols-2 gap-2">
+            <Pill label={t(lang, "pipeline_events_24h")} value={stats?.events_24h ?? 0} />
+            <Pill label={t(lang, "pipeline_unclassified")} value={`${((stats?.unclassified_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.unclassified_rate ?? 0) > 0.05} />
+            <Pill label={t(lang, "pipeline_translation_fail")} value={`${((stats?.translation_fail_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.translation_fail_rate ?? 0) > 0.05} />
+            <Pill label={t(lang, "pipeline_geo_fail")} value={`${((stats?.geo_fail_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.geo_fail_rate ?? 0) > 0.1} />
+          </div>
+          {stats?.topic_distribution && stats.topic_distribution.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] text-muted-foreground mb-1">{lang === "ko" ? "토픽 분포" : "Topic Distribution"}</p>
+              <div className="flex flex-wrap gap-1">
+                {stats.topic_distribution.slice(0, 8).map((td) => (
+                  <span key={td.topic} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary">
+                    {td.topic}: {td.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_reprocess")} onClick={() => reprocessMut.mutate()} loading={reprocessMut.isPending} />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_normalized" lang={lang} />
+
+        {/* Stage 2: 중복제거 */}
+        <StageCard index={2} lang={lang} health={getStageHealth(stats, 2)} sectionRef={(el) => (sectionRefs.current[2] = el)}>
+          <div className="grid grid-cols-3 gap-2">
+            <Pill label={t(lang, "pipeline_raw_events")} value={stats?.raw_24h ?? 0} />
+            <Pill label={t(lang, "pipeline_unique_events")} value={stats?.events_24h ?? 0} />
+            <Pill
+              label={t(lang, "pipeline_dup_rate")}
+              value={stats?.raw_24h ? `${(((stats.duplicates_24h) / stats.raw_24h) * 100).toFixed(1)}%` : "0%"}
+            />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_deduped" lang={lang} />
+
+        {/* Stage 3: 클러스터링 */}
+        <StageCard index={3} lang={lang} health={getStageHealth(stats, 3)} sectionRef={(el) => (sectionRefs.current[3] = el)}>
+          <div className="grid grid-cols-3 gap-2">
+            <Pill label={t(lang, "pipeline_active_clusters")} value={stats?.active_clusters ?? 0} />
+            <Pill label={t(lang, "pipeline_noise_clusters")} value={stats?.noise_clusters ?? 0} warn={(stats?.noise_clusters ?? 0) > 10} />
+            <Pill label={t(lang, "pipeline_spike_clusters")} value={stats?.spike_clusters ?? 0} />
+          </div>
+          {clusters.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "최근 클러스터" : "Recent Clusters"}</p>
+              {clusters.slice(0, 5).map((c) => (
+                <div key={c.id} className="flex items-center gap-2 text-xs bg-secondary/50 px-3 py-1.5 rounded-lg">
+                  {editingCluster === c.id ? (
+                    <div className="flex-1 flex items-center gap-2 flex-wrap">
+                      <input
+                        className="bg-background border border-border rounded px-2 py-0.5 text-xs w-24"
+                        value={editTopic}
+                        onChange={(e) => setEditTopic(e.target.value)}
+                        placeholder="topic"
+                      />
+                      <input
+                        type="number"
+                        className="bg-background border border-border rounded px-2 py-0.5 text-xs w-16"
+                        value={editSeverity}
+                        onChange={(e) => setEditSeverity(Number(e.target.value))}
+                      />
+                      <ActionBtn
+                        label={t(lang, "admin_save")}
+                        onClick={() => patchClusterMut.mutate({ id: c.id, topic: editTopic, severity: editSeverity })}
+                        loading={patchClusterMut.isPending}
+                      />
+                      <button className="text-[10px] text-muted-foreground" onClick={() => setEditingCluster(null)}>
+                        {t(lang, "admin_cancel")}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="flex-1 truncate">{lang === "ko" ? c.title_ko || c.title : c.title}</span>
+                      <span className="text-[10px] text-muted-foreground">{c.topic}</span>
+                      <span className="text-[10px] font-mono">{c.severity}</span>
+                      <button
+                        className="text-[10px] text-primary hover:underline"
+                        onClick={() => { setEditingCluster(c.id); setEditTopic(c.topic); setEditSeverity(c.severity); }}
+                      >
+                        {t(lang, "admin_edit")}
+                      </button>
+                      <ActionBtn
+                        label={t(lang, "pipeline_deactivate")}
+                        variant="destructive"
+                        onClick={() => deactivateClusterMut.mutate(c.id)}
+                        loading={deactivateClusterMut.isPending}
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </StageCard>
+
+        <Arrow label="pipeline_label_clustered" lang={lang} />
+
+        {/* Stage 4: 스파이크 */}
+        <StageCard index={4} lang={lang} health={getStageHealth(stats, 4)} sectionRef={(el) => (sectionRefs.current[4] = el)}>
+          <Pill label={t(lang, "pipeline_spike_clusters")} value={stats?.spike_clusters ?? 0} warn={(stats?.spike_clusters ?? 0) > 2} />
+          {spikeClusters.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {spikeClusters.map((c) => (
+                <div key={c.id} className="flex items-center justify-between text-xs bg-yellow-500/5 px-3 py-1.5 rounded-lg">
+                  <span className="truncate flex-1">{lang === "ko" ? c.title_ko || c.title : c.title}</span>
+                  <ActionBtn
+                    label={t(lang, "pipeline_deactivate")}
+                    variant="destructive"
+                    onClick={() => deactivateClusterMut.mutate(c.id)}
+                    loading={deactivateClusterMut.isPending}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {spikeClusters.length === 0 && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <CheckCircle className="h-3 w-3 text-green-500" />
+              {lang === "ko" ? "현재 스파이크 없음" : "No active spikes"}
+            </p>
+          )}
+        </StageCard>
+
+        <Arrow label="pipeline_label_scored" lang={lang} />
+
+        {/* Stage 5: KScore */}
+        <StageCard index={5} lang={lang} health={getStageHealth(stats, 5)} sectionRef={(el) => (sectionRefs.current[5] = el)}>
+          {trending.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "Top 5 트렌딩" : "Top 5 Trending"}</p>
+              {trending.slice(0, 5).map((kw) => (
+                <div key={kw.id} className="flex items-center justify-between text-xs bg-secondary/50 px-3 py-1.5 rounded-lg">
+                  <span>{lang === "ko" ? kw.keyword_ko || kw.keyword : kw.keyword}</span>
+                  <span className="font-mono text-primary">{kw.kscore?.toFixed(1)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{lang === "ko" ? "트렌딩 데이터 없음" : "No trending data"}</p>
+          )}
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_recalculate")} onClick={() => trendingRecalcMut.mutate()} loading={trendingRecalcMut.isPending} />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_tension" lang={lang} />
+
+        {/* Stage 6: 긴장도 */}
+        <StageCard index={6} lang={lang} health={getStageHealth(stats, 6)} sectionRef={(el) => (sectionRefs.current[6] = el)}>
+          <Pill label={t(lang, "pipeline_crisis_countries")} value={stats?.crisis_countries ?? 0} warn={(stats?.crisis_countries ?? 0) > 1} />
+          {tensions.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "Top 5 긴장 국가" : "Top 5 Tension Countries"}</p>
+              {tensions
+                .sort((a, b) => b.raw_score - a.raw_score)
+                .slice(0, 5)
+                .map((t_item) => (
+                  <div key={t_item.country_code} className="flex items-center justify-between text-xs bg-secondary/50 px-3 py-1.5 rounded-lg">
+                    <span className="font-mono">{t_item.country_code}</span>
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                      t_item.tension_level === 3 ? "bg-red-500/20 text-red-400" :
+                      t_item.tension_level === 2 ? "bg-yellow-500/20 text-yellow-400" :
+                      "bg-green-500/20 text-green-400"
+                    )}>
+                      Lv.{t_item.tension_level}
+                    </span>
+                    <span className="font-mono">{t_item.raw_score?.toFixed(1)}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_recalculate")} onClick={() => tensionRecalcMut.mutate()} loading={tensionRecalcMut.isPending} />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_trending" lang={lang} />
+
+        {/* Stage 7: 트렌딩 */}
+        <StageCard index={7} lang={lang} health={getStageHealth(stats, 7)} sectionRef={(el) => (sectionRefs.current[7] = el)}>
+          <Pill label={lang === "ko" ? "활성 키워드" : "Active Keywords"} value={trending.length} />
+          {trending.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "Top 5 키워드" : "Top 5 Keywords"}</p>
+              {trending.slice(0, 5).map((kw) => (
+                <div key={kw.id} className="flex items-center justify-between text-xs bg-secondary/50 px-3 py-1.5 rounded-lg">
+                  <span>{lang === "ko" ? kw.keyword_ko || kw.keyword : kw.keyword}</span>
+                  <span className="text-muted-foreground">{kw.event_count} events</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_recalculate")} onClick={() => trendingRecalcMut.mutate()} loading={trendingRecalcMut.isPending} />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_notification" lang={lang} />
+
+        {/* Stage 8: 푸시 */}
+        <StageCard index={8} lang={lang} health={getStageHealth(stats, 8)} sectionRef={(el) => (sectionRefs.current[8] = el)}>
+          <div className="grid grid-cols-2 gap-2">
+            <Pill label={t(lang, "pipeline_push_tokens")} value={stats?.push_tokens ?? 0} />
+            <Pill label="Web" value={stats?.push_web ?? 0} />
+            <Pill label="Android" value={stats?.push_android ?? 0} />
+            <Pill label="iOS" value={stats?.push_ios ?? 0} />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_test_push")} onClick={() => testPushMut.mutate()} loading={testPushMut.isPending} />
+          </div>
+        </StageCard>
+
+        <Arrow label="pipeline_label_orphan" lang={lang} />
+
+        {/* Stage 9: 오펀 재처리 */}
+        <StageCard index={9} lang={lang} health={getStageHealth(stats, 9)} sectionRef={(el) => (sectionRefs.current[9] = el)}>
+          <p className="text-xs text-muted-foreground">{t(lang, "pipeline_orphan_schedule")}</p>
+          <div className="flex gap-2 mt-2">
+            <ActionBtn label={t(lang, "pipeline_trigger")} onClick={() => orphanMut.mutate()} loading={orphanMut.isPending} />
+          </div>
+        </StageCard>
+      </div>
+    </div>
+  );
+}

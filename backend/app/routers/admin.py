@@ -1622,3 +1622,219 @@ async def list_email_logs(
             for l in logs
         ],
     }
+
+
+# ── 파이프라인 통합 통계 ──────────────────────────────────────────────────────
+
+@router.get("/pipeline/stats")
+async def pipeline_stats(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 파이프라인 단계별 통계를 한 번에 반환."""
+    now = datetime.now(timezone.utc)
+    cutoff_24h = now - timedelta(hours=24)
+
+    # 1) 소스 통계
+    total_sources = (await db.execute(
+        select(func.count()).select_from(SourceChannel)
+    )).scalar() or 0
+    active_sources = (await db.execute(
+        select(func.count()).select_from(SourceChannel).where(SourceChannel.is_active == True)
+    )).scalar() or 0
+
+    # 오류 소스: Redis collect:status:{id} 조회
+    error_sources = 0
+    try:
+        import json as _json
+        redis = get_redis()
+        all_src = await db.execute(
+            select(SourceChannel.id).where(SourceChannel.is_active == True)
+        )
+        src_ids = [r[0] for r in all_src.all()]
+        if src_ids:
+            keys = [f"collect:status:{sid}" for sid in src_ids]
+            vals = await redis.mget(keys)
+            for val in vals:
+                if val:
+                    st = _json.loads(val)
+                    if st.get("status") == "error":
+                        error_sources += 1
+    except Exception:
+        pass
+
+    # RSS / Telegram 비율
+    rss_count = (await db.execute(
+        select(func.count()).select_from(SourceChannel)
+        .where(SourceChannel.is_active == True, SourceChannel.source_type == "rss")
+    )).scalar() or 0
+    telegram_count = (await db.execute(
+        select(func.count()).select_from(SourceChannel)
+        .where(SourceChannel.is_active == True, SourceChannel.source_type == "telegram")
+    )).scalar() or 0
+
+    # 2) 정규화 이벤트 통계
+    events_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h)
+    )).scalar() or 0
+
+    unclassified_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.topic == "unknown")
+    )).scalar() or 0
+
+    translation_fail = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.title_ko == None)
+    )).scalar() or 0
+
+    geo_fail = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.country_code == None)
+    )).scalar() or 0
+
+    unclassified_rate = round(unclassified_24h / max(1, events_24h), 3)
+    translation_fail_rate = round(translation_fail / max(1, events_24h), 3)
+    geo_fail_rate = round(geo_fail / max(1, events_24h), 3)
+
+    # 3) 토픽 분포
+    topic_rows = await db.execute(
+        select(NormalizedEvent.topic, func.count().label("count"))
+        .where(NormalizedEvent.created_at >= cutoff_24h)
+        .group_by(NormalizedEvent.topic)
+        .order_by(func.count().desc())
+    )
+    topic_distribution = [
+        {"topic": row.topic or "unknown", "count": row.count}
+        for row in topic_rows.all()
+    ]
+
+    # 4) 중복 제거 (RawEvent 대비)
+    raw_24h = (await db.execute(
+        select(func.count()).select_from(RawEvent)
+        .where(RawEvent.collected_at >= cutoff_24h)
+    )).scalar() or 0
+    duplicates_24h = max(0, raw_24h - events_24h)
+
+    # 5) 클러스터 통계
+    active_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0)
+    )).scalar() or 0
+    noise_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.severity == 0)
+    )).scalar() or 0
+    spike_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster)
+        .where(IssueCluster.severity > 0, IssueCluster.is_spike == True)
+    )).scalar() or 0
+
+    # 6) 푸시 토큰 통계
+    push_tokens = (await db.execute(
+        select(func.count()).select_from(UserPushToken)
+    )).scalar() or 0
+    platform_rows = await db.execute(
+        select(UserPushToken.platform, func.count().label("count"))
+        .group_by(UserPushToken.platform)
+    )
+    platform_map = {r.platform: r.count for r in platform_rows.all()}
+    push_web = platform_map.get("web", 0)
+    push_android = platform_map.get("android", 0)
+    push_ios = platform_map.get("ios", 0)
+
+    # 7) 위기 국가
+    crisis_q = await db.execute(
+        select(TensionIndex.country_code)
+        .where(TensionIndex.tension_level == 3)
+        .group_by(TensionIndex.country_code)
+    )
+    crisis_countries = len(crisis_q.all())
+
+    return {
+        "total_sources": total_sources,
+        "active_sources": active_sources,
+        "error_sources": error_sources,
+        "rss_count": rss_count,
+        "telegram_count": telegram_count,
+        "events_24h": events_24h,
+        "unclassified_rate": unclassified_rate,
+        "translation_fail_rate": translation_fail_rate,
+        "geo_fail_rate": geo_fail_rate,
+        "topic_distribution": topic_distribution,
+        "raw_24h": raw_24h,
+        "duplicates_24h": duplicates_24h,
+        "active_clusters": active_clusters,
+        "noise_clusters": noise_clusters,
+        "spike_clusters": spike_clusters,
+        "push_tokens": push_tokens,
+        "push_web": push_web,
+        "push_android": push_android,
+        "push_ios": push_ios,
+        "crisis_countries": crisis_countries,
+    }
+
+
+# ── 오펀 이벤트 재처리 (클러스터 미배정 이벤트) ───────────────────────────────
+
+@router.post("/trigger-orphan-reprocess")
+async def trigger_orphan_reprocess(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """클러스터에 배정되지 않은 최근 이벤트를 재처리."""
+    import logging
+    _logger = logging.getLogger(__name__)
+
+    try:
+        from backend.app.models.issue_cluster import ClusterEvent
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+
+        # 클러스터에 속하지 않은 이벤트 수
+        orphan_q = (
+            select(func.count())
+            .select_from(NormalizedEvent)
+            .where(
+                NormalizedEvent.created_at >= cutoff,
+                NormalizedEvent.id.notin_(
+                    select(ClusterEvent.event_id)
+                ),
+            )
+        )
+        orphan_count = (await db.execute(orphan_q)).scalar() or 0
+
+        # 재처리: severity 재계산
+        reprocessed = 0
+        if orphan_count > 0:
+            from worker.processor.normalizer import _classify_topic, _calculate_severity
+
+            orphans = await db.execute(
+                select(NormalizedEvent)
+                .where(
+                    NormalizedEvent.created_at >= cutoff,
+                    NormalizedEvent.id.notin_(select(ClusterEvent.event_id)),
+                )
+                .limit(500)
+            )
+            for ev in orphans.scalars().all():
+                txt = f"{ev.title or ''} {ev.body or ''}"
+                new_topic = _classify_topic(txt)
+                new_sev = _calculate_severity(txt, new_topic)
+                if new_topic != ev.topic or new_sev != ev.severity:
+                    ev.topic = new_topic
+                    ev.severity = new_sev
+                    reprocessed += 1
+            await db.flush()
+
+        await _log_action(db, admin, "trigger_orphan_reprocess", detail={
+            "orphan_count": orphan_count,
+            "reprocessed": reprocessed,
+        })
+
+        return {
+            "status": "ok",
+            "orphan_count": orphan_count,
+            "reprocessed": reprocessed,
+        }
+    except Exception as e:
+        _logger.error("orphan_reprocess 실패: %s", e, exc_info=True)
+        raise HTTPException(500, detail=f"오펀 재처리 실패: {str(e)}")

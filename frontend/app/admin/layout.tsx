@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Layers, Activity, FileText,
   Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
   CreditCard, MessageSquare, TrendingUp, MessageCircleQuestion,
-  Mail, ScrollText,
+  Mail, ScrollText, Workflow,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "admin_group_data",
     items: [
+      { href: "/admin/pipeline", icon: Workflow, labelKey: "admin_pipeline" },
       { href: "/admin/clusters", icon: Layers, labelKey: "admin_clusters" },
       { href: "/admin/events", icon: FileText, labelKey: "admin_events" },
       { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" },
