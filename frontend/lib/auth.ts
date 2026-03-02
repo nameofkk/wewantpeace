@@ -5,6 +5,7 @@ import {
   getAuth,
   Auth,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -87,6 +88,31 @@ export async function checkGoogleRedirectResult(): Promise<FirebaseUser | null> 
   } catch {
     return null;
   }
+}
+
+// Apple 로그인
+export async function signInWithApple(): Promise<FirebaseUser> {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    throw new Error(
+      "Firebase가 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_FIREBASE_API_KEY를 설정하세요."
+    );
+  }
+  const provider = new OAuthProvider("apple.com");
+  provider.addScope("email");
+  provider.addScope("name");
+
+  if (isReactNativeWebView()) {
+    // React Native WebView: signInWithPopup은 같은 창에서 열려 빈 화면 발생
+    // signInWithRedirect 사용 → 리다이렉트 후 getRedirectResult로 결과 확인
+    await signInWithRedirect(auth, provider);
+    // signInWithRedirect는 페이지를 리다이렉트하므로 여기에 도달하지 않음
+    throw new Error("redirect");
+  }
+
+  // 웹 브라우저: signInWithPopup 사용 (정상 팝업)
+  const result = await signInWithPopup(auth, provider);
+  return result.user;
 }
 
 // 카카오 로그인

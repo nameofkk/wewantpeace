@@ -8,6 +8,7 @@ import { Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   signInWithGoogle,
+  signInWithApple,
   signInWithEmail,
   signInWithToss,
   createEmailUser,
@@ -21,6 +22,7 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
+import { detectPlatform } from "@/lib/platform-detect";
 
 type Tab = "login" | "register" | "google-register";
 
@@ -66,6 +68,10 @@ export default function LoginPage() {
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
+
+  // iOS 플랫폼 감지 (Apple 로그인 버튼 표시용)
+  const platform = detectPlatform();
+  const isIOS = platform === "ios-native" || platform === "ios-app";
 
   // React Native WebView: Google 리다이렉트 로그인 결과 확인
   useEffect(() => {
@@ -256,10 +262,84 @@ export default function LoginPage() {
         setTab("google-register");
       }
     } catch (e: unknown) {
-      const err = e as { message?: string };
+      const err = e as { code?: string; message?: string; customData?: { email?: string } };
       // signInWithRedirect 후 페이지가 리다이렉트되므로 "redirect" 에러는 무시
       if (err.message === "redirect") return;
-      setError(err.message || "Google login failed.");
+      if (err.code === "auth/account-exists-with-different-credential") {
+        const email = err.customData?.email;
+        if (email) {
+          try {
+            const auth = getFirebaseAuth();
+            if (auth) {
+              const methods = await fetchSignInMethodsForEmail(auth, email);
+              const provider = methods[0] === "google.com" ? "Google" : methods[0] === "apple.com" ? "Apple" : methods[0] || "unknown";
+              setError(t(lang, "login_provider_conflict", { provider }));
+            } else {
+              setError(err.message || "Google login failed.");
+            }
+          } catch {
+            setError(err.message || "Google login failed.");
+          }
+        } else {
+          setError(err.message || "Google login failed.");
+        }
+      } else {
+        setError(err.message || "Google login failed.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAppleLogin() {
+    setLoading(true);
+    setError(null);
+    try {
+      const user = await signInWithApple();
+      // signInWithRedirect (React Native)는 여기에 도달하지 않음 → catch로 이동
+      const token = await user.getIdToken();
+      const meRes = await fetch(`${API_BASE}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        // 닉네임/약관동의가 없으면 등록 폼으로
+        if (!meData.nickname || !meData.agreed_terms_at) {
+          setGoogleUser(user);
+          setTab("google-register");
+          return;
+        }
+        localStorage.setItem("onboarding_done", "true");
+        router.push("/home");
+      } else {
+        setGoogleUser(user);
+        setTab("google-register");
+      }
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string; customData?: { email?: string } };
+      // signInWithRedirect 후 페이지가 리다이렉트되므로 "redirect" 에러는 무시
+      if (err.message === "redirect") return;
+      if (err.code === "auth/account-exists-with-different-credential") {
+        const email = err.customData?.email;
+        if (email) {
+          try {
+            const auth = getFirebaseAuth();
+            if (auth) {
+              const methods = await fetchSignInMethodsForEmail(auth, email);
+              const provider = methods[0] === "google.com" ? "Google" : methods[0] === "apple.com" ? "Apple" : methods[0] || "unknown";
+              setError(t(lang, "login_provider_conflict", { provider }));
+            } else {
+              setError(err.message || "Apple login failed.");
+            }
+          } catch {
+            setError(err.message || "Apple login failed.");
+          }
+        } else {
+          setError(err.message || "Apple login failed.");
+        }
+      } else {
+        setError(err.message || "Apple login failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -579,6 +659,19 @@ export default function LoginPage() {
                 </svg>
                 {t(lang, "login_google")}
               </button>
+
+              {isIOS && (
+                <button
+                  onClick={handleAppleLogin}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-3 rounded-lg border border-border bg-background py-3 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                  </svg>
+                  {t(lang, "login_apple")}
+                </button>
+              )}
 
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
