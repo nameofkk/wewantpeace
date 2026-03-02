@@ -847,6 +847,10 @@ export const translations = {
     pwa_install_title: "WeWantPeace 앱 설치",
     pwa_install_desc: "실시간 알림과 빠른 접근을 위해 설치하세요",
     pwa_install_btn: "설치",
+
+    // 관심국가 비활성
+    settings_area_inactive: "비활성 (플랜 제한 초과)",
+    settings_area_upgrade_hint: "Pro로 업그레이드하면 다시 활성화됩니다",
   },
   en: {
     // bottom nav
@@ -1692,6 +1696,10 @@ export const translations = {
     pwa_install_title: "Install WeWantPeace App",
     pwa_install_desc: "Install for real-time alerts and quick access",
     pwa_install_btn: "Install",
+
+    // area inactive
+    settings_area_inactive: "Inactive (plan limit exceeded)",
+    settings_area_upgrade_hint: "Upgrade to Pro to reactivate",
   },
 } as const;
 

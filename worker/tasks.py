@@ -738,6 +738,8 @@ def sync_store_subscriptions(self):
                             user = user_result.scalar_one_or_none()
                             if user and user.plan != "free":
                                 user.plan = "free"
+                                from backend.app.services.area_activation import sync_area_activation
+                                await sync_area_activation(user.id, "free", db)
 
                     except Exception as e:
                         logger.warning("sync_store_subscriptions 오류 [%s]: %s", sub.id, e)
@@ -802,6 +804,8 @@ def expire_subscriptions(self):
                     valid_sub = sub_result.scalar_one_or_none()
                     if valid_sub is None:
                         user.plan = "free"
+                        from backend.app.services.area_activation import sync_area_activation
+                        await sync_area_activation(user.id, "free", db)
                         downgraded += 1
 
                 logger.info("expire_subscriptions: %d명 → free 다운그레이드", downgraded)

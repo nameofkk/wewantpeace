@@ -18,6 +18,7 @@ from backend.app.models.user import User
 from backend.app.models.subscription import Subscription
 from backend.app.services.subscription_service import activate_store_subscription, handle_store_event
 from backend.app.core.store_products import google_product_to_plan, apple_product_to_plan
+from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +181,7 @@ async def restore_purchase(
             user = user_result.scalar_one_or_none()
             if user:
                 user.plan = sub.plan
+                await sync_area_activation(current_user.id, sub.plan, db)
             await db.flush()
             return {"status": "ok", "plan": sub.plan}
 
@@ -207,6 +209,7 @@ async def restore_purchase(
             user = user_result.scalar_one_or_none()
             if user:
                 user.plan = sub.plan
+                await sync_area_activation(current_user.id, sub.plan, db)
             await db.flush()
             return {"status": "ok", "plan": sub.plan}
 

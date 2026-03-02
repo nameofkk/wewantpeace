@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.auth import get_current_user, get_db
 from backend.app.models.user import User
 from backend.app.models.subscription import Subscription
+from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,10 @@ async def cancel_subscription(
     now = datetime.now(timezone.utc)
     sub.status = "cancelled"
     sub.cancelled_at = now
+    # 만료일이 이미 지났으면 즉시 free 전환 + 관심국가 동기화
+    if not sub.expires_at or sub.expires_at <= now:
+        current_user.plan = "free"
+        await sync_area_activation(current_user.id, "free", db)
     await db.flush()
 
     return {

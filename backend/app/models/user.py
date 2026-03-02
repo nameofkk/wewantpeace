@@ -80,6 +80,7 @@ class UserArea(Base):
     label: Mapped[str | None] = mapped_column(String(128), nullable=True)
     notify_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify_fast: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,

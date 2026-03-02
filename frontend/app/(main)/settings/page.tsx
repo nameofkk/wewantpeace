@@ -544,12 +544,21 @@ export default function SettingsPage() {
                     {myCountries.map((code) => {
                       const c = countryMap[code];
                       const area = areasMap[code];
+                      const inactive = area && !area.is_active;
                       return (
-                        <div key={code} className="flex items-center gap-3 px-4 py-3">
+                        <div key={code} className={cn("flex items-center gap-3 px-4 py-3", inactive && "opacity-40")}>
                           <span className="text-xl">{c?.flag ?? "🌐"}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{getCountryName(code, lang)}</p>
-                            {area ? (
+                            {inactive && (
+                              <div className="mt-1 space-y-0.5">
+                                <p className="text-[10px] text-amber-400">{t(lang, "settings_area_inactive")}</p>
+                                <a href="/upgrade" className="text-[10px] text-primary hover:underline">
+                                  {t(lang, "settings_area_upgrade_hint")}
+                                </a>
+                              </div>
+                            )}
+                            {area && !inactive ? (
                               <div className={cn("mt-2 space-y-1.5", !hasFCMToken && "opacity-40 pointer-events-none")}>
                                 {!hasFCMToken && (
                                   <p className="text-[9px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
@@ -632,12 +641,12 @@ export default function SettingsPage() {
                                   )}
                                 </div>
                               </div>
-                            ) : (
+                            ) : !area ? (
                               <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                                 <Loader2 className="h-3 w-3 animate-spin" />
                                 {t(lang, "settings_alert_loading")}
                               </div>
-                            )}
+                            ) : null}
                           </div>
                           <button
                             onClick={() => {

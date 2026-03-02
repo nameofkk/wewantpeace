@@ -94,11 +94,13 @@ async def _get_target_tokens_by_platform(
     if notify_fast:
         area_filter = (
             UserArea.country_code == country_code,
+            UserArea.is_active == True,
             UserArea.notify_fast == True,
         )
     else:
         area_filter = (
             UserArea.country_code == country_code,
+            UserArea.is_active == True,
             UserArea.notify_verified == True,
         )
 
@@ -420,6 +422,7 @@ async def save_in_app_notifications(
     if notif_type == "verified":
         area_filter = (
             UserArea.country_code == country_code,
+            UserArea.is_active == True,
             UserArea.notify_verified == True,
         )
         title = f"⚠️ {cluster_title}"
@@ -427,6 +430,7 @@ async def save_in_app_notifications(
     else:
         area_filter = (
             UserArea.country_code == country_code,
+            UserArea.is_active == True,
             UserArea.notify_fast == True,
         )
         title = f"🚨 {cluster_title}"

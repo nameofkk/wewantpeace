@@ -11,6 +11,7 @@ from backend.app.models.user import User
 from backend.app.core.store_products import (
     google_product_to_plan, apple_product_to_plan, PLAN_AMOUNTS,
 )
+from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,7 @@ async def activate_store_subscription(
     user = user_result.scalar_one_or_none()
     if user:
         user.plan = plan
+        await sync_area_activation(user_id, plan, db)
 
     await db.flush()
     return sub
@@ -165,6 +167,7 @@ async def handle_store_event(
         user = user_result.scalar_one_or_none()
         if user:
             user.plan = sub.plan
+            await sync_area_activation(sub.user_id, sub.plan, db)
 
     elif event_type in ("CANCELED", "EXPIRED", "DID_FAIL_TO_RENEW", "REVOKE",
                          "SUBSCRIPTION_STATE_EXPIRED", "SUBSCRIPTION_STATE_REVOKED"):
@@ -179,6 +182,7 @@ async def handle_store_event(
             user = user_result.scalar_one_or_none()
             if user:
                 user.plan = "free"
+                await sync_area_activation(sub.user_id, "free", db)
 
     elif event_type in ("IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"):
         sub.status = "grace_period"
@@ -208,6 +212,7 @@ async def handle_store_event(
         user = user_result.scalar_one_or_none()
         if user:
             user.plan = "free"
+            await sync_area_activation(sub.user_id, "free", db)
     else:
         logger.info("Webhook: 미처리 이벤트 type=%s", event_type)
         return {"status": "ignored", "event_type": event_type}

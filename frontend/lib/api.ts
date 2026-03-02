@@ -346,6 +346,7 @@ export interface UserArea {
   label: string;
   notify_verified: boolean;
   notify_fast: boolean;
+  is_active: boolean;
 }
 
 export interface UserPreferences {

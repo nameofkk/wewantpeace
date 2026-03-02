@@ -43,6 +43,7 @@ class AreaOut(BaseModel):
     label: Optional[str]
     notify_verified: bool
     notify_fast: bool
+    is_active: bool
     created_at: str
 
 
@@ -93,6 +94,7 @@ def _area_to_out(a: UserArea) -> AreaOut:
         label=a.label,
         notify_verified=a.notify_verified,
         notify_fast=a.notify_fast,
+        is_active=a.is_active,
         created_at=a.created_at.isoformat(),
     )
 
@@ -221,6 +223,12 @@ async def update_area(
     area = result.scalar_one_or_none()
     if not area:
         raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
+
+    if not area.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "AREA_INACTIVE", "message": "비활성 관심지역은 수정할 수 없습니다. 플랜을 업그레이드하세요."},
+        )
 
     if body.notify_verified is not None:
         area.notify_verified = body.notify_verified
