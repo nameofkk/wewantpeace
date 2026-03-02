@@ -91,7 +91,7 @@ async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
     """notify_verified=True 사용자에게 Verified 레인 발송."""
     _, _, token = await _make_user_with_area(db, "UA", notify_verified=True, notify_fast=False)
 
-    with patch("worker.push.push_service._split_and_send", return_value=1) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [])) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Kyiv attack",
@@ -113,7 +113,7 @@ async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
     """is_verified=False이면 Verified 레인 발송 안됨."""
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=0) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(0, [])) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -134,7 +134,7 @@ async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
     """notify_fast=True Pro 사용자에게 Fast 레인 발송."""
     await _make_user_with_area(db, "UA", notify_fast=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=1) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [])) as mock_fcm:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -165,7 +165,7 @@ async def test_cooldown_set_after_send(db, redis_mock):
     cluster_id = str(uuid.uuid4())
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=1):
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [])):
         await send_spike_alert(
             cluster_id=cluster_id,
             cluster_title="Test",
