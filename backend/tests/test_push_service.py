@@ -5,10 +5,11 @@ PushService 단위 테스트.
 - 15분 쿨다운
 - notify_fast=False 시 Fast 레인 발송 안됨
 """
+import contextlib
 import pytest
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 from worker.push.push_service import (
     send_spike_alert,
@@ -51,12 +52,13 @@ async def _make_user_with_area(db, country_code: str, notify_fast: bool = False,
     return user, area, token
 
 
-# delivery log 함수들을 mock하는 패치 헬퍼 (FK 제약 회피)
-_DELIVERY_LOG_PATCHES = [
-    patch("worker.push.push_service._insert_pending_logs", new_callable=AsyncMock, return_value={}),
-    patch("worker.push.push_service._insert_suppressed_logs", new_callable=AsyncMock, return_value=None),
-    patch("worker.push.push_service._process_delivery_results", new_callable=AsyncMock, return_value=None),
-]
+def _mock_delivery_logs():
+    """delivery log 함수들을 mock하는 context manager (FK 제약 회피)."""
+    stack = contextlib.ExitStack()
+    stack.enter_context(patch("worker.push.push_service._insert_pending_logs", new_callable=AsyncMock, return_value={}))
+    stack.enter_context(patch("worker.push.push_service._insert_suppressed_logs", new_callable=AsyncMock, return_value=None))
+    stack.enter_context(patch("worker.push.push_service._process_delivery_results", new_callable=AsyncMock, return_value=None))
+    return stack
 
 
 # ── 쿨다운 ────────────────────────────────────────────────────────────────────
@@ -100,7 +102,7 @@ async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
     _, _, token = await _make_user_with_area(db, "UA", notify_verified=True, notify_fast=False)
 
     with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
-         *_DELIVERY_LOG_PATCHES:
+         _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Kyiv attack",
@@ -123,7 +125,7 @@ async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
     await _make_user_with_area(db, "UA", notify_verified=True)
 
     with patch("worker.push.push_service._split_and_send", return_value=(0, [], {})) as mock_fcm, \
-         *_DELIVERY_LOG_PATCHES:
+         _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -145,7 +147,7 @@ async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
     await _make_user_with_area(db, "UA", notify_fast=True)
 
     with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
-         *_DELIVERY_LOG_PATCHES:
+         _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -177,7 +179,7 @@ async def test_cooldown_set_after_send(db, redis_mock):
     await _make_user_with_area(db, "UA", notify_verified=True)
 
     with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})), \
-         *_DELIVERY_LOG_PATCHES:
+         _mock_delivery_logs():
         await send_spike_alert(
             cluster_id=cluster_id,
             cluster_title="Test",
