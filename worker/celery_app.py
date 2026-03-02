@@ -1,6 +1,6 @@
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_ready
+from celery.signals import worker_ready, worker_process_init
 import os
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
@@ -73,10 +73,20 @@ app.conf.beat_schedule = {
 }
 
 
-@worker_ready.connect
-def on_worker_ready(**kwargs):
-    """워커 시작 시 Firebase 초기화 + 긴장도·트렌딩 즉시 계산."""
+@worker_process_init.connect
+def on_worker_process_init(**kwargs):
+    """각 ForkPoolWorker 프로세스 시작 시 Firebase 초기화.
+
+    prefork 모드에서 worker_ready는 MainProcess에서만 실행되고
+    fork된 자식 프로세스(ForkPoolWorker)에는 Firebase SDK가 전달되지 않음.
+    worker_process_init은 각 자식 프로세스마다 호출됨.
+    """
     from backend.app.core.firebase_init import init_firebase
     init_firebase()
+
+
+@worker_ready.connect
+def on_worker_ready(**kwargs):
+    """워커 시작 시 긴장도·트렌딩 즉시 계산."""
     app.send_task("worker.tasks.calculate_tension", queue="process")
     app.send_task("worker.tasks.calculate_trending", queue="process")
