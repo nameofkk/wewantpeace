@@ -6,56 +6,41 @@ on:
 
 env:
   RAILWAY_PROJECT_ID: 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed
+  RAILWAY_ENV_ID: 92d7e229-1071-4b32-a12c-8336ef7be7d5
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend
+  deploy:
+    name: Trigger Railway Deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy backend
+      - name: Redeploy all services via Railway API
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
-          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
-          railway up --service backend --detach
+          API="https://backboard.railway.app/graphql/v2"
 
-  deploy-worker:
-    name: Deploy Worker
-    runs-on: ubuntu-latest
-    needs: deploy-backend
-    steps:
-      - uses: actions/checkout@v4
+          # 서비스 ID
+          BACKEND="81e6a83e-e920-4168-a67b-666d485fe9ea"
+          WORKER="2ee51089-125e-4e77-95e8-0fc3b8935ec5"
+          FRONTEND="aefe12db-4de1-43e8-8098-5be3751d3518"
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+          deploy_service() {
+            local SVC_ID=$1
+            local SVC_NAME=$2
+            echo "Deploying $SVC_NAME..."
+            RESULT=$(curl -s -X POST "$API" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
+              -d "{\"query\":\"mutation { serviceInstanceRedeploy(environmentId: \\\"$RAILWAY_ENV_ID\\\", serviceId: \\\"$SVC_ID\\\") }\"}")
+            echo "$SVC_NAME: $RESULT"
+            if echo "$RESULT" | grep -q '"errors"'; then
+              echo "::error::Failed to deploy $SVC_NAME"
+              return 1
+            fi
+          }
 
-      - name: Deploy worker
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-        run: |
-          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
-          cp railway-worker.json railway.json
-          railway up --service worker --detach
+          deploy_service "$BACKEND" "backend"
+          deploy_service "$WORKER" "worker"
+          deploy_service "$FRONTEND" "frontend"
 
-  deploy-frontend:
-    name: Deploy Frontend
-    runs-on: ubuntu-latest
-    needs: deploy-backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy frontend
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-        run: |
-          railway link --project 8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed --environment production
-          cp railway-frontend.json railway.json
-          railway up --service frontend --detach
+          echo "All services redeployed successfully"
