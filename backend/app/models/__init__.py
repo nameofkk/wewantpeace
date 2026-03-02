@@ -6,6 +6,11 @@ from backend.app.models.tension_index import TensionIndex
 from backend.app.models.trending_keyword import TrendingKeyword
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
 from backend.app.models.notification import Notification
+from backend.app.models.subscription import Subscription
+from backend.app.models.spike_event import SpikeEvent
+from backend.app.models.alert_delivery_log import AlertDeliveryLog
+from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+from backend.app.models.paywall_event import PaywallEvent
 
 __all__ = [
     "SourceChannel",
@@ -20,4 +25,9 @@ __all__ = [
     "UserPushToken",
     "UserPreference",
     "Notification",
+    "Subscription",
+    "SpikeEvent",
+    "AlertDeliveryLog",
+    "UserMissedSpikeSummary",
+    "PaywallEvent",
 ]

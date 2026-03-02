@@ -93,7 +93,8 @@ async def test_spike_triggers_on_c1_threshold(redis_mock):
     await track_source(cid, "src-b", redis_mock)
     # 4번째 호출 (evaluate_spike 내부에서 1회 더 증가)
     result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
-    assert result is True
+    is_spike, _ = result
+    assert is_spike is True
 
 
 @pytest.mark.asyncio
@@ -108,7 +109,8 @@ async def test_spike_triggers_on_c10_threshold(redis_mock):
     await track_source(cid, "src-a", redis_mock)
     await track_source(cid, "src-b", redis_mock)
     result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
-    assert result is True
+    is_spike, _ = result
+    assert is_spike is True
 
 
 # ── 스파이크 감지: 트리거 OFF ─────────────────────────────────────────────────
@@ -121,7 +123,8 @@ async def test_spike_not_triggered_low_severity(redis_mock):
     for _ in range(20):
         await increment_event_counters(cid, redis_mock)
     result = await evaluate_spike(cid, ckey, severity=20, redis=redis_mock)
-    assert result is False
+    is_spike, _ = result
+    assert is_spike is False
 
 
 @pytest.mark.asyncio
@@ -131,7 +134,8 @@ async def test_spike_not_triggered_low_count(redis_mock):
     ckey = "jkl78:protest"
     # 카운터 없는 상태 → evaluate_spike 1회만 호출 → c1=1, c10=1
     result = await evaluate_spike(cid, ckey, severity=60, redis=redis_mock)
-    assert result is False
+    is_spike, _ = result
+    assert is_spike is False
 
 
 @pytest.mark.asyncio
@@ -145,7 +149,8 @@ async def test_spike_cooldown_prevents_retrigger(redis_mock):
     for _ in range(20):
         await increment_event_counters(cid, redis_mock)
     result = await evaluate_spike(cid, ckey, severity=80, redis=redis_mock)
-    assert result is False
+    is_spike, _ = result
+    assert is_spike is False
 
 
 @pytest.mark.asyncio
@@ -160,4 +165,5 @@ async def test_spike_ratio_prevents_trigger(redis_mock):
     for _ in range(10):
         await increment_event_counters(cid, redis_mock)
     result = await evaluate_spike(cid, ckey, severity=70, redis=redis_mock)
-    assert result is False
+    is_spike, _ = result
+    assert is_spike is False
