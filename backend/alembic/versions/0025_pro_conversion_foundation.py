@@ -77,8 +77,9 @@ def upgrade() -> None:
             ["decision", "created_at"],
         )
 
-        # TimescaleDB hypertable (optional)
+        # TimescaleDB hypertable (optional — use savepoint to avoid aborting transaction)
         try:
+            conn.execute(sa.text("SAVEPOINT timescale_sp"))
             op.execute(sa.text(
                 "SELECT create_hypertable('alert_delivery_log', 'created_at', "
                 "chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE)"
@@ -87,8 +88,9 @@ def upgrade() -> None:
                 "SELECT add_retention_policy('alert_delivery_log', "
                 "INTERVAL '90 days', if_not_exists => TRUE)"
             ))
+            conn.execute(sa.text("RELEASE SAVEPOINT timescale_sp"))
         except Exception:
-            pass  # TimescaleDB not available
+            conn.execute(sa.text("ROLLBACK TO SAVEPOINT timescale_sp"))
 
     # ── C. user_push_tokens improvements ───────────────────────────────
     if "user_push_tokens" in existing_tables:
@@ -243,11 +245,13 @@ def downgrade() -> None:
     if "alert_delivery_log" in existing_tables:
         # Remove retention policy if TimescaleDB is available
         try:
+            conn.execute(sa.text("SAVEPOINT timescale_down_sp"))
             op.execute(sa.text(
                 "SELECT remove_retention_policy('alert_delivery_log', if_exists => TRUE)"
             ))
+            conn.execute(sa.text("RELEASE SAVEPOINT timescale_down_sp"))
         except Exception:
-            pass
+            conn.execute(sa.text("ROLLBACK TO SAVEPOINT timescale_down_sp"))
         op.drop_index("ix_delivery_decision", table_name="alert_delivery_log")
         op.drop_index("ix_delivery_created", table_name="alert_delivery_log")
         op.drop_index("uq_delivery_user_spike", table_name="alert_delivery_log")
