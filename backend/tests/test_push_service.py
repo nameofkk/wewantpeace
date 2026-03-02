@@ -8,7 +8,7 @@ PushService 단위 테스트.
 import pytest
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 from worker.push.push_service import (
     send_spike_alert,
@@ -51,6 +51,14 @@ async def _make_user_with_area(db, country_code: str, notify_fast: bool = False,
     return user, area, token
 
 
+# delivery log 함수들을 mock하는 패치 헬퍼 (FK 제약 회피)
+_DELIVERY_LOG_PATCHES = [
+    patch("worker.push.push_service._insert_pending_logs", new_callable=AsyncMock, return_value={}),
+    patch("worker.push.push_service._insert_suppressed_logs", new_callable=AsyncMock, return_value=None),
+    patch("worker.push.push_service._process_delivery_results", new_callable=AsyncMock, return_value=None),
+]
+
+
 # ── 쿨다운 ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -91,7 +99,8 @@ async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
     """notify_verified=True 사용자에게 Verified 레인 발송."""
     _, _, token = await _make_user_with_area(db, "UA", notify_verified=True, notify_fast=False)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [])) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
+         *_DELIVERY_LOG_PATCHES:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Kyiv attack",
@@ -113,7 +122,8 @@ async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
     """is_verified=False이면 Verified 레인 발송 안됨."""
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(0, [])) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(0, [], {})) as mock_fcm, \
+         *_DELIVERY_LOG_PATCHES:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -134,7 +144,8 @@ async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
     """notify_fast=True Pro 사용자에게 Fast 레인 발송."""
     await _make_user_with_area(db, "UA", notify_fast=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [])) as mock_fcm:
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
+         *_DELIVERY_LOG_PATCHES:
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -155,8 +166,8 @@ async def test_notify_fast_false_no_fast_lane(db, redis_mock):
     """notify_fast=False 사용자는 Fast 레인 대상 아님."""
     await _make_user_with_area(db, "UA", notify_fast=False)
 
-    tokens = await _get_target_tokens_by_platform("UA", notify_fast=True, kscore=10.0, cluster_topic=None, db=db)
-    assert len(tokens) == 0
+    target = await _get_target_tokens_by_platform("UA", notify_fast=True, kscore=10.0, cluster_topic=None, db=db)
+    assert len(target.tokens) == 0
 
 
 @pytest.mark.asyncio
@@ -165,7 +176,8 @@ async def test_cooldown_set_after_send(db, redis_mock):
     cluster_id = str(uuid.uuid4())
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [])):
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})), \
+         *_DELIVERY_LOG_PATCHES:
         await send_spike_alert(
             cluster_id=cluster_id,
             cluster_title="Test",
@@ -186,5 +198,5 @@ async def test_no_tokens_for_different_country(db, redis_mock):
     """다른 국가 사용자에게 발송 안됨."""
     await _make_user_with_area(db, "KR", notify_verified=True)  # KR 등록
 
-    tokens = await _get_target_tokens_by_platform("UA", notify_fast=False, kscore=10.0, cluster_topic=None, db=db)  # UA 조회
-    assert len(tokens) == 0
+    target = await _get_target_tokens_by_platform("UA", notify_fast=False, kscore=10.0, cluster_topic=None, db=db)  # UA 조회
+    assert len(target.tokens) == 0
