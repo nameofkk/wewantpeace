@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_, cast, Date, text
+from sqlalchemy import select, func, and_, cast, Date, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, require_admin
@@ -938,6 +938,7 @@ async def test_push(
 
     sent = 0
     errors = []
+    invalid_token_ids = []
     try:
         import firebase_admin.messaging as messaging
 
@@ -972,14 +973,28 @@ async def test_push(
                 messaging.send(msg)
                 sent += 1
             except Exception as e:
+                err_class = type(e).__name__
                 errors.append(f"{token_obj.platform}: {str(e)[:100]}")
+                # 만료/무효 토큰 자동 정리
+                if err_class in ("UnregisteredError", "InvalidArgumentError", "SenderIdMismatchError", "NotFoundError"):
+                    invalid_token_ids.append(token_obj.id)
     except ImportError:
         raise HTTPException(status_code=500, detail="firebase_admin 미설치")
+
+    # 무효 토큰 DB에서 삭제
+    cleaned = 0
+    if invalid_token_ids:
+        await db.execute(
+            delete(UserPushToken).where(UserPushToken.id.in_(invalid_token_ids))
+        )
+        await db.commit()
+        cleaned = len(invalid_token_ids)
 
     return {
         "sent": sent,
         "total_tokens": len(tokens),
         "errors": errors,
+        "cleaned_tokens": cleaned,
     }
 
 

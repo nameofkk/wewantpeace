@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Bell, Send } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useAdminToast } from "@/components/ui/admin-toast";
@@ -199,6 +199,89 @@ export default function AdminSettingsPage() {
             {t(lang, "admin_pricing_note")}
           </p>
         </div>
+
+        {/* Test Push */}
+        <TestPushSection lang={lang} />
+      </div>
+    </div>
+  );
+}
+
+function TestPushSection({ lang }: { lang: "ko" | "en" }) {
+  const { user } = useAuth();
+  const { toast } = useAdminToast();
+  const [pushTitle, setPushTitle] = useState("🔔 WeWantPeace 테스트");
+  const [pushBody, setPushBody] = useState("푸시 알림이 정상적으로 도착했습니다!");
+
+  const testPushMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Unauthorized");
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/admin/test-push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: pushTitle, body: pushBody }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const msg = t(lang, "admin_test_push_result")
+        .replace("{sent}", String(data.sent))
+        .replace("{total}", String(data.total_tokens))
+        .replace("{cleaned}", String(data.cleaned_tokens || 0));
+      toast(msg, data.sent > 0 ? "success" : "error");
+    },
+    onError: (err: Error) => {
+      if (err.message.includes("토큰")) {
+        toast(t(lang, "admin_test_push_no_token"), "error");
+      } else {
+        toast(err.message, "error");
+      }
+    },
+  });
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Bell className="h-4 w-4 text-amber-400" />
+        <p className="font-medium">{t(lang, "admin_test_push_title")}</p>
+      </div>
+      <p className="text-sm text-muted-foreground mb-3">{t(lang, "admin_test_push_desc")}</p>
+      <div className="space-y-2">
+        <div>
+          <label className="text-xs text-muted-foreground">{t(lang, "admin_test_push_msg_title")}</label>
+          <input
+            value={pushTitle}
+            onChange={(e) => setPushTitle(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground">{t(lang, "admin_test_push_msg_body")}</label>
+          <input
+            value={pushBody}
+            onChange={(e) => setPushBody(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <button
+          onClick={() => testPushMutation.mutate()}
+          disabled={testPushMutation.isPending}
+          className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-50 hover:bg-amber-600 transition-colors"
+        >
+          {testPushMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <Send className="h-4 w-4" />
+              {t(lang, "admin_test_push_send")}
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

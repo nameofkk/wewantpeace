@@ -65,6 +65,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/4"),  # 4시간마다
         "options": {"queue": "process"},
     },
+    "cleanup-stale-tokens": {
+        "task": "worker.tasks.cleanup_stale_tokens",
+        "schedule": crontab(minute=0, hour=3),  # 매일 새벽 3시 UTC
+        "options": {"queue": "process"},
+    },
 }
 
 

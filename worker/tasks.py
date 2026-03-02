@@ -812,3 +812,40 @@ def expire_subscriptions(self):
     except Exception as exc:
         logger.error("expire_subscriptions 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── 만료 FCM 토큰 주기적 정리 ──────────────────────────────────────────────
+
+@app.task(
+    bind=True,
+    name="worker.tasks.cleanup_stale_tokens",
+    queue="process",
+    max_retries=1,
+)
+def cleanup_stale_tokens(self):
+    """
+    7일 이상 오래된 FCM 토큰 정리.
+    매일 새벽 3시 UTC 실행.
+    """
+    async def _run():
+        from sqlalchemy import select, delete, func
+        from backend.app.models.user import UserPushToken
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # last_used가 30일 이상 된 토큰 삭제
+                result = await db.execute(
+                    delete(UserPushToken).where(
+                        UserPushToken.last_used < cutoff
+                    )
+                )
+                deleted = result.rowcount
+                logger.info("cleanup_stale_tokens: 오래된 토큰 %d개 삭제 (cutoff=%s)", deleted, cutoff)
+                return {"status": "ok", "deleted": deleted}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("cleanup_stale_tokens 오류: %s", exc)
+        raise self.retry(exc=exc)
