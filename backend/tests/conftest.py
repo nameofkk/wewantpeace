@@ -31,13 +31,18 @@ from sqlalchemy.dialects.postgresql import JSONB
 from backend.app.core.database import Base
 import backend.app.models  # noqa: F401 — 모든 모델을 Base.metadata에 등록
 
-# ─── SQLite에서 PostgreSQL JSONB 타입 호환 ────────────────────────────────────
-# SQLite는 JSONB를 지원하지 않으므로 JSON으로 매핑
+# ─── SQLite에서 PostgreSQL 전용 타입 호환 ─────────────────────────────────────
+# SQLite는 JSONB/ARRAY를 지원하지 않으므로 JSON/TEXT로 매핑
 from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import ARRAY as PgARRAY
 
 @compiles(JSONB, "sqlite")
 def _compile_jsonb_sqlite(type_, compiler, **kw):
     return compiler.visit_JSON(JSON(), **kw)
+
+@compiles(PgARRAY, "sqlite")
+def _compile_array_sqlite(type_, compiler, **kw):
+    return "TEXT"
 
 
 # ─── 비동기 DB 픽스처 ───────────────────────────────────────────────────────

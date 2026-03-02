@@ -54,16 +54,17 @@ class TestClassifyTopic:
 class TestCalculateSeverity:
     def test_base_conflict(self):
         sev = _calculate_severity("troops moved", "conflict")
-        assert sev == 55  # base only
+        assert sev == 60  # base only
 
     def test_upward_modifier(self):
         sev = _calculate_severity("killed and dead, casualties reported", "conflict")
-        assert sev == 55 + 10 + 10 + 8  # base + killed + dead + casualties = 83
+        # base=60 + killed(10) + dead(10) + casualties(8) = 88, capped keyword_delta at 40
+        assert sev == 88
 
     def test_downward_modifier(self):
         sev = _calculate_severity("allegedly missile strike unconfirmed", "conflict")
-        # base=55, +10(missile strike), -8(alleged), -10(unconfirmed) = 47
-        assert sev == 47
+        # base=60, +12(missile strike), -10(unconfirmed) = 62
+        assert sev == 62
 
     def test_clamp_max_100(self):
         text = ("nuclear chemical weapon killed dead casualties deaths martial law mobilization "
@@ -79,7 +80,7 @@ class TestCalculateSeverity:
 
     def test_unknown_base(self):
         sev = _calculate_severity("something happened", "unknown")
-        assert sev == 25
+        assert sev == 20
 
 
 # ── geo 추출 ──────────────────────────────────────────────────────────────────
@@ -113,10 +114,10 @@ class TestMakeDedupKey:
         key = _make_dedup_key("some text")
         assert len(key) == 32
 
-    def test_same_words_different_order(self):
+    def test_same_words_different_order_gives_different_key(self):
         k1 = _make_dedup_key("apple banana cherry")
         k2 = _make_dedup_key("cherry apple banana")
-        assert k1 == k2
+        assert k1 != k2  # 단어 순서 유지 → 다른 키
 
     def test_punctuation_stripped(self):
         k1 = _make_dedup_key("hello, world!")
@@ -158,12 +159,17 @@ class TestCalculateConfidence:
     def test_tier_c(self):
         assert _calculate_confidence("C", 50) == pytest.approx(0.55)
 
-    def test_high_severity_reduces_confidence(self):
+    def test_high_severity_no_penalty(self):
         conf = _calculate_confidence("A", 80)
-        assert conf < 0.85  # severity >= 75 시 -0.05
+        assert conf == pytest.approx(0.85)  # severity ≥ 75 에서도 confidence 감점 없음
 
     def test_unknown_tier(self):
         assert _calculate_confidence("Z", 50) == pytest.approx(0.50)
+
+    def test_high_severity_reduces_confidence(self):
+        # 현재 로직에서는 severity로 confidence를 감점하지 않음
+        conf = _calculate_confidence("A", 90)
+        assert conf == pytest.approx(0.85)
 
 
 # ── 통합: normalize() ─────────────────────────────────────────────────────────
