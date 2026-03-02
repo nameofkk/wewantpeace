@@ -6,7 +6,9 @@ import base64
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -21,6 +23,7 @@ from backend.app.core.store_products import google_product_to_plan, apple_produc
 from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
+slog = structlog.get_logger()
 
 router = APIRouter(prefix="/subscriptions/store", tags=["store-subscriptions"])
 
@@ -32,11 +35,13 @@ PACKAGE_NAME = "com.wewantpeace.app"
 class GoogleVerifyBody(BaseModel):
     purchase_token: str
     product_id: str
+    source: Optional[str] = None
 
 
 class AppleVerifyBody(BaseModel):
     transaction_id: str
     product_id: str = ""
+    source: Optional[str] = None
 
 
 class RestoreBody(BaseModel):
@@ -89,6 +94,15 @@ async def google_verify(
         db=db,
     )
 
+    slog.info(
+        "store_subscription_verified",
+        platform="android",
+        user_id=str(current_user.id),
+        plan=sub.plan,
+        product_id=body.product_id,
+        source=body.source,
+    )
+
     return {
         "status": "ok",
         "plan": sub.plan,
@@ -139,6 +153,15 @@ async def apple_verify(
         auto_renewing=result.get("auto_renew_status", 0) == 1,
         raw_response=result.get("raw", {}),
         db=db,
+    )
+
+    slog.info(
+        "store_subscription_verified",
+        platform="ios",
+        user_id=str(current_user.id),
+        plan=sub.plan,
+        product_id=product_id,
+        source=body.source,
     )
 
     return {

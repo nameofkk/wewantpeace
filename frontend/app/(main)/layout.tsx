@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { NewEventBanner } from "@/components/ui/new-event-banner";
@@ -9,6 +9,7 @@ import { SmartAppBanner } from "@/components/ui/smart-app-banner";
 import { useMe, useMyAreas } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { updateLastActive, checkAndResetSession } from "@/lib/session";
 
 /** DB에 저장된 관심국가를 localStorage(Zustand)에 동기화 — DB가 항상 진실의 원천 */
 function CountrySync() {
@@ -44,6 +45,33 @@ function RegistrationGuard() {
   return null;
 }
 
+/** 세션 추적: 30분 비활성 → 새 세션 (PRD 6.5) */
+function SessionTracker() {
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === "visible") {
+      checkAndResetSession();
+    }
+  }, []);
+
+  useEffect(() => {
+    // 사용자 활동 시 마지막 활동 시간 갱신
+    const onActivity = () => updateLastActive();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("click", onActivity, { passive: true });
+    document.addEventListener("scroll", onActivity, { passive: true });
+    document.addEventListener("keydown", onActivity, { passive: true });
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("click", onActivity);
+      document.removeEventListener("scroll", onActivity);
+      document.removeEventListener("keydown", onActivity);
+    };
+  }, [handleVisibilityChange]);
+
+  return null;
+}
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   // 레이아웃 마운트 시 사용자 정보 프리페치 (하위 페이지에서 캐시 히트)
   useMe();
@@ -52,6 +80,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <>
       <CountrySync />
       <RegistrationGuard />
+      <SessionTracker />
       <NewEventBanner />
       <main className="pb-[60px]">{children}</main>
       <BottomNav />

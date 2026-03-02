@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -12,6 +12,7 @@ import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
 import { ExternalLink } from "lucide-react";
+import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 
 // ── 국가 선택 패널 ─────────────────────────────────────────────────────────
 function CountryPickerPanel({
@@ -160,6 +161,11 @@ export default function SettingsPage() {
   const [deleteStep, setDeleteStep] = useState(0); // 0: idle, 1: confirm dialog
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
+
+  // ── PaywallModal 훅 ──────────────────────────────────────────
+  const fastPaywall = usePaywall("fast_locked");
+  const kscorePaywall = usePaywall("kscore_threshold_locked");
+  const watchCountryPaywall = usePaywall("watch_country_limit_locked");
 
   // 피드백 모달
   const [showFeedback, setShowFeedback] = useState(false);
@@ -372,7 +378,13 @@ export default function SettingsPage() {
 
   function handleAdd(code: string) {
     const ok = addMyCountry(code, plan);
-    if (!ok) return; // 제한 초과 (store에서 처리)
+    if (!ok) {
+      // Free 유저 제한 초과 시 PaywallModal
+      if (plan === "free") {
+        watchCountryPaywall.show();
+      }
+      return;
+    }
     // 백엔드에도 저장
     addArea.mutate({ area_type: "country", country_code: code });
     const newCount = myCountries.length + 1;
@@ -603,11 +615,18 @@ export default function SettingsPage() {
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <button
-                                      onClick={() => { if (plan !== "free" && hasFCMToken) patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } }); }}
-                                      disabled={plan === "free" || !hasFCMToken}
+                                      onClick={() => {
+                                        if (plan === "free") {
+                                          fastPaywall.show();
+                                          return;
+                                        }
+                                        if (hasFCMToken) patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } });
+                                      }}
+                                      disabled={!hasFCMToken && plan !== "free"}
                                       className={cn(
                                         "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
-                                        (plan === "free" || !hasFCMToken) ? "bg-muted opacity-40 cursor-not-allowed"
+                                        plan === "free" ? "bg-muted opacity-60 cursor-pointer"
+                                          : !hasFCMToken ? "bg-muted opacity-40 cursor-not-allowed"
                                           : area.notify_fast ? "bg-orange-500" : "bg-muted"
                                       )}
                                     >
@@ -688,12 +707,18 @@ export default function SettingsPage() {
                     )}
                   </button>
                 ) : (
-                  <div className="flex items-center gap-3 px-4 py-3 border-t border-border">
+                  <button
+                    onClick={() => {
+                      if (plan === "free") watchCountryPaywall.show();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 border-t border-border w-full text-left hover:bg-muted/30 transition-colors cursor-pointer"
+                  >
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     <p className="text-[11px] text-muted-foreground">
                       {t(lang, "settings_upgrade_for_unlimited")}
                     </p>
-                  </div>
+                    {plan === "free" && <Lock className="h-3 w-3 text-muted-foreground ml-auto" />}
+                  </button>
                 )}
 
                 {showPicker && (
@@ -818,8 +843,16 @@ export default function SettingsPage() {
                   {t(lang, "settings_push_off_hint")}
                 </p>
               ) : plan === "free" ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-muted" />
+                <div
+                  className="mt-2 flex items-center gap-2 cursor-pointer group"
+                  onClick={() => kscorePaywall.show()}
+                >
+                  <div className="flex-1 relative">
+                    <div className="h-2 rounded-full bg-muted" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                  </div>
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                     {t(lang, "notif_kscore_free_hint")}
                   </span>
@@ -1233,6 +1266,11 @@ export default function SettingsPage() {
           <p className="text-center text-[10px] text-muted-foreground/20 select-none">
             WeWantPeace v2.0
           </p>
+
+          {/* ── PaywallModal들 ──────────────────────────────────────── */}
+          <PaywallModal trigger="fast_locked" isOpen={fastPaywall.isOpen} onClose={fastPaywall.close} />
+          <PaywallModal trigger="kscore_threshold_locked" isOpen={kscorePaywall.isOpen} onClose={kscorePaywall.close} />
+          <PaywallModal trigger="watch_country_limit_locked" isOpen={watchCountryPaywall.isOpen} onClose={watchCountryPaywall.close} />
 
           {/* 피드백 모달 */}
           {showFeedback && (

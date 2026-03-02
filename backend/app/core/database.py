@@ -1,6 +1,7 @@
 import json
+import uuid as _uuid
 from sqlalchemy import TypeDecorator, Text, String
-from sqlalchemy.dialects.postgresql import ARRAY as PgArray
+from sqlalchemy.dialects.postgresql import ARRAY as PgArray, UUID as PgUUID
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from backend.app.core.config import settings
@@ -31,6 +32,33 @@ class StringArray(TypeDecorator):
         if isinstance(value, list):
             return value
         return json.loads(value)
+
+
+class UUIDArray(TypeDecorator):
+    """Cross-database UUID array: native ARRAY(UUID) on PostgreSQL, JSON text on SQLite."""
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PgArray(PgUUID(as_uuid=True)))
+        return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value, dialect):
+        if dialect.name == "postgresql":
+            return value
+        if value is None:
+            return "[]"
+        return json.dumps([str(v) for v in value])
+
+    def process_result_value(self, value, dialect):
+        if dialect.name == "postgresql":
+            return value
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [v if isinstance(v, _uuid.UUID) else _uuid.UUID(v) for v in value]
+        return [_uuid.UUID(v) for v in json.loads(value)]
 
 _is_sqlite = settings.database_url.startswith("sqlite")
 engine = create_async_engine(

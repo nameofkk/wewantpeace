@@ -74,6 +74,9 @@ class Settings(BaseSettings):
             return [item.strip() for item in v.split(",")]
         return v
 
+    # Alert pipeline mode (shadow → primary)
+    alert_pipeline_mode: str = "shadow"
+
     # 앱 설정
     app_name: str = "WeWantPeace API"
     debug: bool = False

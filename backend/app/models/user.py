@@ -113,6 +113,8 @@ class UserPushToken(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    last_seen_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("user_id", "fcm_token", name="uq_user_push_tokens"),
@@ -136,3 +138,4 @@ class UserPreference(Base):
     quiet_hours_end: Mapped[time | None] = mapped_column(Time, nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Seoul")
     min_kscore: Mapped[float] = mapped_column(nullable=False, default=3.0)
+    intent: Mapped[str] = mapped_column(String(16), nullable=False, default="general")

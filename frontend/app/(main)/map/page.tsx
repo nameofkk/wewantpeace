@@ -8,6 +8,7 @@ import { useClusters, useMe } from "@/lib/api";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
+import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 
 // ── 실시간 경과 시간 훅 ───────────────────────────────────────────────────
 function useElapsed(isoString?: string, lang: Lang = "ko") {
@@ -342,6 +343,19 @@ export default function MapPage() {
 
   // showPreview → ref 동기화
   useEffect(() => { showPreviewRef.current = showPreview; }, [showPreview]);
+
+  // ── PaywallModal: 5초 프리뷰 후 blur + 모달 ────────────────────────────
+  const mapPaywall = usePaywall("map_locked");
+  const [previewExpired, setPreviewExpired] = useState(false);
+  useEffect(() => {
+    if (!isLocked || !showPreview) return;
+    const timer = setTimeout(() => {
+      setPreviewExpired(true);
+      mapPaywall.show();
+    }, 5000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLocked, showPreview]);
 
   const { data: apiClusters, isError, isLoading, refetch, isFetching } = useClusters({ limit: "2000" });
   const [clusters, setClusters] = useState<Cluster[]>([]);
@@ -800,6 +814,17 @@ export default function MapPage() {
           </div>
         </div>
       )}
+
+      {/* ── 5초 프리뷰 만료 후 blur overlay ────────────────────────── */}
+      {isLocked && showPreview && previewExpired && (
+        <div
+          className="absolute inset-0 z-25 pointer-events-none"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.35)" }}
+        />
+      )}
+
+      {/* ── PaywallModal ──────────────────────────────────────────── */}
+      <PaywallModal trigger="map_locked" isOpen={mapPaywall.isOpen} onClose={mapPaywall.close} />
     </div>
   );
 }

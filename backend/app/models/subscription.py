@@ -31,6 +31,8 @@ class Subscription(Base):
     next_billing_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    trial_start: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    trial_end: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('active','cancelled','expired','trial','grace_period','billing_retry')", name="ck_subscriptions_status"),
