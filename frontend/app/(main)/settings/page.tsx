@@ -136,16 +136,6 @@ export default function SettingsPage() {
     (areasDupMap[a.country_code] ??= []).push(a.id);
   }
 
-  // area가 없는 관심지역 자동 생성 (로그인 전에 추가했거나 API 실패 시 복구)
-  useEffect(() => {
-    if (!firebaseUser || !areas) return;
-    const missing = myCountries.filter((code) => !areasMap[code]);
-    missing.forEach((code) => {
-      addArea.mutate({ area_type: "country", country_code: code });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firebaseUser, areas, myCountries.length]);
-
   const [showPicker, setShowPicker] = useState(false);
   const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied" | "unsupported">("idle");
   const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태

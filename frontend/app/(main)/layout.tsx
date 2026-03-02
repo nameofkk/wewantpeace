@@ -8,20 +8,17 @@ import { SmartAppBanner } from "@/components/ui/smart-app-banner";
 import { useMe, useMyAreas } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 
-/** DB에 저장된 관심국가를 localStorage(Zustand)에 동기화 */
+/** DB에 저장된 관심국가를 localStorage(Zustand)에 동기화 — DB가 항상 진실의 원천 */
 function CountrySync() {
   const { data: areas } = useMyAreas();
-  const myCountries = useAppStore((s) => s.myCountries);
   const setMyCountries = useAppStore((s) => s.setMyCountries);
 
   useEffect(() => {
-    if (!areas || areas.length === 0) return;
-    // DB에 관심국가가 있는데 localStorage가 비어있으면 DB에서 복원 (중복 제거)
+    if (!areas) return; // 로딩 중
+    // DB 기준으로 localStorage를 항상 덮어씀 (중복 제거)
     const dbCodes = [...new Set(areas.map((a) => a.country_code))];
-    if (myCountries.length === 0 && dbCodes.length > 0) {
-      setMyCountries(dbCodes);
-    }
-  }, [areas, myCountries.length, setMyCountries]);
+    setMyCountries(dbCodes);
+  }, [areas, setMyCountries]);
 
   return null;
 }
