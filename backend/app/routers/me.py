@@ -80,6 +80,7 @@ class UserOut(BaseModel):
     nickname: Optional[str] = None
     display_name: Optional[str] = None
     bio: Optional[str] = None
+    agreed_terms_at: Optional[str] = None
 
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
@@ -121,6 +122,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         nickname=current_user.nickname,
         display_name=current_user.display_name,
         bio=current_user.bio,
+        agreed_terms_at=current_user.agreed_terms_at.isoformat() if current_user.agreed_terms_at else None,
     )
 
 

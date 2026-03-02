@@ -149,10 +149,22 @@ export function getTensionLevelLabel(level: number): string {
 }
 
 // --- 사용자 훅 ---
+interface MeData {
+  id: string;
+  firebase_uid: string;
+  plan: string;
+  role: string;
+  email: string | null;
+  nickname: string | null;
+  display_name: string | null;
+  bio: string | null;
+  agreed_terms_at: string | null;
+}
+
 export function useMe() {
   return useQuery({
     queryKey: ["me"],
-    queryFn: () => apiFetch("/me"),
+    queryFn: () => apiFetch<MeData>("/me"),
     retry: false,
     staleTime: 5 * 60 * 1000,
   });

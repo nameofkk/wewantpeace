@@ -77,6 +77,14 @@ export default function LoginPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (meRes.ok) {
+          const meData = await meRes.json();
+          // 닉네임/약관동의가 없으면 등록 폼으로
+          if (!meData.nickname || !meData.agreed_terms_at) {
+            setGoogleUser(user);
+            setTab("google-register");
+            setCheckingRedirect(false);
+            return;
+          }
           localStorage.setItem("onboarding_done", "true");
           router.push("/home");
           return; // 홈으로 이동 중 — 로딩 유지
@@ -196,11 +204,22 @@ export default function LoginPage() {
       if (!user) throw new Error("토스 로그인 실패");
 
       if (isNewUser) {
-        // 신규 유저 → 회원가입 폼으로 (Google 신규와 동일 흐름)
-        setGoogleUser(user); // googleUser state 재활용
+        setGoogleUser(user);
         setTab("google-register");
       } else {
-        // 기존 유저 → 홈으로
+        // 기존 유저 — 약관동의 완료 여부 확인
+        const token = await user.getIdToken();
+        const meRes = await fetch(`${API_BASE}/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (!meData.nickname || !meData.agreed_terms_at) {
+            setGoogleUser(user);
+            setTab("google-register");
+            return;
+          }
+        }
         localStorage.setItem("onboarding_done", "true");
         router.push("/home");
       }
@@ -223,6 +242,13 @@ export default function LoginPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (meRes.ok) {
+        const meData = await meRes.json();
+        // 닉네임/약관동의가 없으면 등록 폼으로
+        if (!meData.nickname || !meData.agreed_terms_at) {
+          setGoogleUser(user);
+          setTab("google-register");
+          return;
+        }
         localStorage.setItem("onboarding_done", "true");
         router.push("/home");
       } else {
@@ -348,6 +374,13 @@ export default function LoginPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (meRes.ok) {
+        const meData = await meRes.json();
+        // 닉네임/약관동의가 없으면 등록 폼으로
+        if (!meData.nickname || !meData.agreed_terms_at) {
+          setGoogleUser(user);
+          setTab("google-register");
+          return;
+        }
         localStorage.setItem("onboarding_done", "true");
         router.push("/home");
       } else {
