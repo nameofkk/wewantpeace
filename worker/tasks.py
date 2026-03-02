@@ -238,6 +238,7 @@ def process_raw_event(self, raw_event_id: str):
                 # 6. 중복 아닌 경우 클러스터 할당 + 스파이크 평가
                 cluster_id = None
                 is_spike = False
+                spike_event_id = None
 
                 just_verified = False
                 if not is_dup:
@@ -250,12 +251,13 @@ def process_raw_event(self, raw_event_id: str):
                             redis = get_redis()
                             # source_id: 소스 채널 ID (가짜 스파이크 방지용)
                             _source_id = str(raw_event.source_channel_id) if raw_event.source_channel_id else ""
-                            is_spike = await evaluate_spike(
+                            is_spike, spike_event_id = await evaluate_spike(
                                 cluster_id=cluster_id,
                                 cluster_key=cluster.cluster_key,
                                 severity=cluster.severity,
                                 redis=redis,
                                 source_id=_source_id,
+                                kscore=cluster.kscore,
                             )
                             if is_spike and not cluster.is_spike:
                                 cluster.is_spike = True
@@ -268,7 +270,7 @@ def process_raw_event(self, raw_event_id: str):
 
         # 스파이크이면 알림 태스크 체이닝 (트랜잭션 밖에서)
         if is_spike and cluster_id:
-            push_spike_alert.delay(cluster_id)
+            push_spike_alert.delay(cluster_id, spike_event_id)
 
         # 공식확인 전환 시 verified 알림 태스크 체이닝
         if just_verified and cluster_id:
@@ -471,12 +473,13 @@ def reprocess_orphans(self):
                             # 스파이크 재평가
                             try:
                                 redis = get_redis()
-                                is_spike = await evaluate_spike(
+                                is_spike, _spike_eid = await evaluate_spike(
                                     cluster_id=str(cluster.id),
                                     cluster_key=cluster.cluster_key,
                                     severity=cluster.severity,
                                     redis=redis,
                                     source_id="",
+                                    kscore=cluster.kscore,
                                 )
                                 if is_spike and not cluster.is_spike:
                                     cluster.is_spike = True
@@ -525,7 +528,7 @@ def reprocess_orphans(self):
     bind=True,
     max_retries=2,
 )
-def push_spike_alert(self, cluster_id: str):
+def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
     """스파이크 알림 발송."""
 
     async def _run():
@@ -832,21 +835,24 @@ def cleanup_stale_tokens(self):
     매일 새벽 3시 UTC 실행.
     """
     async def _run():
-        from sqlalchemy import select, delete, func
+        from sqlalchemy import update
         from backend.app.models.user import UserPushToken
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                # last_used가 30일 이상 된 토큰 삭제
+                # last_used가 30일 이상 된 활성 토큰을 expired로 전환 (소프트 삭제)
                 result = await db.execute(
-                    delete(UserPushToken).where(
-                        UserPushToken.last_used < cutoff
+                    update(UserPushToken)
+                    .where(
+                        UserPushToken.last_used < cutoff,
+                        UserPushToken.status == "active",
                     )
+                    .values(status="expired")
                 )
-                deleted = result.rowcount
-                logger.info("cleanup_stale_tokens: 오래된 토큰 %d개 삭제 (cutoff=%s)", deleted, cutoff)
-                return {"status": "ok", "deleted": deleted}
+                expired = result.rowcount
+                logger.info("cleanup_stale_tokens: 오래된 토큰 %d개 expired 처리 (cutoff=%s)", expired, cutoff)
+                return {"status": "ok", "expired": expired}
 
     try:
         return run_async(_run())

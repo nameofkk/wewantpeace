@@ -11,6 +11,7 @@ SpikeDetector: Redis 카운터 기반 스파이크 감지.
 """
 import logging
 import math
+import uuid as _uuid
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -129,20 +130,53 @@ def _key_obs_count(cluster_key: str) -> str:
     return f"spike:obs_count:{cluster_key}"
 
 
+async def _save_spike_event(
+    cluster_id: str,
+    severity: int,
+    kscore: float,
+    c1: int,
+    c10: int,
+    baseline: float,
+    ratio: float,
+    unique_sources: int,
+) -> str:
+    """Save spike event to DB and return its ID as string."""
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.models.spike_event import SpikeEvent
+
+    async with AsyncSessionLocal() as db:
+        async with db.begin():
+            event = SpikeEvent(
+                cluster_id=_uuid.UUID(cluster_id),
+                severity=severity,
+                kscore=kscore,
+                c1=c1,
+                c10=c10,
+                baseline=baseline,
+                ratio=ratio,
+                unique_sources=unique_sources,
+            )
+            db.add(event)
+            await db.flush()
+            return str(event.id)
+
+
 async def evaluate_spike(
     cluster_id: str,
     cluster_key: str,
     severity: int,
     redis,
     source_id: str = "",
-) -> bool:
+    kscore: float = 0.0,
+) -> tuple[bool, str | None]:
     """
     스파이크 조건 평가.
-    True 반환 시 cluster.is_spike = True 로 업데이트해야 함.
+    Returns (triggered, spike_event_id).
+    triggered=True 시 cluster.is_spike = True 로 업데이트해야 함.
     """
     # 쿨다운 확인
     if await is_in_cooldown(cluster_id, redis):
-        return False
+        return False, None
 
     # 소스 추적
     if source_id:
@@ -172,7 +206,25 @@ async def evaluate_spike(
         cluster_id, c1, c10, b10, ratio, severity, unique_sources, triggered,
     )
 
+    spike_event_id: str | None = None
     if triggered:
         await set_cooldown(cluster_id, redis, severity=severity)
+        try:
+            spike_event_id = await _save_spike_event(
+                cluster_id=cluster_id,
+                severity=severity,
+                kscore=kscore,
+                c1=c1,
+                c10=c10,
+                baseline=b10,
+                ratio=ratio,
+                unique_sources=unique_sources,
+            )
+            logger.info(
+                "SpikeEvent 저장: id=%s cluster=%s sev=%d",
+                spike_event_id, cluster_id, severity,
+            )
+        except Exception as e:
+            logger.error("SpikeEvent 저장 실패 (무시): %s", e)
 
-    return triggered
+    return triggered, spike_event_id

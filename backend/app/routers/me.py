@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from sqlalchemy import select, delete, func
@@ -82,6 +83,19 @@ class UserOut(BaseModel):
     display_name: Optional[str] = None
     bio: Optional[str] = None
     agreed_terms_at: Optional[str] = None
+
+
+class EventBody(BaseModel):
+    name: str
+    props: dict = {}
+
+
+class PaywallEventBody(BaseModel):
+    trigger: str
+    action: str  # shown|dismissed|clicked_upgrade
+    source: Optional[str] = None
+    plan: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
@@ -383,11 +397,16 @@ async def register_push_token(
     if token:
         from datetime import datetime, timezone
         token.last_used = datetime.now(timezone.utc)
+        token.last_seen_at = datetime.now(timezone.utc)
+        token.status = "active"
     else:
+        from datetime import datetime, timezone
         token = UserPushToken(
             user_id=current_user.id,
             fcm_token=body.fcm_token,
             platform=body.platform,
+            status="active",
+            last_seen_at=datetime.now(timezone.utc),
         )
         db.add(token)
 
@@ -401,11 +420,14 @@ async def delete_push_token(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from sqlalchemy import update as sa_update
     await db.execute(
-        delete(UserPushToken).where(
+        sa_update(UserPushToken)
+        .where(
             UserPushToken.user_id == current_user.id,
             UserPushToken.fcm_token == fcm_token,
         )
+        .values(status="revoked")
     )
     await db.flush()
     return {"status": "ok"}
@@ -504,4 +526,57 @@ async def mark_all_read(
         .values(is_read=True)
     )
     await db.flush()
+    return {"status": "ok"}
+
+
+# ── /me/events & /me/paywall-event ───────────────────────────────────────────
+
+logger = structlog.get_logger()
+
+
+@router.post("/events", status_code=201)
+async def track_event(
+    body: EventBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generic event tracking endpoint."""
+    logger.info("track_event", user_id=str(current_user.id), event=body.name, props=body.props)
+
+    # paywall events go to dedicated table
+    if body.name.startswith("paywall_"):
+        from backend.app.models.paywall_event import PaywallEvent
+        pe = PaywallEvent(
+            user_id=current_user.id,
+            trigger=body.props.get("trigger", body.name),
+            action=body.props.get("action", body.name),
+            source=body.props.get("source"),
+            plan=body.props.get("plan"),
+            session_id=body.props.get("session_id"),
+        )
+        db.add(pe)
+        await db.flush()
+
+    return {"status": "ok"}
+
+
+@router.post("/paywall-event", status_code=201)
+async def track_paywall_event(
+    body: PaywallEventBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dedicated paywall event tracking."""
+    from backend.app.models.paywall_event import PaywallEvent
+    pe = PaywallEvent(
+        user_id=current_user.id,
+        trigger=body.trigger,
+        action=body.action,
+        source=body.source,
+        plan=body.plan,
+        session_id=body.session_id,
+    )
+    db.add(pe)
+    await db.flush()
+    logger.info("paywall_event", user_id=str(current_user.id), trigger=body.trigger, action=body.action)
     return {"status": "ok"}

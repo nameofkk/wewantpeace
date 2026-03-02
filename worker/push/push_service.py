@@ -19,7 +19,7 @@ from datetime import datetime, timezone, time as dt_time
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.user import User, UserArea, UserPreference, UserPushToken
@@ -115,7 +115,7 @@ async def _get_target_tokens_by_platform(
         )
         .join(UserArea, UserArea.user_id == UserPushToken.user_id)
         .join(UserPreference, UserPreference.user_id == UserPushToken.user_id)
-        .where(*area_filter, UserPreference.min_kscore <= kscore)
+        .where(*area_filter, UserPreference.min_kscore <= kscore, UserPushToken.status == "active")
     )
     rows = result.fetchall()
 
@@ -279,15 +279,17 @@ def _split_and_send(
 
 
 async def cleanup_invalid_tokens(invalid_tokens: list[str], db: AsyncSession):
-    """무효/만료 FCM 토큰을 DB에서 삭제."""
+    """무효/만료 FCM 토큰을 status='expired'로 소프트 삭제."""
     if not invalid_tokens:
         return
     result = await db.execute(
-        delete(UserPushToken).where(UserPushToken.fcm_token.in_(invalid_tokens))
+        update(UserPushToken)
+        .where(UserPushToken.fcm_token.in_(invalid_tokens))
+        .values(status="expired")
     )
-    deleted = result.rowcount
-    if deleted:
-        logger.info("만료/무효 FCM 토큰 %d개 삭제: %s", deleted, invalid_tokens[:5])
+    updated = result.rowcount
+    if updated:
+        logger.info("만료/무효 FCM 토큰 %d개 expired 처리: %s", updated, invalid_tokens[:5])
 
 
 async def send_spike_alert(
