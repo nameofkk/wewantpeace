@@ -787,6 +787,16 @@ export const translations = {
     upgrade_downgrade_store: "구독 변경은 스토어에서 관리해주세요.",
     upgrade_cancel_success: "구독이 취소되었습니다. 현재 결제 기간 만료까지 서비스를 이용할 수 있습니다.",
     upgrade_footer: "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능",
+    upgrade_success_title: "구독 완료!",
+    upgrade_success_subtitle_pro: "Pro 플랜이 활성화되었습니다",
+    upgrade_success_subtitle_proplus: "Pro+ 플랜이 활성화되었습니다",
+    upgrade_success_desc: "이제 더 많은 기능을 이용할 수 있어요",
+    upgrade_success_feature1_pro: "관심 국가 5개까지 모니터링",
+    upgrade_success_feature1_proplus: "관심 국가 무제한 모니터링",
+    upgrade_success_feature2: "실시간 이슈 지도 접근",
+    upgrade_success_feature3: "속보 알림 (미확인 포함)",
+    upgrade_success_go_home: "시작하기",
+    upgrade_success_go_settings: "구독 관리",
 
     // store (IAP)
     store_subscribe_in_app: "구독은 앱에서만 가능합니다",
@@ -1622,6 +1632,16 @@ export const translations = {
     upgrade_downgrade_store: "Please manage your subscription in the app store.",
     upgrade_cancel_success: "Subscription cancelled. You can continue using the service until the current billing period ends.",
     upgrade_footer: "Cancel anytime",
+    upgrade_success_title: "You're all set!",
+    upgrade_success_subtitle_pro: "Pro plan is now active",
+    upgrade_success_subtitle_proplus: "Pro+ plan is now active",
+    upgrade_success_desc: "Unlock powerful features to stay informed",
+    upgrade_success_feature1_pro: "Monitor up to 5 countries",
+    upgrade_success_feature1_proplus: "Monitor unlimited countries",
+    upgrade_success_feature2: "Real-time issue map access",
+    upgrade_success_feature3: "Breaking news alerts",
+    upgrade_success_go_home: "Get started",
+    upgrade_success_go_settings: "Manage subscription",
 
     // store (IAP)
     store_subscribe_in_app: "Subscriptions are only available in the app",

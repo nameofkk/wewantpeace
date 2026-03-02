@@ -241,7 +241,7 @@ export default function UpgradePage() {
     if (isReactNative()) {
       const result = await purchaseSubscription(productId, authToken);
       if (!result) return; // 취소
-      window.location.href = "/settings";
+      router.push(`/upgrade/success?plan=${planId}`);
       return;
     }
 
@@ -263,7 +263,7 @@ export default function UpgradePage() {
       throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
     }
 
-    window.location.href = "/settings";
+    router.push(`/upgrade/success?plan=${planId}`);
   }
 
   async function handleIOSPurchase(planId: string) {
@@ -277,7 +277,7 @@ export default function UpgradePage() {
       const authToken = await user!.getIdToken();
       const result = await purchaseSubscription(productId, authToken);
       if (!result) return;
-      window.location.href = "/settings";
+      router.push(`/upgrade/success?plan=${planId}`);
       return;
     }
 
@@ -301,7 +301,7 @@ export default function UpgradePage() {
       throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
     }
 
-    window.location.href = "/settings";
+    router.push(`/upgrade/success?plan=${planId}`);
   }
 
   const isWeb = platform === "web";
