@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -1136,6 +1136,25 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+
+        {/* ── 친구 초대 ──────────────────────────────────────────────── */}
+        {me && (
+          <section>
+            <a
+              href="/settings/referral"
+              className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 hover:bg-primary/10 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Gift className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{t(lang, "referral_title")}</p>
+                <p className="text-[11px] text-muted-foreground">{t(lang, "referral_subtitle")}</p>
+              </div>
+              <span className="text-primary text-xs">→</span>
+            </a>
+          </section>
+        )}
 
         {/* ── 고객센터 ──────────────────────────────────────────────── */}
         <section>

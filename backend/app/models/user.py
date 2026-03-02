@@ -36,6 +36,11 @@ class User(Base):
     agreed_privacy_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     marketing_agreed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
+    # 레퍼럴
+    referral_code: Mapped[str | None] = mapped_column(String(12), nullable=True, unique=True)
+    referred_by_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    referral_pro_expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
     # 정지
     suspended_until: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     suspend_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)

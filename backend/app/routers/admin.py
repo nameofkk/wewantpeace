@@ -22,6 +22,7 @@ from backend.app.models.tension_index import TensionIndex
 from backend.app.models.raw_event import RawEvent
 from backend.app.models.source_channel import SourceChannel
 from backend.app.models.trending_keyword import TrendingKeyword
+from backend.app.models.app_event import AppEvent
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -1838,3 +1839,104 @@ async def trigger_orphan_reprocess(
     except Exception as e:
         _logger.error("orphan_reprocess 실패: %s", e, exc_info=True)
         raise HTTPException(500, detail=f"오펀 재처리 실패: {str(e)}")
+
+
+# ── KPI 대시보드 ──────────────────────────────────────────────────────────────
+
+@router.get("/kpi")
+async def get_kpi(
+    days: int = Query(default=7, ge=1, le=90),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Phase Gate KPI 지표: 온보딩율, Paywall 전환율, Trial→Paid, D7 리텐션."""
+    from backend.app.models.paywall_event import PaywallEvent
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+
+    # ── app_events 집계 ──
+    ae_counts_q = await db.execute(
+        select(AppEvent.name, func.count())
+        .where(AppEvent.created_at >= cutoff)
+        .group_by(AppEvent.name)
+    )
+    ae_counts = {row[0]: row[1] for row in ae_counts_q.all()}
+
+    auth_success = ae_counts.get("auth_success", 0)
+    onboarding_complete = ae_counts.get("onboarding_complete", 0)
+
+    # A1: 온보딩 완료율 = onboarding_complete / auth_success
+    a1_rate = round(onboarding_complete / max(1, auth_success) * 100, 1)
+
+    # ── Paywall 전환율 ──
+    pw_shown = (await db.execute(
+        select(func.count()).select_from(PaywallEvent)
+        .where(PaywallEvent.action == "shown", PaywallEvent.created_at >= cutoff)
+    )).scalar() or 0
+
+    pw_purchase = (await db.execute(
+        select(func.count()).select_from(PaywallEvent)
+        .where(PaywallEvent.action == "purchase_success", PaywallEvent.created_at >= cutoff)
+    )).scalar() or 0
+
+    paywall_rate = round(pw_purchase / max(1, pw_shown) * 100, 1)
+
+    # ── Trial → Paid ──
+    from backend.app.models.subscription import Subscription
+
+    trial_started = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(Subscription.trial_start != None, Subscription.trial_start >= cutoff)
+    )).scalar() or 0
+
+    trial_converted = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(
+            Subscription.trial_start != None,
+            Subscription.trial_start >= cutoff,
+            Subscription.status == "active",
+            Subscription.trial_end != None,
+        )
+    )).scalar() or 0
+
+    trial_to_paid = round(trial_converted / max(1, trial_started) * 100, 1)
+
+    # ── D7 리텐션 ──
+    d7_start = now - timedelta(days=days + 7)
+    d7_end = now - timedelta(days=7)
+    yesterday = now - timedelta(days=1)
+
+    d7_cohort = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(User.created_at >= d7_start, User.created_at < d7_end, User.status != "deleted")
+    )).scalar() or 0
+
+    d7_retained = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(
+            User.created_at >= d7_start,
+            User.created_at < d7_end,
+            User.last_active >= yesterday,
+            User.status != "deleted",
+        )
+    )).scalar() or 0
+
+    d7_retention = round(d7_retained / max(1, d7_cohort) * 100, 1)
+
+    return {
+        "period_days": days,
+        "a1_onboarding_rate": a1_rate,
+        "paywall_conversion_rate": paywall_rate,
+        "trial_to_paid_rate": trial_to_paid,
+        "d7_retention_rate": d7_retention,
+        "raw": {
+            **ae_counts,
+            "paywall_shown": pw_shown,
+            "paywall_purchase": pw_purchase,
+            "trial_started": trial_started,
+            "trial_converted": trial_converted,
+            "d7_cohort": d7_cohort,
+            "d7_retained": d7_retained,
+        },
+    }

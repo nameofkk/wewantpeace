@@ -92,6 +92,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=9),  # 매일 09:00 UTC = KST 18:00
         "options": {"queue": "process"},
     },
+    # ── 주간 리포트 ──
+    "send-weekly-report": {
+        "task": "worker.tasks.send_weekly_report",
+        "schedule": crontab(minute=0, hour=9, day_of_week=1),  # 매주 월요일 09:00 UTC = KST 18:00
+        "options": {"queue": "process"},
+    },
 }
 
 

@@ -11,6 +11,7 @@ from backend.app.models.spike_event import SpikeEvent
 from backend.app.models.alert_delivery_log import AlertDeliveryLog
 from backend.app.models.user_missed_spike import UserMissedSpikeSummary
 from backend.app.models.paywall_event import PaywallEvent
+from backend.app.models.app_event import AppEvent
 
 __all__ = [
     "SourceChannel",
@@ -30,4 +31,5 @@ __all__ = [
     "AlertDeliveryLog",
     "UserMissedSpikeSummary",
     "PaywallEvent",
+    "AppEvent",
 ]

@@ -7,6 +7,7 @@ import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils"
 import { useClusterDetail } from "@/lib/api";
 import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
+import { ShareButton } from "@/components/issue/ShareButton";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { getCountryName } from "@/lib/countries";
@@ -59,15 +60,18 @@ interface ClusterDetail {
   events: EventOut[];
 }
 
+interface Props {
+  initialData?: ClusterDetail;
+}
 
-export default function IssueDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default function IssueDetailClient({ initialData }: Props) {
+  const id = initialData?.id ?? "";
   const router = useRouter();
   const { data, isPending, isError } = useClusterDetail(id);
-  const issue = data as ClusterDetail | undefined;
+  const issue = (data as ClusterDetail | undefined) ?? initialData;
   const lang = useAppStore((s) => s.lang);
 
-  if (isPending) {
+  if (!initialData && isPending) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -75,7 +79,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
     );
   }
 
-  if (isError || !issue) {
+  if (!issue) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-3">
         <AlertTriangle className="h-8 w-8 text-muted-foreground" />
@@ -114,6 +118,7 @@ export default function IssueDetailPage({ params }: { params: { id: string } }) 
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h1 className="text-sm font-bold flex-1 truncate">{displayTitle}</h1>
+          <ShareButton issueId={issue.id} title={displayTitle} />
         </div>
       </div>
 

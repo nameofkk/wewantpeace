@@ -18,10 +18,11 @@ from pydantic import BaseModel
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, get_db, _PLAN_ORDER
+from backend.app.core.auth import get_current_user, get_optional_user, get_db, _PLAN_ORDER
 from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
 from backend.app.models.notification import Notification
 from backend.app.models.paywall_event import PaywallEvent
+from backend.app.models.app_event import AppEvent
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -90,6 +91,8 @@ class UserOut(BaseModel):
 class EventBody(BaseModel):
     name: str
     props: dict = {}
+    session_id: Optional[str] = None
+    platform: str = "web"
 
 
 class PaywallEventBody(BaseModel):
@@ -577,15 +580,25 @@ logger = structlog.get_logger()
 @router.post("/events", status_code=201)
 async def track_event(
     body: EventBody,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Generic event tracking endpoint."""
-    logger.info("track_event", user_id=str(current_user.id), event=body.name, props=body.props)
+    """Generic event tracking endpoint. Works for both authenticated and anonymous users."""
+    user_id = current_user.id if current_user else None
+    logger.info("track_event", user_id=str(user_id) if user_id else "anon", event=body.name, props=body.props)
 
-    # paywall events go to dedicated table
-    if body.name.startswith("paywall_"):
-        from backend.app.models.paywall_event import PaywallEvent
+    # Save to app_events (all events)
+    ae = AppEvent(
+        user_id=user_id,
+        session_id=body.session_id,
+        name=body.name,
+        props=body.props or None,
+        platform=body.platform,
+    )
+    db.add(ae)
+
+    # paywall events also go to dedicated table (authenticated only)
+    if body.name.startswith("paywall_") and current_user:
         pe = PaywallEvent(
             user_id=current_user.id,
             trigger=body.props.get("trigger", body.name),
@@ -595,8 +608,8 @@ async def track_event(
             session_id=body.props.get("session_id"),
         )
         db.add(pe)
-        await db.flush()
 
+    await db.flush()
     return {"status": "ok"}
 
 
@@ -681,3 +694,65 @@ async def mark_missed_spike_shown(
     summary.is_shown = True
     await db.flush()
     return {"status": "ok"}
+
+
+# ── /me/referral ─────────────────────────────────────────────────────────────
+
+import secrets
+import string
+
+
+def _generate_referral_code() -> str:
+    """8자리 대문자+숫자 레퍼럴 코드 생성."""
+    chars = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(chars) for _ in range(8))
+
+
+@router.get("/referral")
+async def get_referral(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """내 레퍼럴 코드 + 초대 현황 조회. 코드 없으면 자동 생성."""
+    from sqlalchemy import text
+
+    # 코드 없으면 생성
+    if not current_user.referral_code:
+        for _ in range(5):  # collision retry
+            code = _generate_referral_code()
+            existing = await db.execute(select(User).where(User.referral_code == code))
+            if not existing.scalar_one_or_none():
+                current_user.referral_code = code
+                await db.flush()
+                break
+
+    # 초대 현황
+    rewards_q = await db.execute(
+        text("""
+            SELECT rr.referee_id, rr.reward_type, rr.rewarded_at, rr.referee_activated_at, rr.created_at,
+                   u.nickname, u.display_name
+            FROM referral_rewards rr
+            JOIN users u ON u.id = rr.referee_id
+            WHERE rr.referrer_id = :uid
+            ORDER BY rr.created_at DESC
+        """),
+        {"uid": str(current_user.id)},
+    )
+    rewards = [
+        {
+            "referee_name": row.display_name or row.nickname or "User",
+            "reward_type": row.reward_type,
+            "rewarded": row.rewarded_at is not None,
+            "activated": row.referee_activated_at is not None,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in rewards_q.all()
+    ]
+
+    return {
+        "referral_code": current_user.referral_code,
+        "referral_url": f"https://www.wewantpeace.live/?ref={current_user.referral_code}",
+        "total_invited": len(rewards),
+        "total_activated": sum(1 for r in rewards if r["activated"]),
+        "rewards": rewards,
+    }

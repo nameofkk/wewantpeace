@@ -1170,3 +1170,248 @@ def send_trial_nudges(self):
     except Exception as exc:
         logger.error("send_trial_nudges 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── 주간 리포트 이메일 발송 ───────────────────────────────────────────────
+
+
+async def _send_weekly_report_impl():
+    """매주 월요일 마케팅 동의 사용자에게 주간 리포트 이메일 발송."""
+    import smtplib
+    import os
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    import jinja2
+    from sqlalchemy import select, func, text
+    from backend.app.models.user import User, UserArea, UserPreference
+    from backend.app.models.issue_cluster import IssueCluster
+    from backend.app.models.tension_index import TensionIndex
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    sender = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.warning("send_weekly_report: SMTP 설정 누락 (SMTP_USER/SMTP_PASS), 발송 중단")
+        return {"status": "skipped", "reason": "no_smtp_config"}
+
+    # Jinja2 템플릿 로드
+    template_path = os.path.join(
+        os.path.dirname(__file__),
+        "..", "backend", "app", "templates",
+    )
+    template_path = os.path.abspath(template_path)
+    jinja_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(template_path),
+        autoescape=True,
+    )
+    template = jinja_env.get_template("weekly_report.html")
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=7)
+
+    # 전체 통계 (모든 사용자 공통)
+    async with AsyncSessionLocal() as db:
+        total_events_result = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM normalized_events
+                WHERE event_time >= :cutoff AND is_duplicate = FALSE
+            """),
+            {"cutoff": cutoff},
+        )
+        total_events = total_events_result.scalar() or 0
+
+        new_clusters_result = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM issue_clusters
+                WHERE created_at >= :cutoff AND severity > 0
+            """),
+            {"cutoff": cutoff},
+        )
+        new_clusters = new_clusters_result.scalar() or 0
+
+        crisis_countries_result = await db.execute(
+            text("""
+                SELECT COUNT(DISTINCT country_code) FROM issue_clusters
+                WHERE created_at >= :cutoff AND severity >= 70 AND country_code IS NOT NULL
+            """),
+            {"cutoff": cutoff},
+        )
+        crisis_countries = crisis_countries_result.scalar() or 0
+
+        global_stats = {
+            "total_events": total_events,
+            "new_clusters": new_clusters,
+            "crisis_countries": crisis_countries,
+        }
+
+        # TOP 10 이슈 클러스터 (전체 사용자 공통)
+        top_issues_result = await db.execute(
+            select(IssueCluster).where(
+                IssueCluster.severity > 0,
+                IssueCluster.last_event_at >= cutoff,
+            ).order_by(
+                IssueCluster.severity.desc(),
+                IssueCluster.kscore.desc(),
+            ).limit(10)
+        )
+        top_issues = top_issues_result.scalars().all()
+
+        # 마케팅 동의 사용자 전체 조회
+        users_result = await db.execute(
+            select(User).where(
+                User.marketing_agreed_at.isnot(None),
+                User.status == "active",
+                User.email.isnot(None),
+            )
+        )
+        all_users = users_result.scalars().all()
+
+    logger.info("send_weekly_report: 대상 사용자 %d명", len(all_users))
+
+    sent_total = 0
+    failed_total = 0
+    batch_size = 50
+
+    try:
+        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp.starttls()
+        smtp.login(smtp_user, smtp_pass)
+    except Exception as e:
+        logger.error("send_weekly_report: SMTP 연결 실패: %s", e)
+        return {"status": "error", "reason": str(e)}
+
+    for batch_start in range(0, len(all_users), batch_size):
+        batch = all_users[batch_start:batch_start + batch_size]
+
+        for user in batch:
+            try:
+                is_pro = user.plan in ("pro", "pro_plus")
+                lang = "ko"
+
+                async with AsyncSessionLocal() as db:
+                    # 사용자 언어 설정 조회
+                    pref_result = await db.execute(
+                        select(UserPreference).where(UserPreference.user_id == user.id)
+                    )
+                    pref = pref_result.scalar_one_or_none()
+                    if pref and pref.language:
+                        lang = pref.language
+
+                    # Pro/Pro+ 사용자: 관심 국가 긴장도 조회
+                    tensions = []
+                    if is_pro:
+                        areas_result = await db.execute(
+                            select(UserArea).where(
+                                UserArea.user_id == user.id,
+                                UserArea.is_active == True,
+                                UserArea.country_code.isnot(None),
+                            )
+                        )
+                        user_areas = areas_result.scalars().all()
+                        country_codes = [a.country_code for a in user_areas if a.country_code]
+
+                        if country_codes:
+                            tension_result = await db.execute(
+                                text("""
+                                    SELECT DISTINCT ON (country_code)
+                                        country_code, tension_level, raw_score
+                                    FROM tension_index
+                                    WHERE country_code = ANY(:codes)
+                                    ORDER BY country_code, time DESC
+                                """),
+                                {"codes": country_codes},
+                            )
+                            tensions = [
+                                {
+                                    "country_code": row.country_code,
+                                    "tension_level": row.tension_level,
+                                    "raw_score": row.raw_score,
+                                }
+                                for row in tension_result.fetchall()
+                            ]
+
+                # 템플릿 렌더링
+                subject_ko = "WeWantPeace 주간 리포트"
+                subject_en = "WeWantPeace Weekly Report"
+                subject = subject_ko if lang == "ko" else subject_en
+
+                html_body = template.render(
+                    user=user,
+                    issues=top_issues,
+                    tensions=tensions,
+                    stats=global_stats,
+                    is_pro=is_pro,
+                    lang=lang,
+                )
+
+                # 이메일 발송
+                msg = MIMEMultipart("alternative")
+                msg["From"] = sender
+                msg["To"] = user.email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(html_body, "html", "utf-8"))
+                smtp.sendmail(sender, user.email, msg.as_string())
+
+                # 발송 로그 기록
+                async with AsyncSessionLocal() as db:
+                    async with db.begin():
+                        await db.execute(
+                            text(
+                                "INSERT INTO marketing_email_logs"
+                                " (user_id, subject, status)"
+                                " VALUES (:uid, :subj, :st)"
+                            ),
+                            {"uid": str(user.id), "subj": subject, "st": "sent"},
+                        )
+
+                sent_total += 1
+
+            except Exception as e:
+                logger.warning(
+                    "send_weekly_report: 발송 실패 [user=%s, email=%s]: %s",
+                    user.id, user.email, e,
+                )
+                # 실패 로그 기록
+                try:
+                    async with AsyncSessionLocal() as db:
+                        async with db.begin():
+                            await db.execute(
+                                text(
+                                    "INSERT INTO marketing_email_logs"
+                                    " (user_id, subject, status)"
+                                    " VALUES (:uid, :subj, :st)"
+                                ),
+                                {
+                                    "uid": str(user.id),
+                                    "subj": "WeWantPeace Weekly Report",
+                                    "st": "failed",
+                                },
+                            )
+                except Exception:
+                    pass
+                failed_total += 1
+
+        # 배치 간 딜레이 (마지막 배치 제외)
+        if batch_start + batch_size < len(all_users):
+            import asyncio as _asyncio
+            await _asyncio.sleep(0.5)
+
+    try:
+        smtp.quit()
+    except Exception:
+        pass
+
+    logger.info(
+        "send_weekly_report 완료: sent=%d, failed=%d",
+        sent_total, failed_total,
+    )
+    return {"status": "ok", "sent": sent_total, "failed": failed_total}
+
+
+@app.task(name="worker.tasks.send_weekly_report", queue="process")
+def send_weekly_report():
+    """매주 월요일 주간 리포트 발송."""
+    return run_async(_send_weekly_report_impl())

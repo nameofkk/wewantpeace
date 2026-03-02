@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{% if lang == 'ko' %}WeWantPeace 주간 리포트{% else %}WeWantPeace Weekly Report{% endif %}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0d1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+
+  <!-- Outer wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#0d1117;padding:32px 16px;">
+    <tr>
+      <td align="center">
+
+        <!-- Main container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background-color:#161b22;border-radius:12px;overflow:hidden;border:1px solid #30363d;">
+
+          <!-- Header / Logo -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1a2332 0%,#0d1117 100%);padding:36px 40px 28px;border-bottom:1px solid #30363d;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <span style="font-size:24px;font-weight:700;color:#e6edf3;letter-spacing:-0.5px;">
+                      &#9760;&nbsp;WeWantPeace
+                    </span>
+                    <p style="margin:6px 0 0;font-size:13px;color:#8b949e;">
+                      {% if lang == 'ko' %}
+                        {{ user.display_name or user.email }}님의 주간 분쟁 리포트
+                      {% else %}
+                        Weekly Conflict Report for {{ user.display_name or user.email }}
+                      {% endif %}
+                    </p>
+                  </td>
+                  <td align="right" style="vertical-align:top;">
+                    <span style="display:inline-block;background-color:#21262d;border:1px solid #30363d;border-radius:6px;padding:4px 12px;font-size:12px;color:#8b949e;">
+                      {% if lang == 'ko' %}주간 리포트{% else %}Weekly Report{% endif %}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Section 1: Top 10 Issues -->
+          <tr>
+            <td style="padding:32px 40px 24px;">
+              <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#e6edf3;">
+                {% if lang == 'ko' %}이번 주 TOP 10 이슈{% else %}Top 10 Issues This Week{% endif %}
+              </h2>
+              <p style="margin:0 0 20px;font-size:13px;color:#8b949e;">
+                {% if lang == 'ko' %}지난 7일간 가장 주목받은 분쟁·위기 이슈{% else %}Most significant conflict and crisis events of the past 7 days{% endif %}
+              </p>
+
+              <!-- Issue list -->
+              {% for issue in issues %}
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:12px;background-color:#21262d;border-radius:8px;border:1px solid #30363d;overflow:hidden;">
+                <tr>
+                  <td style="padding:14px 16px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td style="vertical-align:top;padding-right:12px;">
+                          <!-- Rank badge -->
+                          <span style="display:inline-block;min-width:24px;height:24px;line-height:24px;text-align:center;background-color:#30363d;border-radius:50%;font-size:11px;font-weight:700;color:#8b949e;">{{ loop.index }}</span>
+                        </td>
+                        <td style="vertical-align:top;width:100%;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                            <tr>
+                              <td>
+                                <!-- Severity badge -->
+                                {% if issue.severity >= 70 %}
+                                <span style="display:inline-block;background-color:#3d1212;border:1px solid #f85149;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#f85149;margin-bottom:6px;">
+                                  {% if lang == 'ko' %}위험{% else %}CRITICAL{% endif %}
+                                </span>
+                                {% elif issue.severity >= 40 %}
+                                <span style="display:inline-block;background-color:#3d2a10;border:1px solid #e3b341;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#e3b341;margin-bottom:6px;">
+                                  {% if lang == 'ko' %}경고{% else %}WARNING{% endif %}
+                                </span>
+                                {% else %}
+                                <span style="display:inline-block;background-color:#122d1e;border:1px solid #3fb950;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#3fb950;margin-bottom:6px;">
+                                  {% if lang == 'ko' %}주시{% else %}WATCH{% endif %}
+                                </span>
+                                {% endif %}
+                                <!-- Country & Topic -->
+                                {% if issue.country_code %}
+                                <span style="display:inline-block;background-color:#161b22;border:1px solid #30363d;border-radius:4px;padding:2px 8px;font-size:11px;color:#8b949e;margin-bottom:6px;margin-left:4px;">{{ issue.country_code }}</span>
+                                {% endif %}
+                                {% if issue.topic %}
+                                <span style="display:inline-block;background-color:#161b22;border:1px solid #30363d;border-radius:4px;padding:2px 8px;font-size:11px;color:#8b949e;margin-bottom:6px;margin-left:4px;">{{ issue.topic }}</span>
+                                {% endif %}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <a href="https://www.wewantpeace.live/issues/{{ issue.id }}"
+                                   style="font-size:14px;font-weight:600;color:#58a6ff;text-decoration:none;line-height:1.4;display:block;margin-bottom:4px;">
+                                  {{ issue.title_ko or issue.title }}
+                                </a>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {% else %}
+              <p style="color:#8b949e;font-size:14px;text-align:center;padding:20px 0;">
+                {% if lang == 'ko' %}이번 주 수집된 이슈가 없습니다.{% else %}No issues collected this week.{% endif %}
+              </p>
+              {% endfor %}
+
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #30363d;margin:0;">
+            </td>
+          </tr>
+
+          <!-- Section 2: Tension Trends -->
+          <tr>
+            <td style="padding:32px 40px 24px;">
+              <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#e6edf3;">
+                {% if lang == 'ko' %}관심국가 긴장도 추이{% else %}Tension Trends{% endif %}
+              </h2>
+              <p style="margin:0 0 20px;font-size:13px;color:#8b949e;">
+                {% if lang == 'ko' %}관심 국가의 이번 주 긴장도 지수{% else %}Tension index for your tracked countries this week{% endif %}
+              </p>
+
+              {% if is_pro %}
+                {% if tensions %}
+                <!-- Pro: Tension table -->
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-radius:8px;border:1px solid #30363d;overflow:hidden;">
+                  <!-- Table header -->
+                  <tr style="background-color:#21262d;">
+                    <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#8b949e;border-bottom:1px solid #30363d;">
+                      {% if lang == 'ko' %}국가{% else %}Country{% endif %}
+                    </td>
+                    <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#8b949e;border-bottom:1px solid #30363d;text-align:center;">
+                      {% if lang == 'ko' %}긴장 단계{% else %}Tension Level{% endif %}
+                    </td>
+                    <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#8b949e;border-bottom:1px solid #30363d;text-align:right;">
+                      {% if lang == 'ko' %}점수{% else %}Score{% endif %}
+                    </td>
+                  </tr>
+                  {% for t in tensions %}
+                  <tr style="background-color:{% if loop.index is odd %}#161b22{% else %}#1c2128{% endif %};">
+                    <td style="padding:12px 16px;font-size:14px;font-weight:600;color:#e6edf3;{% if not loop.last %}border-bottom:1px solid #30363d;{% endif %}">
+                      {{ t.country_code }}
+                    </td>
+                    <td style="padding:12px 16px;text-align:center;{% if not loop.last %}border-bottom:1px solid #30363d;{% endif %}">
+                      {% if t.tension_level >= 4 %}
+                      <span style="display:inline-block;background-color:#3d1212;border:1px solid #f85149;border-radius:4px;padding:2px 10px;font-size:12px;font-weight:600;color:#f85149;">
+                        {% if lang == 'ko' %}매우 높음{% else %}Very High{% endif %}
+                      </span>
+                      {% elif t.tension_level >= 3 %}
+                      <span style="display:inline-block;background-color:#3d2a10;border:1px solid #e3b341;border-radius:4px;padding:2px 10px;font-size:12px;font-weight:600;color:#e3b341;">
+                        {% if lang == 'ko' %}높음{% else %}High{% endif %}
+                      </span>
+                      {% elif t.tension_level >= 2 %}
+                      <span style="display:inline-block;background-color:#1a2e44;border:1px solid #388bfd;border-radius:4px;padding:2px 10px;font-size:12px;font-weight:600;color:#388bfd;">
+                        {% if lang == 'ko' %}보통{% else %}Moderate{% endif %}
+                      </span>
+                      {% else %}
+                      <span style="display:inline-block;background-color:#122d1e;border:1px solid #3fb950;border-radius:4px;padding:2px 10px;font-size:12px;font-weight:600;color:#3fb950;">
+                        {% if lang == 'ko' %}낮음{% else %}Low{% endif %}
+                      </span>
+                      {% endif %}
+                    </td>
+                    <td style="padding:12px 16px;font-size:14px;color:#8b949e;text-align:right;{% if not loop.last %}border-bottom:1px solid #30363d;{% endif %}">
+                      {{ "%.1f"|format(t.raw_score) }}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </table>
+                {% else %}
+                <p style="color:#8b949e;font-size:14px;text-align:center;padding:20px 0;background-color:#21262d;border-radius:8px;border:1px solid #30363d;">
+                  {% if lang == 'ko' %}관심 국가를 앱에서 등록하면 긴장도 추이를 확인할 수 있어요.{% else %}Add countries of interest in the app to see tension trends.{% endif %}
+                </p>
+                {% endif %}
+              {% else %}
+              <!-- Free: CTA upgrade box -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:linear-gradient(135deg,#1a2332 0%,#1c1a2e 100%);border-radius:8px;border:1px solid #30363d;overflow:hidden;">
+                <tr>
+                  <td style="padding:28px 24px;text-align:center;">
+                    <div style="font-size:32px;margin-bottom:12px;">&#128274;</div>
+                    <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#e6edf3;">
+                      {% if lang == 'ko' %}Pro로 업그레이드하면 관심국가 추이를 확인할 수 있어요{% else %}Upgrade to Pro to unlock country tension trends{% endif %}
+                    </p>
+                    <p style="margin:0 0 20px;font-size:13px;color:#8b949e;line-height:1.5;">
+                      {% if lang == 'ko' %}
+                        실시간 긴장도 지수, 상세 분석, 무제한 알림 등<br>Pro의 모든 기능을 사용해보세요.
+                      {% else %}
+                        Get real-time tension indices, detailed analysis,<br>unlimited alerts, and more with Pro.
+                      {% endif %}
+                    </p>
+                    <a href="https://www.wewantpeace.live/upgrade"
+                       style="display:inline-block;background:linear-gradient(135deg,#388bfd,#58a6ff);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;letter-spacing:0.3px;">
+                      {% if lang == 'ko' %}Pro 업그레이드 &rarr;{% else %}Upgrade to Pro &rarr;{% endif %}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #30363d;margin:0;">
+            </td>
+          </tr>
+
+          <!-- Section 3: Weekly Summary Stats -->
+          <tr>
+            <td style="padding:32px 40px 24px;">
+              <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#e6edf3;">
+                {% if lang == 'ko' %}이번 주 요약{% else %}Weekly Summary{% endif %}
+              </h2>
+              <p style="margin:0 0 20px;font-size:13px;color:#8b949e;">
+                {% if lang == 'ko' %}지난 7일간의 전체 현황{% else %}Overall activity in the past 7 days{% endif %}
+              </p>
+
+              <!-- Stats grid -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <!-- Total events -->
+                  <td width="33%" style="padding-right:8px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#21262d;border-radius:8px;border:1px solid #30363d;">
+                      <tr>
+                        <td style="padding:20px 16px;text-align:center;">
+                          <div style="font-size:28px;font-weight:700;color:#58a6ff;margin-bottom:4px;">{{ stats.total_events | default(0) }}</div>
+                          <div style="font-size:12px;color:#8b949e;line-height:1.3;">
+                            {% if lang == 'ko' %}수집된<br>이벤트{% else %}Total<br>Events{% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <!-- New clusters -->
+                  <td width="33%" style="padding-right:8px;padding-left:4px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#21262d;border-radius:8px;border:1px solid #30363d;">
+                      <tr>
+                        <td style="padding:20px 16px;text-align:center;">
+                          <div style="font-size:28px;font-weight:700;color:#3fb950;margin-bottom:4px;">{{ stats.new_clusters | default(0) }}</div>
+                          <div style="font-size:12px;color:#8b949e;line-height:1.3;">
+                            {% if lang == 'ko' %}신규<br>이슈 클러스터{% else %}New<br>Issue Clusters{% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <!-- Crisis countries -->
+                  <td width="33%" style="padding-left:4px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#21262d;border-radius:8px;border:1px solid #30363d;">
+                      <tr>
+                        <td style="padding:20px 16px;text-align:center;">
+                          <div style="font-size:28px;font-weight:700;color:#f85149;margin-bottom:4px;">{{ stats.crisis_countries | default(0) }}</div>
+                          <div style="font-size:12px;color:#8b949e;line-height:1.3;">
+                            {% if lang == 'ko' %}위기<br>국가{% else %}Crisis<br>Countries{% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- CTA Button -->
+          <tr>
+            <td style="padding:0 40px 32px;text-align:center;">
+              <a href="https://www.wewantpeace.live"
+                 style="display:inline-block;background:linear-gradient(135deg,#1a2e44,#1c3a5e);border:1px solid #388bfd;color:#58a6ff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px;letter-spacing:0.3px;">
+                {% if lang == 'ko' %}앱에서 전체 이슈 보기 &rarr;{% else %}View All Issues in App &rarr;{% endif %}
+              </a>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 40px;">
+              <hr style="border:none;border-top:1px solid #30363d;margin:0;">
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px 32px;">
+              <p style="margin:0 0 8px;font-size:12px;color:#6e7681;line-height:1.5;text-align:center;">
+                {% if lang == 'ko' %}
+                  이 이메일은 WeWantPeace 마케팅 동의에 의해 발송됩니다.<br>
+                  더 이상 받고 싶지 않으시면 아래 수신거부 링크를 클릭해주세요.
+                {% else %}
+                  This email is sent based on your WeWantPeace marketing consent.<br>
+                  If you no longer wish to receive these emails, click the unsubscribe link below.
+                {% endif %}
+              </p>
+              <p style="margin:0;font-size:12px;color:#6e7681;text-align:center;">
+                <a href="https://www.wewantpeace.live/unsubscribe?token={{ user.id }}" style="color:#388bfd;text-decoration:none;">
+                  {% if lang == 'ko' %}수신거부{% else %}Unsubscribe{% endif %}
+                </a>
+                &nbsp;&bull;&nbsp;
+                <a href="https://www.wewantpeace.live/privacy" style="color:#388bfd;text-decoration:none;">
+                  {% if lang == 'ko' %}개인정보처리방침{% else %}Privacy Policy{% endif %}
+                </a>
+                &nbsp;&bull;&nbsp;
+                <a href="https://www.wewantpeace.live" style="color:#388bfd;text-decoration:none;">
+                  WeWantPeace
+                </a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Main container -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

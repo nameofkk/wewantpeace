@@ -970,6 +970,31 @@ export const translations = {
     trial_already_used: "무료 체험은 1회만 가능합니다",
     trial_success: "Pro 7일 무료 체험이 시작되었습니다!",
     trial_note: "Pro+ 플랜은 무료 체험이 제공되지 않습니다",
+
+    // Phase 2: Admin KPI
+    admin_kpi: "KPI",
+
+    // Phase 2: 공유
+    share_button: "공유하기",
+    share_copied: "링크가 복사되었습니다",
+    share_title: "WeWantPeace — {title}",
+
+    // Phase 2: 레퍼럴
+    referral_title: "친구 초대",
+    referral_subtitle: "친구를 초대하면 양쪽 모두 Pro 7일이 제공됩니다",
+    referral_my_code: "내 초대 코드",
+    referral_copy: "코드 복사",
+    referral_copied: "복사됨!",
+    referral_share: "초대 링크 공유",
+    referral_count: "초대 완료 {n}명",
+    referral_reward_pending: "보상 대기 중",
+    referral_reward_given: "Pro 7일 지급됨",
+
+    // Phase 2: 주간 리포트
+    weekly_report_subject: "WeWantPeace 주간 리포트",
+    weekly_report_top_issues: "이번 주 TOP 10 이슈",
+    weekly_report_tension: "관심국가 긴장도 추이",
+    weekly_report_upgrade_cta: "Pro로 업그레이드하면 관심국가 추이를 확인할 수 있어요",
   },
   en: {
     // bottom nav
@@ -1938,6 +1963,31 @@ export const translations = {
     trial_already_used: "Free trial is available once",
     trial_success: "Your 7-day Pro free trial has started!",
     trial_note: "Pro+ plan does not include a free trial",
+
+    // Phase 2: Admin KPI
+    admin_kpi: "KPI",
+
+    // Phase 2: Share
+    share_button: "Share",
+    share_copied: "Link copied",
+    share_title: "WeWantPeace — {title}",
+
+    // Phase 2: Referral
+    referral_title: "Invite Friends",
+    referral_subtitle: "Both you and your friend get 7 days of Pro",
+    referral_my_code: "My referral code",
+    referral_copy: "Copy code",
+    referral_copied: "Copied!",
+    referral_share: "Share invite link",
+    referral_count: "{n} friends invited",
+    referral_reward_pending: "Reward pending",
+    referral_reward_given: "Pro 7 days granted",
+
+    // Phase 2: Weekly report
+    weekly_report_subject: "WeWantPeace Weekly Report",
+    weekly_report_top_issues: "Top 10 Issues This Week",
+    weekly_report_tension: "Tension Trends for Your Countries",
+    weekly_report_upgrade_cta: "Upgrade to Pro to see tension trends for your countries",
   },
 } as const;
 

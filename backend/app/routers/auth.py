@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import uuid
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -72,6 +72,7 @@ class RegisterBody(BaseModel):
     marketing_agreed: bool = False
     display_name: Optional[str] = None
     email: Optional[str] = None
+    referral_code: Optional[str] = None
 
     @field_validator("nickname")
     @classmethod
@@ -313,6 +314,49 @@ async def register(
     admin_email = os.getenv("ADMIN_EMAIL", "")
     if admin_email and user.email and user.email.lower() == admin_email.lower():
         user.role = "admin"
+
+    await db.flush()
+
+    # 레퍼럴 코드 처리
+    if body.referral_code:
+        referrer_q = await db.execute(
+            select(User).where(User.referral_code == body.referral_code.strip().upper())
+        )
+        referrer = referrer_q.scalar_one_or_none()
+        if referrer and referrer.id != user.id:
+            from sqlalchemy import text as sa_text
+            user.referred_by_code = body.referral_code.strip().upper()
+
+            # 피추천인에게 즉시 Pro 7일 부여
+            user.referral_pro_expires_at = now + timedelta(days=7)
+            if user.plan == "free":
+                user.plan = "pro"
+
+            # referral_rewards 기록 (추천인 보상은 onboarding_complete 이벤트 후)
+            await db.execute(sa_text("""
+                INSERT INTO referral_rewards (referrer_id, referee_id, code, reward_type, referee_activated_at)
+                VALUES (:referrer_id, :referee_id, :code, 'pro_7d', now())
+            """), {
+                "referrer_id": str(referrer.id),
+                "referee_id": str(user.id),
+                "code": body.referral_code.strip().upper(),
+            })
+
+            # 추천인에게도 즉시 Pro 7일 보상
+            if not referrer.referral_pro_expires_at or referrer.referral_pro_expires_at < now:
+                referrer.referral_pro_expires_at = now + timedelta(days=7)
+            else:
+                referrer.referral_pro_expires_at = referrer.referral_pro_expires_at + timedelta(days=7)
+            if referrer.plan == "free":
+                referrer.plan = "pro"
+
+            await db.execute(sa_text("""
+                UPDATE referral_rewards SET rewarded_at = now()
+                WHERE referrer_id = :referrer_id AND referee_id = :referee_id
+            """), {
+                "referrer_id": str(referrer.id),
+                "referee_id": str(user.id),
+            })
 
     await db.flush()
 
