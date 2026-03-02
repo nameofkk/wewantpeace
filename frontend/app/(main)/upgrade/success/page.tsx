@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Check, MapPin, Bell, Globe, ArrowRight } from "lucide-react";
 import { useAppStore } from "@/lib/store";
@@ -8,6 +8,14 @@ import { t, type Lang } from "@/lib/i18n";
 import Link from "next/link";
 
 export default function UpgradeSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <UpgradeSuccessContent />
+    </Suspense>
+  );
+}
+
+function UpgradeSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const lang = (useAppStore((s) => s.lang) || "ko") as Lang;
