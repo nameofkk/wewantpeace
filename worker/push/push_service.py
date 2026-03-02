@@ -216,6 +216,34 @@ async def _get_target_tokens_by_platform(
     return _TargetResult(tokens, suppressed)
 
 
+async def _get_plan_locked_users(
+    country_code: Optional[str],
+    db: AsyncSession,
+) -> list[_SuppressedInfo]:
+    """Free 유저 중 해당 국가를 관심 등록했지만 Fast 알림을 받을 수 없는 유저 조회.
+    → 'plan_locked' suppression 사유로 delivery log에 기록."""
+    if not country_code:
+        return []
+    result = await db.execute(
+        select(User.id, UserPushToken.platform, UserPushToken.last_seen_at)
+        .join(UserArea, UserArea.user_id == User.id)
+        .join(UserPushToken, UserPushToken.user_id == User.id)
+        .where(
+            UserArea.country_code == country_code,
+            UserArea.is_active == True,
+            UserArea.notify_fast == False,
+            User.plan == "free",
+            UserPushToken.status == "active",
+        )
+        .distinct(User.id)
+    )
+    # 유저당 1 레코드만 (DISTINCT)
+    return [
+        _SuppressedInfo(row.id, row.platform or "web", "plan_locked")
+        for row in result.fetchall()
+    ]
+
+
 FCM_BATCH_SIZE = 500  # FCM MulticastMessage 최대 토큰 수
 
 
@@ -634,9 +662,13 @@ async def send_spike_alert(
         country_code, notify_fast=True, kscore=kscore, cluster_topic=cluster_topic, db=db
     )
 
+    # plan_locked 억제: Free 유저 중 해당 국가를 관심 등록했지만 Fast 알림 불가한 유저
+    plan_locked = await _get_plan_locked_users(country_code, db)
+    all_suppressed_fast = list(target_f.suppressed) + plan_locked
+
     # 1. suppressed 로그
     await _insert_suppressed_logs(
-        target_f.suppressed, cluster_id, spike_event_id, "fast", db,
+        all_suppressed_fast, cluster_id, spike_event_id, "fast", db,
     )
 
     # 2. pending 로그

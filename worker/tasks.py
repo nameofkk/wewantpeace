@@ -812,6 +812,7 @@ def expire_subscriptions(self):
                             select(Subscription).where(
                                 Subscription.user_id == user.id,
                                 Subscription.status == "trial",
+                                Subscription.trial_end.isnot(None),
                                 Subscription.trial_end > now,
                             ).limit(1)
                         )
@@ -826,6 +827,7 @@ def expire_subscriptions(self):
                 trial_expired_result = await db.execute(
                     select(Subscription).where(
                         Subscription.status == "trial",
+                        Subscription.trial_end.isnot(None),
                         Subscription.trial_end <= now,
                     )
                 )
