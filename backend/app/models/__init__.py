@@ -12,6 +12,9 @@ from backend.app.models.alert_delivery_log import AlertDeliveryLog
 from backend.app.models.user_missed_spike import UserMissedSpikeSummary
 from backend.app.models.paywall_event import PaywallEvent
 from backend.app.models.app_event import AppEvent
+from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
+from backend.app.models.partner import Partner
+from backend.app.models.short_link import ShortLink, LinkClick
 
 __all__ = [
     "SourceChannel",
@@ -32,4 +35,8 @@ __all__ = [
     "UserMissedSpikeSummary",
     "PaywallEvent",
     "AppEvent",
+    "WeeklyKpiSnapshot",
+    "Partner",
+    "ShortLink",
+    "LinkClick",
 ]

@@ -98,6 +98,17 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # 매주 월요일 09:00 UTC = KST 18:00
         "options": {"queue": "process"},
     },
+    # ── Admin Ops v0.9 ──
+    "snapshot-weekly-kpi": {
+        "task": "worker.tasks.snapshot_weekly_kpi",
+        "schedule": crontab(minute=5, hour=15, day_of_week=0),  # Sun 15:05 UTC = Mon 00:05 KST
+        "options": {"queue": "process"},
+    },
+    "aggregate-link-clicks": {
+        "task": "worker.tasks.aggregate_link_clicks",
+        "schedule": crontab(minute=0, hour="*/1"),  # 매 1시간
+        "options": {"queue": "process"},
+    },
 }
 
 

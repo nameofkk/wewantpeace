@@ -23,6 +23,9 @@ from backend.app.models.raw_event import RawEvent
 from backend.app.models.source_channel import SourceChannel
 from backend.app.models.trending_keyword import TrendingKeyword
 from backend.app.models.app_event import AppEvent
+from backend.app.models.partner import Partner
+from backend.app.models.short_link import ShortLink, LinkClick
+from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -1242,10 +1245,22 @@ async def reprocess_events(
 @router.get("/feedbacks")
 async def list_feedbacks(
     page: int = Query(1, ge=1),
+    search: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     q = select(Feedback)
+    filters = []
+    if search:
+        filters.append(Feedback.message.ilike(f"%{search}%"))
+    if date_from:
+        filters.append(Feedback.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        filters.append(Feedback.created_at <= datetime.fromisoformat(date_to))
+    if filters:
+        q = q.where(and_(*filters))
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     q = q.order_by(Feedback.created_at.desc()).offset((page - 1) * 20).limit(20)
     result = await db.execute(q)
@@ -1416,10 +1431,25 @@ async def hide_comment(
 @router.get("/logs")
 async def list_admin_logs(
     page: int = Query(1, ge=1),
+    action: Optional[str] = Query(None),
+    admin_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     q = select(AdminLog)
+    filters = []
+    if action:
+        filters.append(AdminLog.action == action)
+    if admin_id:
+        filters.append(AdminLog.admin_id == uuid.UUID(admin_id))
+    if date_from:
+        filters.append(AdminLog.created_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        filters.append(AdminLog.created_at <= datetime.fromisoformat(date_to))
+    if filters:
+        q = q.where(and_(*filters))
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     q = q.order_by(AdminLog.created_at.desc()).offset((page - 1) * 20).limit(20)
     result = await db.execute(q)
@@ -1939,4 +1969,618 @@ async def get_kpi(
             "d7_cohort": d7_cohort,
             "d7_retained": d7_retained,
         },
+    }
+
+
+# ── KPI Snapshots ────────────────────────────────────────────────────────────
+
+@router.get("/kpi/snapshots")
+async def list_kpi_snapshots(
+    weeks: int = Query(8, ge=1, le=52),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """최근 N주 KPI 스냅샷 목록."""
+    result = await db.execute(
+        select(WeeklyKpiSnapshot)
+        .order_by(WeeklyKpiSnapshot.week_start.desc())
+        .limit(weeks)
+    )
+    snapshots = result.scalars().all()
+    return [
+        {
+            "id": s.id,
+            "week_start": s.week_start.isoformat(),
+            "week_end": s.week_end.isoformat(),
+            "metrics": s.metrics,
+            "kpi": s.kpi,
+            "wow_delta": s.wow_delta,
+            "alerts": s.alerts,
+            "created_at": s.created_at.isoformat(),
+        }
+        for s in snapshots
+    ]
+
+
+@router.post("/kpi/snapshots/generate")
+async def generate_kpi_snapshot(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """수동 KPI 스냅샷 생성 (직전 주)."""
+    from datetime import date
+    from backend.app.models.paywall_event import PaywallEvent
+
+    now = datetime.now(timezone.utc)
+    # 직전 주 월~일
+    today = now.date()
+    days_since_monday = today.weekday()
+    this_monday = today - timedelta(days=days_since_monday)
+    last_monday = this_monday - timedelta(days=7)
+    last_sunday = this_monday - timedelta(days=1)
+
+    week_start_dt = datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=timezone.utc)
+    week_end_dt = datetime.combine(last_sunday, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    # 중복 체크
+    existing = await db.execute(
+        select(WeeklyKpiSnapshot).where(WeeklyKpiSnapshot.week_start == last_monday)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "이미 해당 주의 스냅샷이 존재합니다")
+
+    # app_events 집계
+    ae_q = await db.execute(
+        select(AppEvent.name, func.count())
+        .where(AppEvent.created_at >= week_start_dt, AppEvent.created_at <= week_end_dt)
+        .group_by(AppEvent.name)
+    )
+    ae_counts = {row[0]: row[1] for row in ae_q.all()}
+
+    auth_success = ae_counts.get("auth_success", 0)
+    onboarding_complete = ae_counts.get("onboarding_complete", 0)
+    a1_rate = round(onboarding_complete / max(1, auth_success) * 100, 1)
+
+    # Paywall
+    pw_shown = (await db.execute(
+        select(func.count()).select_from(PaywallEvent)
+        .where(PaywallEvent.action == "shown", PaywallEvent.created_at >= week_start_dt, PaywallEvent.created_at <= week_end_dt)
+    )).scalar() or 0
+    pw_purchase = (await db.execute(
+        select(func.count()).select_from(PaywallEvent)
+        .where(PaywallEvent.action == "purchase_success", PaywallEvent.created_at >= week_start_dt, PaywallEvent.created_at <= week_end_dt)
+    )).scalar() or 0
+    paywall_rate = round(pw_purchase / max(1, pw_shown) * 100, 1)
+
+    # Trial → Paid
+    trial_started = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(Subscription.trial_start.isnot(None), Subscription.trial_start >= week_start_dt, Subscription.trial_start <= week_end_dt)
+    )).scalar() or 0
+    trial_converted = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(Subscription.trial_start.isnot(None), Subscription.trial_start >= week_start_dt, Subscription.trial_start <= week_end_dt, Subscription.status == "active", Subscription.trial_end.isnot(None))
+    )).scalar() or 0
+    trial_to_paid = round(trial_converted / max(1, trial_started) * 100, 1)
+
+    # D7 Retention
+    d7_start = week_start_dt - timedelta(days=7)
+    d7_end = week_start_dt
+    d7_cohort = (await db.execute(
+        select(func.count()).select_from(User).where(User.created_at >= d7_start, User.created_at < d7_end, User.status != "deleted")
+    )).scalar() or 0
+    d7_retained = (await db.execute(
+        select(func.count()).select_from(User).where(User.created_at >= d7_start, User.created_at < d7_end, User.last_active >= week_start_dt, User.status != "deleted")
+    )).scalar() or 0
+    d7_retention = round(d7_retained / max(1, d7_cohort) * 100, 1)
+
+    # Referral 메트릭
+    referral_install = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(User.created_at >= week_start_dt, User.created_at <= week_end_dt, User.referred_by_code.isnot(None))
+    )).scalar() or 0
+    referral_trial_start = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(
+            Subscription.trial_start.isnot(None),
+            Subscription.trial_start >= week_start_dt,
+            Subscription.trial_start <= week_end_dt,
+        ).where(
+            Subscription.user_id.in_(
+                select(User.id).where(User.referred_by_code.isnot(None))
+            )
+        )
+    )).scalar() or 0
+
+    metrics = {**ae_counts, "paywall_shown": pw_shown, "paywall_purchase": pw_purchase, "trial_started": trial_started, "trial_converted": trial_converted, "d7_cohort": d7_cohort, "d7_retained": d7_retained, "referral_install": referral_install, "referral_trial_start": referral_trial_start}
+    kpi_data = {"a1_onboarding_rate": a1_rate, "paywall_conversion_rate": paywall_rate, "trial_to_paid_rate": trial_to_paid, "d7_retention_rate": d7_retention}
+
+    # WoW delta
+    prev_snapshot = await db.execute(
+        select(WeeklyKpiSnapshot).where(WeeklyKpiSnapshot.week_start == last_monday - timedelta(days=7))
+    )
+    prev = prev_snapshot.scalar_one_or_none()
+    wow_delta = None
+    alerts = None
+    if prev and prev.kpi:
+        wow_delta = {}
+        alerts = []
+        for k, v in kpi_data.items():
+            prev_val = prev.kpi.get(k, 0)
+            delta = round(v - prev_val, 1)
+            wow_delta[k] = delta
+            # Alert: WoW -30% drop AND prev denominator >= 10
+            if prev_val > 0 and delta / prev_val * 100 <= -30:
+                alerts.append({"kpi": k, "prev": prev_val, "curr": v, "drop_pct": round(delta / prev_val * 100, 1)})
+        if not alerts:
+            alerts = None
+
+    snapshot = WeeklyKpiSnapshot(
+        week_start=last_monday,
+        week_end=last_sunday,
+        metrics=metrics,
+        kpi=kpi_data,
+        wow_delta=wow_delta,
+        alerts=alerts,
+        data_source="manual",
+    )
+    db.add(snapshot)
+    await db.flush()
+    await _log_action(db, admin, "generate_kpi_snapshot", detail={"week_start": last_monday.isoformat()})
+    return {"status": "ok", "week_start": last_monday.isoformat(), "kpi": kpi_data, "alerts": alerts}
+
+
+# ── Partners CRM ─────────────────────────────────────────────────────────────
+
+VALID_PARTNER_STATUSES = {"prospect", "contacted", "negotiating", "active", "churned", "rejected"}
+
+
+class PartnerCreate(BaseModel):
+    name: str
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    company_type: str = "media"
+    status: str = "prospect"
+    channel: Optional[str] = None
+    segment: Optional[str] = None
+    url: Optional[str] = None
+    notes: Optional[str] = None
+    next_follow_up: Optional[str] = None
+
+
+class PartnerPatch(BaseModel):
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    company_type: Optional[str] = None
+    status: Optional[str] = None
+    channel: Optional[str] = None
+    segment: Optional[str] = None
+    url: Optional[str] = None
+    notes: Optional[str] = None
+    next_follow_up: Optional[str] = None
+
+
+@router.get("/partners")
+async def list_partners(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    segment: Optional[str] = Query(None),
+    channel: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(Partner)
+    filters = []
+    if status:
+        filters.append(Partner.status == status)
+    if segment:
+        filters.append(Partner.segment == segment)
+    if channel:
+        filters.append(Partner.channel == channel)
+    if search:
+        filters.append((Partner.name.ilike(f"%{search}%")) | (Partner.contact_email.ilike(f"%{search}%")))
+    if filters:
+        q = q.where(and_(*filters))
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(Partner.created_at.desc()).offset((page - 1) * limit).limit(limit)
+    result = await db.execute(q)
+    partners = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "contact_name": p.contact_name,
+                "contact_email": p.contact_email,
+                "contact_phone": p.contact_phone,
+                "company_type": p.company_type,
+                "status": p.status,
+                "channel": p.channel,
+                "segment": p.segment,
+                "url": p.url,
+                "notes": p.notes,
+                "next_follow_up": p.next_follow_up.isoformat() if p.next_follow_up else None,
+                "last_published_at": p.last_published_at.isoformat() if p.last_published_at else None,
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat(),
+            }
+            for p in partners
+        ],
+    }
+
+
+@router.post("/partners")
+async def create_partner(
+    body: PartnerCreate,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import date as date_type
+    if body.status not in VALID_PARTNER_STATUSES:
+        raise HTTPException(422, f"Invalid status. Valid: {sorted(VALID_PARTNER_STATUSES)}")
+    partner = Partner(
+        name=body.name,
+        contact_name=body.contact_name,
+        contact_email=body.contact_email,
+        contact_phone=body.contact_phone,
+        company_type=body.company_type,
+        status=body.status,
+        channel=body.channel,
+        segment=body.segment,
+        url=body.url,
+        notes=body.notes,
+        next_follow_up=date_type.fromisoformat(body.next_follow_up) if body.next_follow_up else None,
+    )
+    db.add(partner)
+    await db.flush()
+    await _log_action(db, admin, "create_partner", "partner", str(partner.id))
+    return {"status": "ok", "id": str(partner.id)}
+
+
+@router.patch("/partners/{partner_id}")
+async def update_partner(
+    partner_id: str,
+    body: PartnerPatch,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import date as date_type
+    result = await db.execute(select(Partner).where(Partner.id == uuid.UUID(partner_id)))
+    partner = result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(404)
+    if body.status is not None and body.status not in VALID_PARTNER_STATUSES:
+        raise HTTPException(422, f"Invalid status. Valid: {sorted(VALID_PARTNER_STATUSES)}")
+    changes = {}
+    for field in ["name", "contact_name", "contact_email", "contact_phone", "company_type", "status", "channel", "segment", "url", "notes"]:
+        val = getattr(body, field)
+        if val is not None:
+            setattr(partner, field, val)
+            changes[field] = val
+    if body.next_follow_up is not None:
+        partner.next_follow_up = date_type.fromisoformat(body.next_follow_up) if body.next_follow_up else None
+        changes["next_follow_up"] = body.next_follow_up
+    partner.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await _log_action(db, admin, "update_partner", "partner", partner_id, changes)
+    return {"status": "ok"}
+
+
+@router.delete("/partners/{partner_id}", status_code=204)
+async def delete_partner(
+    partner_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Partner).where(Partner.id == uuid.UUID(partner_id)))
+    partner = result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(404)
+    await db.delete(partner)
+    await db.flush()
+    await _log_action(db, admin, "delete_partner", "partner", partner_id)
+
+
+# ── Short Links Admin ────────────────────────────────────────────────────────
+
+class LinkCreate(BaseModel):
+    target_url: str
+    title: Optional[str] = None
+    code: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class LinkPatch(BaseModel):
+    target_url: Optional[str] = None
+    title: Optional[str] = None
+    is_active: Optional[bool] = None
+    expires_at: Optional[str] = None
+
+
+@router.get("/links")
+async def list_links(
+    page: int = Query(1, ge=1),
+    search: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    q = select(ShortLink)
+    filters = []
+    if search:
+        filters.append((ShortLink.code.ilike(f"%{search}%")) | (ShortLink.title.ilike(f"%{search}%")))
+    if is_active is not None:
+        filters.append(ShortLink.is_active == is_active)
+    if filters:
+        q = q.where(and_(*filters))
+
+    total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
+    q = q.order_by(ShortLink.created_at.desc()).offset((page - 1) * 20).limit(20)
+    result = await db.execute(q)
+    links = result.scalars().all()
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": str(l.id),
+                "code": l.code,
+                "target_url": l.target_url,
+                "title": l.title,
+                "utm_source": l.utm_source,
+                "utm_medium": l.utm_medium,
+                "utm_campaign": l.utm_campaign,
+                "click_count": l.click_count,
+                "is_active": l.is_active,
+                "created_at": l.created_at.isoformat(),
+                "expires_at": l.expires_at.isoformat() if l.expires_at else None,
+            }
+            for l in links
+        ],
+    }
+
+
+@router.post("/links")
+async def create_link(
+    body: LinkCreate,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    import secrets
+    code = body.code or secrets.token_urlsafe(4)[:6]
+    # Check uniqueness
+    existing = await db.execute(select(ShortLink).where(ShortLink.code == code))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, f"Code '{code}' already exists")
+
+    link = ShortLink(
+        code=code,
+        target_url=body.target_url,
+        title=body.title,
+        utm_source=body.utm_source,
+        utm_medium=body.utm_medium,
+        utm_campaign=body.utm_campaign,
+        created_by=admin.id,
+        expires_at=datetime.fromisoformat(body.expires_at) if body.expires_at else None,
+    )
+    db.add(link)
+    await db.flush()
+    await _log_action(db, admin, "create_link", "link", str(link.id))
+    return {"status": "ok", "id": str(link.id), "code": code}
+
+
+@router.patch("/links/{link_id}")
+async def update_link(
+    link_id: str,
+    body: LinkPatch,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ShortLink).where(ShortLink.id == uuid.UUID(link_id)))
+    link = result.scalar_one_or_none()
+    if not link:
+        raise HTTPException(404)
+    if body.target_url is not None:
+        link.target_url = body.target_url
+    if body.title is not None:
+        link.title = body.title
+    if body.is_active is not None:
+        link.is_active = body.is_active
+    if body.expires_at is not None:
+        link.expires_at = datetime.fromisoformat(body.expires_at) if body.expires_at else None
+    await db.flush()
+    # Invalidate Redis cache
+    try:
+        redis = get_redis()
+        await redis.delete(f"sl:{link.code}")
+    except Exception:
+        pass
+    await _log_action(db, admin, "update_link", "link", link_id)
+    return {"status": "ok"}
+
+
+@router.delete("/links/{link_id}", status_code=204)
+async def delete_link(
+    link_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ShortLink).where(ShortLink.id == uuid.UUID(link_id)))
+    link = result.scalar_one_or_none()
+    if not link:
+        raise HTTPException(404)
+    # Invalidate cache
+    try:
+        redis = get_redis()
+        await redis.delete(f"sl:{link.code}")
+    except Exception:
+        pass
+    await db.execute(delete(LinkClick).where(LinkClick.link_id == link.id))
+    await db.delete(link)
+    await db.flush()
+    await _log_action(db, admin, "delete_link", "link", link_id)
+
+
+@router.get("/links/{link_id}/clicks")
+async def get_link_clicks(
+    link_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(LinkClick)
+        .where(LinkClick.link_id == uuid.UUID(link_id))
+        .order_by(LinkClick.created_at.desc())
+        .limit(100)
+    )
+    clicks = result.scalars().all()
+    return [
+        {
+            "id": str(c.id),
+            "ip_hash": c.ip_hash,
+            "user_agent": c.user_agent,
+            "referer": c.referer,
+            "country_code": c.country_code,
+            "created_at": c.created_at.isoformat(),
+        }
+        for c in clicks
+    ]
+
+
+@router.get("/links/{link_id}/stats")
+async def get_link_stats(
+    link_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """일별 클릭 통계."""
+    result = await db.execute(
+        select(
+            cast(LinkClick.created_at, Date).label("date"),
+            func.count().label("count"),
+        )
+        .where(LinkClick.link_id == uuid.UUID(link_id))
+        .group_by("date")
+        .order_by("date")
+    )
+    return [{"date": row.date.isoformat(), "count": row.count} for row in result.all()]
+
+
+# ── Subscription Admin PATCH ─────────────────────────────────────────────────
+
+class SubscriptionPatch(BaseModel):
+    plan: Optional[str] = None
+    status: Optional[str] = None
+
+
+@router.patch("/subscriptions/{sub_id}")
+async def update_subscription(
+    sub_id: str,
+    body: SubscriptionPatch,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Subscription).where(Subscription.id == uuid.UUID(sub_id)))
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(404)
+    changes = {}
+    if body.plan:
+        # Update the user's plan too
+        user_result = await db.execute(select(User).where(User.id == sub.user_id))
+        user = user_result.scalar_one_or_none()
+        if user:
+            user.plan = body.plan
+        changes["plan"] = body.plan
+    if body.status:
+        sub.status = body.status
+        changes["status"] = body.status
+    await db.flush()
+    await _log_action(db, admin, "update_subscription", "subscription", sub_id, changes)
+    return {"status": "ok"}
+
+
+# ── Reports Performance ──────────────────────────────────────────────────────
+
+@router.get("/reports/weekly-performance")
+async def weekly_report_performance(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """주간 리포트 발송 성적."""
+    result = await db.execute(
+        text("""
+            SELECT
+                date_trunc('week', created_at)::date AS week,
+                status,
+                COUNT(*) AS cnt
+            FROM marketing_email_logs
+            WHERE created_at >= NOW() - INTERVAL '8 weeks'
+            GROUP BY 1, 2
+            ORDER BY 1 DESC
+        """)
+    )
+    rows = result.fetchall()
+    weeks = {}
+    for row in rows:
+        w = row.week.isoformat()
+        if w not in weeks:
+            weeks[w] = {"week": w, "sent": 0, "failed": 0}
+        weeks[w][row.status] = row.cnt
+    return list(weeks.values())
+
+
+@router.get("/reports/referral-kpi")
+async def referral_kpi(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """레퍼럴 성과."""
+    total_codes = (await db.execute(
+        select(func.count()).select_from(User).where(User.referral_code.isnot(None))
+    )).scalar() or 0
+
+    total_used = (await db.execute(
+        select(func.count()).select_from(User).where(User.referred_by_code.isnot(None))
+    )).scalar() or 0
+
+    # Pro 전환 (referred users who became pro)
+    pro_converted = (await db.execute(
+        select(func.count()).select_from(User).where(
+            User.referred_by_code.isnot(None),
+            User.plan != "free",
+        )
+    )).scalar() or 0
+
+    # Top referrers
+    top_referrers = await db.execute(
+        text("""
+            SELECT u.referral_code, u.nickname,
+                   (SELECT COUNT(*) FROM users r WHERE r.referred_by_code = u.referral_code) AS referred_count
+            FROM users u
+            WHERE u.referral_code IS NOT NULL
+            ORDER BY referred_count DESC
+            LIMIT 10
+        """)
+    )
+
+    return {
+        "total_codes": total_codes,
+        "total_used": total_used,
+        "pro_converted": pro_converted,
+        "top_referrers": [
+            {"code": r.referral_code, "nickname": r.nickname, "count": r.referred_count}
+            for r in top_referrers.fetchall()
+        ],
     }

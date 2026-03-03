@@ -1415,3 +1415,264 @@ async def _send_weekly_report_impl():
 def send_weekly_report():
     """매주 월요일 주간 리포트 발송."""
     return run_async(_send_weekly_report_impl())
+
+
+# ── Admin Ops v0.9: KPI Alert Email ──────────────────────────────────────────
+
+async def _send_kpi_alert_email(alerts: list[dict], week_start) -> None:
+    """KPI drop alert 이메일을 admin 유저들에게 발송."""
+    import smtplib
+    import os
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from sqlalchemy import select
+    from backend.app.models.user import User
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    sender = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.warning("_send_kpi_alert_email: SMTP 설정 누락, 발송 중단")
+        return
+
+    # admin 유저 조회
+    async with AsyncSessionLocal() as db:
+        admin_result = await db.execute(
+            select(User).where(User.role == "admin", User.email.isnot(None), User.status == "active")
+        )
+        admins = admin_result.scalars().all()
+
+    if not admins:
+        logger.info("_send_kpi_alert_email: admin 유저 없음")
+        return
+
+    # 이메일 본문 생성
+    rows = ""
+    for a in alerts:
+        rows += f"<tr><td style='padding:8px;border:1px solid #ddd'>{a['kpi']}</td>"
+        rows += f"<td style='padding:8px;border:1px solid #ddd'>{a['prev']}</td>"
+        rows += f"<td style='padding:8px;border:1px solid #ddd'>{a['curr']}</td>"
+        rows += f"<td style='padding:8px;border:1px solid #ddd;color:red'>{a['drop_pct']}%</td></tr>"
+
+    html = f"""<html><body>
+    <h2>⚠️ WeWantPeace KPI Alert — Week of {week_start}</h2>
+    <p>다음 KPI가 전주 대비 30% 이상 하락했습니다:</p>
+    <table style='border-collapse:collapse;width:100%'>
+    <tr style='background:#f5f5f5'>
+      <th style='padding:8px;border:1px solid #ddd'>KPI</th>
+      <th style='padding:8px;border:1px solid #ddd'>Previous</th>
+      <th style='padding:8px;border:1px solid #ddd'>Current</th>
+      <th style='padding:8px;border:1px solid #ddd'>Drop</th>
+    </tr>
+    {rows}
+    </table>
+    <p style='margin-top:16px;color:#666'>어드민 대시보드에서 상세 내용을 확인하세요.</p>
+    </body></html>"""
+
+    try:
+        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp.starttls()
+        smtp.login(smtp_user, smtp_pass)
+
+        for admin in admins:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["From"] = sender
+                msg["To"] = admin.email
+                msg["Subject"] = f"[WeWantPeace] KPI Alert — Week of {week_start}"
+                msg.attach(MIMEText(html, "html", "utf-8"))
+                smtp.sendmail(sender, admin.email, msg.as_string())
+            except Exception as e:
+                logger.warning("KPI alert 이메일 발송 실패 [%s]: %s", admin.email, e)
+
+        smtp.quit()
+        logger.info("KPI alert 이메일 발송 완료: %d명 admin", len(admins))
+    except Exception as e:
+        logger.error("KPI alert SMTP 연결 실패: %s", e)
+
+
+# ── Admin Ops v0.9: Weekly KPI Snapshot ──────────────────────────────────────
+
+@app.task(
+    name="worker.tasks.snapshot_weekly_kpi",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def snapshot_weekly_kpi(self):
+    """매주 월요일 자동 KPI 스냅샷 생성."""
+
+    async def _run():
+        from sqlalchemy import select, func
+        from backend.app.models.app_event import AppEvent
+        from backend.app.models.paywall_event import PaywallEvent
+        from backend.app.models.subscription import Subscription
+        from backend.app.models.user import User
+        from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
+
+        now = datetime.now(timezone.utc)
+        today = now.date()
+        days_since_monday = today.weekday()
+        this_monday = today - timedelta(days=days_since_monday)
+        last_monday = this_monday - timedelta(days=7)
+        last_sunday = this_monday - timedelta(days=1)
+
+        week_start_dt = datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=timezone.utc)
+        week_end_dt = datetime.combine(last_sunday, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 중복 체크
+                existing = await db.execute(
+                    select(WeeklyKpiSnapshot).where(WeeklyKpiSnapshot.week_start == last_monday)
+                )
+                if existing.scalar_one_or_none():
+                    logger.info("snapshot_weekly_kpi: 이미 존재 (week=%s)", last_monday)
+                    return {"status": "exists"}
+
+                # app_events 집계
+                ae_q = await db.execute(
+                    select(AppEvent.name, func.count())
+                    .where(AppEvent.created_at >= week_start_dt, AppEvent.created_at <= week_end_dt)
+                    .group_by(AppEvent.name)
+                )
+                ae_counts = {row[0]: row[1] for row in ae_q.all()}
+
+                auth_success = ae_counts.get("auth_success", 0)
+                onboarding_complete = ae_counts.get("onboarding_complete", 0)
+                a1_rate = round(onboarding_complete / max(1, auth_success) * 100, 1)
+
+                pw_shown = (await db.execute(
+                    select(func.count()).select_from(PaywallEvent)
+                    .where(PaywallEvent.action == "shown", PaywallEvent.created_at >= week_start_dt, PaywallEvent.created_at <= week_end_dt)
+                )).scalar() or 0
+                pw_purchase = (await db.execute(
+                    select(func.count()).select_from(PaywallEvent)
+                    .where(PaywallEvent.action == "purchase_success", PaywallEvent.created_at >= week_start_dt, PaywallEvent.created_at <= week_end_dt)
+                )).scalar() or 0
+                paywall_rate = round(pw_purchase / max(1, pw_shown) * 100, 1)
+
+                trial_started = (await db.execute(
+                    select(func.count()).select_from(Subscription)
+                    .where(Subscription.trial_start.isnot(None), Subscription.trial_start >= week_start_dt, Subscription.trial_start <= week_end_dt)
+                )).scalar() or 0
+                trial_converted = (await db.execute(
+                    select(func.count()).select_from(Subscription)
+                    .where(Subscription.trial_start.isnot(None), Subscription.trial_start >= week_start_dt, Subscription.trial_start <= week_end_dt, Subscription.status == "active", Subscription.trial_end.isnot(None))
+                )).scalar() or 0
+                trial_to_paid = round(trial_converted / max(1, trial_started) * 100, 1)
+
+                d7_start = week_start_dt - timedelta(days=7)
+                d7_end = week_start_dt
+                d7_cohort = (await db.execute(
+                    select(func.count()).select_from(User).where(User.created_at >= d7_start, User.created_at < d7_end, User.status != "deleted")
+                )).scalar() or 0
+                d7_retained = (await db.execute(
+                    select(func.count()).select_from(User).where(User.created_at >= d7_start, User.created_at < d7_end, User.last_active >= week_start_dt, User.status != "deleted")
+                )).scalar() or 0
+                d7_retention = round(d7_retained / max(1, d7_cohort) * 100, 1)
+
+                # Referral 메트릭
+                referral_install = (await db.execute(
+                    select(func.count()).select_from(User)
+                    .where(User.created_at >= week_start_dt, User.created_at <= week_end_dt, User.referred_by_code.isnot(None))
+                )).scalar() or 0
+                referral_trial_start = (await db.execute(
+                    select(func.count()).select_from(Subscription)
+                    .where(
+                        Subscription.trial_start.isnot(None),
+                        Subscription.trial_start >= week_start_dt,
+                        Subscription.trial_start <= week_end_dt,
+                    ).where(
+                        Subscription.user_id.in_(
+                            select(User.id).where(User.referred_by_code.isnot(None))
+                        )
+                    )
+                )).scalar() or 0
+
+                metrics = {**ae_counts, "paywall_shown": pw_shown, "paywall_purchase": pw_purchase, "trial_started": trial_started, "trial_converted": trial_converted, "d7_cohort": d7_cohort, "d7_retained": d7_retained, "referral_install": referral_install, "referral_trial_start": referral_trial_start}
+                kpi_data = {"a1_onboarding_rate": a1_rate, "paywall_conversion_rate": paywall_rate, "trial_to_paid_rate": trial_to_paid, "d7_retention_rate": d7_retention}
+
+                # WoW delta
+                prev_q = await db.execute(
+                    select(WeeklyKpiSnapshot).where(WeeklyKpiSnapshot.week_start == last_monday - timedelta(days=7))
+                )
+                prev = prev_q.scalar_one_or_none()
+                wow_delta = None
+                alerts = None
+                if prev and prev.kpi:
+                    wow_delta = {}
+                    alerts = []
+                    for k, v in kpi_data.items():
+                        prev_val = prev.kpi.get(k, 0)
+                        delta = round(v - prev_val, 1)
+                        wow_delta[k] = delta
+                        if prev_val > 0 and delta / prev_val * 100 <= -30:
+                            alerts.append({"kpi": k, "prev": prev_val, "curr": v, "drop_pct": round(delta / prev_val * 100, 1)})
+                    if not alerts:
+                        alerts = None
+
+                snapshot = WeeklyKpiSnapshot(
+                    week_start=last_monday,
+                    week_end=last_sunday,
+                    metrics=metrics,
+                    kpi=kpi_data,
+                    wow_delta=wow_delta,
+                    alerts=alerts,
+                    data_source="auto",
+                )
+                db.add(snapshot)
+
+        # KPI drop alert 이메일 발송
+        if alerts:
+            await _send_kpi_alert_email(alerts, last_monday)
+
+        logger.info("snapshot_weekly_kpi 완료: week=%s, kpi=%s, alerts=%s", last_monday, kpi_data, alerts)
+        return {"status": "ok", "week_start": str(last_monday), "alerts": alerts}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("snapshot_weekly_kpi 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.aggregate_link_clicks",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def aggregate_link_clicks(self):
+    """단축 링크 클릭 수 집계 (1시간마다)."""
+
+    async def _run():
+        from sqlalchemy import select, func, update
+        from backend.app.models.short_link import ShortLink, LinkClick
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                counts_q = await db.execute(
+                    select(LinkClick.link_id, func.count().label("cnt"))
+                    .group_by(LinkClick.link_id)
+                )
+                updated = 0
+                for row in counts_q.all():
+                    await db.execute(
+                        update(ShortLink)
+                        .where(ShortLink.id == row.link_id)
+                        .values(click_count=row.cnt)
+                    )
+                    updated += 1
+
+        logger.info("aggregate_link_clicks: %d개 링크 업데이트", updated)
+        return {"status": "ok", "updated": updated}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("aggregate_link_clicks 오류: %s", exc)
+        raise self.retry(exc=exc)

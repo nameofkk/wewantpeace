@@ -15,6 +15,7 @@ from backend.app.core.firebase_init import init_firebase
 from backend.app.routers import issues, trending, tension, me
 from backend.app.routers import auth as auth_router, community, admin as admin_router, subscriptions, terms as terms_router
 from backend.app.routers import store_subscriptions
+from backend.app.routers import links as links_router
 import structlog
 
 logger = structlog.get_logger()
@@ -230,6 +231,7 @@ app.include_router(admin_router.router)
 app.include_router(subscriptions.router)
 app.include_router(store_subscriptions.router)
 app.include_router(terms_router.router)
+app.include_router(links_router.router)
 
 
 @app.get("/health")

@@ -8,6 +8,7 @@ import {
   Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
   CreditCard, MessageSquare, TrendingUp, MessageCircleQuestion,
   Mail, ScrollText, Workflow, BarChart3,
+  Handshake, Link2, FileBarChart, BookOpen,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,15 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/kpi", icon: BarChart3, labelKey: "admin_kpi" },
       { href: "/admin/kscore", icon: TrendingUp, labelKey: "admin_trending" },
       { href: "/admin/tension", icon: Activity, labelKey: "admin_tension" },
+    ],
+  },
+  {
+    labelKey: "admin_group_ops",
+    items: [
+      { href: "/admin/partners", icon: Handshake, labelKey: "admin_partners" },
+      { href: "/admin/links", icon: Link2, labelKey: "admin_links" },
+      { href: "/admin/reports-perf", icon: FileBarChart, labelKey: "admin_reports_perf" },
+      { href: "/admin/guide", icon: BookOpen, labelKey: "admin_guide" },
     ],
   },
   {

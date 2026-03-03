@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, CreditCard } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2, CreditCard, HelpCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { API_BASE } from "@/lib/admin-utils";
+import { useAdminToast } from "@/components/ui/admin-toast";
 
 interface SubscriptionItem {
   id: string;
@@ -48,11 +49,43 @@ const STATUS_LABEL_KEY: Record<string, string> = {
   grace_period: "admin_sub_grace_period",
 };
 
+const PLAN_OPTIONS = ["pro", "pro_plus", "free"] as const;
+
+function InlineGuide({ lang }: { lang: "ko" | "en" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4 rounded-xl border border-border/50 bg-card/50">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-1.5">
+          <HelpCircle className="h-3.5 w-3.5" />
+          {t(lang, "admin_page_guide")}
+        </span>
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="px-4 pb-3 text-xs text-muted-foreground space-y-1 leading-relaxed">
+          <p>
+            {lang === "ko"
+              ? "구독 현황을 조회하고 플랜을 변경할 수 있습니다. 플랜 변경 시 사용자의 즉시 반영됩니다."
+              : "View subscriptions and change plans. Plan changes take effect immediately for the user."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminSubscriptionsPage() {
   const { user } = useAuth();
   const { lang } = useAppStore();
+  const { toast } = useAdminToast();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [planFilter, setPlanFilter] = useState("all");
+  const [changingPlan, setChangingPlan] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<{ items: SubscriptionItem[]; total: number }>({
     queryKey: ["admin-subscriptions", page, planFilter],
@@ -70,6 +103,27 @@ export default function AdminSubscriptionsPage() {
     enabled: !!user,
   });
 
+  const changePlanMutation = useMutation({
+    mutationFn: async ({ subId, newPlan }: { subId: string; newPlan: string }) => {
+      if (!user) throw new Error("Unauthorized");
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/admin/subscriptions/${subId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      if (!res.ok) throw new Error("Plan change failed");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      setChangingPlan(null);
+      toast(lang === "ko" ? "플랜이 변경되었습니다" : "Plan changed successfully", "success");
+    },
+    onError: () => {
+      toast(t(lang, "admin_toast_error"), "error");
+    },
+  });
+
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
   const filtered = data?.items ?? [];
@@ -77,7 +131,7 @@ export default function AdminSubscriptionsPage() {
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
 
   const formatDate = (d: string | null) => {
-    if (!d) return "—";
+    if (!d) return "\u2014";
     return new Date(d).toLocaleDateString(locale);
   };
 
@@ -96,6 +150,9 @@ export default function AdminSubscriptionsPage() {
           </p>
         </div>
       </div>
+
+      {/* Inline Guide */}
+      <InlineGuide lang={lang} />
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
@@ -152,6 +209,7 @@ export default function AdminSubscriptionsPage() {
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_user_nickname")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_plan")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_status")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_change_plan")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_platform")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_started")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_sub_expires")}</th>
@@ -171,6 +229,37 @@ export default function AdminSubscriptionsPage() {
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", STATUS_COLORS[item.status] || "bg-secondary")}>
                         {t(lang, STATUS_LABEL_KEY[item.status] as any) || item.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {changingPlan === item.id ? (
+                        <select
+                          autoFocus
+                          className="rounded-lg border border-border bg-card px-2 py-1 text-xs"
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              changePlanMutation.mutate({ subId: item.id, newPlan: e.target.value });
+                            }
+                          }}
+                          onBlur={() => setChangingPlan(null)}
+                        >
+                          <option value="" disabled>
+                            {lang === "ko" ? "선택..." : "Select..."}
+                          </option>
+                          {PLAN_OPTIONS.filter((p) => p !== item.plan).map((p) => (
+                            <option key={p} value={p}>
+                              {p === "pro_plus" ? "Pro+" : p === "pro" ? "Pro" : "Free"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={() => setChangingPlan(item.id)}
+                          className="rounded-lg bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-border transition-colors"
+                        >
+                          {t(lang, "admin_sub_change_plan")}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {item.platform}
@@ -218,6 +307,37 @@ export default function AdminSubscriptionsPage() {
                     <span className="text-muted-foreground">{t(lang, "admin_sub_expires")}</span>
                     <p className="font-medium">{formatDate(item.expires_at)}</p>
                   </div>
+                </div>
+                <div className="mt-2">
+                  {changingPlan === item.id ? (
+                    <select
+                      autoFocus
+                      className="rounded-lg border border-border bg-card px-2 py-1 text-xs w-full"
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          changePlanMutation.mutate({ subId: item.id, newPlan: e.target.value });
+                        }
+                      }}
+                      onBlur={() => setChangingPlan(null)}
+                    >
+                      <option value="" disabled>
+                        {lang === "ko" ? "플랜 선택..." : "Select plan..."}
+                      </option>
+                      {PLAN_OPTIONS.filter((p) => p !== item.plan).map((p) => (
+                        <option key={p} value={p}>
+                          {p === "pro_plus" ? "Pro+" : p === "pro" ? "Pro" : "Free"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      onClick={() => setChangingPlan(item.id)}
+                      className="w-full rounded-lg bg-secondary px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-border transition-colors"
+                    >
+                      {t(lang, "admin_sub_change_plan")}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

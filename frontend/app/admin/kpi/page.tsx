@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { adminFetch } from "@/lib/admin-utils";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
+import { HelpCircle, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface KpiData {
   period_days: number;
@@ -12,6 +14,41 @@ interface KpiData {
   trial_to_paid_rate: number;
   d7_retention_rate: number;
   raw: Record<string, number>;
+}
+
+interface KpiSnapshot {
+  week: string;
+  a1_onboarding_rate: number;
+  paywall_conversion_rate: number;
+  trial_to_paid_rate: number;
+  d7_retention_rate: number;
+}
+
+function InlineGuide({ lang }: { lang: "ko" | "en" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4 rounded-xl border border-border/50 bg-card/50">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-1.5">
+          <HelpCircle className="h-3.5 w-3.5" />
+          {t(lang, "admin_page_guide")}
+        </span>
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="px-4 pb-3 text-xs text-muted-foreground space-y-1 leading-relaxed">
+          <p>
+            {lang === "ko"
+              ? "KPI 대시보드에서는 온보딩율, Paywall 전환율, Trial\u2192Paid 전환율, D7 리텐션을 실시간으로 추적합니다. 주간 추이 섹션에서 WoW 비교가 가능합니다."
+              : "Track onboarding rate, paywall conversion, trial-to-paid rate, and D7 retention in real time. Use the weekly trend section for WoW comparisons."}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function KpiCard({
@@ -38,11 +75,31 @@ function KpiCard({
   );
 }
 
+function WowBadge({ delta }: { delta: number }) {
+  const isPositive = delta > 0;
+  const isSevereDrop = delta <= -30;
+  const colorClass = isSevereDrop
+    ? "bg-orange-500/20 text-orange-400"
+    : isPositive
+      ? "bg-green-500/20 text-green-400"
+      : delta < 0
+        ? "bg-red-500/20 text-red-400"
+        : "bg-secondary text-muted-foreground";
+  const sign = delta > 0 ? "+" : "";
+  return (
+    <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", colorClass)}>
+      {sign}{delta.toFixed(1)}
+    </span>
+  );
+}
+
 export default function KpiPage() {
   const lang = useAppStore((s) => s.lang);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
+  const [snapshots, setSnapshots] = useState<KpiSnapshot[]>([]);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -51,6 +108,14 @@ export default function KpiPage() {
       .catch(() => setKpi(null))
       .finally(() => setLoading(false));
   }, [days]);
+
+  useEffect(() => {
+    setSnapshotsLoading(true);
+    adminFetch<KpiSnapshot[]>(`/admin/kpi/snapshots?weeks=8`)
+      .then(setSnapshots)
+      .catch(() => setSnapshots([]))
+      .finally(() => setSnapshotsLoading(false));
+  }, []);
 
   if (loading) {
     return (
@@ -92,6 +157,9 @@ export default function KpiPage() {
           <option value={30}>{lang === "ko" ? "최근 30일" : "Last 30 days"}</option>
         </select>
       </div>
+
+      {/* Inline Guide */}
+      <InlineGuide lang={lang} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -139,6 +207,98 @@ export default function KpiPage() {
               </div>
             ))}
         </div>
+      </div>
+
+      {/* Weekly Trend */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold">
+            {t(lang, "admin_kpi_weekly")}
+          </h2>
+        </div>
+        {snapshotsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : snapshots.length === 0 ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">
+            {lang === "ko" ? "스냅샷 데이터가 없습니다" : "No snapshot data available"}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                    {lang === "ko" ? "주차" : "Week"}
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                    {lang === "ko" ? "온보딩율" : "Onboarding"}
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                    {lang === "ko" ? "Paywall" : "Paywall"}
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                    {lang === "ko" ? "Trial\u2192Paid" : "Trial\u2192Paid"}
+                  </th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                    {lang === "ko" ? "D7 리텐션" : "D7 Retention"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {snapshots.map((snap, idx) => {
+                  const prev = idx < snapshots.length - 1 ? snapshots[idx + 1] : null;
+                  const deltas = prev
+                    ? {
+                        onboarding: snap.a1_onboarding_rate - prev.a1_onboarding_rate,
+                        paywall: snap.paywall_conversion_rate - prev.paywall_conversion_rate,
+                        trial: snap.trial_to_paid_rate - prev.trial_to_paid_rate,
+                        retention: snap.d7_retention_rate - prev.d7_retention_rate,
+                      }
+                    : null;
+                  const hasAlert = deltas
+                    ? Object.values(deltas).some((d) => d <= -30)
+                    : false;
+                  return (
+                    <tr
+                      key={snap.week}
+                      className={cn(
+                        "hover:bg-secondary/20",
+                        hasAlert && "bg-red-500/5"
+                      )}
+                    >
+                      <td className="px-3 py-2.5 text-xs font-medium">
+                        {snap.week}
+                        {hasAlert && (
+                          <span className="ml-1.5 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold text-red-400">
+                            {t(lang, "admin_kpi_alert")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs tabular-nums">
+                        {snap.a1_onboarding_rate}%
+                        {deltas && <span className="ml-1"><WowBadge delta={deltas.onboarding} /></span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs tabular-nums">
+                        {snap.paywall_conversion_rate}%
+                        {deltas && <span className="ml-1"><WowBadge delta={deltas.paywall} /></span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs tabular-nums">
+                        {snap.trial_to_paid_rate}%
+                        {deltas && <span className="ml-1"><WowBadge delta={deltas.trial} /></span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs tabular-nums">
+                        {snap.d7_retention_rate}%
+                        {deltas && <span className="ml-1"><WowBadge delta={deltas.retention} /></span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
