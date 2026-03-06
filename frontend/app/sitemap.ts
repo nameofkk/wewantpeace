@@ -77,6 +77,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.3,
     },
+    {
+      url: `${BASE_URL}/reports/weekly`,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    },
   ];
 
   const countryPages: MetadataRoute.Sitemap = COUNTRY_CODES.map((code) => ({

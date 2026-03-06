@@ -28,7 +28,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "article",
       url: `https://www.wewantpeace.live/issues/${issue.id}`,
       siteName: "WeWantPeace",
-      images: [`/issues/${issue.id}/opengraph-image`],
     },
     twitter: {
       card: "summary_large_image",
