@@ -70,6 +70,19 @@ _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     # 편집자 주·재출판 고지가 기사 전체를 차지하는 경우
     r"^editor'?s?\s+(note|correction)\s*[:\-–].{0,400}(creative commons|license|republished|copyright)",
     r"^this article (was|has been) (republished|reprinted).{0,300}(creative commons|permission|license)",
+    # 사설·칼럼·오피니언 — 뉴스가 아닌 의견 기사
+    r"^\(?(editorial|opinion|commentary|column|op-?ed)\b",
+    r"\bEDITORIAL from\b",
+    r"^\(?사설\)?",
+    r"^\(?칼럼\)?",
+    r"^\(?논설\)?",
+    r"^\(?기고\)?",
+    # 통신사 슬러그 접두어 — 실제 제목이 아닌 메타 태그
+    r"^\(\d+(st|nd|rd|th)\s+LD\)",
+    r"^\(LEAD\)",
+    r"^\(URGENT\)",
+    r"^\(profile\)",
+    r"^\(CORRECTED\)",
     # 연예/스포츠/문화 기사 차단 (사망·사고 키워드와 결합되어 오분류 방지)
     r"(actor|actress|singer|musician|rapper|comedian|celebrity|footballer|athlete).{0,80}(dies|died|dead|passes away|passed away)",
     r"(dies|died|dead|passed away).{0,80}(actor|actress|singer|musician|rapper|comedian|celebrity)",
