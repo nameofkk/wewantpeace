@@ -18,6 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = issue.title_ko || issue.title;
   const siteDesc = "WeWantPeace | 실시간 세계정세 모니터링";
+  // 카카오톡: og:title이 길면 description 영역을 밀어내서 숨김
+  const ogTitle = title.length > 40 ? title.slice(0, 40) + "…" : title;
 
   const ogImage = `https://www.wewantpeace.live/issues/${issue.id}/og`;
 
@@ -25,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: siteDesc,
     openGraph: {
-      title: `${title} | WeWantPeace`,
+      title: `${ogTitle} | WeWantPeace`,
       description: siteDesc,
       type: "website",
       url: `https://www.wewantpeace.live/issues/${issue.id}`,
@@ -34,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary",
-      title: `${title} | WeWantPeace`,
+      title: `${ogTitle} | WeWantPeace`,
       description: siteDesc,
       images: [{ url: ogImage }],
     },
