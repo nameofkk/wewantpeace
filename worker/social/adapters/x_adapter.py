@@ -19,18 +19,31 @@ def is_configured() -> bool:
     return bool(X_API_KEY and X_API_SECRET and X_ACCESS_TOKEN and X_ACCESS_SECRET)
 
 
-_CTA = "🔗 www.wewantpeace.live"
+# 2026.3 X 알고리즘 변경: 비프리미엄 링크 포스트 노출 0
+# → URL 대신 브랜드명만 언급 (프로필 링크로 유도)
+_CTA = "— WeWantPeace"
 
 
 def _build_text(post: SocialPost) -> str:
-    """본문 + 해시태그 + CTA 조합 (280자 제한)."""
-    hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
+    """본문 + 해시태그 + CTA 조합 (280자 제한).
+
+    X 2026 최적화:
+    - 70-100자 본문이 최적 (스캔 용이)
+    - 링크 포함 시 노출 0 → URL 제거, 브랜드명만
+    - 네이티브 이미지 = 40% 더 높은 인게이지먼트
+    - 리플/RT 유도가 좋아요보다 13-20x 가치
+    """
+    # body_text에서 URL 제거 (AI가 넣었을 수 있음)
+    import re
+    body = re.sub(r'https?://\S+', '', post.body_text).strip()
+    body = re.sub(r'www\.\S+', '', body).strip()
+
+    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
     footer = f"\n\n{hashtag_str}\n{_CTA}" if hashtag_str else f"\n\n{_CTA}"
-    full_text = post.body_text
+    full_text = body
     if len(full_text) + len(footer) <= 280:
         full_text = full_text + footer
     elif len(full_text) + len(f"\n\n{_CTA}") <= 280:
-        # 해시태그 빼고 CTA만
         full_text = f"{full_text}\n\n{_CTA}"
     return full_text
 

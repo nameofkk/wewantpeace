@@ -33,6 +33,12 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
 
         hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
         full_text = post.body_text
+
+        # Threads 2026 최적화: 대화형 톤, 500자 한도
+        # CTA가 본문에 없으면 추가
+        if "wewantpeace" not in full_text.lower():
+            full_text = f"{full_text}\n\n🔗 www.wewantpeace.live"
+
         if hashtag_str:
             if len(full_text) + len(hashtag_str) + 1 <= 500:
                 full_text = f"{full_text}\n{hashtag_str}"

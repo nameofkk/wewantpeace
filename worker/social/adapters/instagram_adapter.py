@@ -24,9 +24,14 @@ def is_configured() -> bool:
 
 
 def _build_caption(post: SocialPost) -> str:
-    """본문 + 해시태그 조합 (2200자 제한)."""
-    hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
+    """본문 + CTA + 해시태그 조합 (2200자 제한)."""
     caption = post.body_text
+
+    # CTA 추가
+    if "wewantpeace" not in caption.lower():
+        caption = f"{caption}\n\n🌍 More updates → link in bio\n실시간 분석 → 프로필 링크"
+
+    hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
     if hashtag_str:
         candidate = f"{caption}\n\n{hashtag_str}"
         if len(candidate) <= _MAX_CAPTION_LEN:
