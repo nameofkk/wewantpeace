@@ -66,13 +66,11 @@ function condenseTitle(raw: string, maxLen = 35): string {
     t = t.slice(colonIdx + 2).trim();
   }
 
-  // 한국어 장황한 어미 축약
+  // 한국어 장황한 간접인용 어미만 축약 (자연 종결어미는 유지)
   t = t
     .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
     .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
-    .replace(/고\s+(있|밝혔|전했)습니다\.?$/, "")
-    .replace(/습니다\.?$/, "")
-    .replace(/했다$/, "")
+    .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
     .trim();
 
   // 마침표 제거
@@ -83,7 +81,7 @@ function condenseTitle(raw: string, maxLen = 35): string {
   // 길이 제한: 자연스러운 끊김점에서 자르기
   if (t.length <= maxLen) return t;
 
-  // 쉼표, 세미콜론, 공백 등에서 자르기
+  // 쉼표, 세미콜론, 공백 등에서 자르기 + 말줄임표 추가
   const slice = t.slice(0, maxLen);
   const lastBreak = Math.max(
     slice.lastIndexOf(", "),
@@ -92,9 +90,9 @@ function condenseTitle(raw: string, maxLen = 35): string {
     slice.lastIndexOf(" – "),
   );
   if (lastBreak > maxLen * 0.6) {
-    return slice.slice(0, lastBreak).trim();
+    return slice.slice(0, lastBreak).trim() + "…";
   }
-  return slice.trim();
+  return slice.trim() + "…";
 }
 
 /** 외부 이미지를 fetch하여 base64 data URI로 변환. 실패 시 null. */

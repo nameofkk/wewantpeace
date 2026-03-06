@@ -59,9 +59,7 @@ function condenseTitle(raw: string, maxLen = 35): string {
   t = t
     .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
     .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
-    .replace(/고\s+(있|밝혔|전했)습니다\.?$/, "")
-    .replace(/습니다\.?$/, "")
-    .replace(/했다$/, "")
+    .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
     .replace(/\.$/, "")
     .trim();
   if (!t) return raw.slice(0, maxLen);
@@ -73,8 +71,8 @@ function condenseTitle(raw: string, maxLen = 35): string {
     slice.lastIndexOf("·"),
     slice.lastIndexOf(" – "),
   );
-  if (lastBreak > maxLen * 0.6) return slice.slice(0, lastBreak).trim();
-  return slice.trim();
+  if (lastBreak > maxLen * 0.6) return slice.slice(0, lastBreak).trim() + "…";
+  return slice.trim() + "…";
 }
 
 /** 외부 이미지를 fetch하여 base64 data URI로 변환. 실패 시 null. */
