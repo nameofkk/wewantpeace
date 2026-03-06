@@ -1,9 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "WeWantPeace Country Tension";
 export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
