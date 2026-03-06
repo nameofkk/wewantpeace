@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = issue.title_ko || issue.title;
-  const description = `${title} — Severity ${issue.severity}, ${issue.event_count} reports. Track global conflicts in real time.`;
+  const description = `${title} — 위기지수 ${issue.severity}, 보도 ${issue.event_count}건 | WeWantPeace 실시간 세계정세 모니터링`;
 
   return {
     title,

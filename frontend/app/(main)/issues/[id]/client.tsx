@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
-import { useClusterDetail } from "@/lib/api";
+import { useClusterDetail, useKScoreHistory, type KScoreHistoryPoint } from "@/lib/api";
 import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
 import { ShareButton } from "@/components/issue/ShareButton";
@@ -64,12 +65,80 @@ interface Props {
   initialData?: ClusterDetail;
 }
 
+function KScoreHistorySection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
+  const { data, isPending } = useKScoreHistory(clusterId, 7);
+
+  if (isPending) {
+    return (
+      <div className="mt-4 pt-4 border-t border-border">
+        <div className="h-32 flex items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  return <KScoreHistoryChart data={data ?? []} lang={lang} />;
+}
+
+function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: Lang }) {
+  if (data.length < 2) {
+    return (
+      <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">
+        {lang === "ko" ? "히스토리 데이터가 부족합니다" : "Not enough history data"}
+      </div>
+    );
+  }
+
+  const maxKscore = Math.max(...data.map((d) => d.kscore), 1);
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border">
+      <p className="text-xs font-medium text-muted-foreground mb-3">{t(lang, "issue_kscore_history_section")}</p>
+      <div className="relative h-32">
+        <svg viewBox={`0 0 ${data.length - 1} 100`} className="w-full h-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="kscoreGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <path
+            d={`M0,${100 - (data[0].kscore / maxKscore) * 90} ${data.map((d, i) => `L${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")} L${data.length - 1},100 L0,100 Z`}
+            fill="url(#kscoreGrad)"
+          />
+          <polyline
+            points={data.map((d, i) => `${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
+          <span className="text-[9px] text-muted-foreground">
+            {new Date(data[0].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+          </span>
+          <span className="text-[9px] text-muted-foreground">
+            {new Date(data[data.length - 1].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+          </span>
+        </div>
+        <div className="absolute top-0 right-1">
+          <span className="text-[9px] text-muted-foreground">max {maxKscore.toFixed(1)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function IssueDetailClient({ initialData }: Props) {
   const id = initialData?.id ?? "";
   const router = useRouter();
   const { data, isPending, isError } = useClusterDetail(id);
   const issue = (data as ClusterDetail | undefined) ?? initialData;
   const lang = useAppStore((s) => s.lang);
+  const [showHistory, setShowHistory] = useState(false);
 
   if (!initialData && isPending) {
     return (
@@ -165,6 +234,23 @@ export default function IssueDetailClient({ initialData }: Props) {
             <span>{t(lang, "issue_first_report")} {new Date(issue.first_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
             <span>{t(lang, "issue_last_report")} {new Date(issue.last_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
+
+          {/* 공유하기 + 히스토리 버튼 */}
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
+            <ShareButton issueId={issue.id} title={displayTitle} />
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              {showHistory ? (
+                <><ChevronUp className="h-3 w-3" /> {t(lang, "issue_kscore_history_collapse")}</>
+              ) : (
+                <><ChevronDown className="h-3 w-3" /> {t(lang, "issue_kscore_history_expand")}</>
+              )}
+            </button>
+          </div>
+
+          {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
 
         {/* 타임라인 */}

@@ -13,6 +13,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
+import { ShareButton } from "@/components/issue/ShareButton";
 import WelcomeModal from "@/components/ui/WelcomeModal";
 
 const TOPIC_COLORS: Record<string, string> = {
@@ -504,15 +505,22 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
       )}
 
       {clusterId && (
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowHistory((v) => !v); }}
-          className="mt-3 w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1 relative"
-        >
-          {showHistory
-            ? <><ChevronUp className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 접기" : "Hide KScore history"}</>
-            : <><ChevronDown className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 보기" : "Show KScore history"}</>
-          }
-        </button>
+        <div className="mt-3 flex items-center justify-between relative" onClick={(e) => e.stopPropagation()}>
+          <ShareButton
+            issueId={clusterId}
+            title={displayTitle}
+            analyticsEvent="cluster_card_share"
+          />
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            {showHistory
+              ? <><ChevronUp className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 접기" : "Hide KScore history"}</>
+              : <><ChevronDown className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 보기" : "Show KScore history"}</>
+            }
+          </button>
+        </div>
       )}
 
       {showHistory && clusterId && (
