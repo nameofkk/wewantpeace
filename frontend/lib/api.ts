@@ -2,11 +2,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-function getAuthHeaders(): Record<string, string> {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   const devUid = typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
   if (devUid) return { "X-Dev-UID": devUid };
-  const token = typeof window !== "undefined" ? localStorage.getItem("firebase_token") : null;
-  if (token) return { Authorization: `Bearer ${token}` };
+  try {
+    const { getIdToken } = await import("./auth");
+    const token = await getIdToken();
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // fallback
+  }
   return {};
 }
 
@@ -19,11 +24,12 @@ async function apiFetch<T>(
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(url.toString(), {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders(),
+      ...authHeaders,
       ...options?.headers,
     },
   });

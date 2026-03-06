@@ -429,13 +429,13 @@ async def handle_ai_question(question: str) -> str:
 
     try:
         reply = await asyncio.to_thread(_call_openai_agent, system_prompt, question)
-        return reply or "⚠️ AI 응답 생성에 실패했습니다."
+        return reply if reply else "⚠️ AI 응답이 비어있습니다."
     except Exception:
         logger.exception("AI 에이전트 오류")
         return "⚠️ AI 처리 중 오류가 발생했습니다."
 
 
-def _call_openai_agent(system_prompt: str, user_prompt: str) -> str | None:
+def _call_openai_agent(system_prompt: str, user_prompt: str) -> str:
     """sync OpenAI 호출 (asyncio.to_thread에서 사용)."""
     try:
         from openai import OpenAI
@@ -451,6 +451,6 @@ def _call_openai_agent(system_prompt: str, user_prompt: str) -> str | None:
             max_tokens=1000,
         )
         return (resp.choices[0].message.content or "").strip()
-    except Exception:
+    except Exception as e:
         logger.exception("OpenAI 에이전트 호출 실패")
-        return None
+        return f"⚠️ AI 호출 오류: {type(e).__name__}: {e}"

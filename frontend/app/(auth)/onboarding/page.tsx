@@ -224,9 +224,6 @@ export default function OnboardingPage() {
         ? await signInWithGoogle()
         : await signInWithApple();
 
-      const token = await user.getIdToken();
-      localStorage.setItem("firebase_token", token);
-
       const meResult = await refetchMe();
       const me = meResult.data as { nickname: string | null; agreed_terms_at: string | null } | undefined;
 
@@ -253,9 +250,6 @@ export default function OnboardingPage() {
     try {
       const { user, isNewUser } = await signInWithToss();
       if (!user) throw new Error("Toss login failed");
-
-      const token = await user.getIdToken();
-      localStorage.setItem("firebase_token", token);
 
       if (!isNewUser) {
         const meResult = await refetchMe();

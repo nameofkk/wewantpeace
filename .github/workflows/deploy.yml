@@ -32,11 +32,11 @@ jobs:
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
               -d "{\"query\":\"mutation { serviceInstanceRedeploy(environmentId: \\\"$RAILWAY_ENV_ID\\\", serviceId: \\\"$SVC_ID\\\") }\"}")
-            echo "$SVC_NAME: $RESULT"
             if echo "$RESULT" | grep -q '"errors"'; then
               echo "::error::Failed to deploy $SVC_NAME"
               return 1
             fi
+            echo "$SVC_NAME: deployed successfully"
           }
 
           deploy_service "$BACKEND" "backend"

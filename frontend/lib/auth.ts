@@ -191,7 +191,6 @@ export async function sendPasswordResetEmail(email: string): Promise<void> {
 // 로그아웃
 export async function signOut(): Promise<void> {
   const auth = getFirebaseAuth();
-  localStorage.removeItem("firebase_token");
   if (!auth) return;
   await firebaseSignOut(auth);
 }
@@ -225,12 +224,7 @@ export function useAuth() {
     const unsubscribe = onIdTokenChanged(auth, async (u) => {
       setUser(u);
       const uid = u?.uid ?? null;
-      if (u) {
-        const token = await u.getIdToken();
-        localStorage.setItem("firebase_token", token);
-      } else {
-        localStorage.removeItem("firebase_token");
-      }
+      // Firebase SDK가 내부적으로 토큰을 관리하므로 localStorage 저장 불필요
       // 로그인/로그아웃 시 사용자 관련 캐시 즉시 무효화
       if (uid !== prevUid.current) {
         prevUid.current = uid;

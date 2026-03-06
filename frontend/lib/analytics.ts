@@ -16,11 +16,16 @@ function getSessionId(): string {
   return sid;
 }
 
-function getAuthHeaders(): Record<string, string> {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   const devUid = typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
   if (devUid) return { "X-Dev-UID": devUid };
-  const token = typeof window !== "undefined" ? localStorage.getItem("firebase_token") : null;
-  if (token) return { Authorization: `Bearer ${token}` };
+  try {
+    const { getIdToken } = await import("./auth");
+    const token = await getIdToken();
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // fallback
+  }
   return {};
 }
 
@@ -29,7 +34,7 @@ export async function trackEvent(
   props?: Record<string, any>
 ): Promise<void> {
   try {
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
     const sessionId = getSessionId();
 
     fetch(`${API_BASE}/me/events`, {
@@ -56,7 +61,7 @@ export async function trackPaywallEvent(
   extra?: { source?: string; plan?: string; session_id?: string }
 ): Promise<void> {
   try {
-    const headers = getAuthHeaders();
+    const headers = await getAuthHeaders();
 
     fetch(`${API_BASE}/me/paywall-event`, {
       method: "POST",

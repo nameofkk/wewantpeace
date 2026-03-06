@@ -38,20 +38,21 @@ class Settings(BaseSettings):
     google_application_credentials: str = ""
 
     # 보안
-    secret_key: str = "dev-secret-change-me-in-production"
+    secret_key: str = ""
 
     @model_validator(mode="after")
     def enforce_secret_key(self) -> "Settings":
-        import logging, os
+        import logging, os, secrets
         _log = logging.getLogger(__name__)
-        if self.secret_key == "dev-secret-change-me-in-production":
+        if not self.secret_key:
             if not self.debug and os.getenv("RAILWAY_ENVIRONMENT"):
                 raise ValueError(
                     "SECRET_KEY must be set in production. "
                     "Add SECRET_KEY environment variable in Railway dashboard."
                 )
+            self.secret_key = secrets.token_hex(32)
             _log.warning(
-                "SECRET_KEY is using the default insecure value. "
+                "SECRET_KEY not set — generated random key for this session. "
                 "Set SECRET_KEY env var before deploying to production!"
             )
         return self

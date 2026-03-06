@@ -6,13 +6,16 @@ export async function adminFetch<T>(
   path: string,
   opts?: { method?: string; body?: unknown }
 ): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("firebase_token") : null;
   const devUid =
     typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (devUid) headers["X-Dev-UID"] = devUid;
-  else if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (devUid) {
+    headers["X-Dev-UID"] = devUid;
+  } else {
+    const { getIdToken } = await import("./auth");
+    const token = await getIdToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     method: opts?.method ?? "GET",

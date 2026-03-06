@@ -42,12 +42,12 @@ app.conf.beat_schedule = {
     },
     "calc-tension": {
         "task": "worker.tasks.calculate_tension",
-        "schedule": crontab(minute="*/5"),  # 5분마다
+        "schedule": crontab(minute="1,6,11,16,21,26,31,36,41,46,51,56"),  # 5분마다 (+1분 오프셋)
         "options": {"queue": "process"},
     },
     "calc-trending": {
         "task": "worker.tasks.calculate_trending",
-        "schedule": crontab(minute="*/5"),  # 5분마다
+        "schedule": crontab(minute="2,7,12,17,22,27,32,37,42,47,52,57"),  # 5분마다 (+2분 오프셋)
         "options": {"queue": "process"},
     },
     "reprocess-orphans": {
@@ -117,7 +117,7 @@ app.conf.beat_schedule = {
     },
     "generate-spike-social": {
         "task": "worker.tasks.generate_spike_social",
-        "schedule": crontab(minute="*/5"),  # 스파이크 감지 주기와 동일
+        "schedule": crontab(minute="*/10"),  # 10분마다 (부하 분산)
         "options": {"queue": "process"},
     },
     "generate-weekly-social": {
@@ -144,7 +144,7 @@ app.conf.beat_schedule = {
     # ── 서비스 모니터링 ──
     "monitor-service-health": {
         "task": "worker.tasks.monitor_service_health",
-        "schedule": crontab(minute="*/5"),  # 5분마다
+        "schedule": crontab(minute="3,8,13,18,23,28,33,38,43,48,53,58"),  # 5분마다 (+3분 오프셋)
         "options": {"queue": "process"},
     },
 }

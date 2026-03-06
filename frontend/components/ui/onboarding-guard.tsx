@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth";
+import { useAuth, getFirebaseAuth } from "@/lib/auth";
 import { SplashScreen } from "./splash-screen";
 
 /**
@@ -23,8 +23,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     const isAdminPage = window.location.pathname.startsWith("/admin");
 
     // 로그인 상태면 온보딩 자동 완료 처리 (이중 리다이렉트 방지)
+    const auth = getFirebaseAuth();
     const isLoggedIn =
-      !!localStorage.getItem("dev_uid") || !!localStorage.getItem("firebase_token");
+      !!localStorage.getItem("dev_uid") || !!auth?.currentUser;
     if (!done && isLoggedIn) {
       localStorage.setItem("onboarding_done", "true");
       setChecked(true);
