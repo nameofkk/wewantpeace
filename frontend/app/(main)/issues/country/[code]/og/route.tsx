@@ -67,7 +67,7 @@ export async function GET(
   let logoSrc: string | null = null;
   try {
     const logoRes = await fetch(
-      new URL("../../../../../public/logo-eye.png", import.meta.url)
+      new URL("../../../../../../public/logo-eye.png", import.meta.url)
     );
     const logoBuf = await logoRes.arrayBuffer();
     logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
