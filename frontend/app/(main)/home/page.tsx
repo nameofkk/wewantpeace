@@ -848,6 +848,7 @@ export default function HomePage() {
                   <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 animate-pulse leading-none">
                     RISING
                   </span>
+                  <InfoTooltip text={t(lang, "signal_rising_tooltip")} direction="down" />
                 </div>
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                   {risingData.map((item) => {
