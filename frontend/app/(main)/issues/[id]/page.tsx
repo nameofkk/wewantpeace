@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${title} | WeWantPeace`,
       description: siteDesc,
-      type: "article",
+      type: "website",
       url: `https://www.wewantpeace.live/issues/${issue.id}`,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],

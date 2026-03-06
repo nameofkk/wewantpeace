@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
@@ -62,10 +62,6 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { code: string } }
 ) {
-  const ua = req.headers.get("user-agent") || "";
-  const isKakao = ua.includes("kakaotalk-scrap");
-  const imgSize = isKakao ? { width: 400, height: 210 } : size;
-
   const code = params.code.toUpperCase();
 
   let logoSrc: string | null = null;
@@ -116,7 +112,7 @@ export async function GET(
           WeWantPeace
         </div>
       ),
-      { ...imgSize }
+      { ...size }
     );
   }
 
@@ -453,6 +449,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...imgSize }
+    { ...size }
   );
 }
