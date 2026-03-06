@@ -40,7 +40,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = `${nameKo} 긴장도`;
   const siteDesc = "WeWantPeace 실시간 세계정세 모니터링";
-  const ogImageUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/opengraph-image`;
 
   return {
     title,
@@ -51,20 +50,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "website",
       url: `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`,
       siteName: "WeWantPeace",
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: 630,
-          alt: `${nameKo} ${nameEn} Tension Index`,
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
       title: `${title} | WeWantPeace`,
       description: siteDesc,
-      images: [ogImageUrl],
     },
   };
 }
