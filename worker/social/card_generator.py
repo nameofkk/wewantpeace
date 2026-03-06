@@ -9,6 +9,12 @@ import tempfile
 from datetime import datetime, timezone
 from urllib.request import urlretrieve
 
+try:
+    from pilmoji import Pilmoji as _Pilmoji
+    _HAS_PILMOJI = True
+except ImportError:
+    _HAS_PILMOJI = False
+
 logger = logging.getLogger(__name__)
 
 _FONT_BOLD = [
@@ -269,6 +275,9 @@ def generate_card(
             img = Image.alpha_composite(img, panel)
             draw = ImageDraw.Draw(img)
 
+            # pilmoji: 이모지 포함 텍스트 렌더링용
+            _pj = _Pilmoji(img) if _HAS_PILMOJI else None
+
             for idx, iss in enumerate(issues[:3]):
                 if y >= max_y:
                     break
@@ -300,11 +309,12 @@ def generate_card(
 
                 # EN 라인 (- 접두사)
                 en_lines = _wrap(title_en, f_issue, text_w - 24, draw)
+                _text = _pj.text if _pj else draw.text
                 for li, line in enumerate(en_lines[:2]):
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
-                    draw.text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
+                    _text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
                     y += 22
 
                 # KO 라인 (- 접두사)
@@ -313,7 +323,7 @@ def generate_card(
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
-                    draw.text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
+                    _text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
                     y += 22
 
                 # 글자-바 간격
@@ -343,11 +353,13 @@ def generate_card(
 
         elif body_text:
             # 폴백: flat 텍스트
+            _pj_fb = _Pilmoji(img) if _HAS_PILMOJI else None
+            _text_fb = _pj_fb.text if _pj_fb else draw.text
             lines = _wrap(body_text, f_issue, text_w, draw)
             for line in lines[:12]:
                 if y >= max_y:
                     break
-                draw.text((M, y), line, fill=_LIGHT, font=f_issue)
+                _text_fb((M, y), line, fill=_LIGHT, font=f_issue)
                 y += 22
 
         # ── 하단 ──
