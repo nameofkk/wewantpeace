@@ -33,6 +33,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "WeWantPeace",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   formatDetection: {
     telephone: false,
   },
