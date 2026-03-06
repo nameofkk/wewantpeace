@@ -316,12 +316,30 @@
 }
 
 /* ── 스플래시 화면 ────────────────────────────────── */
-@keyframes splash-breathe {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.05); }
+@keyframes splash-radar {
+  0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 0.6; }
+  100% { transform: translate(-50%,-50%) scale(4); opacity: 0; }
 }
-.splash-breathe {
-  animation: splash-breathe 2s ease-in-out infinite;
+.splash-radar {
+  animation: splash-radar 3s ease-out infinite;
+}
+
+@keyframes splash-scan {
+  0%   { top: 15%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 85%; opacity: 0; }
+}
+.splash-scan {
+  animation: splash-scan 3s ease-in-out infinite;
+}
+
+@keyframes splash-glow {
+  0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+}
+.splash-glow {
+  animation: splash-glow 4s ease-in-out infinite;
 }
 
 @keyframes splash-fade-out {
