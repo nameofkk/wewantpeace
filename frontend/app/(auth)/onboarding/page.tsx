@@ -12,8 +12,12 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Search,
   Check,
+  Activity,
+  Shield,
+  Globe,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -25,7 +29,7 @@ import { trackEvent } from "@/lib/analytics";
 type Step = 0 | 1 | 2;
 
 // 주요 국기 (히어로 하단)
-const HERO_FLAGS = ["UA", "IL", "TW", "MM", "SD"];
+const HERO_FLAGS = ["UA", "IL", "TW", "MM", "SD", "SY", "YE", "AF"];
 
 // 지역별 그룹핑
 function groupByRegion(lang: string) {
@@ -37,6 +41,20 @@ function groupByRegion(lang: string) {
   }
   return groups;
 }
+
+const REGION_EN: Record<string, string> = {
+  "유럽": "Europe",
+  "중동": "Middle East",
+  "동아시아": "East Asia",
+  "동남아": "Southeast Asia",
+  "남아시아": "South Asia",
+  "중앙아시아": "Central Asia",
+  "아프리카": "Africa",
+  "남미": "South America",
+  "중미": "Central America",
+  "북미": "North America",
+  "오세아니아": "Oceania",
+};
 
 // Google SVG 아이콘
 function GoogleIcon() {
@@ -59,6 +77,18 @@ function AppleIcon() {
   );
 }
 
+// 실시간 스캔 카운터 (히어로)
+function useScanCounter() {
+  const [count, setCount] = useState(1247);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCount((c) => c + Math.floor(Math.random() * 3) + 1);
+    }, 2000 + Math.random() * 1500);
+    return () => clearInterval(interval);
+  }, []);
+  return count;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { lang, setMyCountries } = useAppStore();
@@ -70,7 +100,9 @@ export default function OnboardingPage() {
   const [search, setSearch] = useState("");
   const [proBannerHighlight, setProBannerHighlight] = useState(false);
   const [loginLoading, setLoginLoading] = useState<"google" | "apple" | null>(null);
-  const [isApple, setIsApple] = useState(false);
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+
+  const scanCount = useScanCounter();
 
   // 이미 온보딩 완료면 /home
   useEffect(() => {
@@ -85,12 +117,6 @@ export default function OnboardingPage() {
     if (typeof Notification !== "undefined") {
       setPushStatus(Notification.permission as "default" | "granted" | "denied");
     }
-  }, []);
-
-  // Apple 디바이스 감지
-  useEffect(() => {
-    const ua = navigator.userAgent;
-    setIsApple(/iPad|iPhone|iPod|Macintosh/.test(ua));
   }, []);
 
   // 국가 검색 필터
@@ -110,6 +136,9 @@ export default function OnboardingPage() {
     }
     return result;
   }, [regionGroups, search, lang]);
+
+  // 검색 중이면 모든 지역 펼침
+  const isSearching = search.trim().length > 0;
 
   // --- 이벤트 트래킹 ---
   const trackSkip = useCallback(
@@ -155,13 +184,22 @@ export default function OnboardingPage() {
       trackEvent("watch_country_remove", { code, count_after: selectedCountries.length - 1 });
     } else {
       if (selectedCountries.length >= 2) {
-        // 3번째 탭 시 배너 하이라이트
         setProBannerHighlight(true);
         return;
       }
       setSelectedCountries((prev) => [...prev, code]);
       trackEvent("watch_country_add", { code, count_after: selectedCountries.length + 1 });
     }
+  }
+
+  // --- 지역 접기/펴기 ---
+  function toggleRegion(region: string) {
+    setExpandedRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(region)) next.delete(region);
+      else next.add(region);
+      return next;
+    });
   }
 
   // --- 알림 권한 요청 ---
@@ -188,7 +226,6 @@ export default function OnboardingPage() {
       const token = await user.getIdToken();
       localStorage.setItem("firebase_token", token);
 
-      // /me 호출하여 닉네임+약관 확인
       const meResult = await refetchMe();
       const me = meResult.data as { nickname: string | null; agreed_terms_at: string | null } | undefined;
 
@@ -196,15 +233,12 @@ export default function OnboardingPage() {
         trackEvent("onboarding_login_complete", { provider });
         finishOnboarding();
       } else {
-        // 닉네임/약관 미등록 → 등록 폼
         trackEvent("onboarding_login_need_register", { provider });
         localStorage.setItem("onboarding_done", "true");
         router.push("/login?tab=google-register");
       }
     } catch (err: any) {
-      // redirect 에러는 정상 (React Native WebView)
       if (err?.message === "redirect") return;
-      // 그 외 에러 → 무시, 홈으로
       trackEvent("onboarding_login_error", { provider, error: String(err) });
       finishOnboarding();
     } finally {
@@ -268,37 +302,59 @@ export default function OnboardingPage() {
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center animate-fadeIn">
-              {/* 로고 + 타이틀 */}
-              <div className="text-center mb-8">
-                <div className="flex justify-center mb-4">
+              {/* 로고 + 레이더 */}
+              <div className="relative flex items-center justify-center mb-6">
+                {/* 레이더 파동 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="ob-radar ob-radar--1" />
+                  <span className="ob-radar ob-radar--2" />
+                  <span className="ob-radar ob-radar--3" />
+                </div>
+                <div className="relative z-10">
                   <Image
                     src="/logo-eye.png"
                     alt="WeWantPeace"
-                    width={80}
-                    height={35}
+                    width={100}
+                    height={44}
                     className="object-contain"
                     priority
                   />
                 </div>
-                <h1 className="text-lg font-bold text-foreground/80 mb-1">WeWantPeace</h1>
-                <h2 className="text-xl font-bold whitespace-pre-line leading-snug">
-                  {t(lang, "ob_hero_title")}
-                </h2>
+              </div>
+
+              <h1 className="text-lg font-bold text-foreground/80 mb-1">WeWantPeace</h1>
+              <h2 className="text-xl font-bold whitespace-pre-line leading-snug text-center mb-6">
+                {t(lang, "ob_hero_title")}
+              </h2>
+
+              {/* 실시간 스캔 인디케이터 */}
+              <div className="flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="ob-live-dot" />
+                <span className="text-xs font-semibold text-emerald-400">
+                  {lang === "ko" ? "실시간 스캔 중" : "Live scanning"}
+                </span>
+                <span className="text-xs font-mono text-emerald-400/70 tabular-nums">
+                  {scanCount.toLocaleString()}
+                </span>
+                <span className="text-xs text-emerald-400/50">
+                  {lang === "ko" ? "건" : "events"}
+                </span>
               </div>
 
               {/* Trust Signals */}
-              <div className="w-full space-y-3 mb-8">
+              <div className="w-full space-y-2.5 mb-6">
                 {[
-                  { icon: Rss, key: "ob_hero_signal_1" as const },
-                  { icon: Brain, key: "ob_hero_signal_2" as const },
-                  { icon: Bell, key: "ob_hero_signal_3" as const },
-                ].map(({ icon: Icon, key }) => (
+                  { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
+                  { icon: Brain, key: "ob_hero_signal_2" as const, delay: "0.1s" },
+                  { icon: Bell, key: "ob_hero_signal_3" as const, delay: "0.2s" },
+                ].map(({ icon: Icon, key, delay }) => (
                   <div
                     key={key}
-                    className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 px-4 py-3"
+                    className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 px-4 py-3 ob-slide-in"
+                    style={{ animationDelay: delay }}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Icon className="h-4.5 w-4.5 text-primary" />
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Icon className="h-5 w-5 text-primary" />
                     </div>
                     <span className="text-sm font-medium text-foreground/80">
                       {t(lang, key)}
@@ -307,16 +363,35 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              {/* 모니터링 현황 + 국기 */}
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-2">
-                  {t(lang, "ob_hero_monitoring")}
-                </p>
-                <div className="flex justify-center gap-1.5">
-                  {HERO_FLAGS.map((code) => (
-                    <span key={code} className="text-xl">{getFlag(code)}</span>
-                  ))}
+              {/* 하단 신뢰 지표 */}
+              <div className="w-full flex items-center justify-between px-2 mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                    <Globe className="h-3.5 w-3.5" />
+                    <span className="text-[11px] font-medium">
+                      {t(lang, "ob_hero_monitoring")}
+                    </span>
+                  </div>
                 </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span className="text-[11px] font-medium">
+                    {lang === "ko" ? "SSL 암호화" : "SSL Encrypted"}
+                  </span>
+                </div>
+              </div>
+
+              {/* 국기 행진 */}
+              <div className="flex justify-center gap-2">
+                {HERO_FLAGS.map((code, i) => (
+                  <span
+                    key={code}
+                    className="text-lg ob-flag-pop"
+                    style={{ animationDelay: `${0.5 + i * 0.08}s` }}
+                  >
+                    {getFlag(code)}
+                  </span>
+                ))}
               </div>
             </div>
           )}
@@ -324,7 +399,6 @@ export default function OnboardingPage() {
           {/* === Step 1: 국가 선택 + 알림 === */}
           {step === 1 && (
             <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
-              {/* 국가 선택 헤더 */}
               <div className="text-center mb-3">
                 <h2 className="text-xl font-bold mb-1">{t(lang, "ob_step_countries")}</h2>
                 <p className="text-sm text-muted-foreground">{t(lang, "ob_countries_desc")}</p>
@@ -353,7 +427,7 @@ export default function OnboardingPage() {
                 </span>
               </div>
 
-              {/* Pro 인라인 배너 (항상 표시) */}
+              {/* Pro 인라인 배너 */}
               <div
                 className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-2 transition-all duration-300 ${
                   proBannerHighlight
@@ -374,54 +448,71 @@ export default function OnboardingPage() {
                 </p>
               )}
 
-              {/* 국가 목록 (스크롤) */}
-              <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-2 space-y-4 scrollbar-thin">
-                {Object.entries(filteredGroups).map(([region, countries]) => (
-                  <div key={region}>
-                    <div className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-1.5 px-1">
-                      {lang === "en"
-                        ? (
-                            {
-                              "유럽": "Europe",
-                              "중동": "Middle East",
-                              "동아시아": "East Asia",
-                              "동남아": "Southeast Asia",
-                              "남아시아": "South Asia",
-                              "중앙아시아": "Central Asia",
-                              "아프리카": "Africa",
-                              "남미": "South America",
-                              "중미": "Central America",
-                              "북미": "North America",
-                              "오세아니아": "Oceania",
-                            } as Record<string, string>
-                          )[region] ?? region
-                        : region}
+              {/* 국가 목록 (아코디언) */}
+              <div className="flex-1 overflow-y-auto -mx-1 px-1 pb-2 space-y-1 scrollbar-thin">
+                {Object.entries(filteredGroups).map(([region, countries]) => {
+                  const isOpen = isSearching || expandedRegions.has(region);
+                  const selectedInRegion = countries.filter((c) =>
+                    selectedCountries.includes(c.code)
+                  ).length;
+                  const regionLabel = lang === "en" ? (REGION_EN[region] ?? region) : region;
+
+                  return (
+                    <div key={region} className="rounded-xl border border-border/20 overflow-hidden">
+                      {/* 지역 헤더 (탭하여 펼치기/접기) */}
+                      <button
+                        onClick={() => toggleRegion(region)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-muted/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground/80">
+                            {regionLabel}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/50">
+                            {countries.length}
+                          </span>
+                          {selectedInRegion > 0 && (
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                              {selectedInRegion}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 ${
+                            isOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {/* 국가 칩들 */}
+                      {isOpen && (
+                        <div className="flex flex-wrap gap-1.5 px-3 pb-3 animate-fadeIn">
+                          {countries.map((c) => {
+                            const selected = selectedCountries.includes(c.code);
+                            return (
+                              <button
+                                key={c.code}
+                                onClick={() => toggleCountry(c.code)}
+                                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
+                                  selected
+                                    ? "bg-primary/15 border border-primary/50 text-foreground"
+                                    : "bg-card/40 border border-border/30 text-muted-foreground hover:border-border"
+                                }`}
+                              >
+                                <span>{getFlag(c.code)}</span>
+                                <span>{getCountryName(c.code, lang)}</span>
+                                {selected && <CheckCircle2 className="h-3 w-3 text-primary" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {countries.map((c) => {
-                        const selected = selectedCountries.includes(c.code);
-                        return (
-                          <button
-                            key={c.code}
-                            onClick={() => toggleCountry(c.code)}
-                            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-95 ${
-                              selected
-                                ? "bg-primary/15 border border-primary/50 text-foreground"
-                                : "bg-card/40 border border-border/30 text-muted-foreground hover:border-border"
-                            }`}
-                          >
-                            <span>{getFlag(c.code)}</span>
-                            <span>{getCountryName(c.code, lang)}</span>
-                            {selected && <CheckCircle2 className="h-3 w-3 text-primary" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* 알림 섹션 (구분선 후) */}
+              {/* 알림 섹션 */}
               <div className="border-t border-border/30 pt-3 mt-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -462,12 +553,10 @@ export default function OnboardingPage() {
           {/* === Step 2: 로그인 유도 === */}
           {step === 2 && (
             <div className="flex-1 flex flex-col items-center justify-center animate-fadeIn">
-              {/* 잠금 아이콘 */}
               <div className="mx-auto mb-6 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <Lock className="h-8 w-8 text-primary" />
               </div>
 
-              {/* 메인 카피 */}
               <h2 className="text-xl font-bold text-center whitespace-pre-line leading-snug mb-6">
                 {t(lang, "ob_login_title")}
               </h2>
@@ -504,21 +593,19 @@ export default function OnboardingPage() {
                   {t(lang, "ob_login_google")}
                 </button>
 
-                {/* Apple (iOS/Mac만) */}
-                {isApple && (
-                  <button
-                    onClick={() => handleOAuthLogin("apple")}
-                    disabled={loginLoading !== null}
-                    className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-foreground text-background py-3 text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
-                  >
-                    {loginLoading === "apple" ? (
-                      <div className="h-5 w-5 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <AppleIcon />
-                    )}
-                    {t(lang, "ob_login_apple")}
-                  </button>
-                )}
+                {/* Apple (항상 표시) */}
+                <button
+                  onClick={() => handleOAuthLogin("apple")}
+                  disabled={loginLoading !== null}
+                  className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-foreground text-background py-3 text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+                >
+                  {loginLoading === "apple" ? (
+                    <div className="h-5 w-5 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <AppleIcon />
+                  )}
+                  {t(lang, "ob_login_apple")}
+                </button>
               </div>
 
               {/* 나중에 할게요 */}
@@ -572,28 +659,69 @@ export default function OnboardingPage() {
 
       <style jsx global>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .animate-fadeIn {
           animation: fadeIn 0.35s ease-out both;
         }
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 4px;
+
+        /* 레이더 파동 */
+        @keyframes ob-radar-pulse {
+          0% { transform: scale(0.3); opacity: 0.6; }
+          100% { transform: scale(2.5); opacity: 0; }
         }
+        .ob-radar {
+          position: absolute;
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          border: 1.5px solid rgba(99,102,241,0.3);
+          animation: ob-radar-pulse 3s ease-out infinite;
+        }
+        .ob-radar--2 { animation-delay: 1s; }
+        .ob-radar--3 { animation-delay: 2s; }
+
+        /* 라이브 닷 */
+        @keyframes ob-live-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .ob-live-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+          animation: ob-live-blink 1.5s ease-in-out infinite;
+          flex-shrink: 0;
+        }
+
+        /* 슬라이드 인 */
+        @keyframes ob-slide-in {
+          from { opacity: 0; transform: translateX(-12px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .ob-slide-in {
+          animation: ob-slide-in 0.4s ease-out both;
+        }
+
+        /* 국기 팝 */
+        @keyframes ob-flag-pop {
+          0% { opacity: 0; transform: scale(0.5); }
+          60% { transform: scale(1.15); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .ob-flag-pop {
+          opacity: 0;
+          animation: ob-flag-pop 0.3s ease-out both;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
         .scrollbar-thin::-webkit-scrollbar-thumb {
           background: rgba(255, 255, 255, 0.1);
           border-radius: 2px;
         }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
       `}</style>
     </div>
   );

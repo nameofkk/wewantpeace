@@ -56,7 +56,7 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
           fill
           priority
           className="object-contain"
-          style={{ position: "relative", zIndex: 1 }}
+          style={{ zIndex: 1 }}
         />
       </div>
 
