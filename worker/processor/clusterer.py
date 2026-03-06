@@ -203,9 +203,32 @@ def _is_junk_title(title: str) -> bool:
     min_len = 5 if has_ko else 8
     if len(stripped) < min_len:
         return True
-    # 인사 패턴
     low = stripped.lower()
+    # 인사 패턴
     if re.match(r'^(good\s+(morning|afternoon|evening)|좋은\s+(아침|오후|저녁))', low):
+        return True
+    # 뉴스 메타 패턴 — 내용 없이 형식만 있는 제목
+    if re.match(
+        r'^(afternoon|morning|evening|daily|weekly|overnight)\s*'
+        r'(recap|summary|update|brief|briefing|roundup|round-up|report|digest|wrap)',
+        low,
+    ):
+        return True
+    if re.match(r'^(live|breaking)\s*(briefing|update|blog)\s*[:.]?\s*$', low):
+        return True
+    if re.match(r'^(오후|오전|아침|저녁|주간|일일)\s*(요약|브리핑|업데이트|정리|리포트)\s*$', low):
+        return True
+    # "국가명 + 토픽라벨"만 있는 2단어 제목 (예: "China Diplomacy", "Lebanon Disaster")
+    _topic_words = {
+        'conflict', 'diplomacy', 'sanctions', 'disaster', 'protest',
+        'coup', 'crisis', 'dispute', 'attack', 'strikes', 'terror',
+    }
+    words = low.split()
+    if len(words) <= 2:
+        if any(w in _topic_words for w in words):
+            return True
+    # EDITORIAL / opinion 전용 접두사
+    if re.match(r'^\(?(editorial|opinion|column|사설|칼럼)', low):
         return True
     # 날짜/도시만 있는 패턴 (예: "Tehran 20 February 2026 #1")
     date_stripped = re.sub(r'\d+', '', stripped).strip()
