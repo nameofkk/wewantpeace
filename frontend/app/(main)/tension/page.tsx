@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
-import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
+import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
@@ -635,9 +635,18 @@ export default function TensionPage() {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground mb-3 -mt-1">
-          {t(lang, "tension_subtitle")}
-        </p>
+        <div className="flex items-center justify-between mb-3 -mt-1">
+          <p className="text-[11px] text-muted-foreground">
+            {t(lang, "tension_subtitle")}
+          </p>
+          <Link
+            href="/reports/weekly"
+            className="flex items-center gap-1 shrink-0 text-[11px] text-primary hover:text-primary/80 transition-colors"
+          >
+            <BarChart3 className="h-3 w-3" />
+            {t(lang, "weekly_report_link")}
+          </Link>
+        </div>
 
         {/* 글로벌 / 관심지역 토글 탭 (홈과 동일 구조) */}
         <div className="flex gap-0">

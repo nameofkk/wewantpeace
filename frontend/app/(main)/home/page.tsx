@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -821,6 +821,18 @@ export default function HomePage() {
                 {items.slice(0, visibleCount).map((item, i) => (
                   <TrendingCard key={item.id} item={item} rank={i + 1} delay={Math.min(i * 50, 500)} userPlan={userPlan} isAdmin={isAdmin} />
                 ))}
+                {/* 주간 리포트 배너 */}
+                <Link
+                  href="/reports/weekly"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 hover:bg-card/80 transition-colors group"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="flex-1 text-sm font-medium">{t(lang, "weekly_report_banner")}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </Link>
+
                 {items.length > visibleCount && (
                   <button
                     onClick={() => {

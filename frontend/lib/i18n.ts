@@ -1045,6 +1045,8 @@ export const translations = {
     weekly_report_new_clusters: "신규 클러스터",
     weekly_report_crisis_countries: "위기 국가",
     weekly_report_cta: "앱에서 관심국가 추이 확인",
+    weekly_report_link: "주간 리포트",
+    weekly_report_banner: "주간 TOP 10 리포트 보기",
 
     // 대시보드 주간비교
     dashboard_week_comparison: "주간 비교",
@@ -2101,6 +2103,8 @@ export const translations = {
     weekly_report_new_clusters: "New Clusters",
     weekly_report_crisis_countries: "Crisis Countries",
     weekly_report_cta: "Track your countries in the app",
+    weekly_report_link: "Weekly Report",
+    weekly_report_banner: "View Weekly Top 10 Report",
 
     // Dashboard week comparison
     dashboard_week_comparison: "Week Comparison",
