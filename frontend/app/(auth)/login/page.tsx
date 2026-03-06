@@ -615,8 +615,8 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* 탭 */}
-      {tab !== "google-register" && (
+      {/* 탭 (Toss 미니앱에서는 숨김 — Toss 로그인만 제공) */}
+      {tab !== "google-register" && !isTossMiniApp() && (
         <div className="flex rounded-lg bg-secondary p-1 mb-6">
           {(["login", "register"] as const).map((tabKey) => (
             <button
@@ -696,46 +696,49 @@ export default function LoginPage() {
             </>
           )}
 
-          <form onSubmit={handleEmailLogin} className="space-y-3">
-            <input
-              type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
-              placeholder={t(lang, "login_email_placeholder")} required
-              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            />
-            <div className="relative">
+          {/* 이메일 로그인 (Toss 미니앱에서는 숨김) */}
+          {!isTossMiniApp() && (
+            <form onSubmit={handleEmailLogin} className="space-y-3">
               <input
-                type={showLoginPw ? "text" : "password"}
-                value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder={t(lang, "login_password_placeholder")} required
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary pr-10"
+                type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder={t(lang, "login_email_placeholder")} required
+                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
               />
-              <button type="button" onClick={() => setShowLoginPw(!showLoginPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <div className="relative">
+                <input
+                  type={showLoginPw ? "text" : "password"}
+                  value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder={t(lang, "login_password_placeholder")} required
+                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary pr-10"
+                />
+                <button type="button" onClick={() => setShowLoginPw(!showLoginPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {showLoginPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="flex justify-between">
+                <button
+                  type="button"
+                  onClick={() => { setShowFindEmail(true); setFindNickname(""); setFindBirthYear(""); setFindResult(null); setFindError(null); }}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {t(lang, "login_find_email")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowResetPw(true); setResetEmail(loginEmail); setResetSent(false); setResetError(null); }}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {t(lang, "login_forgot_password")}
+                </button>
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
+                {loading && <Loader2 className="h-4 w-4" />}
+                {t(lang, "login_submit")}
               </button>
-            </div>
-            <div className="flex justify-between">
-              <button
-                type="button"
-                onClick={() => { setShowFindEmail(true); setFindNickname(""); setFindBirthYear(""); setFindResult(null); setFindError(null); }}
-                className="text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                {t(lang, "login_find_email")}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowResetPw(true); setResetEmail(loginEmail); setResetSent(false); setResetError(null); }}
-                className="text-xs text-muted-foreground hover:text-primary transition-colors"
-              >
-                {t(lang, "login_forgot_password")}
-              </button>
-            </div>
-            <button type="submit" disabled={loading}
-              className="w-full rounded-lg bg-primary py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2">
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t(lang, "login_submit")}
-            </button>
-          </form>
+            </form>
+          )}
 
           {/* 비밀번호 재설정 모달 */}
           {showResetPw && (

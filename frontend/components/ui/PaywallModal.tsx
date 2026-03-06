@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { detectPlatform, type AppPlatform } from "@/lib/platform-detect";
+import { isTossMiniApp } from "@/lib/platform";
 import { shouldShowPaywall, recordPaywallShown } from "@/lib/paywall-cap";
 import { trackPaywallEvent } from "@/lib/analytics";
 import { getSessionId } from "@/lib/session";
@@ -76,7 +77,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
 
   if (!isOpen) return null;
 
-  const isWeb = platform === "web";
+  const isWeb = platform === "web" && !isTossMiniApp();
   const isIOS = platform === "ios-native" || platform === "ios-app";
   const title = TRIGGER_TITLES[trigger]?.[lang] || "";
   const description = TRIGGER_DESCRIPTIONS[trigger]?.[lang] || "";

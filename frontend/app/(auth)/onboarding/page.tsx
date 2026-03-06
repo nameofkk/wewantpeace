@@ -23,7 +23,8 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { ALL_COUNTRIES, getCountryName, getFlag } from "@/lib/countries";
 import { useMe } from "@/lib/api";
-import { signInWithGoogle, signInWithApple, getIdToken } from "@/lib/auth";
+import { signInWithGoogle, signInWithApple, signInWithToss, getIdToken } from "@/lib/auth";
+import { isTossMiniApp } from "@/lib/platform";
 import { trackEvent } from "@/lib/analytics";
 
 type Step = 0 | 1 | 2;
@@ -99,7 +100,7 @@ export default function OnboardingPage() {
   const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
   const [search, setSearch] = useState("");
   const [proBannerHighlight, setProBannerHighlight] = useState(false);
-  const [loginLoading, setLoginLoading] = useState<"google" | "apple" | null>(null);
+  const [loginLoading, setLoginLoading] = useState<"google" | "apple" | "toss" | null>(null);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
 
   const scanCount = useScanCounter();
@@ -240,6 +241,36 @@ export default function OnboardingPage() {
     } catch (err: any) {
       if (err?.message === "redirect") return;
       trackEvent("onboarding_login_error", { provider, error: String(err) });
+      finishOnboarding();
+    } finally {
+      setLoginLoading(null);
+    }
+  }
+
+  // --- Toss 로그인 처리 ---
+  async function handleTossLogin() {
+    setLoginLoading("toss");
+    try {
+      const { user, isNewUser } = await signInWithToss();
+      if (!user) throw new Error("Toss login failed");
+
+      const token = await user.getIdToken();
+      localStorage.setItem("firebase_token", token);
+
+      if (!isNewUser) {
+        const meResult = await refetchMe();
+        const me = meResult.data as { nickname: string | null; agreed_terms_at: string | null } | undefined;
+        if (me?.nickname && me?.agreed_terms_at) {
+          trackEvent("onboarding_login_complete", { provider: "toss" });
+          finishOnboarding();
+          return;
+        }
+      }
+      trackEvent("onboarding_login_need_register", { provider: "toss" });
+      localStorage.setItem("onboarding_done", "true");
+      router.push("/login?tab=google-register");
+    } catch (err: any) {
+      trackEvent("onboarding_login_error", { provider: "toss", error: String(err) });
       finishOnboarding();
     } finally {
       setLoginLoading(null);
@@ -579,33 +610,53 @@ export default function OnboardingPage() {
 
               {/* OAuth 버튼들 */}
               <div className="w-full space-y-3">
-                {/* Google */}
-                <button
-                  onClick={() => handleOAuthLogin("google")}
-                  disabled={loginLoading !== null}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-background py-3 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
-                >
-                  {loginLoading === "google" ? (
-                    <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <GoogleIcon />
-                  )}
-                  {t(lang, "ob_login_google")}
-                </button>
+                {isTossMiniApp() ? (
+                  /* Toss 미니앱: Toss 로그인만 */
+                  <button
+                    onClick={handleTossLogin}
+                    disabled={loginLoading !== null}
+                    className="w-full flex items-center justify-center gap-3 rounded-xl py-3 text-sm font-bold text-white transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: "#0064FF" }}
+                  >
+                    {loginLoading === "toss" ? (
+                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 14.5v-9l7 4.5-7 4.5z" fill="white"/>
+                      </svg>
+                    )}
+                    {t(lang, "login_toss")}
+                  </button>
+                ) : (
+                  /* 일반: Google + Apple */
+                  <>
+                    <button
+                      onClick={() => handleOAuthLogin("google")}
+                      disabled={loginLoading !== null}
+                      className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-background py-3 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+                    >
+                      {loginLoading === "google" ? (
+                        <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <GoogleIcon />
+                      )}
+                      {t(lang, "ob_login_google")}
+                    </button>
 
-                {/* Apple (항상 표시) */}
-                <button
-                  onClick={() => handleOAuthLogin("apple")}
-                  disabled={loginLoading !== null}
-                  className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-foreground text-background py-3 text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
-                >
-                  {loginLoading === "apple" ? (
-                    <div className="h-5 w-5 border-2 border-background border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <AppleIcon />
-                  )}
-                  {t(lang, "ob_login_apple")}
-                </button>
+                    <button
+                      onClick={() => handleOAuthLogin("apple")}
+                      disabled={loginLoading !== null}
+                      className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-foreground text-background py-3 text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+                    >
+                      {loginLoading === "apple" ? (
+                        <div className="h-5 w-5 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <AppleIcon />
+                      )}
+                      {t(lang, "ob_login_apple")}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* 나중에 할게요 */}

@@ -3,9 +3,9 @@ import { defineConfig } from '@apps-in-toss/web-framework/config';
 export default defineConfig({
   appName: 'wewantpeace',
   brand: {
-    displayName: 'WeWantPeace',
+    displayName: 'Wewantpeace',
     primaryColor: '#1A1A2E',
-    icon: '',
+    icon: '/logo.png',
   },
   web: {
     host: 'localhost',

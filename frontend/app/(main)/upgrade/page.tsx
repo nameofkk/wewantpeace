@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
+import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { API_BASE, useMe } from "@/lib/api";
@@ -362,7 +363,7 @@ function UpgradeContent() {
     router.push(`/upgrade/success?plan=${planId}`);
   }
 
-  const isWeb = platform === "web";
+  const isWeb = platform === "web" && !isTossMiniApp();
 
   return (
     <div className="min-h-screen bg-background">
@@ -504,8 +505,8 @@ function UpgradeContent() {
           </div>
         )}
 
-        {/* 웹 브라우저: 앱 설치 유도 */}
-        {isWeb && (
+        {/* 웹 브라우저: 앱 설치 유도 (Toss 미니앱에서는 숨김) */}
+        {isWeb && !isTossMiniApp() && (
           <div className="mb-8" style={{ animation: "fadeSlideUp 0.35s ease both" }}>
             <AppInstallPrompt lang={lang} />
           </div>
