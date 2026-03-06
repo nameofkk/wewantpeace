@@ -96,11 +96,16 @@ def _sev_color(severity):
 
 def _download_image(url):
     try:
+        from urllib.request import Request
         tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
         tmp.close()
-        urlretrieve(url, tmp.name)
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; WeWantPeace/1.0)"})
+        import urllib.request
+        with urllib.request.urlopen(req, timeout=10) as resp, open(tmp.name, "wb") as f:
+            f.write(resp.read())
         return tmp.name
     except Exception:
+        logger.warning("이미지 다운로드 실패: %s", url[:80])
         return None
 
 
