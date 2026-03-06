@@ -10,6 +10,7 @@ import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { TensionHistoryChart } from "@/components/tension/TensionHistoryChart";
+import { ShareButton } from "@/components/issue/ShareButton";
 
 interface ClusterOut {
   id: string;
@@ -105,6 +106,11 @@ export default function CountryIssuesPage() {
             <p className="text-[11px] text-muted-foreground">{t(lang, "country_issues_count", { n: clusters.length })}</p>
           )}
         </div>
+        <ShareButton
+          url={`https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`}
+          title={`${countryName} ${lang === "ko" ? "긴장도" : "Tension"}`}
+          analyticsEvent="country_share"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">

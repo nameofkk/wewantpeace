@@ -38,18 +38,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const nameKo = country?.ko || code;
   const nameEn = country?.en || code;
 
-  const title = `${nameKo} (${nameEn}) 이슈 | WeWantPeace`;
+  const title = `${nameKo} (${nameEn}) 이슈`;
   const description = `${nameKo} 관련 분쟁·갈등 이슈를 실시간으로 추적합니다. Track ${nameEn} conflict issues in real time.`;
 
   return {
     title,
     description,
     openGraph: {
-      title,
+      title: `${title} | WeWantPeace`,
       description,
       type: "website",
       url: `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`,
       siteName: "WeWantPeace",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} | WeWantPeace`,
+      description,
     },
   };
 }

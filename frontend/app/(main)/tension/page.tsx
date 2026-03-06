@@ -11,6 +11,7 @@ import { TensionHistoryChart } from "@/components/tension/TensionHistoryChart";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { ALL_MONITORED_COUNTRIES, COUNTRY_MAP, getCountryName, getFlag } from "@/lib/countries";
+import { ShareButton } from "@/components/issue/ShareButton";
 
 interface ClusterSummary {
   id: string;
@@ -482,17 +483,24 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
         </div>
       )}
 
-      {/* 히스토리 토글 */}
-      <button
-        onClick={() => setShowHistory((v) => !v)}
-        className="mt-3 w-full flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
-      >
-        {showHistory ? (
-          <><ChevronUp className="h-3 w-3" /> {t(lang, "tension_history_collapse")}</>
-        ) : (
-          <><ChevronDown className="h-3 w-3" /> {t(lang, "tension_history_expand")}</>
-        )}
-      </button>
+      {/* 히스토리 토글 + 공유 */}
+      <div className="mt-3 flex items-center justify-between">
+        <ShareButton
+          url={`https://www.wewantpeace.live/issues/country/${data.country_code.toLowerCase()}`}
+          title={`${getCountryName(data.country_code, lang)} ${lang === "ko" ? "긴장도" : "Tension"}`}
+          analyticsEvent="tension_card_share"
+        />
+        <button
+          onClick={() => setShowHistory((v) => !v)}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          {showHistory ? (
+            <><ChevronUp className="h-3 w-3" /> {t(lang, "tension_history_collapse")}</>
+          ) : (
+            <><ChevronDown className="h-3 w-3" /> {t(lang, "tension_history_expand")}</>
+          )}
+        </button>
+      </div>
 
       {showHistory && <HistorySection countryCode={data.country_code} userPlan={userPlan} lang={lang} />}
     </div>

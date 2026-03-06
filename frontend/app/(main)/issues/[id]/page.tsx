@@ -13,14 +13,14 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
   if (!issue) {
-    return { title: "Issue Not Found | WeWantPeace" };
+    return { title: "Issue Not Found" };
   }
 
   const title = issue.title_ko || issue.title;
   const description = `${title} — Severity ${issue.severity}, ${issue.event_count} reports. Track global conflicts in real time.`;
 
   return {
-    title: `${title} | WeWantPeace`,
+    title,
     description,
     openGraph: {
       title: `${title} | WeWantPeace`,

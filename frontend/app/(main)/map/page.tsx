@@ -9,6 +9,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
+import { ShareButton } from "@/components/issue/ShareButton";
 
 // ── 실시간 경과 시간 훅 ───────────────────────────────────────────────────
 function useElapsed(isoString?: string, lang: Lang = "ko") {
@@ -274,6 +275,11 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
                 {t(lang, "map_popup_all_in_region", { n: cluster.grouped_count ?? 1 })}
               </button>
             )}
+            <ShareButton
+              url={`https://www.wewantpeace.live/issues/${cluster.id}`}
+              title={cluster.title_ko ?? cluster.title}
+              analyticsEvent="map_popup_share"
+            />
           </>
         )}
       </div>

@@ -6,14 +6,24 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { trackEvent } from "@/lib/analytics";
 
-export function ShareButton({ issueId, title }: { issueId: string; title: string }) {
+export function ShareButton({
+  issueId,
+  url: urlProp,
+  title,
+  analyticsEvent = "issue_share",
+}: {
+  issueId?: string;
+  url?: string;
+  title: string;
+  analyticsEvent?: string;
+}) {
   const lang = useAppStore((s) => s.lang);
   const [copied, setCopied] = useState(false);
 
-  const url = `https://www.wewantpeace.live/issues/${issueId}`;
+  const url = urlProp ?? `https://www.wewantpeace.live/issues/${issueId}`;
 
   async function handleShare() {
-    trackEvent("issue_share", { issue_id: issueId, method: "unknown" });
+    trackEvent(analyticsEvent, { url, method: "unknown" });
 
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
@@ -21,7 +31,7 @@ export function ShareButton({ issueId, title }: { issueId: string; title: string
           title: t(lang, "share_title", { title }),
           url,
         });
-        trackEvent("issue_share", { issue_id: issueId, method: "native" });
+        trackEvent(analyticsEvent, { url, method: "native" });
         return;
       } catch {
         // user cancelled or not supported
@@ -31,7 +41,7 @@ export function ShareButton({ issueId, title }: { issueId: string; title: string
     // Fallback: clipboard
     try {
       await navigator.clipboard.writeText(url);
-      trackEvent("issue_share", { issue_id: issueId, method: "clipboard" });
+      trackEvent(analyticsEvent, { url, method: "clipboard" });
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
