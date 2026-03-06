@@ -332,7 +332,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
   const topicLabel = t(lang, topicKey) || topic;
   // 쓰레기 제목(해시태그만): 국가명+토픽 조합 / 정상 제목: 접두어 제거
   const displayTitle = isJunkTitle(rawTitle)
-    ? buildSmartTitle(item.keyword, topic, lang, getCountryName)
+    ? buildSmartTitle(item.keyword, topic, lang, getCountryName, item.country_codes[0])
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
   const handleEditStart = (e: React.MouseEvent) => {
@@ -854,7 +854,7 @@ export default function HomePage() {
                     const clusterId = item.cluster_ids?.[0];
                     const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
                     const displayTitle = isJunkTitle(rawTitle)
-                      ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName)
+                      ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName, item.country_codes?.[0])
                       : (stripTitlePrefix(rawTitle) || item.keyword);
                     const badge = getKScoreBadge(item.kscore, lang);
                     return (

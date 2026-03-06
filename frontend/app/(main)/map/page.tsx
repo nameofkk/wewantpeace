@@ -168,7 +168,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
   const rawTitle = lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title);
   const topicKey = `topic_${cluster.topic}` as Parameters<typeof t>[1];
   const displayTitle = isJunkTitle(rawTitle)
-    ? buildSmartTitle(cluster.title, cluster.topic, lang, getCountryName)
+    ? buildSmartTitle(cluster.title, cluster.topic, lang, getCountryName, cluster.country_code)
     : (stripTitlePrefix(rawTitle) || t(lang, topicKey));
 
   return (
@@ -308,7 +308,7 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
         {(() => {
           const raw = lang === "en" ? c.title : (c.title_ko ?? c.title);
           return isJunkTitle(raw)
-            ? buildSmartTitle(c.title, c.topic, lang, getCountryName)
+            ? buildSmartTitle(c.title, c.topic, lang, getCountryName, c.country_code)
             : (stripTitlePrefix(raw) || t(lang, `topic_${c.topic}` as Parameters<typeof t>[1]));
         })()}
       </span>

@@ -34,6 +34,7 @@ class ClusterSummary(BaseModel):
     topic: str
     kscore: float = 0.0
     image_url: Optional[str] = None
+    country_code: Optional[str] = None
 
 
 class TensionOut(BaseModel):
@@ -101,6 +102,7 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
             topic=c.topic,
             kscore=round(c.kscore, 2),
             image_url=c.image_url,
+            country_code=c.country_code,
         )
         for c in clusters
     ]
@@ -160,6 +162,7 @@ async def _get_top5_batch(
             topic=row.topic,
             kscore=round(row.kscore, 2),
             image_url=row.image_url,
+            country_code=row.country_code,
         )
         top5_map.setdefault(row.country_code, []).append(cs)
     return top5_map

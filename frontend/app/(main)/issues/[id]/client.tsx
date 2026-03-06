@@ -92,7 +92,7 @@ export default function IssueDetailClient({ initialData }: Props) {
   const rawIssueTitle = lang === "en" ? issue.title : (issue.title_ko ?? issue.title);
   const issueTopicKey = `topic_${issue.topic}` as Parameters<typeof t>[1];
   const displayTitle = isJunkTitle(rawIssueTitle)
-    ? buildSmartTitle(issue.title, issue.topic, lang, getCountryName)
+    ? buildSmartTitle(issue.title, issue.topic, lang, getCountryName, issue.country_code)
     : (stripTitlePrefix(rawIssueTitle) || t(lang, issueTopicKey));
 
   const statusLabel = issue.confidence >= 0.70
@@ -191,7 +191,7 @@ export default function IssueDetailClient({ initialData }: Props) {
                 const eventTopicKey = `topic_${event.topic}` as Parameters<typeof t>[1];
                 const rawEventTitle = lang === "en" ? event.title : (event.title_ko ?? event.title);
                 const eventTitle = isJunkTitle(rawEventTitle)
-                  ? buildSmartTitle(event.title, event.topic, lang, getCountryName)
+                  ? buildSmartTitle(event.title, event.topic, lang, getCountryName, event.country_code)
                   : (stripTitlePrefix(rawEventTitle) || t(lang, eventTopicKey));
                 return (
                   <div key={event.id} className="flex gap-3">

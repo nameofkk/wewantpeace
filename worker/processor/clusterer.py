@@ -107,6 +107,42 @@ def _is_junk_title(title: str) -> bool:
     return len(stripped) < 5
 
 
+_TOPIC_LABELS_EN: dict[str, str] = {
+    "conflict": "Conflict", "terror": "Terror Attack", "coup": "Coup",
+    "sanctions": "Sanctions", "cyber": "Cyber Attack", "protest": "Protest",
+    "diplomacy": "Diplomacy", "maritime": "Maritime Dispute",
+    "disaster": "Disaster", "health": "Health Crisis", "unknown": "Issue",
+}
+
+_COUNTRY_NAMES_EN: dict[str, str] = {
+    "US": "US", "UA": "Ukraine", "RU": "Russia", "PS": "Palestine",
+    "IL": "Israel", "IR": "Iran", "CN": "China", "KP": "North Korea",
+    "KR": "South Korea", "TW": "Taiwan", "SY": "Syria", "MM": "Myanmar",
+    "SD": "Sudan", "ET": "Ethiopia", "SO": "Somalia", "VE": "Venezuela",
+    "HT": "Haiti", "LB": "Lebanon", "IQ": "Iraq", "AF": "Afghanistan",
+    "PK": "Pakistan", "IN": "India", "MX": "Mexico", "GB": "UK",
+    "FR": "France", "DE": "Germany", "JP": "Japan", "BR": "Brazil",
+    "TR": "Turkey", "SA": "Saudi Arabia", "YE": "Yemen", "LY": "Libya",
+    "NG": "Nigeria", "CU": "Cuba", "AE": "UAE", "QA": "Qatar",
+    "BH": "Bahrain", "KW": "Kuwait", "EG": "Egypt",
+}
+
+
+def _make_fallback_titles(
+    topic: str,
+    country_code: str | None,
+) -> tuple[str, str]:
+    """쓰레기 제목용 국가+토픽 폴백 (en, ko) 반환."""
+    topic_ko = _TOPIC_LABELS_KO.get(topic, "이슈")
+    topic_en = _TOPIC_LABELS_EN.get(topic, "Issue")
+    country_ko = _COUNTRY_NAMES_KO.get(country_code or "", "")
+    country_en = _COUNTRY_NAMES_EN.get(country_code or "", country_code or "")
+
+    if country_ko:
+        return f"{country_en} {topic_en}", f"{country_ko} {topic_ko}"
+    return topic_en, topic_ko
+
+
 def _make_cluster_title_ko(
     title: str,
     topic: str,
@@ -114,12 +150,11 @@ def _make_cluster_title_ko(
 ) -> str | None:
     """
     클러스터 홈 카드용 한국어 제목 생성.
-    UI에서 토픽·국기를 별도 표시하므로 번역된 핵심 제목만 반환.
-    해시태그만 있는 저품질 제목은 None 반환 (프론트에서 영어 원문 폴백).
+    해시태그만 있는 저품질 제목은 국가+토픽 폴백 제목 생성.
     """
-    # 해시태그만 있는 쓰레기 제목 → 번역하지 않음
     if _is_junk_title(title):
-        return None
+        _, title_ko = _make_fallback_titles(topic, country_code)
+        return title_ko
 
     title_ko = _translate_cached(title)
     if title_ko is None:
@@ -282,6 +317,9 @@ async def assign_cluster(
         else:
             ai_title_en = None
             title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
+            # 쓰레기 제목일 때 영문도 폴백
+            if _is_junk_title(event.title):
+                ai_title_en, _ = _make_fallback_titles(event.topic, event.country_code)
         # KScore 즉시 계산
         initial_kscore = _calc_kscore(
             event_count=1,

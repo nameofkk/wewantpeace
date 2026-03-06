@@ -21,6 +21,7 @@ interface ClusterSummary {
   confidence: number;
   topic: string;
   kscore: number;
+  country_code?: string | null;
 }
 
 interface TensionData {
@@ -460,7 +461,7 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
               const rawTitle = lang === "en" ? c.title : (c.title_ko ?? c.title);
               const topicKey = `topic_${c.topic}` as Parameters<typeof t>[1];
               const clusterTitle = isJunkTitle(rawTitle)
-                ? buildSmartTitle(c.title, c.topic, lang, getCountryName)
+                ? buildSmartTitle(c.title, c.topic, lang, getCountryName, c.country_code)
                 : (stripTitlePrefix(rawTitle) || t(lang, topicKey));
               return (
                 <Link

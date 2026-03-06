@@ -52,21 +52,26 @@ const NAME_TO_CODE: Record<string, string> = {
 /**
  * 쓰레기 제목에서 국가명 추출 + 토픽 조합으로 의미있는 제목 생성.
  * "#USA #Iran" + topic "conflict" → "미국·이란 무장 충돌" (ko) / "USA-Iran Conflict" (en)
+ * countryCode: 클러스터의 country_code 필드 (해시태그 추출 실패 시 폴백)
  */
 export function buildSmartTitle(
   rawTitle: string,
   topic: string,
   lang: "ko" | "en",
   getCountryNameFn: (code: string, lang: string) => string,
+  countryCode?: string | null,
 ): string {
   // 해시태그에서 국가 추출
   const tags = rawTitle.match(/#(\w+)/g)?.map((t) => t.slice(1)) || [];
 
+  // 국가가 아닌 해시태그 (ME, EU 등 지역 약어) 제외
+  const NON_COUNTRY_CODES = new Set(["ME", "EU", "UN"]);
+
   const countryNames: string[] = [];
   for (const tag of tags) {
-    // 직접 국가코드인 경우 (US, IR 등)
     const upper = tag.toUpperCase();
-    if (upper.length === 2) {
+    // 직접 국가코드인 경우 (2글자) — 비-국가 약어 제외
+    if (upper.length === 2 && !NON_COUNTRY_CODES.has(upper)) {
       countryNames.push(getCountryNameFn(upper, lang));
       continue;
     }
@@ -75,6 +80,11 @@ export function buildSmartTitle(
     if (code) {
       countryNames.push(getCountryNameFn(code, lang));
     }
+  }
+
+  // 해시태그에서 국가 못 찾았으면 cluster.country_code 사용
+  if (countryNames.length === 0 && countryCode) {
+    countryNames.push(getCountryNameFn(countryCode, lang));
   }
 
   // 중복 제거

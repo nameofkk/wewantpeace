@@ -171,7 +171,7 @@ export default function CountryIssuesPage() {
           const topicKey = `topic_${cluster.topic}` as Parameters<typeof t>[1];
           const rawClusterTitle = lang === "en" ? cluster.title : (cluster.title_ko ?? cluster.title);
           const clusterTitle = isJunkTitle(rawClusterTitle)
-            ? buildSmartTitle(cluster.title, cluster.topic, lang, getCountryName)
+            ? buildSmartTitle(cluster.title, cluster.topic, lang, getCountryName, cluster.country_code)
             : (stripTitlePrefix(rawClusterTitle) || t(lang, topicKey));
           const locale = lang === "en" ? "en-US" : "ko-KR";
 
