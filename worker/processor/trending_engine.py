@@ -262,7 +262,10 @@ async def _sync_independent_sources(db: AsyncSession, clusters: list[IssueCluste
         logger.info("독립출처 수 동기화: %d개 클러스터 업데이트", updated)
 
 
-from worker.processor.clusterer import _is_junk_title  # noqa: E402 — 통합 junk 판별
+def _is_junk_title(title: str) -> bool:
+    """Lazy wrapper — 순환 import 방지."""
+    from worker.processor.clusterer import _is_junk_title as _junk
+    return _junk(title)
 
 
 def _translate_cached(title: str) -> str | None:
