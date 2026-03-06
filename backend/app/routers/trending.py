@@ -281,11 +281,13 @@ async def mine_trending(
     )
     clusters = result.scalars().all()
 
+    now = datetime.now(timezone.utc)
     scored = []
     for c in clusters:
         # min_severity 필터: 사용자 설정값 미만 클러스터 제외
         if c.severity < user_min_severity:
             continue
+        age_hours = (now - c.last_event_at).total_seconds() / 3600 if c.last_event_at else 0.0
         kscore = _calc_kscore(
             event_count=c.event_count,
             is_spike=c.is_spike,
@@ -293,6 +295,7 @@ async def mine_trending(
             severity=c.severity,
             independent_sources=c.independent_sources,
             source_tiers=c.source_tiers or [],
+            age_hours=age_hours,
         )
         if kscore < KSCORE_MIN:
             continue
