@@ -429,20 +429,20 @@ async def handle_ai_question(question: str) -> str:
     )
 
     try:
-        reply = await asyncio.to_thread(_call_openai_agent, system_prompt, question)
+        reply = await _call_openai_agent_async(system_prompt, question)
         return reply if reply else "⚠️ AI 응답이 비어있습니다."
     except Exception:
         logger.exception("AI 에이전트 오류")
         return "⚠️ AI 처리 중 오류가 발생했습니다."
 
 
-def _call_openai_agent(system_prompt: str, user_prompt: str) -> str:
-    """sync OpenAI 호출 (asyncio.to_thread에서 사용)."""
+async def _call_openai_agent_async(system_prompt: str, user_prompt: str) -> str:
+    """async OpenAI 호출 (텔레그램 봇 이벤트 루프에서 직접 사용)."""
     try:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
 
-        client = OpenAI(api_key=_OPENAI_KEY, timeout=30.0)
-        resp = client.chat.completions.create(
+        client = AsyncOpenAI(api_key=_OPENAI_KEY, timeout=30.0)
+        resp = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
