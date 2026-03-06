@@ -38,7 +38,7 @@ function RegistrationGuard() {
     if (!me) return;
     // 닉네임 또는 약관동의가 없으면 등록 폼으로 리다이렉트
     if (!me.nickname || !me.agreed_terms_at) {
-      router.replace("/login");
+      router.replace("/login?tab=google-register");
     }
   }, [authLoading, meLoading, user, me, router]);
 
