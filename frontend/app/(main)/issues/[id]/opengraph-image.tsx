@@ -43,7 +43,7 @@ function getConfig(severity: number) {
   return SEVERITY_CONFIG.find((c) => severity >= c.min) || SEVERITY_CONFIG[SEVERITY_CONFIG.length - 1];
 }
 
-function condenseTitle(raw: string, maxLen = 40): string {
+function cleanTitle(raw: string): string {
   let t = raw
     .replace(
       /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
@@ -63,17 +63,7 @@ function condenseTitle(raw: string, maxLen = 40): string {
     .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
     .replace(/\.$/, "")
     .trim();
-  if (!t) return raw.slice(0, maxLen);
-  if (t.length <= maxLen) return t;
-  const slice = t.slice(0, maxLen);
-  const lastBreak = Math.max(
-    slice.lastIndexOf(", "),
-    slice.lastIndexOf(" "),
-    slice.lastIndexOf("·"),
-    slice.lastIndexOf(" – "),
-  );
-  if (lastBreak > maxLen * 0.6) return slice.slice(0, lastBreak).trim() + "…";
-  return slice.trim() + "…";
+  return t || raw;
 }
 
 interface KScorePoint {
@@ -145,8 +135,8 @@ export default async function OGImage({ params }: { params: { id: string } }) {
   }
 
   const rawTitle = issue.title_ko || issue.title;
-  const headline = condenseTitle(rawTitle, 45);
-  const titleSize = headline.length <= 18 ? 60 : headline.length <= 30 ? 50 : 42;
+  const headline = cleanTitle(rawTitle);
+  const titleSize = headline.length <= 18 ? 56 : headline.length <= 30 ? 46 : headline.length <= 50 ? 38 : 32;
   const config = getConfig(issue.severity);
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
@@ -339,13 +329,16 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               {/* 헤드라인 */}
               <div
                 style={{
+                  display: "flex",
                   color: "#FFFFFF",
                   fontSize: titleSize,
                   fontWeight: 900,
-                  lineHeight: 1.3,
+                  lineHeight: 1.35,
                   letterSpacing: "-0.5px",
                   wordBreak: "keep-all",
                   overflowWrap: "break-word",
+                  maxHeight: `${Math.round(titleSize * 1.35 * 3)}px`,
+                  overflow: "hidden",
                 }}
               >
                 {headline}
