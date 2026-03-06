@@ -26,6 +26,7 @@ from backend.app.models.app_event import AppEvent
 from backend.app.models.partner import Partner
 from backend.app.models.short_link import ShortLink, LinkClick
 from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
+from backend.app.models.social_post import SocialPost, SocialPostPlatform
 from backend.app.services.area_activation import sync_area_activation
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -2640,3 +2641,265 @@ async def referral_kpi(
             for r in top_referrers.fetchall()
         ],
     }
+
+
+# ── SNS 자동 포스팅 관리 ─────────────────────────────────────────────────────
+
+class SocialPostUpdate(BaseModel):
+    body_text: Optional[str] = None
+    hashtags: Optional[list[str]] = None
+
+
+@router.get("/social")
+async def list_social_posts(
+    status: Optional[str] = Query(None),
+    content_type: Optional[str] = Query(None),
+    platform: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    per_page = 20
+    query = select(SocialPost)
+    count_query = select(func.count()).select_from(SocialPost)
+
+    filters = []
+    if status:
+        filters.append(SocialPost.status == status)
+    if content_type:
+        filters.append(SocialPost.content_type == content_type)
+    if q:
+        filters.append(SocialPost.body_text.ilike(f"%{q}%"))
+
+    if filters:
+        for f in filters:
+            query = query.where(f)
+            count_query = count_query.where(f)
+
+    total = (await db.execute(count_query)).scalar() or 0
+    query = query.order_by(SocialPost.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
+    result = await db.execute(query)
+    posts = result.scalars().all()
+
+    # 플랫폼 상태 조회
+    post_ids = [p.id for p in posts]
+    platforms_map: dict[uuid.UUID, list[dict]] = {pid: [] for pid in post_ids}
+    if post_ids:
+        plat_result = await db.execute(
+            select(SocialPostPlatform).where(SocialPostPlatform.post_id.in_(post_ids))
+        )
+        for pp in plat_result.scalars().all():
+            platforms_map[pp.post_id].append({
+                "platform": pp.platform,
+                "status": pp.status,
+                "platform_post_id": pp.platform_post_id,
+                "error_message": pp.error_message,
+                "published_at": pp.published_at.isoformat() if pp.published_at else None,
+            })
+
+    # platform 필터 (post-query 필터)
+    items = []
+    for p in posts:
+        plats = platforms_map.get(p.id, [])
+        if platform:
+            if not any(pp["platform"] == platform for pp in plats):
+                continue
+        items.append({
+            "id": str(p.id),
+            "content_type": p.content_type,
+            "lang": p.lang,
+            "body_text": p.body_text,
+            "hashtags": p.hashtags or [],
+            "image_url": p.image_url,
+            "risk_level": p.risk_level,
+            "source_cluster_id": str(p.source_cluster_id) if p.source_cluster_id else None,
+            "source_spike_id": str(p.source_spike_id) if p.source_spike_id else None,
+            "dedup_key": p.dedup_key,
+            "status": p.status,
+            "created_at": p.created_at.isoformat(),
+            "approved_at": p.approved_at.isoformat() if p.approved_at else None,
+            "approved_by": p.approved_by,
+            "published_at": p.published_at.isoformat() if p.published_at else None,
+            "platforms": plats,
+        })
+
+    return {"items": items, "total": total}
+
+
+@router.get("/social/stats")
+async def social_stats(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())
+
+    pending = (await db.execute(
+        select(func.count()).select_from(SocialPost).where(SocialPost.status == "pending_review")
+    )).scalar() or 0
+    published_today = (await db.execute(
+        select(func.count()).select_from(SocialPost)
+        .where(SocialPost.status == "published", SocialPost.published_at >= today_start)
+    )).scalar() or 0
+    published_week = (await db.execute(
+        select(func.count()).select_from(SocialPost)
+        .where(SocialPost.status == "published", SocialPost.published_at >= week_start)
+    )).scalar() or 0
+    failed_count = (await db.execute(
+        select(func.count()).select_from(SocialPost).where(SocialPost.status == "failed")
+    )).scalar() or 0
+
+    return {
+        "pending": pending,
+        "published_today": published_today,
+        "published_week": published_week,
+        "failed": failed_count,
+    }
+
+
+@router.get("/social/{post_id}")
+async def get_social_post(
+    post_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    plat_result = await db.execute(
+        select(SocialPostPlatform).where(SocialPostPlatform.post_id == post.id)
+    )
+    platforms = [
+        {
+            "platform": pp.platform,
+            "status": pp.status,
+            "platform_post_id": pp.platform_post_id,
+            "error_message": pp.error_message,
+            "published_at": pp.published_at.isoformat() if pp.published_at else None,
+        }
+        for pp in plat_result.scalars().all()
+    ]
+
+    return {
+        "id": str(post.id),
+        "content_type": post.content_type,
+        "lang": post.lang,
+        "body_text": post.body_text,
+        "hashtags": post.hashtags or [],
+        "image_url": post.image_url,
+        "risk_level": post.risk_level,
+        "source_cluster_id": str(post.source_cluster_id) if post.source_cluster_id else None,
+        "source_spike_id": str(post.source_spike_id) if post.source_spike_id else None,
+        "dedup_key": post.dedup_key,
+        "status": post.status,
+        "created_at": post.created_at.isoformat(),
+        "approved_at": post.approved_at.isoformat() if post.approved_at else None,
+        "approved_by": post.approved_by,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "platforms": platforms,
+    }
+
+
+@router.post("/social/{post_id}/approve")
+async def approve_social_post(
+    post_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    post.status = "approved"
+    post.approved_at = datetime.now(timezone.utc)
+    post.approved_by = admin.nickname or admin.email or str(admin.id)
+    await db.flush()
+    await _log_action(db, admin, "approve_social", "social_post", post_id)
+    return {"status": "ok"}
+
+
+@router.post("/social/{post_id}/reject")
+async def reject_social_post(
+    post_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    post.status = "rejected"
+    await db.flush()
+    await _log_action(db, admin, "reject_social", "social_post", post_id)
+    return {"status": "ok"}
+
+
+@router.post("/social/{post_id}/retry")
+async def retry_social_post(
+    post_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+    if post.status != "failed":
+        raise HTTPException(400, "Only failed posts can be retried")
+
+    post.status = "approved"
+    post.approved_at = datetime.now(timezone.utc)
+    post.approved_by = admin.nickname or admin.email or str(admin.id)
+
+    # 실패한 플랫폼 레코드 삭제 (재시도)
+    await db.execute(
+        delete(SocialPostPlatform).where(
+            SocialPostPlatform.post_id == post.id,
+            SocialPostPlatform.status == "failed",
+        )
+    )
+
+    await db.flush()
+    await _log_action(db, admin, "retry_social", "social_post", post_id)
+    return {"status": "ok"}
+
+
+@router.patch("/social/{post_id}")
+async def update_social_post(
+    post_id: str,
+    body: SocialPostUpdate,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    changes = {}
+    if body.body_text is not None:
+        post.body_text = body.body_text[:280]
+        changes["body_text"] = body.body_text[:50] + "..."
+    if body.hashtags is not None:
+        post.hashtags = body.hashtags
+        changes["hashtags"] = body.hashtags
+
+    await db.flush()
+    await _log_action(db, admin, "update_social", "social_post", post_id, changes)
+    return {"status": "ok"}

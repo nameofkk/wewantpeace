@@ -15,6 +15,7 @@ from backend.app.models.app_event import AppEvent
 from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
 from backend.app.models.partner import Partner
 from backend.app.models.short_link import ShortLink, LinkClick
+from backend.app.models.social_post import SocialPost, SocialPostPlatform
 
 __all__ = [
     "SourceChannel",
@@ -39,4 +40,6 @@ __all__ = [
     "Partner",
     "ShortLink",
     "LinkClick",
+    "SocialPost",
+    "SocialPostPlatform",
 ]

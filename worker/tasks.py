@@ -1659,6 +1659,244 @@ def snapshot_weekly_kpi(self):
         raise self.retry(exc=exc)
 
 
+# ── SNS 자동 포스팅 태스크 ──────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.generate_daily_social",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def generate_daily_social(self):
+    """매일 Daily Movers SNS 포스트 생성."""
+
+    async def _run():
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED
+        if not SOCIAL_AUTOGEN_ENABLED:
+            logger.info("generate_daily_social: SOCIAL_AUTOGEN_ENABLED=false, 건너뜀")
+            return {"status": "disabled"}
+
+        from worker.social.generators import generate_daily_movers
+        from worker.social.telegram_bot import send_review_message
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                post = await generate_daily_movers(db)
+                if not post:
+                    return {"status": "skipped"}
+
+            # Telegram 승인 요청 (트랜잭션 밖에서)
+            await send_review_message(post)
+            return {"status": "ok", "post_id": str(post.id)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("generate_daily_social 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.generate_spike_social",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def generate_spike_social(self):
+    """미처리 스파이크 이벤트에 대한 SNS 포스트 생성."""
+
+    async def _run():
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED, SPIKE_SOCIAL_SEVERITY_MIN
+        if not SOCIAL_AUTOGEN_ENABLED:
+            return {"status": "disabled"}
+
+        from sqlalchemy import select
+        from backend.app.models.spike_event import SpikeEvent
+        from backend.app.models.issue_cluster import IssueCluster
+        from backend.app.models.social_post import SocialPost
+        from worker.social.generators import generate_spike_alert
+        from worker.social.telegram_bot import send_review_message
+
+        created = 0
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # severity 기준 이상 스파이크 중 아직 SNS 포스트가 없는 것만
+                result = await db.execute(
+                    select(SpikeEvent, IssueCluster)
+                    .join(IssueCluster, SpikeEvent.cluster_id == IssueCluster.id)
+                    .where(SpikeEvent.severity >= SPIKE_SOCIAL_SEVERITY_MIN)
+                    .order_by(SpikeEvent.triggered_at.desc())
+                    .limit(10)
+                )
+                rows = result.all()
+
+                posts_to_notify = []
+                for spike, cluster in rows:
+                    # 이미 생성된 포스트가 있는지 확인
+                    dedup_key = f"spike_alert:{spike.id}"
+                    existing = await db.execute(
+                        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    post = await generate_spike_alert(spike, cluster, db)
+                    if post:
+                        posts_to_notify.append(post)
+                        created += 1
+
+            # Telegram 알림 (트랜잭션 밖)
+            for post in posts_to_notify:
+                await send_review_message(post)
+
+        return {"status": "ok", "created": created}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("generate_spike_social 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.generate_weekly_social",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def generate_weekly_social(self):
+    """매주 월요일 Weekly Recap SNS 포스트 생성."""
+
+    async def _run():
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED
+        if not SOCIAL_AUTOGEN_ENABLED:
+            return {"status": "disabled"}
+
+        from worker.social.generators import generate_weekly_recap
+        from worker.social.telegram_bot import send_review_message
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                post = await generate_weekly_recap(db)
+                if not post:
+                    return {"status": "skipped"}
+
+            await send_review_message(post)
+            return {"status": "ok", "post_id": str(post.id)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("generate_weekly_social 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.publish_approved_social",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def publish_approved_social(self):
+    """approved 상태 포스트를 X/Threads에 발행."""
+
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.social_post import SocialPost, SocialPostPlatform
+        from worker.social.config import SOCIAL_PLATFORM_X_ENABLED, SOCIAL_PLATFORM_THREADS_ENABLED
+
+        published = 0
+        failed = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                result = await db.execute(
+                    select(SocialPost)
+                    .where(SocialPost.status == "approved")
+                    .order_by(SocialPost.approved_at.asc())
+                    .limit(5)
+                )
+                posts = result.scalars().all()
+
+                for post in posts:
+                    all_ok = True
+
+                    # X (Twitter)
+                    if SOCIAL_PLATFORM_X_ENABLED:
+                        # 이미 발행된 플랫폼 레코드 확인
+                        existing_x = await db.execute(
+                            select(SocialPostPlatform).where(
+                                SocialPostPlatform.post_id == post.id,
+                                SocialPostPlatform.platform == "x",
+                            )
+                        )
+                        x_record = existing_x.scalar_one_or_none()
+
+                        if not x_record:
+                            from worker.social.adapters.x_adapter import publish as x_publish
+                            platform_id, error = x_publish(post)
+                            x_record = SocialPostPlatform(
+                                post_id=post.id,
+                                platform="x",
+                                platform_post_id=platform_id,
+                                status="published" if platform_id else "failed",
+                                error_message=error,
+                                published_at=datetime.now(timezone.utc) if platform_id else None,
+                            )
+                            db.add(x_record)
+                            if not platform_id:
+                                all_ok = False
+                        elif x_record.status == "failed":
+                            all_ok = False
+
+                    # Threads
+                    if SOCIAL_PLATFORM_THREADS_ENABLED:
+                        existing_th = await db.execute(
+                            select(SocialPostPlatform).where(
+                                SocialPostPlatform.post_id == post.id,
+                                SocialPostPlatform.platform == "threads",
+                            )
+                        )
+                        th_record = existing_th.scalar_one_or_none()
+
+                        if not th_record:
+                            from worker.social.adapters.threads_adapter import publish as threads_publish
+                            platform_id, error = threads_publish(post)
+                            th_record = SocialPostPlatform(
+                                post_id=post.id,
+                                platform="threads",
+                                platform_post_id=platform_id,
+                                status="published" if platform_id else "failed",
+                                error_message=error,
+                                published_at=datetime.now(timezone.utc) if platform_id else None,
+                            )
+                            db.add(th_record)
+                            if not platform_id:
+                                all_ok = False
+                        elif th_record.status == "failed":
+                            all_ok = False
+
+                    # 전체 발행 상태 업데이트
+                    if all_ok:
+                        post.status = "published"
+                        post.published_at = datetime.now(timezone.utc)
+                        published += 1
+                    else:
+                        post.status = "failed"
+                        failed += 1
+
+        if published or failed:
+            logger.info("publish_approved_social: published=%d, failed=%d", published, failed)
+        return {"status": "ok", "published": published, "failed": failed}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("publish_approved_social 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
 @app.task(
     name="worker.tasks.aggregate_link_clicks",
     queue="process",

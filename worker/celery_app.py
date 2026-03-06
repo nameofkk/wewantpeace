@@ -109,6 +109,27 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/1"),  # 매 1시간
         "options": {"queue": "process"},
     },
+    # ── SNS 자동 포스팅 ──
+    "generate-daily-social": {
+        "task": "worker.tasks.generate_daily_social",
+        "schedule": crontab(minute=0, hour=0),  # 매일 00:00 UTC = KST 09:00
+        "options": {"queue": "process"},
+    },
+    "generate-spike-social": {
+        "task": "worker.tasks.generate_spike_social",
+        "schedule": crontab(minute="*/5"),  # 스파이크 감지 주기와 동일
+        "options": {"queue": "process"},
+    },
+    "generate-weekly-social": {
+        "task": "worker.tasks.generate_weekly_social",
+        "schedule": crontab(minute=0, hour=0, day_of_week=1),  # 매주 월요일
+        "options": {"queue": "process"},
+    },
+    "publish-approved-social": {
+        "task": "worker.tasks.publish_approved_social",
+        "schedule": crontab(minute="*/2"),  # 2분마다 approved 상태 게시물 발행
+        "options": {"queue": "process"},
+    },
 }
 
 
@@ -126,6 +147,14 @@ def on_worker_process_init(**kwargs):
 
 @worker_ready.connect
 def on_worker_ready(**kwargs):
-    """워커 시작 시 긴장도·트렌딩 즉시 계산."""
+    """워커 시작 시 긴장도·트렌딩 즉시 계산 + Telegram 봇 시작."""
     app.send_task("worker.tasks.calculate_tension", queue="process")
     app.send_task("worker.tasks.calculate_trending", queue="process")
+
+    # SNS Telegram 봇 polling 시작
+    try:
+        from worker.social.telegram_bot import start_polling_loop
+        start_polling_loop()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Telegram 봇 시작 실패 (무시): %s", e)

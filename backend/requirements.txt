@@ -35,6 +35,9 @@ google-api-python-client>=2.127.0
 # Apple StoreKit (JWT 생성)
 PyJWT[crypto]>=2.8.0
 cryptography>=42.0.0
+# SNS 자동 포스팅
+python-telegram-bot>=21.0
+tweepy>=4.14.0
 # 유틸
 geohash2==1.1
 tenacity==8.3.0
