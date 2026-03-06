@@ -33,6 +33,8 @@ from worker.processor.calibration import (
     KSCORE_SCALE,
     TRENDING_LIMIT,
     KSCORE_VALID_MINUTES,
+    DECAY_LAMBDA,
+    DECAY_FLOOR,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,7 @@ def _calc_kscore(
     severity: int,
     independent_sources: int,
     source_tiers: list[str],
+    age_hours: float = 0.0,
 ) -> float:
     """
     KScore 계산 (v4) — 0~10 스케일.
@@ -88,7 +91,8 @@ def _calc_kscore(
         + 0.40 * severity_norm
         + 0.20 * spread
     )
-    return round(raw * KSCORE_SCALE, 2)
+    decay = max(DECAY_FLOOR, math.exp(-DECAY_LAMBDA * age_hours))
+    return round(raw * KSCORE_SCALE * decay, 2)
 
 
 async def calculate_global_trending(db: AsyncSession) -> list[dict]:
@@ -123,6 +127,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     # KScore 계산
     scored = []
     for c in clusters:
+        age_hours = (now - c.last_event_at).total_seconds() / 3600 if c.last_event_at else 0.0
         kscore = _calc_kscore(
             event_count=c.event_count,
             is_spike=c.is_spike,
@@ -130,6 +135,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             severity=c.severity,
             independent_sources=c.independent_sources,
             source_tiers=c.source_tiers or [],
+            age_hours=age_hours,
         )
         # 포함 조건 완화: event_count >= 1 이상이면 포함
         if kscore < KSCORE_MIN:

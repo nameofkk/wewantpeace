@@ -6,8 +6,9 @@ SpikeDetector: Redis 카운터 기반 스파이크 감지.
   c10 = 10분 이내 동일 cluster 이벤트 수 (Redis INCR, TTL 600s)
   b10 = 7일 시즌성 기준선 (없으면 EWMA 6h, alpha=0.3)
 
-트리거: (c1 >= 4 OR c10 >= 12) AND ratio >= 4.0 AND severity >= 35
+트리거: (c1 >= 3 OR c10 >= 8) AND ratio >= 2.5 AND severity >= 35
 쿨다운: severity >= 90 → 30분, 그 외 → 1시간
+baseline 갱신: 1시간 주기 (bl_lock 키로 제어)
 """
 import logging
 import math
@@ -17,9 +18,9 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # ── 상수 ─────────────────────────────────────────────────────────────────────
-C1_THRESHOLD = 4
-C10_THRESHOLD = 12
-RATIO_THRESHOLD = 4.0
+C1_THRESHOLD = 3
+C10_THRESHOLD = 8
+RATIO_THRESHOLD = 2.5
 SEVERITY_MIN = 35
 COOLDOWN_SECONDS = 3600  # 1시간 (기본)
 COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
@@ -126,6 +127,10 @@ async def get_unique_source_count(cluster_id: str, redis) -> int:
     return await redis.scard(_key_sources(cluster_id))
 
 
+def _key_bl_lock(cluster_key: str) -> str:
+    return f"spike:bl_lock:{cluster_key}"
+
+
 def _key_obs_count(cluster_key: str) -> str:
     return f"spike:obs_count:{cluster_key}"
 
@@ -185,9 +190,12 @@ async def evaluate_spike(
     # 카운터 증가
     c1, c10 = await increment_event_counters(cluster_id, redis)
 
-    # 기준선
+    # 기준선 — baseline은 1시간 주기로만 갱신 (매 이벤트 추적 방지)
     b10 = await get_baseline(cluster_key, redis)
-    await update_baseline(cluster_key, c10, redis)
+    bl_lock_key = _key_bl_lock(cluster_key)
+    if not await redis.exists(bl_lock_key):
+        await update_baseline(cluster_key, c10, redis)
+        await redis.setex(bl_lock_key, 3600, "1")
 
     ratio = c10 / (b10 + 1)
 

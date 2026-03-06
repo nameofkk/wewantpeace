@@ -122,6 +122,11 @@ KSCORE_MIN: float = 1.5
 # v1=20, v2=30 (더 많은 채널 = 더 많은 이슈)
 TRENDING_LIMIT: int = 30
 
+# KScore 시간감쇠: decay = max(DECAY_FLOOR, exp(-DECAY_LAMBDA * age_hours))
+# 0.04: 6h→79%, 12h→62%, 24h→38%, 48h→15%(floor)
+DECAY_LAMBDA: float = 0.04
+DECAY_FLOOR: float = 0.15
+
 # 트렌딩 키워드 유효 시간 (분)
 KSCORE_VALID_HOURS: int = 24
 KSCORE_VALID_MINUTES: int = KSCORE_VALID_HOURS * 60

@@ -330,19 +330,21 @@ def calculate_trending(self):
         """같은 cluster_key의 분산된 클러스터를 병합 (보수적).
 
         병합 조건:
-        - conflict/terror/coup 토픽만 (diplomacy/protest 등은 너무 광범위)
+        - 8개 토픽 (conflict/terror/coup + diplomacy/maritime/protest/sanctions/cyber)
         - cluster_key가 '0000'으로 시작하지 않을 것 (위치 미상 = 혼합 위험)
-        - winner의 event_count가 30 이하일 때만
-        - loser의 last_event_at이 winner 기준 48시간 이내
+        - winner의 event_count가 100 이하일 때만
+        - loser의 last_event_at이 winner 기준 72시간 이내
+        - 광범위 토픽은 title_overlap >= 0.25 필요
         """
         from collections import defaultdict
         from sqlalchemy import select, text
         from backend.app.models.issue_cluster import IssueCluster
         from worker.processor.trending_engine import _calc_kscore
 
-        _MERGE_TOPICS = {"conflict", "terror", "coup"}
-        _MAX_EVENTS = 30
-        _TIME_WINDOW = timedelta(hours=48)
+        _MERGE_TOPICS = {"conflict", "terror", "coup", "diplomacy", "maritime", "protest", "sanctions", "cyber"}
+        _BROAD_TOPICS = {"diplomacy", "protest", "maritime", "sanctions", "cyber"}
+        _MAX_EVENTS = 100
+        _TIME_WINDOW = timedelta(hours=72)
 
         result = await db.execute(
             select(IssueCluster).where(
@@ -371,6 +373,18 @@ def calculate_trending(self):
                 if (winner.last_event_at and loser.last_event_at
                         and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _TIME_WINDOW.total_seconds()):
                     continue
+                # 광범위 토픽: 제목 유사도 체크 (다른 이슈 오병합 방지)
+                topic = winner.topic or ""
+                if topic in _BROAD_TOPICS:
+                    from worker.processor.clusterer import _title_overlap
+                    if _title_overlap(winner.title or "", loser.title or "") < 0.25:
+                        continue
+
+                # 제목 교체: winner가 쓰레기 제목이면 loser 것으로 승격
+                from worker.processor.trending_engine import _is_junk_title
+                if _is_junk_title(winner.title or "") and not _is_junk_title(loser.title or ""):
+                    winner.title = loser.title
+                    winner.title_ko = loser.title_ko
 
                 winner.event_count += loser.event_count
                 winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
@@ -393,6 +407,7 @@ def calculate_trending(self):
                 loser.kscore = 0
                 merged_total += 1
 
+            age_hours = (datetime.now(timezone.utc) - winner.last_event_at).total_seconds() / 3600 if winner.last_event_at else 0.0
             winner.kscore = _calc_kscore(
                 event_count=winner.event_count,
                 is_spike=winner.is_spike,
@@ -400,6 +415,7 @@ def calculate_trending(self):
                 severity=winner.severity,
                 independent_sources=winner.independent_sources or 1,
                 source_tiers=winner.source_tiers or [],
+                age_hours=age_hours,
             )
             winner.updated_at = datetime.now(timezone.utc)
 

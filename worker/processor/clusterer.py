@@ -259,6 +259,7 @@ async def assign_cluster(
             cluster.country_code = event.country_code
             cluster.geohash5 = event.geohash5
         # KScore 즉시 계산 (calculate_trending 의존 제거)
+        age_hours = (now - cluster.last_event_at).total_seconds() / 3600 if cluster.last_event_at else 0.0
         cluster.kscore = _calc_kscore(
             event_count=cluster.event_count,
             is_spike=cluster.is_spike,
@@ -266,6 +267,7 @@ async def assign_cluster(
             severity=cluster.severity,
             independent_sources=cluster.independent_sources or 1,
             source_tiers=cluster.source_tiers or [],
+            age_hours=age_hours,
         )
         cluster.updated_at = now
     else:

@@ -98,6 +98,13 @@ function isNew(isoString?: string | null): boolean {
   return Date.now() - new Date(isoString).getTime() < 2 * 60 * 60 * 1000;
 }
 
+// RISING 태그 기준: 6시간 이내 + KScore >= 3
+function isRising(firstEventAt?: string | null, kscore?: number): boolean {
+  if (!firstEventAt || !kscore) return false;
+  const ageMs = Date.now() - new Date(firstEventAt).getTime();
+  return ageMs < 6 * 60 * 60 * 1000 && kscore >= 3;
+}
+
 // 날짜+시분 포맷
 import { type Lang } from "@/lib/i18n";
 
@@ -404,6 +411,12 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
                 <InfoTooltip direction="down" text={t(lang, "signal_new_tooltip")} />
               </span>
             )}
+            {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
+              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none animate-pulse">
+                RISING
+                <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
+              </span>
+            )}
             <span className={cn("inline-flex items-center h-5 gap-0.5 rounded-full px-2 text-[10px] font-medium leading-none", TOPIC_COLORS[topic])}>
               {topicLabel}
               <InfoTooltip direction="down" text={t(lang, (`topic_${topic}_tooltip`) as Parameters<typeof t>[1]) || topicLabel} />
@@ -536,6 +549,7 @@ function LoadingSkeleton() {
 
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  const router = useRouter();
   const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan } = useAppStore();
   const { data: me } = useMe();
   const meObj = me as { plan?: string; role?: string } | undefined;
@@ -583,6 +597,16 @@ export default function HomePage() {
         independent_sources: c.independent_sources ?? 1,
       })) as TrendingItem[];
   }, [clusterData]);
+  // 급상승 데이터: 6시간 이내 생성 + KScore >= 3 (글로벌 탭 전용)
+  const risingData = useMemo(() => {
+    if (!globalData) return [];
+    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+    return globalData
+      .filter(item => item.first_event_at &&
+        new Date(item.first_event_at).getTime() > sixHoursAgo && item.kscore >= 3)
+      .slice(0, 5);
+  }, [globalData]);
+
   const globalLoading = clusterLoading;
   const globalFetching = clusterFetching;
   const globalError = clusterError;
@@ -813,6 +837,51 @@ export default function HomePage() {
                 <MapPin className="h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-sm font-medium">{t(lang, "home_no_trending")}</p>
                 <p className="text-sm text-muted-foreground">{t(lang, "home_no_trending_sub")}</p>
+              </div>
+            )}
+
+            {/* ── 급상승 섹션 (글로벌 탭, 데이터 있을 때만) ──── */}
+            {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
+              <div className="mb-2">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="text-xs font-bold">{t(lang, "home_rising_title")}</span>
+                  <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 animate-pulse leading-none">
+                    RISING
+                  </span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {risingData.map((item) => {
+                    const clusterId = item.cluster_ids?.[0];
+                    const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
+                    const displayTitle = isJunkTitle(rawTitle)
+                      ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName)
+                      : (stripTitlePrefix(rawTitle) || item.keyword);
+                    const badge = getKScoreBadge(item.kscore, lang);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+                        className={cn(
+                          "shrink-0 w-48 rounded-lg border border-border bg-card p-3 cursor-pointer hover:bg-card/80 transition-colors",
+                          kscoreAccent(item.kscore),
+                          "border-l-4",
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={cn("text-[10px] font-bold", badge.text)}>
+                            {roundKScore(item.kscore).toFixed(1)}
+                          </span>
+                          {item.country_codes.length > 0 && (
+                            <span className="text-[11px]">
+                              {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] font-medium leading-snug line-clamp-2">{displayTitle}</p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
