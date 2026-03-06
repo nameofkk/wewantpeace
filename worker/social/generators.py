@@ -1,4 +1,4 @@
-"""SNS 콘텐츠 생성기 — Daily Movers / Spike Alert / Weekly Recap (ko+en)."""
+"""SNS 콘텐츠 생성기 — Daily Movers / Spike Alert / Weekly Recap (bilingual)."""
 import logging
 import os
 import uuid
@@ -75,25 +75,76 @@ async def _generate_card_for_post(post: SocialPost, cluster=None):
         logger.warning("카드 이미지 생성 실패 (무시): post=%s", post.id)
 
 
+# ── 공통 bilingual 시스템 프롬프트 ──────────────────────────────────────────
+
+_BILINGUAL_SYSTEM = (
+    "You write punchy, eye-catching bilingual social media posts about global conflicts.\n"
+    "Format — English first, blank line, then Korean:\n"
+    "\n"
+    "[emoji] Bold headline in English\n"
+    "Key point 1 · Key point 2\n"
+    "\n"
+    "[emoji] 한국어 헤드라인\n"
+    "핵심 1 · 핵심 2\n"
+    "\n"
+    "Rules:\n"
+    "- Total MUST be under 240 chars (hashtags added separately)\n"
+    "- Use 1-2 relevant emojis (🔴⚡🌍🇺🇦 etc.) for visual impact\n"
+    "- Use · or | as separators, NOT full sentences\n"
+    "- Be factual but impactful — hook the reader in 2 seconds\n"
+    "- NO hashtags, NO labels like 'EN:'/'KO:'"
+)
+
+_SPIKE_BILINGUAL_SYSTEM = (
+    "You write URGENT breaking news bilingual posts about global conflicts.\n"
+    "Format — English first, blank line, then Korean:\n"
+    "\n"
+    "🚨 [BREAKING] Headline\n"
+    "Key detail · Impact\n"
+    "\n"
+    "🚨 [속보] 헤드라인\n"
+    "핵심 · 영향\n"
+    "\n"
+    "Rules:\n"
+    "- Total MUST be under 240 chars\n"
+    "- Start with 🚨 for urgency\n"
+    "- Use · or | as separators\n"
+    "- Maximum impact in minimum words\n"
+    "- NO hashtags, NO labels"
+)
+
+_WEEKLY_BILINGUAL_SYSTEM = (
+    "You write weekly recap bilingual posts about global conflicts.\n"
+    "Format — English first, blank line, then Korean:\n"
+    "\n"
+    "📊 Week in Review: [headline]\n"
+    "Top: Country1 · Country2 · Country3\n"
+    "\n"
+    "📊 주간 리뷰: [헤드라인]\n"
+    "상위: 국가1 · 국가2 · 국가3\n"
+    "\n"
+    "Rules:\n"
+    "- Total MUST be under 240 chars\n"
+    "- Highlight top 2-3 countries with stats\n"
+    "- Use · or | as separators\n"
+    "- Clean, scannable format\n"
+    "- NO hashtags, NO labels"
+)
+
+
 # ── Daily Movers ─────────────────────────────────────────────────────────────
 
-_DAILY_SYSTEM_KO = (
-    "You are a concise news writer for social media about global conflicts. "
-    "Write a Korean post (under 280 characters) summarizing the top 3 global issues. "
-    "Be factual, neutral, and informative. Do NOT include hashtags."
-)
-
-_DAILY_SYSTEM_EN = (
-    "You are a concise news writer for social media about global conflicts. "
-    "Write an English post (under 280 characters) summarizing the top 3 global issues. "
-    "Be factual, neutral, and informative. Do NOT include hashtags."
-)
-
-
-async def generate_daily_movers(db: AsyncSession) -> list[SocialPost]:
-    """지난 24시간 severity 상위 3개 클러스터로 Daily Movers 포스트 생성 (ko+en)."""
+async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
+    """지난 24시간 severity 상위 3개 클러스터로 Daily Movers 포스트 생성 (bilingual)."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    posts = []
+    dedup_key = f"daily_movers:{today}"
+
+    existing = await db.execute(
+        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+    )
+    if existing.scalar_one_or_none():
+        logger.info("Daily Movers 이미 존재: %s", dedup_key)
+        return None
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     result = await db.execute(
@@ -109,15 +160,17 @@ async def generate_daily_movers(db: AsyncSession) -> list[SocialPost]:
 
     if not top_clusters:
         logger.info("Daily Movers: 최근 24시간 클러스터 없음")
-        return posts
+        return None
 
-    # 공통 데이터 준비
-    items_ko, items_en = [], []
+    # 데이터 준비
+    items = []
     country_codes = []
     max_severity = 0
     for i, c in enumerate(top_clusters, 1):
-        items_ko.append(f"{i}. [{c.country_code or '??'}] {c.title_ko or c.title} (severity: {c.severity})")
-        items_en.append(f"{i}. [{c.country_code or '??'}] {c.title} (severity: {c.severity})")
+        title_bi = f"{c.title}"
+        if c.title_ko and c.title_ko != c.title:
+            title_bi = f"{c.title} / {c.title_ko}"
+        items.append(f"{i}. [{c.country_code or '??'}] {title_bi} (severity: {c.severity})")
         if c.country_code:
             country_codes.append(c.country_code)
         max_severity = max(max_severity, c.severity)
@@ -125,160 +178,114 @@ async def generate_daily_movers(db: AsyncSession) -> list[SocialPost]:
     hashtags = _build_hashtags(country_codes)
     risk = _risk_from_severity(max_severity)
 
-    # ko + en 포스트 생성
-    for lang, system_prompt, items, fallback_prefix in [
-        ("ko", _DAILY_SYSTEM_KO, items_ko, "오늘의 주요 이슈"),
-        ("en", _DAILY_SYSTEM_EN, items_en, "Today's Top Issues"),
-    ]:
-        dedup_key = f"daily_movers:{lang}:{today}"
+    user_prompt = "Summarize these top global issues:\n" + "\n".join(items)
+    body = _call_openai(_BILINGUAL_SYSTEM, user_prompt)
 
-        existing = await db.execute(
-            select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-        )
-        if existing.scalar_one_or_none():
-            logger.info("Daily Movers 이미 존재: %s", dedup_key)
-            continue
+    if not body:
+        # 폴백: bilingual compact
+        top = top_clusters[0]
+        en_title = top.title[:60] if len(top.title) > 60 else top.title
+        ko_title = (top.title_ko or top.title)[:60]
+        body = f"🌍 {en_title}\n\n🌍 {ko_title}"
 
-        prompt_prefix = "다음 이슈를 요약하여 SNS 포스트를 작성하세요:" if lang == "ko" else "Summarize these issues into a social media post:"
-        user_prompt = prompt_prefix + "\n" + "\n".join(items)
-        body = _call_openai(system_prompt, user_prompt)
+    if len(body) > 250:
+        body = body[:247] + "..."
 
-        if not body:
-            lines = [f"- {c.title_ko or c.title}" if lang == "ko" else f"- {c.title}" for c in top_clusters]
-            body = f"{fallback_prefix}\n\n" + "\n".join(lines)
-
-        if len(body) > 280:
-            body = body[:277] + "..."
-
-        post = SocialPost(
-            content_type="daily_movers",
-            lang=lang,
-            body_text=body,
-            hashtags=hashtags,
-            risk_level=risk,
-            source_cluster_id=top_clusters[0].id,
-            dedup_key=dedup_key,
-            status="pending_review",
-        )
-        db.add(post)
-        await db.flush()
-        await _generate_card_for_post(post, top_clusters[0])
-        posts.append(post)
-        logger.info("Daily Movers [%s] 생성: %s (risk=%s)", lang, post.id, risk)
-
-    return posts
+    post = SocialPost(
+        content_type="daily_movers",
+        lang="bi",
+        body_text=body,
+        hashtags=hashtags,
+        risk_level=risk,
+        source_cluster_id=top_clusters[0].id,
+        dedup_key=dedup_key,
+        status="pending_review",
+    )
+    db.add(post)
+    await db.flush()
+    await _generate_card_for_post(post, top_clusters[0])
+    logger.info("Daily Movers [bi] 생성: %s (risk=%s)", post.id, risk)
+    return post
 
 
 # ── Spike Alert ──────────────────────────────────────────────────────────────
-
-_SPIKE_SYSTEM_KO = (
-    "You are a breaking news writer for social media about global conflicts. "
-    "Write an urgent-style Korean post (under 280 characters) about this spike event. "
-    "Be factual and concise. Do NOT include hashtags."
-)
-
-_SPIKE_SYSTEM_EN = (
-    "You are a breaking news writer for social media about global conflicts. "
-    "Write an urgent-style English post (under 280 characters) about this spike event. "
-    "Be factual and concise. Do NOT include hashtags."
-)
-
 
 async def generate_spike_alert(
     spike: SpikeEvent,
     cluster: IssueCluster,
     db: AsyncSession,
-) -> list[SocialPost]:
-    """스파이크 이벤트 기반 긴급 포스트 생성 (ko+en)."""
-    posts = []
+) -> SocialPost | None:
+    """스파이크 이벤트 기반 긴급 포스트 생성 (bilingual)."""
+    dedup_key = f"spike_alert:{spike.id}"
+
+    existing = await db.execute(
+        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+    )
+    if existing.scalar_one_or_none():
+        logger.info("Spike Alert 이미 존재: %s", dedup_key)
+        return None
+
     country_codes = [cluster.country_code] if cluster.country_code else []
     hashtags = _build_hashtags(country_codes)
     risk = "high" if cluster.severity >= 70 else "medium"
 
-    for lang, system_prompt, fallback_tmpl in [
-        ("ko", _SPIKE_SYSTEM_KO, "[속보] {title} (심각도: {sev})"),
-        ("en", _SPIKE_SYSTEM_EN, "[BREAKING] {title} (Severity: {sev})"),
-    ]:
-        dedup_key = f"spike_alert:{lang}:{spike.id}"
+    title_en = cluster.title
+    title_ko = cluster.title_ko or cluster.title
+    country_label = cluster.country_code or "Unknown"
 
-        existing = await db.execute(
-            select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-        )
-        if existing.scalar_one_or_none():
-            logger.info("Spike Alert 이미 존재: %s", dedup_key)
-            continue
+    user_prompt = (
+        f"Breaking news:\n"
+        f"Title (EN): {title_en}\n"
+        f"Title (KO): {title_ko}\n"
+        f"Country: {country_label}\n"
+        f"Severity: {cluster.severity}/100\n"
+        f"KScore: {cluster.kscore:.1f}"
+    )
 
-        title = (cluster.title_ko or cluster.title) if lang == "ko" else cluster.title
-        country_label = cluster.country_code or ("미상" if lang == "ko" else "Unknown")
+    body = _call_openai(_SPIKE_BILINGUAL_SYSTEM, user_prompt)
+    if not body:
+        en_short = title_en[:80] if len(title_en) > 80 else title_en
+        ko_short = title_ko[:80] if len(title_ko) > 80 else title_ko
+        body = f"🚨 {en_short}\n\n🚨 {ko_short}"
 
-        if lang == "ko":
-            user_prompt = (
-                f"긴급 속보:\n"
-                f"제목: {title}\n"
-                f"국가: {country_label}\n"
-                f"심각도: {cluster.severity}/100\n"
-                f"KScore: {cluster.kscore:.1f}"
-            )
-        else:
-            user_prompt = (
-                f"Breaking news:\n"
-                f"Title: {title}\n"
-                f"Country: {country_label}\n"
-                f"Severity: {cluster.severity}/100\n"
-                f"KScore: {cluster.kscore:.1f}"
-            )
+    if len(body) > 250:
+        body = body[:247] + "..."
 
-        body = _call_openai(system_prompt, user_prompt)
-        if not body:
-            body = fallback_tmpl.format(title=title, sev=cluster.severity)
-
-        if len(body) > 280:
-            body = body[:277] + "..."
-
-        post = SocialPost(
-            content_type="spike_alert",
-            lang=lang,
-            body_text=body,
-            hashtags=hashtags,
-            risk_level=risk,
-            source_cluster_id=cluster.id,
-            source_spike_id=spike.id,
-            dedup_key=dedup_key,
-            status="pending_review",
-        )
-        db.add(post)
-        await db.flush()
-        await _generate_card_for_post(post, cluster)
-        posts.append(post)
-        logger.info("Spike Alert [%s] 생성: %s (risk=%s)", lang, post.id, risk)
-
-    return posts
+    post = SocialPost(
+        content_type="spike_alert",
+        lang="bi",
+        body_text=body,
+        hashtags=hashtags,
+        risk_level=risk,
+        source_cluster_id=cluster.id,
+        source_spike_id=spike.id,
+        dedup_key=dedup_key,
+        status="pending_review",
+    )
+    db.add(post)
+    await db.flush()
+    await _generate_card_for_post(post, cluster)
+    logger.info("Spike Alert [bi] 생성: %s (risk=%s)", post.id, risk)
+    return post
 
 
 # ── Weekly Recap ─────────────────────────────────────────────────────────────
 
-_WEEKLY_SYSTEM_KO = (
-    "You are a weekly news summarizer for social media about global conflicts. "
-    "Write a Korean weekly recap post (under 280 characters) summarizing the week's key events. "
-    "Be informative and neutral. Do NOT include hashtags."
-)
-
-_WEEKLY_SYSTEM_EN = (
-    "You are a weekly news summarizer for social media about global conflicts. "
-    "Write an English weekly recap post (under 280 characters) summarizing the week's key events. "
-    "Be informative and neutral. Do NOT include hashtags."
-)
-
-
-async def generate_weekly_recap(db: AsyncSession) -> list[SocialPost]:
-    """지난 7일 클러스터 통계 기반 주간 요약 포스트 생성 (ko+en)."""
+async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
+    """지난 7일 클러스터 통계 기반 주간 요약 포스트 생성 (bilingual)."""
     now = datetime.now(timezone.utc)
     iso_cal = now.isocalendar()
-    posts = []
+    dedup_key = f"weekly_recap:{iso_cal.year}-W{iso_cal.week:02d}"
+
+    existing = await db.execute(
+        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+    )
+    if existing.scalar_one_or_none():
+        logger.info("Weekly Recap 이미 존재: %s", dedup_key)
+        return None
 
     cutoff = now - timedelta(days=7)
 
-    # 국가별 통계
     stats_result = await db.execute(
         select(
             IssueCluster.country_code,
@@ -298,7 +305,7 @@ async def generate_weekly_recap(db: AsyncSession) -> list[SocialPost]:
 
     if not country_stats:
         logger.info("Weekly Recap: 지난 7일 데이터 없음")
-        return posts
+        return None
 
     total_result = await db.execute(
         select(func.count())
@@ -310,61 +317,38 @@ async def generate_weekly_recap(db: AsyncSession) -> list[SocialPost]:
     country_codes = [s.country_code for s in country_stats[:5] if s.country_code]
     hashtags = _build_hashtags(country_codes)
 
-    for lang, system_prompt in [
-        ("ko", _WEEKLY_SYSTEM_KO),
-        ("en", _WEEKLY_SYSTEM_EN),
-    ]:
-        dedup_key = f"weekly_recap:{lang}:{iso_cal.year}-W{iso_cal.week:02d}"
+    stats_lines = []
+    for s in country_stats[:5]:
+        stats_lines.append(f"- {s.country_code}: {s.event_count} events, avg severity {s.avg_severity:.0f}")
 
-        existing = await db.execute(
-            select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+    user_prompt = (
+        f"Weekly global conflict stats:\n"
+        f"Total {total_clusters} issue clusters\n"
+        f"Top countries:\n" + "\n".join(stats_lines)
+    )
+
+    body = _call_openai(_WEEKLY_BILINGUAL_SYSTEM, user_prompt)
+    if not body:
+        top3 = " · ".join(country_codes[:3])
+        body = (
+            f"📊 Week: {total_clusters} issues | {top3}\n\n"
+            f"📊 주간: {total_clusters}개 이슈 | {top3}"
         )
-        if existing.scalar_one_or_none():
-            logger.info("Weekly Recap 이미 존재: %s", dedup_key)
-            continue
 
-        stats_text = []
-        for s in country_stats[:5]:
-            if lang == "ko":
-                stats_text.append(f"- {s.country_code}: {s.event_count}건, 평균 심각도 {s.avg_severity:.0f}")
-            else:
-                stats_text.append(f"- {s.country_code}: {s.event_count} events, avg severity {s.avg_severity:.0f}")
+    if len(body) > 250:
+        body = body[:247] + "..."
 
-        if lang == "ko":
-            user_prompt = (
-                f"지난 7일 글로벌 이슈 통계:\n"
-                f"총 {total_clusters}개 이슈 클러스터\n"
-                f"주요 국가:\n" + "\n".join(stats_text)
-            )
-            fallback = f"이번 주 글로벌 이슈 요약: {total_clusters}개 이슈, 상위 국가 {', '.join(country_codes[:3])}"
-        else:
-            user_prompt = (
-                f"Global issues stats (past 7 days):\n"
-                f"Total {total_clusters} issue clusters\n"
-                f"Top countries:\n" + "\n".join(stats_text)
-            )
-            fallback = f"This week: {total_clusters} issues. Top: {', '.join(country_codes[:3])}"
-
-        body = _call_openai(system_prompt, user_prompt)
-        if not body:
-            body = fallback
-
-        if len(body) > 280:
-            body = body[:277] + "..."
-
-        post = SocialPost(
-            content_type="weekly_recap",
-            lang=lang,
-            body_text=body,
-            hashtags=hashtags,
-            risk_level="low",
-            dedup_key=dedup_key,
-            status="pending_review",
-        )
-        db.add(post)
-        await db.flush()
-        await _generate_card_for_post(post)
-        posts.append(post)
-        logger.info("Weekly Recap [%s] 생성: %s", lang, post.id)
-
-    return posts
+    post = SocialPost(
+        content_type="weekly_recap",
+        lang="bi",
+        body_text=body,
+        hashtags=hashtags,
+        risk_level="low",
+        dedup_key=dedup_key,
+        status="pending_review",
+    )
+    db.add(post)
+    await db.flush()
+    await _generate_card_for_post(post)
+    logger.info("Weekly Recap [bi] 생성: %s", post.id)
+    return post

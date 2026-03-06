@@ -22,13 +22,19 @@ def is_configured() -> bool:
     return bool(X_API_KEY and X_API_SECRET and X_ACCESS_TOKEN and X_ACCESS_SECRET)
 
 
+_CTA = "🔗 wewantpeace.live"
+
+
 def _build_text(post: SocialPost) -> str:
-    """본문 + 해시태그 조합 (280자 제한)."""
+    """본문 + 해시태그 + CTA 조합 (280자 제한)."""
     hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
+    footer = f"\n{hashtag_str}\n{_CTA}" if hashtag_str else f"\n{_CTA}"
     full_text = post.body_text
-    if hashtag_str:
-        if len(full_text) + len(hashtag_str) + 1 <= 280:
-            full_text = f"{full_text}\n{hashtag_str}"
+    if len(full_text) + len(footer) <= 280:
+        full_text = full_text + footer
+    elif len(full_text) + len(f"\n{_CTA}") <= 280:
+        # 해시태그 빼고 CTA만
+        full_text = f"{full_text}\n{_CTA}"
     return full_text
 
 

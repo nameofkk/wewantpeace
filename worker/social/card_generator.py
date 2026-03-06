@@ -185,7 +185,7 @@ def generate_card(
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         draw.text((40, bottom_y), now_str, fill=_MUTED_COLOR, font=font_label)
 
-        watermark = "wewantpeace.app"
+        watermark = "wewantpeace.live"
         bbox = draw.textbbox((0, 0), watermark, font=font_label)
         ww = bbox[2] - bbox[0]
         draw.text((W - 40 - ww, bottom_y), watermark, fill=_MUTED_COLOR, font=font_label)

@@ -1682,14 +1682,12 @@ def generate_daily_social(self):
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                posts = await generate_daily_movers(db)
-                if not posts:
+                post = await generate_daily_movers(db)
+                if not post:
                     return {"status": "skipped"}
 
-            # Telegram 승인 요청 (트랜잭션 밖에서)
-            for post in posts:
-                await send_review_message(post)
-            return {"status": "ok", "count": len(posts)}
+            await send_review_message(post)
+            return {"status": "ok", "post_id": str(post.id)}
 
     try:
         return run_async(_run())
@@ -1722,7 +1720,6 @@ def generate_spike_social(self):
         created = 0
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                # severity 기준 이상 스파이크 중 아직 SNS 포스트가 없는 것만
                 result = await db.execute(
                     select(SpikeEvent, IssueCluster)
                     .join(IssueCluster, SpikeEvent.cluster_id == IssueCluster.id)
@@ -1734,19 +1731,18 @@ def generate_spike_social(self):
 
                 posts_to_notify = []
                 for spike, cluster in rows:
-                    # 이미 생성된 포스트가 있는지 확인 (ko/en 둘 다)
-                    dedup_key_ko = f"spike_alert:ko:{spike.id}"
+                    dedup_key = f"spike_alert:{spike.id}"
                     existing = await db.execute(
-                        select(SocialPost).where(SocialPost.dedup_key == dedup_key_ko)
+                        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
                     )
                     if existing.scalar_one_or_none():
                         continue
 
-                    new_posts = await generate_spike_alert(spike, cluster, db)
-                    posts_to_notify.extend(new_posts)
-                    created += len(new_posts)
+                    post = await generate_spike_alert(spike, cluster, db)
+                    if post:
+                        posts_to_notify.append(post)
+                        created += 1
 
-            # Telegram 알림 (트랜잭션 밖)
             for post in posts_to_notify:
                 await send_review_message(post)
 
@@ -1778,13 +1774,12 @@ def generate_weekly_social(self):
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                posts = await generate_weekly_recap(db)
-                if not posts:
+                post = await generate_weekly_recap(db)
+                if not post:
                     return {"status": "skipped"}
 
-            for post in posts:
-                await send_review_message(post)
-            return {"status": "ok", "count": len(posts)}
+            await send_review_message(post)
+            return {"status": "ok", "post_id": str(post.id)}
 
     try:
         return run_async(_run())
@@ -1798,7 +1793,6 @@ async def _publish_post_to_platforms(
     post,
     x_enabled: bool,
     threads_enabled: bool,
-    reply_to_tweet_id: str | None = None,
 ) -> bool:
     """단일 포스트를 X/Threads에 발행. 성공 여부 반환."""
     from sqlalchemy import select
@@ -1818,7 +1812,7 @@ async def _publish_post_to_platforms(
 
         if not x_record:
             from worker.social.adapters.x_adapter import publish as x_publish
-            platform_id, error = x_publish(post, reply_to_tweet_id=reply_to_tweet_id)
+            platform_id, error = x_publish(post)
             x_record = SocialPostPlatform(
                 post_id=post.id,
                 platform="x",
@@ -1870,15 +1864,11 @@ async def _publish_post_to_platforms(
     max_retries=1,
 )
 def publish_approved_social(self):
-    """approved 상태 포스트를 X/Threads에 발행.
-
-    같은 dedup_key 기반(content_type + 날짜)의 en/ko 포스트를 그룹핑하여
-    X에서 Thread로 연결: en 먼저 발행 → ko를 reply로 발행.
-    """
+    """approved 상태 포스트를 X/Threads에 발행."""
 
     async def _run():
         from sqlalchemy import select
-        from backend.app.models.social_post import SocialPost, SocialPostPlatform
+        from backend.app.models.social_post import SocialPost
         from worker.social.config import SOCIAL_PLATFORM_X_ENABLED, SOCIAL_PLATFORM_THREADS_ENABLED
 
         published = 0
@@ -1890,66 +1880,11 @@ def publish_approved_social(self):
                     select(SocialPost)
                     .where(SocialPost.status == "approved")
                     .order_by(SocialPost.approved_at.asc())
-                    .limit(10)
+                    .limit(5)
                 )
                 posts = result.scalars().all()
 
-                # ── dedup_key 기반 그룹핑 (en/ko 쌍 찾기) ──
-                # dedup_key 형식: "daily_movers:ko:2026-03-07" → base="daily_movers:2026-03-07"
-                groups: dict[str, dict[str, SocialPost]] = {}
-                standalone: list[SocialPost] = []
-
                 for post in posts:
-                    parts = post.dedup_key.split(":")
-                    if len(parts) >= 3 and parts[1] in ("ko", "en"):
-                        base_key = f"{parts[0]}:{':'.join(parts[2:])}"
-                        groups.setdefault(base_key, {})[post.lang] = post
-                    else:
-                        standalone.append(post)
-
-                # ── 그룹 발행: en 먼저 → ko를 reply로 ──
-                for base_key, lang_posts in groups.items():
-                    en_post = lang_posts.get("en")
-                    ko_post = lang_posts.get("ko")
-
-                    # en/ko 중 하나만 approved면 그것만 발행
-                    ordered = []
-                    if en_post:
-                        ordered.append(en_post)
-                    if ko_post:
-                        ordered.append(ko_post)
-
-                    parent_tweet_id: str | None = None
-
-                    for post in ordered:
-                        ok = await _publish_post_to_platforms(
-                            db, post,
-                            SOCIAL_PLATFORM_X_ENABLED,
-                            SOCIAL_PLATFORM_THREADS_ENABLED,
-                            reply_to_tweet_id=parent_tweet_id,
-                        )
-                        if ok:
-                            post.status = "published"
-                            post.published_at = datetime.now(timezone.utc)
-                            published += 1
-                            # en 발행 성공 시 tweet_id를 가져와서 ko reply에 사용
-                            if post.lang == "en" and parent_tweet_id is None:
-                                x_rec = await db.execute(
-                                    select(SocialPostPlatform).where(
-                                        SocialPostPlatform.post_id == post.id,
-                                        SocialPostPlatform.platform == "x",
-                                        SocialPostPlatform.status == "published",
-                                    )
-                                )
-                                x_plat = x_rec.scalar_one_or_none()
-                                if x_plat and x_plat.platform_post_id:
-                                    parent_tweet_id = x_plat.platform_post_id
-                        else:
-                            post.status = "failed"
-                            failed += 1
-
-                # ── standalone 발행 (그룹에 속하지 않는 포스트) ──
-                for post in standalone:
                     ok = await _publish_post_to_platforms(
                         db, post,
                         SOCIAL_PLATFORM_X_ENABLED,
