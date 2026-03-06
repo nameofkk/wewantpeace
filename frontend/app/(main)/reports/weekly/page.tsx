@@ -39,6 +39,10 @@ interface WeeklySummary {
     new_clusters: number;
     crisis_countries: number;
   };
+  prev_stats?: {
+    total_events: number;
+    new_clusters: number;
+  };
 }
 
 async function fetchWeeklySummary(): Promise<WeeklySummary | null> {

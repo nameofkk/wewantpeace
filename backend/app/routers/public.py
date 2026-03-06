@@ -93,7 +93,7 @@ async def weekly_summary(
         for row in tension_q.all()
     ]
 
-    # 통계
+    # 통계 — 이번 주
     total_events = (await db.execute(
         select(func.count()).select_from(NormalizedEvent)
         .where(NormalizedEvent.created_at >= cutoff)
@@ -110,6 +110,18 @@ async def weekly_summary(
     )
     crisis_countries = len(crisis_countries_q.all())
 
+    # 통계 — 전주 (WoW 비교용)
+    prev_cutoff = cutoff - timedelta(days=7)
+    prev_total_events = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= prev_cutoff, NormalizedEvent.created_at < cutoff)
+    )).scalar() or 0
+
+    prev_new_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster)
+        .where(IssueCluster.first_event_at >= prev_cutoff, IssueCluster.first_event_at < cutoff)
+    )).scalar() or 0
+
     return {
         "period": {"start": cutoff.isoformat(), "end": now.isoformat()},
         "top_issues": top_issues,
@@ -118,5 +130,9 @@ async def weekly_summary(
             "total_events": total_events,
             "new_clusters": new_clusters,
             "crisis_countries": crisis_countries,
+        },
+        "prev_stats": {
+            "total_events": prev_total_events,
+            "new_clusters": prev_new_clusters,
         },
     }

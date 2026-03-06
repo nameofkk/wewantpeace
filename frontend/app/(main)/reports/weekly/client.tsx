@@ -54,6 +54,31 @@ interface WeeklySummary {
     new_clusters: number;
     crisis_countries: number;
   };
+  prev_stats?: {
+    total_events: number;
+    new_clusters: number;
+  };
+}
+
+function WowDelta({ current, previous, lang }: { current: number; previous: number; lang: string }) {
+  if (!previous || previous === 0) return null;
+  const diff = current - previous;
+  const pct = Math.round((diff / previous) * 100);
+  const isUp = diff > 0;
+  const isDown = diff < 0;
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <span className={cn(
+        "text-[10px] font-bold tabular-nums",
+        isUp ? "text-red-500" : isDown ? "text-emerald-500" : "text-muted-foreground",
+      )}>
+        {isUp ? "+" : ""}{pct}%
+      </span>
+      <span className="text-[9px] text-muted-foreground">
+        {lang === "ko" ? `(${previous.toLocaleString()} → ${current.toLocaleString()})` : `(${previous.toLocaleString()} → ${current.toLocaleString()})`}
+      </span>
+    </div>
+  );
 }
 
 export default function WeeklyReportClient({ data }: { data: WeeklySummary | null }) {
@@ -107,6 +132,7 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
             {
               label: t(lang, "weekly_report_total_events"),
               value: data.stats.total_events,
+              prev: data.prev_stats?.total_events,
               icon: BarChart3,
               color: "text-blue-400",
               bg: "bg-blue-500/10",
@@ -114,6 +140,7 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
             {
               label: t(lang, "weekly_report_new_clusters"),
               value: data.stats.new_clusters,
+              prev: data.prev_stats?.new_clusters,
               icon: Layers,
               color: "text-emerald-400",
               bg: "bg-emerald-500/10",
@@ -121,6 +148,7 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
             {
               label: t(lang, "weekly_report_crisis_countries"),
               value: data.stats.crisis_countries,
+              prev: undefined,
               icon: AlertTriangle,
               color: data.stats.crisis_countries > 0 ? "text-red-400" : "text-muted-foreground",
               bg: data.stats.crisis_countries > 0 ? "bg-red-500/10" : "bg-secondary",
@@ -132,6 +160,7 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
               </div>
               <p className="text-2xl font-bold tabular-nums">{s.value.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+              {s.prev != null && <WowDelta current={s.value} previous={s.prev} lang={lang} />}
             </div>
           ))}
         </div>
