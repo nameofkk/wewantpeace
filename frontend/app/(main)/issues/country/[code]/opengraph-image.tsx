@@ -137,8 +137,8 @@ export default async function OGImage({ params }: { params: { code: string } }) 
     svgAreaPath = `${svgPath} L${pts[pts.length - 1].x},${graphHeight} L${pts[0].x},${graphHeight} Z`;
   }
 
-  // 상위 이슈 이미지를 배경으로
-  const topImageUrl = tension.top5_clusters?.[0]?.image_url ?? null;
+  // 상위 이슈 이미지를 배경으로 (전체 클러스터에서 첫 번째 이미지 탐색)
+  const topImageUrl = tension.top5_clusters?.find((c) => c.image_url)?.image_url ?? null;
   const hasBackground = !!topImageUrl;
 
   // 상위 이슈 2개 표시
