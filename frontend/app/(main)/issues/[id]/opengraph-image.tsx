@@ -21,16 +21,17 @@ const TOPIC_KO: Record<string, string> = {
   unknown: "이슈",
 };
 
-const SEVERITY_CONFIG = [
-  { min: 80, gradStart: "#450a0a", barColor: "#ef4444", label: "극심" },
-  { min: 60, gradStart: "#7f1d1d", barColor: "#f97316", label: "심각" },
-  { min: 40, gradStart: "#78350f", barColor: "#f59e0b", label: "경계" },
-  { min: 20, gradStart: "#1e3a5f", barColor: "#3b82f6", label: "주의" },
-  { min: 0, gradStart: "#1e293b", barColor: "#10b981", label: "안정" },
+/* severity → 작은 pill 뱃지 색상만 (배경은 항상 동일) */
+const SEVERITY_BADGE = [
+  { min: 80, bg: "#DC2626", label: "Critical" },
+  { min: 60, bg: "#D97706", label: "Serious" },
+  { min: 40, bg: "#CA8A04", label: "Elevated" },
+  { min: 20, bg: "#2563EB", label: "Moderate" },
+  { min: 0, bg: "#16A34A", label: "Low" },
 ];
 
-function getSeverityConfig(severity: number) {
-  return SEVERITY_CONFIG.find((c) => severity >= c.min) || SEVERITY_CONFIG[SEVERITY_CONFIG.length - 1];
+function getBadge(severity: number) {
+  return SEVERITY_BADGE.find((b) => severity >= b.min) || SEVERITY_BADGE[SEVERITY_BADGE.length - 1];
 }
 
 export default async function OGImage({ params }: { params: { id: string } }) {
@@ -71,11 +72,15 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             justifyContent: "center",
             width: "100%",
             height: "100%",
-            background: "#0f172a",
-            color: "#fff",
-            fontSize: 48,
+            background: "#0B1120",
+            color: "#94A3B8",
+            fontSize: 32,
+            fontFamily: "sans-serif",
           }}
         >
+          {logoSrc ? (
+            <img src={logoSrc} width={64} height={28} style={{ marginRight: "16px" }} />
+          ) : null}
           WeWantPeace
         </div>
       ),
@@ -84,243 +89,131 @@ export default async function OGImage({ params }: { params: { id: string } }) {
   }
 
   const title = issue.title_ko || issue.title;
-  const displayTitle =
-    title.length > 100 ? title.slice(0, 97) + "..." : title;
-  const titleSize = title.length > 60 ? 36 : 48;
-  const config = getSeverityConfig(issue.severity);
+  const displayTitle = title.length > 90 ? title.slice(0, 87) + "..." : title;
+  const titleSize = title.length > 50 ? 40 : 48;
+  const badge = getBadge(issue.severity);
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
-  const kscore = issue.kscore ?? issue.severity / 10;
-  const sources = issue.independent_sources ?? issue.event_count;
+  const countryCode = issue.country_code || "";
 
   return new ImageResponse(
     (
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
           width: "100%",
           height: "100%",
-          background: `linear-gradient(135deg, ${config.gradStart} 0%, #0f172a 100%)`,
+          background: "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
+          padding: "48px",
           fontFamily: "sans-serif",
         }}
       >
-        {/* Left severity bar */}
+        {/* Top row: logo + severity badge */}
         <div
           style={{
             display: "flex",
-            width: "8px",
-            height: "100%",
-            background: config.barColor,
-          }}
-        />
-
-        {/* Main content */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
+            alignItems: "center",
             justifyContent: "space-between",
-            flex: 1,
-            padding: "40px 48px",
           }}
         >
-          {/* Header: Logo + LIVE */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                width={64}
+                height={28}
+                style={{ width: "64px", height: "28px" }}
+              />
+            ) : null}
+            <span
+              style={{
+                color: "#94A3B8",
+                fontSize: 18,
+                fontWeight: 500,
+              }}
+            >
+              WeWantPeace
+            </span>
+          </div>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              background: badge.bg,
+              color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
+              padding: "6px 16px",
+              borderRadius: "20px",
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: "0.5px",
             }}
           >
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "12px" }}
-            >
-              {logoSrc ? (
-                <img
-                  src={logoSrc}
-                  width={73}
-                  height={32}
-                  style={{ width: "73px", height: "32px" }}
-                />
-              ) : null}
-              <span
-                style={{
-                  color: "rgba(255,255,255,0.8)",
-                  fontSize: 22,
-                  fontWeight: 600,
-                }}
-              >
-                WeWantPeace
-              </span>
-            </div>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
+            {badge.label}
+          </div>
+        </div>
+
+        {/* Headline */}
+        <div
+          style={{
+            display: "flex",
+            flex: 1,
+            alignItems: "center",
+            color: "#F8FAFC",
+            fontSize: titleSize,
+            fontWeight: 700,
+            lineHeight: 1.25,
+            letterSpacing: "-0.5px",
+            maxWidth: "95%",
+          }}
+        >
+          {displayTitle}
+        </div>
+
+        {/* Bottom row: badges + url */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {countryCode ? (
               <div
                 style={{
                   display: "flex",
-                  width: "12px",
-                  height: "12px",
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                }}
-              />
-              <span
-                style={{
-                  color: "#ef4444",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  letterSpacing: "1px",
+                  alignItems: "center",
+                  background: "#334155",
+                  color: "#E2E8F0",
+                  padding: "5px 14px",
+                  borderRadius: "14px",
+                  fontSize: 14,
+                  fontWeight: 500,
                 }}
               >
-                LIVE
-              </span>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div
-            style={{
-              display: "flex",
-              width: "100%",
-              height: "1px",
-              background: "rgba(255,255,255,0.1)",
-              marginTop: "16px",
-            }}
-          />
-
-          {/* Country + Topic */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginTop: "24px",
-            }}
-          >
-            {issue.country_code ? (
-              <span
-                style={{
-                  color: "rgba(255,255,255,0.7)",
-                  fontSize: 22,
-                  fontWeight: 600,
-                }}
-              >
-                {issue.country_code}
-              </span>
+                {countryCode}
+              </div>
             ) : null}
-            {issue.country_code ? (
-              <span
-                style={{ color: "rgba(255,255,255,0.3)", fontSize: 22 }}
-              >
-                ·
-              </span>
-            ) : null}
-            <span
-              style={{ color: "rgba(255,255,255,0.7)", fontSize: 22 }}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "#1E293B",
+                color: "#94A3B8",
+                padding: "5px 14px",
+                borderRadius: "14px",
+                fontSize: 14,
+                fontWeight: 500,
+                border: "1px solid #334155",
+              }}
             >
               {topicKo}
-            </span>
-          </div>
-
-          {/* Title */}
-          <div
-            style={{
-              display: "flex",
-              flex: 1,
-              alignItems: "center",
-              color: "#fff",
-              fontSize: titleSize,
-              fontWeight: 700,
-              lineHeight: 1.3,
-              maxHeight: "200px",
-              overflow: "hidden",
-              marginTop: "8px",
-            }}
-          >
-            {displayTitle}
-          </div>
-
-          {/* Badges */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              marginTop: "16px",
-            }}
-          >
-            {/* Severity badge */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: config.barColor,
-                borderRadius: "8px",
-                padding: "6px 14px",
-              }}
-            >
-              <span
-                style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}
-              >
-                {config.label}
-              </span>
-            </div>
-
-            {/* KScore badge */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "rgba(255,255,255,0.12)",
-                borderRadius: "8px",
-                padding: "6px 14px",
-              }}
-            >
-              <span
-                style={{
-                  color: "rgba(255,255,255,0.6)",
-                  fontSize: 18,
-                }}
-              >
-                K
-              </span>
-              <span
-                style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}
-              >
-                {typeof kscore === "number" ? kscore.toFixed(1) : kscore}
-              </span>
-            </div>
-
-            {/* Sources badge */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                background: "rgba(255,255,255,0.12)",
-                borderRadius: "8px",
-                padding: "6px 14px",
-              }}
-            >
-              <span
-                style={{ color: "#fff", fontSize: 18, fontWeight: 600 }}
-              >
-                {sources}개 출처
-              </span>
             </div>
           </div>
-
-          {/* Footer */}
-          <div
-            style={{
-              display: "flex",
-              marginTop: "20px",
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 18,
-            }}
-          >
-            wewantpeace.live · 실시간 세계정세 모니터링
-          </div>
+          <span style={{ color: "#64748B", fontSize: 14 }}>
+            wewantpeace.live
+          </span>
         </div>
       </div>
     ),
