@@ -39,13 +39,12 @@ function getBadge(severity: number) {
 /**
  * OG용 타이틀 압축:
  * 1. 이모지 제거
- * 2. 노이즈 접두사 제거 (중동 라이브:, 요약, Recap 등)
+ * 2. 노이즈 접두사 제거
  * 3. 콜론/대시 뒤 핵심 추출
- * 4. 불필요한 후위절 제거 (~ 밝혔습니다, ~발표했습니다 등)
- * 5. 35자 이내로 자연스럽게 잘라냄
+ * 4. 불필요한 후위절 제거
+ * 5. maxLen 이내로 자연스럽게 잘라냄
  */
-function condenseTitle(raw: string, maxLen = 35): string {
-  // 이모지/특수문자 제거
+function condenseTitle(raw: string, maxLen = 40): string {
   let t = raw
     .replace(
       /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
@@ -54,34 +53,28 @@ function condenseTitle(raw: string, maxLen = 35): string {
     .replace(/[⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]/g, "")
     .trim();
 
-  // 노이즈 접두사 제거
   t = t
     .replace(/^(중동 라이브|MIDDLE EAST LIVE|요약|Recap|속보|BREAKING|URGENT)\s*[:：\-–—]\s*/i, "")
     .replace(/^(좋은 아침입니다|Good morning).*$/i, "")
     .trim();
 
-  // 콜론 뒤 핵심 추출 (앞부분이 지역/카테고리인 경우)
   const colonIdx = t.indexOf(": ");
   if (colonIdx > 0 && colonIdx < 15) {
     t = t.slice(colonIdx + 2).trim();
   }
 
-  // 한국어 장황한 간접인용 어미만 축약 (자연 종결어미는 유지)
   t = t
     .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
     .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
     .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
     .trim();
 
-  // 마침표 제거
   t = t.replace(/\.$/, "").trim();
 
   if (!t) return raw.slice(0, maxLen);
 
-  // 길이 제한: 자연스러운 끊김점에서 자르기
   if (t.length <= maxLen) return t;
 
-  // 쉼표, 세미콜론, 공백 등에서 자르기 + 말줄임표 추가
   const slice = t.slice(0, maxLen);
   const lastBreak = Math.max(
     slice.lastIndexOf(", "),
@@ -139,17 +132,18 @@ export default async function OGImage({
             width: "100%",
             height: "100%",
             background: "#0B1120",
-            color: "#94A3B8",
-            fontSize: 32,
+            color: "#E2E8F0",
+            fontSize: 40,
+            fontWeight: 800,
             fontFamily: "sans-serif",
           }}
         >
           {logoSrc ? (
             <img
               src={logoSrc}
-              width={64}
-              height={28}
-              style={{ marginRight: "16px" }}
+              width={120}
+              height={52}
+              style={{ marginRight: "20px" }}
             />
           ) : null}
           WeWantPeace
@@ -160,8 +154,8 @@ export default async function OGImage({
   }
 
   const rawTitle = issue.title_ko || issue.title;
-  const headline = condenseTitle(rawTitle, 35);
-  const titleSize = headline.length <= 20 ? 60 : headline.length <= 30 ? 52 : 44;
+  const headline = condenseTitle(rawTitle, 40);
+  const titleSize = headline.length <= 18 ? 64 : headline.length <= 28 ? 56 : 48;
   const badge = getBadge(issue.severity);
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryCode = issue.country_code || "";
@@ -179,7 +173,7 @@ export default async function OGImage({
           fontFamily: "sans-serif",
         }}
       >
-        {/* 배경 이미지 — Satori가 URL을 직접 fetch */}
+        {/* 배경 이미지 */}
         {hasBackground ? (
           <img
             src={issue.image_url!}
@@ -192,12 +186,12 @@ export default async function OGImage({
               width: 1200,
               height: 630,
               objectFit: "cover",
-              filter: "brightness(0.45)",
+              filter: "brightness(0.35)",
             }}
           />
         ) : null}
 
-        {/* 하단 그라데이션 오버레이 (이미지 있을 때) / 기존 배경 (없을 때) */}
+        {/* 콘텐츠 레이어 */}
         <div
           style={{
             display: "flex",
@@ -205,10 +199,10 @@ export default async function OGImage({
             justifyContent: "space-between",
             width: "100%",
             height: "100%",
-            padding: "48px 56px",
+            padding: "52px 60px",
             position: "relative",
             background: hasBackground
-              ? "linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.85) 60%, rgba(11,17,32,0.95) 100%)"
+              ? "linear-gradient(180deg, rgba(11,17,32,0.3) 0%, rgba(11,17,32,0.85) 50%, rgba(11,17,32,0.95) 100%)"
               : "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
           }}
         >
@@ -221,17 +215,17 @@ export default async function OGImage({
             }}
           >
             <div
-              style={{ display: "flex", alignItems: "center", gap: "12px" }}
+              style={{ display: "flex", alignItems: "center", gap: "14px" }}
             >
               {logoSrc ? (
                 <img
                   src={logoSrc}
-                  width={64}
-                  height={28}
-                  style={{ width: "64px", height: "28px" }}
+                  width={120}
+                  height={52}
+                  style={{ width: "120px", height: "52px" }}
                 />
               ) : null}
-              <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 500 }}>
+              <span style={{ color: "#CBD5E1", fontSize: 26, fontWeight: 800, letterSpacing: "-0.3px" }}>
                 WeWantPeace
               </span>
             </div>
@@ -241,10 +235,10 @@ export default async function OGImage({
                 alignItems: "center",
                 background: badge.bg,
                 color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-                padding: "6px 16px",
-                borderRadius: "20px",
-                fontSize: 14,
-                fontWeight: 700,
+                padding: "10px 24px",
+                borderRadius: "24px",
+                fontSize: 20,
+                fontWeight: 800,
                 letterSpacing: "0.5px",
               }}
             >
@@ -258,14 +252,14 @@ export default async function OGImage({
               display: "flex",
               flex: 1,
               alignItems: "center",
-              color: "#F8FAFC",
+              color: "#FFFFFF",
               fontSize: titleSize,
-              fontWeight: 700,
-              lineHeight: 1.3,
+              fontWeight: 900,
+              lineHeight: 1.35,
               letterSpacing: "-0.5px",
               wordBreak: "keep-all",
               overflowWrap: "break-word",
-              textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+              textShadow: "0 2px 12px rgba(0,0,0,0.7)",
             }}
           >
             {headline}
@@ -280,19 +274,19 @@ export default async function OGImage({
             }}
           >
             <div
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              style={{ display: "flex", alignItems: "center", gap: "10px" }}
             >
               {countryCode ? (
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    background: hasBackground ? "rgba(51,65,85,0.8)" : "#334155",
-                    color: "#E2E8F0",
-                    padding: "5px 14px",
-                    borderRadius: "14px",
-                    fontSize: 14,
-                    fontWeight: 500,
+                    background: hasBackground ? "rgba(51,65,85,0.85)" : "#334155",
+                    color: "#F1F5F9",
+                    padding: "8px 18px",
+                    borderRadius: "16px",
+                    fontSize: 18,
+                    fontWeight: 700,
                   }}
                 >
                   {countryCode}
@@ -302,19 +296,19 @@ export default async function OGImage({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  background: hasBackground ? "rgba(30,41,59,0.8)" : "#1E293B",
-                  color: "#94A3B8",
-                  padding: "5px 14px",
-                  borderRadius: "14px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  border: "1px solid #334155",
+                  background: hasBackground ? "rgba(30,41,59,0.85)" : "#1E293B",
+                  color: "#CBD5E1",
+                  padding: "8px 18px",
+                  borderRadius: "16px",
+                  fontSize: 18,
+                  fontWeight: 600,
+                  border: "1px solid #475569",
                 }}
               >
                 {topicKo}
               </div>
             </div>
-            <span style={{ color: "#64748B", fontSize: 14 }}>
+            <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600 }}>
               wewantpeace.live
             </span>
           </div>

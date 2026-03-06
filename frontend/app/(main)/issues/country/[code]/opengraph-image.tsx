@@ -42,7 +42,7 @@ function getBadge(level: number) {
   return LEVEL_BADGE.find((b) => b.level === level) || LEVEL_BADGE[LEVEL_BADGE.length - 1];
 }
 
-function condenseTitle(raw: string, maxLen = 35): string {
+function condenseTitle(raw: string, maxLen = 40): string {
   let t = raw
     .replace(
       /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
@@ -113,13 +113,14 @@ export default async function OGImage({ params }: { params: { code: string } }) 
             width: "100%",
             height: "100%",
             background: "#0B1120",
-            color: "#94A3B8",
-            fontSize: 32,
+            color: "#E2E8F0",
+            fontSize: 40,
+            fontWeight: 800,
             fontFamily: "sans-serif",
           }}
         >
           {logoSrc ? (
-            <img src={logoSrc} width={64} height={28} style={{ marginRight: "16px" }} />
+            <img src={logoSrc} width={120} height={52} style={{ marginRight: "20px" }} />
           ) : null}
           WeWantPeace
         </div>
@@ -134,7 +135,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
   const badge = getBadge(tension.tension_level);
   const topIssue = tension.top5_clusters?.[0];
   const topIssueRaw = topIssue ? (topIssue.title_ko || topIssue.title) : "";
-  const displayTopIssue = condenseTitle(topIssueRaw, 40);
+  const displayTopIssue = condenseTitle(topIssueRaw, 45);
 
   const topImageUrl = topIssue?.image_url ?? null;
   const hasBackground = !!topImageUrl;
@@ -150,7 +151,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
           fontFamily: "sans-serif",
         }}
       >
-        {/* 배경 이미지 — Satori가 URL을 직접 fetch */}
+        {/* 배경 이미지 */}
         {hasBackground ? (
           <img
             src={topImageUrl!}
@@ -163,7 +164,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               width: 1200,
               height: 630,
               objectFit: "cover",
-              filter: "brightness(0.45)",
+              filter: "brightness(0.35)",
             }}
           />
         ) : null}
@@ -175,10 +176,10 @@ export default async function OGImage({ params }: { params: { code: string } }) 
             justifyContent: "space-between",
             width: "100%",
             height: "100%",
-            padding: "48px",
+            padding: "52px 60px",
             position: "relative",
             background: hasBackground
-              ? "linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.85) 60%, rgba(11,17,32,0.95) 100%)"
+              ? "linear-gradient(180deg, rgba(11,17,32,0.3) 0%, rgba(11,17,32,0.85) 50%, rgba(11,17,32,0.95) 100%)"
               : "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
           }}
         >
@@ -190,20 +191,21 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               {logoSrc ? (
                 <img
                   src={logoSrc}
-                  width={64}
-                  height={28}
-                  style={{ width: "64px", height: "28px" }}
+                  width={120}
+                  height={52}
+                  style={{ width: "120px", height: "52px" }}
                 />
               ) : null}
               <span
                 style={{
-                  color: "#94A3B8",
-                  fontSize: 18,
-                  fontWeight: 500,
+                  color: "#CBD5E1",
+                  fontSize: 26,
+                  fontWeight: 800,
+                  letterSpacing: "-0.3px",
                 }}
               >
                 WeWantPeace
@@ -215,10 +217,10 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                 alignItems: "center",
                 background: badge.bg,
                 color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-                padding: "6px 16px",
-                borderRadius: "20px",
-                fontSize: 14,
-                fontWeight: 700,
+                padding: "10px 24px",
+                borderRadius: "24px",
+                fontSize: 20,
+                fontWeight: 800,
                 letterSpacing: "0.5px",
               }}
             >
@@ -233,26 +235,26 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               flexDirection: "column",
               flex: 1,
               justifyContent: "center",
-              gap: "8px",
+              gap: "6px",
             }}
           >
             <div
               style={{
-                color: "#F8FAFC",
-                fontSize: 56,
-                fontWeight: 700,
+                color: "#FFFFFF",
+                fontSize: 64,
+                fontWeight: 900,
                 lineHeight: 1.1,
                 letterSpacing: "-0.5px",
-                textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+                textShadow: "0 2px 12px rgba(0,0,0,0.7)",
               }}
             >
               {countryKo}
             </div>
             <div
               style={{
-                color: "#64748B",
-                fontSize: 24,
-                fontWeight: 400,
+                color: "#94A3B8",
+                fontSize: 28,
+                fontWeight: 600,
               }}
             >
               {countryEn}
@@ -263,26 +265,26 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               style={{
                 display: "flex",
                 alignItems: "baseline",
-                gap: "12px",
-                marginTop: "12px",
+                gap: "14px",
+                marginTop: "16px",
               }}
             >
               <span
                 style={{
-                  color: "#F8FAFC",
-                  fontSize: 56,
-                  fontWeight: 800,
+                  color: "#FFFFFF",
+                  fontSize: 64,
+                  fontWeight: 900,
                   letterSpacing: "-1px",
-                  textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+                  textShadow: "0 2px 12px rgba(0,0,0,0.7)",
                 }}
               >
                 {tension.raw_score.toFixed(1)}
               </span>
               <span
                 style={{
-                  color: "#64748B",
-                  fontSize: 20,
-                  fontWeight: 500,
+                  color: "#94A3B8",
+                  fontSize: 24,
+                  fontWeight: 700,
                 }}
               >
                 Tension Index
@@ -294,10 +296,12 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               <div
                 style={{
                   display: "flex",
-                  marginTop: "8px",
-                  color: "#94A3B8",
-                  fontSize: 18,
+                  marginTop: "10px",
+                  color: "#CBD5E1",
+                  fontSize: 22,
+                  fontWeight: 600,
                   lineHeight: 1.4,
+                  textShadow: "0 1px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {displayTopIssue}
@@ -317,17 +321,17 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               style={{
                 display: "flex",
                 alignItems: "center",
-                background: hasBackground ? "rgba(51,65,85,0.8)" : "#334155",
-                color: "#E2E8F0",
-                padding: "5px 14px",
-                borderRadius: "14px",
-                fontSize: 14,
-                fontWeight: 500,
+                background: hasBackground ? "rgba(51,65,85,0.85)" : "#334155",
+                color: "#F1F5F9",
+                padding: "8px 18px",
+                borderRadius: "16px",
+                fontSize: 18,
+                fontWeight: 700,
               }}
             >
               {code}
             </div>
-            <span style={{ color: "#64748B", fontSize: 14 }}>
+            <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600 }}>
               wewantpeace.live
             </span>
           </div>
