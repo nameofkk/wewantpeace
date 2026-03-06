@@ -191,7 +191,10 @@ def generate_card(
         f_tiny = _load_font(_FONT_REGULAR, 11)
 
         if not date_str:
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            if is_spike:
+                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            else:
+                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # ── 헤더 (상단 고정) ──
         y = M
@@ -405,12 +408,20 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
         # 첫 클러스터의 이미지를 배경으로
         bg_image_url = getattr(clusters[0], "image_url", None)
 
+    # spike_alert: 첫 클러스터의 last_event_at을 시간 포함 date_str로
+    date_str = None
+    if post.content_type == "spike_alert" and clusters:
+        evt_time = getattr(clusters[0], "last_event_at", None)
+        if evt_time:
+            date_str = evt_time.strftime("%Y-%m-%d %H:%M UTC")
+
     image_bytes = generate_card(
         content_type=post.content_type,
         issues=issues,
         body_text=post.body_text if not issues else None,
         hashtags=post.hashtags,
         bg_image_url=bg_image_url,
+        date_str=date_str,
     )
     if not image_bytes:
         return None
