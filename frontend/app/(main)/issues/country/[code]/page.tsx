@@ -41,6 +41,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${nameKo} 긴장도`;
   const siteDesc = "WeWantPeace | 실시간 세계정세 모니터링";
 
+  const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og`;
+
   return {
     title,
     description: siteDesc,
@@ -50,11 +52,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "website",
       url: `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`,
       siteName: "WeWantPeace",
+      images: [{ url: ogImage }],
     },
     twitter: {
       card: "summary",
       title: `${title} | WeWantPeace`,
       description: siteDesc,
+      images: [{ url: ogImage }],
     },
   };
 }

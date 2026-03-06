@@ -1,113 +1,95 @@
 import { ImageResponse } from "next/og";
+import { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
-// size를 export하지 않으면 Next.js가 og:image:width/height 메타 태그를 생성하지 않음
-// 카카오톡은 og:image:width >= 800이면 "대형 카드"로 렌더링하여 description을 숨기므로
-// 메타 태그를 생략하여 카카오톡이 description을 표시하는 소형 카드를 사용하도록 함
 const size = { width: 1200, height: 630 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-const TOPIC_KO: Record<string, string> = {
-  conflict: "무장 충돌",
-  terror: "폭력·테러",
-  coup: "정변·쿠데타",
-  sanctions: "경제 제재",
-  cyber: "사이버 공격",
-  protest: "시위·집회",
-  diplomacy: "외교",
-  maritime: "해상 분쟁",
-  disaster: "재난·재해",
-  health: "감염병·보건",
-  unknown: "이슈",
+const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
+  UA: { ko: "우크라이나", en: "Ukraine" },
+  RU: { ko: "러시아", en: "Russia" },
+  CN: { ko: "중국", en: "China" },
+  US: { ko: "미국", en: "United States" },
+  KR: { ko: "대한민국", en: "South Korea" },
+  KP: { ko: "북한", en: "North Korea" },
+  JP: { ko: "일본", en: "Japan" },
+  TW: { ko: "대만", en: "Taiwan" },
+  IL: { ko: "이스라엘", en: "Israel" },
+  PS: { ko: "팔레스타인", en: "Palestine" },
+  IR: { ko: "이란", en: "Iran" },
+  SY: { ko: "시리아", en: "Syria" },
+  MM: { ko: "미얀마", en: "Myanmar" },
+  AF: { ko: "아프가니스탄", en: "Afghanistan" },
+  SD: { ko: "수단", en: "Sudan" },
+  YE: { ko: "예멘", en: "Yemen" },
+  ET: { ko: "에티오피아", en: "Ethiopia" },
+  SO: { ko: "소말리아", en: "Somalia" },
+  LB: { ko: "레바논", en: "Lebanon" },
+  IQ: { ko: "이라크", en: "Iraq" },
 };
 
-const COUNTRY_NAMES: Record<string, string> = {
-  UA: "우크라이나", RU: "러시아", CN: "중국", US: "미국",
-  KR: "대한민국", KP: "북한", JP: "일본", TW: "대만",
-  IL: "이스라엘", PS: "팔레스타인", IR: "이란", SY: "시리아",
-  MM: "미얀마", AF: "아프가니스탄", SD: "수단", YE: "예멘",
-  ET: "에티오피아", SO: "소말리아", LB: "레바논", IQ: "이라크",
-};
-
-const SEVERITY_CONFIG = [
-  { min: 80, bg: "#DC2626", label: "Critical", barColor: "#EF4444" },
-  { min: 60, bg: "#D97706", label: "Serious", barColor: "#F59E0B" },
-  { min: 40, bg: "#CA8A04", label: "Elevated", barColor: "#EAB308" },
-  { min: 20, bg: "#2563EB", label: "Moderate", barColor: "#3B82F6" },
-  { min: 0, bg: "#16A34A", label: "Low", barColor: "#22C55E" },
+const LEVEL_CONFIG = [
+  { level: 4, bg: "#DC2626", label: "위험", labelEn: "Critical", barColor: "#EF4444" },
+  { level: 3, bg: "#D97706", label: "심각", labelEn: "Serious", barColor: "#F59E0B" },
+  { level: 2, bg: "#CA8A04", label: "경계", labelEn: "Elevated", barColor: "#EAB308" },
+  { level: 1, bg: "#2563EB", label: "주의", labelEn: "Moderate", barColor: "#3B82F6" },
+  { level: 0, bg: "#16A34A", label: "안정", labelEn: "Low", barColor: "#22C55E" },
 ];
 
-function getConfig(severity: number) {
-  return SEVERITY_CONFIG.find((c) => severity >= c.min) || SEVERITY_CONFIG[SEVERITY_CONFIG.length - 1];
+function getLevelConfig(level: number) {
+  return LEVEL_CONFIG.find((c) => c.level === level) || LEVEL_CONFIG[LEVEL_CONFIG.length - 1];
 }
 
-function cleanTitle(raw: string): string {
-  let t = raw
-    .replace(
-      /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
-      ""
-    )
-    .replace(/[⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]/g, "")
-    .trim();
-  t = t
-    .replace(/^(중동 라이브|MIDDLE EAST LIVE|요약|Recap|속보|BREAKING|URGENT)\s*[:：\-–—]\s*/i, "")
-    .replace(/^(좋은 아침입니다|Good morning).*$/i, "")
-    .trim();
-  const colonIdx = t.indexOf(": ");
-  if (colonIdx > 0 && colonIdx < 15) t = t.slice(colonIdx + 2).trim();
-  t = t
-    .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
-    .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
-    .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
-    .replace(/\.$/, "")
-    .trim();
-  return t || raw;
+interface TensionData {
+  country_code: string;
+  raw_score: number;
+  tension_level: number;
+  event_score: number;
+  accel_score: number;
+  spillover_score: number;
+  top5_clusters: { title_ko?: string; title: string; image_url?: string; topic?: string }[];
 }
 
-interface KScorePoint {
+interface HistoryPoint {
   time: string;
-  kscore: number;
+  raw_score: number;
+  tension_level: number;
 }
 
-export default async function OGImage({ params }: { params: { id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { code: string } }
+) {
+  const code = params.code.toUpperCase();
+
   let logoSrc: string | null = null;
   try {
     const logoRes = await fetch(
-      new URL("../../../../public/logo-eye.png", import.meta.url)
+      new URL("../../../../../public/logo-eye.png", import.meta.url)
     );
     const logoBuf = await logoRes.arrayBuffer();
     logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
   } catch {}
 
-  let issue: {
-    title_ko?: string;
-    title: string;
-    severity: number;
-    topic: string;
-    event_count: number;
-    country_code?: string;
-    kscore?: number;
-    image_url?: string;
-  } | null = null;
-
+  let tension: TensionData | null = null;
   try {
-    const res = await fetch(`${API_BASE}/issues/${params.id}`, {
-      next: { revalidate: 120 },
-    });
-    if (res.ok) issue = await res.json();
-  } catch {}
-
-  let kscoreHistory: KScorePoint[] = [];
-  try {
-    const res = await fetch(`${API_BASE}/issues/${params.id}/kscore-history?days=7`, {
+    const res = await fetch(`${API_BASE}/tension/country/${code}`, {
       next: { revalidate: 300 },
     });
-    if (res.ok) kscoreHistory = await res.json();
+    if (res.ok) tension = await res.json();
   } catch {}
 
-  if (!issue) {
+  let history: HistoryPoint[] = [];
+  try {
+    const res = await fetch(`${API_BASE}/tension/country/${code}/history?range=7d`, {
+      next: { revalidate: 300 },
+    });
+    if (res.ok) history = await res.json();
+  } catch {}
+
+  if (!tension) {
     return new ImageResponse(
       (
         <div
@@ -134,31 +116,39 @@ export default async function OGImage({ params }: { params: { id: string } }) {
     );
   }
 
-  const rawTitle = issue.title_ko || issue.title;
-  const headline = cleanTitle(rawTitle);
-  const titleSize = headline.length <= 18 ? 56 : headline.length <= 30 ? 46 : headline.length <= 50 ? 38 : 32;
-  const config = getConfig(issue.severity);
-  const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
-  const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
-  const kscore = issue.kscore ?? 0;
-  const hasBackground = !!issue.image_url;
+  const country = COUNTRY_NAMES[code];
+  const countryKo = country ? country.ko : code;
+  const countryEn = country ? country.en : code;
+  const config = getLevelConfig(tension.tension_level);
+  const score = tension.raw_score;
+  const scorePercent = Math.min(score, 100);
 
-  // KScore 그래프
-  const graphWidth = 420;
-  const graphHeight = 120;
+  // 7일 히스토리 → SVG path for sparkline
+  const graphPoints = history.length >= 2 ? history : [];
+  const graphWidth = 500;
+  const graphHeight = 140;
   let svgPath = "";
   let svgAreaPath = "";
-  const graphPoints = kscoreHistory.length >= 2 ? kscoreHistory : [];
   if (graphPoints.length >= 2) {
-    const maxK = Math.max(...graphPoints.map((p) => p.kscore), 1);
+    const maxScore = Math.max(...graphPoints.map((p) => p.raw_score), 10);
     const step = graphWidth / (graphPoints.length - 1);
     const pts = graphPoints.map((p, i) => ({
       x: Math.round(i * step),
-      y: Math.round(graphHeight - (p.kscore / maxK) * (graphHeight - 8)),
+      y: Math.round(graphHeight - (p.raw_score / maxScore) * (graphHeight - 8)),
     }));
     svgPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
     svgAreaPath = `${svgPath} L${pts[pts.length - 1].x},${graphHeight} L${pts[0].x},${graphHeight} Z`;
   }
+
+  // 상위 이슈 이미지를 배경으로 (전체 클러스터에서 첫 번째 이미지 탐색)
+  const topImageUrl = tension.top5_clusters?.find((c) => c.image_url)?.image_url ?? null;
+  const hasBackground = !!topImageUrl;
+
+  // 상위 이슈 2개 표시
+  const topIssues = tension.top5_clusters.slice(0, 2).map((c) => {
+    const raw = c.title_ko || c.title;
+    return raw.length > 35 ? raw.slice(0, 35) + "…" : raw;
+  });
 
   return new ImageResponse(
     (
@@ -175,7 +165,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
         {/* 배경 이미지 (RSS) */}
         {hasBackground ? (
           <img
-            src={issue.image_url!}
+            src={topImageUrl!}
             width={1200}
             height={630}
             alt=""
@@ -232,7 +222,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               : "transparent",
           }}
         >
-          {/* ── 상단: 로고 + 뱃지들 ── */}
+          {/* ── 상단: 로고 + 레벨 배지 ── */}
           <div
             style={{
               display: "flex",
@@ -268,125 +258,116 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                   borderRadius: "24px",
                   fontSize: 20,
                   fontWeight: 800,
+                  letterSpacing: "0.5px",
                 }}
               >
-                {config.label}
+                {config.label} · {config.labelEn}
               </div>
             </div>
           </div>
 
-          {/* ── 중앙: 제목 + 지표 + 그래프 ── */}
+          {/* ── 중앙: 국가명 + 점수 + 그래프 ── */}
           <div
             style={{
               display: "flex",
               flex: 1,
-              gap: "40px",
-              marginTop: "24px",
               alignItems: "center",
+              gap: "48px",
+              marginTop: "20px",
             }}
           >
-            {/* 왼쪽: 제목 + 메타 */}
+            {/* 왼쪽: 국가명 + 점수 + 게이지 */}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 flex: 1,
-                gap: "12px",
+                gap: "4px",
               }}
             >
-              {/* 메타 뱃지 */}
-              <div style={{ display: "flex", gap: "10px" }}>
-                {countryName && (
-                  <span
-                    style={{
-                      background: "#1E293B",
-                      color: "#E2E8F0",
-                      padding: "8px 18px",
-                      borderRadius: "16px",
-                      fontSize: 18,
-                      fontWeight: 700,
-                      border: "1px solid #334155",
-                    }}
-                  >
-                    {countryName}
-                  </span>
-                )}
+              <div style={{ display: "flex", alignItems: "baseline", gap: "16px" }}>
                 <span
                   style={{
-                    background: "#1E293B",
-                    color: "#E2E8F0",
-                    padding: "8px 18px",
-                    borderRadius: "16px",
-                    fontSize: 18,
-                    fontWeight: 700,
-                    border: "1px solid #334155",
+                    color: "#FFFFFF",
+                    fontSize: 68,
+                    fontWeight: 900,
+                    lineHeight: 1.1,
+                    letterSpacing: "-1.5px",
                   }}
                 >
-                  {topicKo}
+                  {countryKo}
+                </span>
+                <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 700 }}>
+                  {countryEn}
                 </span>
               </div>
 
-              {/* 헤드라인 */}
+              {/* 점수 */}
               <div
                 style={{
                   display: "flex",
-                  color: "#FFFFFF",
-                  fontSize: titleSize,
-                  fontWeight: 900,
-                  lineHeight: 1.35,
-                  letterSpacing: "-0.5px",
-                  wordBreak: "keep-all",
-                  overflowWrap: "break-word",
-                  maxHeight: `${Math.round(titleSize * 1.35 * 3)}px`,
-                  overflow: "hidden",
+                  alignItems: "baseline",
+                  gap: "12px",
+                  marginTop: "16px",
                 }}
               >
-                {headline}
+                <span
+                  style={{
+                    color: config.barColor,
+                    fontSize: 88,
+                    fontWeight: 900,
+                    letterSpacing: "-3px",
+                    lineHeight: 1,
+                  }}
+                >
+                  {score.toFixed(1)}
+                </span>
+                <span style={{ color: "#94A3B8", fontSize: 24, fontWeight: 800 }}>
+                  / 100
+                </span>
               </div>
+              <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 700, marginTop: "2px" }}>
+                Tension Index
+              </span>
 
-              {/* 지표 행 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "12px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
-                    {issue.severity}
-                  </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
-                    위기지수
-                  </span>
-                </div>
-                <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
-                    K{kscore.toFixed(1)}
-                  </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
-                    KScore
-                  </span>
-                </div>
-                <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
-                    {issue.event_count}
-                  </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
-                    보도 건수
-                  </span>
-                </div>
+              {/* 게이지 바 */}
+              <div
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  maxWidth: "360px",
+                  height: "16px",
+                  background: "#1E293B",
+                  borderRadius: "6px",
+                  marginTop: "16px",
+                  overflow: "hidden",
+                  border: "1px solid #334155",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    width: `${scorePercent}%`,
+                    height: "100%",
+                    background: `linear-gradient(90deg, ${config.barColor}88, ${config.barColor})`,
+                    borderRadius: "6px",
+                  }}
+                />
               </div>
             </div>
 
-            {/* 오른쪽: KScore 그래프 */}
+            {/* 오른쪽: 7일 추이 그래프 */}
             {graphPoints.length >= 2 && (
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  width: "440px",
+                  width: "500px",
                   gap: "8px",
                 }}
               >
                 <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
-                  KScore 7일 추이
+                  7일 추이
                 </span>
                 <div
                   style={{
@@ -397,6 +378,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                     background: "rgba(15,23,42,0.6)",
                     borderRadius: "12px",
                     border: "1px solid #1E293B",
+                    padding: "0",
                   }}
                 >
                   <svg
@@ -406,22 +388,24 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                     style={{ position: "absolute", top: 0, left: 0 }}
                   >
                     <defs>
-                      <linearGradient id="kGrad" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={config.barColor} stopOpacity="0.3" />
                         <stop offset="100%" stopColor={config.barColor} stopOpacity="0.02" />
                       </linearGradient>
                     </defs>
-                    <path d={svgAreaPath} fill="url(#kGrad)" />
+                    <path d={svgAreaPath} fill="url(#areaGrad)" />
                     <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="4" />
+                    {/* 마지막 포인트 강조 */}
                     {(() => {
-                      const maxK = Math.max(...graphPoints.map((p) => p.kscore), 1);
+                      const maxS = Math.max(...graphPoints.map((p) => p.raw_score), 10);
                       const lastPt = graphPoints[graphPoints.length - 1];
                       const lx = graphWidth;
-                      const ly = graphHeight - (lastPt.kscore / maxK) * (graphHeight - 8);
+                      const ly = graphHeight - (lastPt.raw_score / maxS) * (graphHeight - 8);
                       return <circle cx={lx - 1} cy={ly} r="7" fill={config.barColor} />;
                     })()}
                   </svg>
                 </div>
+                {/* 날짜 라벨 */}
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
                     {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
@@ -434,18 +418,33 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             )}
           </div>
 
-          {/* ── 하단: 브랜드 ── */}
+          {/* ── 하단: 주요 이슈 + 브랜드 ── */}
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
               marginTop: "auto",
             }}
           >
-            <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
-              wewantpeace.live
-            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {topIssues.length > 0 && (
+                <span style={{ color: "#64748B", fontSize: 16, fontWeight: 700, marginBottom: "2px" }}>
+                  주요 이슈
+                </span>
+              )}
+              {topIssues.map((t, i) => (
+                <span key={i} style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 600 }}>
+                  {i + 1}. {t}
+                </span>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#334155", fontSize: 18 }}>|</span>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
+                wewantpeace.live
+              </span>
+            </div>
           </div>
         </div>
       </div>
