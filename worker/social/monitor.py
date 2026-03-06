@@ -124,7 +124,7 @@ async def _check_sns_failures(db: AsyncSession) -> CheckResult:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     result = await db.execute(
         text(
-            "SELECT COUNT(*) FROM social_post_platforms"
+            "SELECT COUNT(*) FROM social_post_platform"
             " WHERE status = 'failed' AND published_at IS NULL"
             " AND created_at >= :cutoff"
         ),
@@ -197,13 +197,18 @@ _ALL_CHECKS = [
 
 
 async def check_service_health() -> list[CheckResult]:
-    """8가지 헬스 체크 실행. 각 체크는 독립 try/except."""
+    """8가지 헬스 체크 실행. 각 체크는 독립 try/except + rollback."""
     results: list[CheckResult] = []
     async with AsyncSessionLocal() as db:
         for check_fn in _ALL_CHECKS:
             try:
                 r = await check_fn(db)
             except Exception as e:
+                # SQL 에러 시 트랜잭션 롤백 — 다음 체크가 연쇄 실패하지 않도록
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
                 r = CheckResult(
                     name=check_fn.__name__.replace("_check_", ""),
                     ok=False,
