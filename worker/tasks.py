@@ -1793,12 +1793,20 @@ async def _publish_post_to_platforms(
     post,
     x_enabled: bool,
     threads_enabled: bool,
+    instagram_enabled: bool = False,
 ) -> bool:
-    """단일 포스트를 X/Threads에 발행. 성공 여부 반환."""
+    """단일 포스트를 X/Threads/Instagram에 발행. 성공 여부 반환."""
     from sqlalchemy import select
     from backend.app.models.social_post import SocialPostPlatform
 
     all_ok = True
+
+    # Threads/Instagram에 이미지가 필요하면 Supabase Storage에 업로드
+    if (threads_enabled or instagram_enabled) and post.image_url and not post.image_url.startswith(("http://", "https://")):
+        from worker.social.image_uploader import upload_image
+        public_url = upload_image(post.image_url, str(post.id))
+        if public_url:
+            post.image_url = public_url
 
     # X (Twitter)
     if x_enabled:
@@ -1854,6 +1862,33 @@ async def _publish_post_to_platforms(
         elif th_record.status == "failed":
             all_ok = False
 
+    # Instagram
+    if instagram_enabled:
+        existing_ig = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == "instagram",
+            )
+        )
+        ig_record = existing_ig.scalar_one_or_none()
+
+        if not ig_record:
+            from worker.social.adapters.instagram_adapter import publish as ig_publish
+            platform_id, error = ig_publish(post)
+            ig_record = SocialPostPlatform(
+                post_id=post.id,
+                platform="instagram",
+                platform_post_id=platform_id,
+                status="published" if platform_id else "failed",
+                error_message=error,
+                published_at=datetime.now(timezone.utc) if platform_id else None,
+            )
+            db.add(ig_record)
+            if not platform_id:
+                all_ok = False
+        elif ig_record.status == "failed":
+            all_ok = False
+
     return all_ok
 
 
@@ -1864,12 +1899,16 @@ async def _publish_post_to_platforms(
     max_retries=1,
 )
 def publish_approved_social(self):
-    """approved 상태 포스트를 X/Threads에 발행."""
+    """approved 상태 포스트를 X/Threads/Instagram에 발행."""
 
     async def _run():
         from sqlalchemy import select
         from backend.app.models.social_post import SocialPost
-        from worker.social.config import SOCIAL_PLATFORM_X_ENABLED, SOCIAL_PLATFORM_THREADS_ENABLED
+        from worker.social.config import (
+            SOCIAL_PLATFORM_X_ENABLED,
+            SOCIAL_PLATFORM_THREADS_ENABLED,
+            SOCIAL_PLATFORM_INSTAGRAM_ENABLED,
+        )
 
         published = 0
         failed = 0
@@ -1889,6 +1928,7 @@ def publish_approved_social(self):
                         db, post,
                         SOCIAL_PLATFORM_X_ENABLED,
                         SOCIAL_PLATFORM_THREADS_ENABLED,
+                        SOCIAL_PLATFORM_INSTAGRAM_ENABLED,
                     )
                     if ok:
                         post.status = "published"

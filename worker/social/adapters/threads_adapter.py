@@ -1,4 +1,4 @@
-"""Threads 어댑터 — Meta Graph API v21+ (PoC, 텍스트 전용)."""
+"""Threads 어댑터 — Meta Graph API v22.0 (텍스트 + 이미지)."""
 import logging
 import os
 import time
@@ -20,6 +20,8 @@ def is_configured() -> bool:
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
     """Threads에 포스트 발행 (2-step: create container → publish).
 
+    이미지: post.image_url이 http(s)로 시작하면 IMAGE 모드, 아니면 TEXT 모드.
+
     Returns:
         (platform_post_id, error_message)
     """
@@ -35,15 +37,28 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             if len(full_text) + len(hashtag_str) + 1 <= 500:
                 full_text = f"{full_text}\n{hashtag_str}"
 
+        # 이미지 URL 확인 — public URL이면 IMAGE 모드
+        has_image = (
+            post.image_url
+            and post.image_url.startswith(("http://", "https://"))
+        )
+
         # Step 1: 미디어 컨테이너 생성
-        with httpx.Client(timeout=15.0) as client:
+        with httpx.Client(timeout=30.0) as client:
+            params = {
+                "text": full_text,
+                "access_token": THREADS_ACCESS_TOKEN,
+            }
+
+            if has_image:
+                params["media_type"] = "IMAGE"
+                params["image_url"] = post.image_url
+            else:
+                params["media_type"] = "TEXT"
+
             create_resp = client.post(
                 f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads",
-                params={
-                    "media_type": "TEXT",
-                    "text": full_text,
-                    "access_token": THREADS_ACCESS_TOKEN,
-                },
+                params=params,
             )
             if create_resp.status_code != 200:
                 return None, f"Container 생성 실패: {create_resp.text[:200]}"
@@ -52,8 +67,8 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             if not container_id:
                 return None, "Container ID 누락"
 
-            # 컨테이너 처리 대기
-            time.sleep(2)
+            # 컨테이너 처리 대기 (이미지일 때 더 오래 대기)
+            time.sleep(5 if has_image else 2)
 
             # Step 2: 발행
             publish_resp = client.post(
