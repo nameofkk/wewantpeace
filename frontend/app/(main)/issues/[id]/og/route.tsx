@@ -69,9 +69,15 @@ interface KScorePoint {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // 카카오톡 스크래퍼는 실제 이미지 픽셀을 다운로드하여 크기 확인
+  // width >= 800이면 "대형 카드"(description 숨김)로 렌더링
+  // 작은 이미지를 반환하면 "소형 카드"(description 표시) 사용
+  const ua = req.headers.get("user-agent") || "";
+  const isKakao = ua.includes("kakaotalk-scrap");
+  const imgSize = isKakao ? { width: 400, height: 210 } : size;
   let logoSrc: string | null = null;
   try {
     const logoRes = await fetch(
@@ -130,7 +136,7 @@ export async function GET(
           WeWantPeace
         </div>
       ),
-      { ...size }
+      { ...imgSize }
     );
   }
 
@@ -450,6 +456,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size }
+    { ...imgSize }
   );
 }

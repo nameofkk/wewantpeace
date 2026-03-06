@@ -59,9 +59,13 @@ interface HistoryPoint {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { code: string } }
 ) {
+  const ua = req.headers.get("user-agent") || "";
+  const isKakao = ua.includes("kakaotalk-scrap");
+  const imgSize = isKakao ? { width: 400, height: 210 } : size;
+
   const code = params.code.toUpperCase();
 
   let logoSrc: string | null = null;
@@ -112,7 +116,7 @@ export async function GET(
           WeWantPeace
         </div>
       ),
-      { ...size }
+      { ...imgSize }
     );
   }
 
@@ -449,6 +453,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size }
+    { ...imgSize }
   );
 }
