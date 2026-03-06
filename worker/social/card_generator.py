@@ -142,7 +142,7 @@ def generate_card(
                     lx = (bg.width - W) // 2
                     ly = (bg.height - H) // 2
                     bg = bg.crop((lx, ly, lx + W, ly + H))
-                    overlay = Image.new("RGBA", (W, H), (10, 10, 18, 185))
+                    overlay = Image.new("RGBA", (W, H), (10, 10, 18, 140))
                     img = Image.alpha_composite(bg, overlay)
                     os.unlink(bg_path)
                 except Exception:
@@ -215,6 +215,18 @@ def generate_card(
         max_y = H - M - footer_h - 6
 
         if issues:
+            # 이슈 영역 반투명 패널 (가독성)
+            panel_top = max(y - 8, header_bottom)
+            panel_bot = min(y + issue_h_total + 8, max_y + 10)
+            panel = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            panel_draw = ImageDraw.Draw(panel)
+            panel_draw.rounded_rectangle(
+                [(M - 10, panel_top), (W - M + 10, panel_bot)],
+                radius=12, fill=(10, 10, 18, 120),
+            )
+            img = Image.alpha_composite(img, panel)
+            draw = ImageDraw.Draw(img)
+
             for idx, iss in enumerate(issues[:3]):
                 if y >= max_y:
                     break
