@@ -339,6 +339,9 @@ async def update_preferences(
             )
         pref.topics = body.topics
     if body.timezone is not None:
+        from zoneinfo import available_timezones
+        if body.timezone and body.timezone not in available_timezones():
+            raise HTTPException(400, detail=f"유효하지 않은 timezone: {body.timezone}")
         pref.timezone = body.timezone
     # quiet_hours: "" = 해제, "HH:MM" = 설정 (Pro 이상만 허용)
     if body.quiet_hours_start is not None:

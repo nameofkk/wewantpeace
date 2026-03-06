@@ -6,6 +6,8 @@ import Link from "next/link";
 import { cn, TOPIC_LABELS } from "@/lib/utils";
 import { COUNTRY_MAP, getFlag } from "@/lib/countries";
 import { API_BASE } from "@/lib/api";
+import { useAppStore } from "@/lib/store";
+import { t, getTensionLevelLabel } from "@/lib/i18n";
 const POLL_INTERVAL = 60_000;
 const AUTO_DISMISS_MS = 9_000;
 
@@ -58,14 +60,6 @@ const TOPIC_DOT: Record<string, string> = {
   disaster:  "bg-sky-400",
   health:    "bg-emerald-400",
   unknown:   "bg-slate-400",
-};
-
-const TENSION_LEVEL_LABELS: Record<number, string> = {
-  0: "안정",
-  1: "주의",
-  2: "경계",
-  3: "심각",
-  4: "극심",
 };
 
 const TENSION_ACCENT: Record<number, string> = {
@@ -121,6 +115,7 @@ function markSeenTension(key: string) {
 }
 
 export function NewEventBanner() {
+  const lang = useAppStore((s) => s.lang);
   const [banner, setBanner] = useState<BannerData | null>(null);
   const [visible, setVisible] = useState(false);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,13 +190,13 @@ export function NewEventBanner() {
 
   // 긴장도 배너 렌더링
   if (banner?.type === "tension") {
-    const t = banner.data;
-    const accent = TENSION_ACCENT[t.tension_level] ?? "bg-slate-500";
-    const dot = TENSION_DOT[t.tension_level] ?? "bg-slate-400";
-    const countryName = COUNTRY_MAP[t.country_code]?.name ?? t.country_code;
-    const flag = getFlag(t.country_code);
-    const prevLabel = TENSION_LEVEL_LABELS[t.prev_level] ?? "?";
-    const newLabel = TENSION_LEVEL_LABELS[t.tension_level] ?? "?";
+    const td = banner.data;
+    const accent = TENSION_ACCENT[td.tension_level] ?? "bg-slate-500";
+    const dot = TENSION_DOT[td.tension_level] ?? "bg-slate-400";
+    const countryName = COUNTRY_MAP[td.country_code]?.name ?? td.country_code;
+    const flag = getFlag(td.country_code);
+    const prevLabel = getTensionLevelLabel(td.prev_level, lang);
+    const newLabel = getTensionLevelLabel(td.tension_level, lang);
 
     return (
       <div
@@ -224,14 +219,14 @@ export function NewEventBanner() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  긴장도 상승
+                  {t(lang, "banner_tension_rise")}
                 </span>
                 <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
-                  {t.raw_score.toFixed(1)}점
+                  {td.raw_score.toFixed(1)}{t(lang, "banner_score_suffix")}
                 </span>
               </div>
               <p className="text-sm font-medium text-foreground truncate">
-                {flag} {countryName} {prevLabel}→{newLabel} ({t.raw_score.toFixed(1)}점)
+                {flag} {countryName} {prevLabel}→{newLabel} ({td.raw_score.toFixed(1)}{t(lang, "banner_score_suffix")})
               </p>
             </div>
 
@@ -241,13 +236,13 @@ export function NewEventBanner() {
                 onClick={dismiss}
                 className="flex items-center gap-1 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors"
               >
-                보기
+                {t(lang, "banner_view")}
                 <ExternalLink className="h-3 w-3 text-muted-foreground" />
               </Link>
               <button
                 onClick={dismiss}
                 className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                aria-label="닫기"
+                aria-label={t(lang, "banner_close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -300,13 +295,13 @@ export function NewEventBanner() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                새 이슈 감지
+                {t(lang, "banner_new_event")}
               </span>
               <span className="text-[10px] text-muted-foreground/60">·</span>
               <span className="text-[10px] text-muted-foreground">{topicLabel}</span>
               {item?.is_spike && (
                 <span className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full leading-none">
-                  스파이크
+                  {t(lang, "banner_spike")}
                 </span>
               )}
               <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
@@ -326,14 +321,14 @@ export function NewEventBanner() {
                 onClick={dismiss}
                 className="flex items-center gap-1 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors"
               >
-                보기
+                {t(lang, "banner_view")}
                 <ExternalLink className="h-3 w-3 text-muted-foreground" />
               </Link>
             )}
             <button
               onClick={dismiss}
               className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              aria-label="닫기"
+              aria-label={t(lang, "banner_close")}
             >
               <X className="h-4 w-4" />
             </button>

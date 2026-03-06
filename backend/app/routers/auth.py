@@ -32,7 +32,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 CURRENT_TERMS_VERSION = "2.0"
 CURRENT_PRIVACY_VERSION = "2.0"
-CURRENT_YEAR = 2026
+from datetime import datetime as _dt
+CURRENT_YEAR = _dt.now().year
 
 # ── 닉네임 검증 (공통) ─────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ async def _exchange_toss_code(authorization_code: str) -> dict:
         )
     if resp.status_code != 200:
         logger.error("토스 토큰 교환 실패: %s %s", resp.status_code, resp.text)
-        raise HTTPException(401, detail="토스 인증에 실패했습니다.")
+        raise HTTPException(502, detail="토스 인증에 실패했습니다.")
     return resp.json()
 
 
@@ -178,7 +179,7 @@ async def _get_toss_user_key(access_token: str) -> str:
         )
     if resp.status_code != 200:
         logger.error("토스 유저 정보 조회 실패: %s %s", resp.status_code, resp.text)
-        raise HTTPException(401, detail="토스 유저 정보를 가져올 수 없습니다.")
+        raise HTTPException(502, detail="토스 유저 정보를 가져올 수 없습니다.")
 
     data = resp.json()
 

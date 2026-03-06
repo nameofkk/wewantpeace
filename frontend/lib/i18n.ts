@@ -1096,6 +1096,25 @@ export const translations = {
     welcome_trust_2: "AI 기반 심각도 분석",
     welcome_trust_3: "무료 이용 가능",
     welcome_cta: "시작하기",
+
+    // 배너 (new-event-banner)
+    banner_tension_rise: "긴장도 상승",
+    banner_new_event: "새 이슈 감지",
+    banner_spike: "스파이크",
+    banner_view: "보기",
+    banner_close: "닫기",
+    banner_score_suffix: "점",
+
+    // 에러 페이지
+    error_title: "문제가 발생했습니다",
+    error_message: "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
+    error_code: "오류 코드",
+    error_retry: "다시 시도",
+
+    // 404 페이지
+    not_found_title: "페이지를 찾을 수 없습니다",
+    not_found_message: "요청하신 페이지가 존재하지 않거나 이동되었습니다.",
+    not_found_go_home: "홈으로 돌아가기",
   },
   en: {
     // bottom nav
@@ -2190,6 +2209,25 @@ export const translations = {
     welcome_trust_2: "AI-powered severity analysis",
     welcome_trust_3: "Free to use",
     welcome_cta: "Get Started",
+
+    // Banner (new-event-banner)
+    banner_tension_rise: "Tension Rising",
+    banner_new_event: "New Event Detected",
+    banner_spike: "Spike",
+    banner_view: "View",
+    banner_close: "Close",
+    banner_score_suffix: "pts",
+
+    // Error page
+    error_title: "Something went wrong",
+    error_message: "A temporary error occurred. Please try again later.",
+    error_code: "Error code",
+    error_retry: "Try again",
+
+    // 404 page
+    not_found_title: "Page not found",
+    not_found_message: "The requested page does not exist or has been moved.",
+    not_found_go_home: "Go to Home",
   },
 } as const;
 
