@@ -144,7 +144,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
 
   const rawTitle = issue.title_ko || issue.title;
   const headline = condenseTitle(rawTitle, 45);
-  const titleSize = headline.length <= 18 ? 52 : headline.length <= 30 ? 44 : 38;
+  const titleSize = headline.length <= 18 ? 60 : headline.length <= 30 ? 50 : 42;
   const config = getConfig(issue.severity);
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
@@ -152,8 +152,8 @@ export default async function OGImage({ params }: { params: { id: string } }) {
   const hasBackground = !!issue.image_url;
 
   // KScore 그래프
-  const graphWidth = 380;
-  const graphHeight = 100;
+  const graphWidth = 420;
+  const graphHeight = 120;
   let svgPath = "";
   let svgAreaPath = "";
   const graphPoints = kscoreHistory.length >= 2 ? kscoreHistory : [];
@@ -224,7 +224,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             top: 0,
             left: 0,
             width: "100%",
-            height: "4px",
+            height: "6px",
             background: `linear-gradient(90deg, transparent 0%, ${config.barColor} 30%, ${config.barColor} 70%, transparent 100%)`,
           }}
         />
@@ -250,22 +250,22 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               {logoSrc ? (
                 <img
                   src={logoSrc}
-                  width={100}
-                  height={43}
+                  width={140}
+                  height={60}
                   alt=""
-                  style={{ width: "100px", height: "43px" }}
+                  style={{ width: "140px", height: "60px" }}
                 />
               ) : null}
-              <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 700, letterSpacing: "-0.3px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 800, letterSpacing: "-0.3px" }}>
                 WeWantPeace
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ color: "#64748B", fontSize: 16, fontWeight: 600 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
                 실시간 세계정세 모니터링
               </span>
               <div
@@ -274,9 +274,9 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                   alignItems: "center",
                   background: config.bg,
                   color: config.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-                  padding: "8px 20px",
-                  borderRadius: "20px",
-                  fontSize: 16,
+                  padding: "10px 26px",
+                  borderRadius: "24px",
+                  fontSize: 20,
                   fontWeight: 800,
                 }}
               >
@@ -305,16 +305,16 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               }}
             >
               {/* 메타 뱃지 */}
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "10px" }}>
                 {countryName && (
                   <span
                     style={{
                       background: "#1E293B",
-                      color: "#CBD5E1",
-                      padding: "6px 14px",
-                      borderRadius: "14px",
-                      fontSize: 15,
-                      fontWeight: 600,
+                      color: "#E2E8F0",
+                      padding: "8px 18px",
+                      borderRadius: "16px",
+                      fontSize: 18,
+                      fontWeight: 700,
                       border: "1px solid #334155",
                     }}
                   >
@@ -324,11 +324,11 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                 <span
                   style={{
                     background: "#1E293B",
-                    color: "#CBD5E1",
-                    padding: "6px 14px",
-                    borderRadius: "14px",
-                    fontSize: 15,
-                    fontWeight: 600,
+                    color: "#E2E8F0",
+                    padding: "8px 18px",
+                    borderRadius: "16px",
+                    fontSize: 18,
+                    fontWeight: 700,
                     border: "1px solid #334155",
                   }}
                 >
@@ -352,30 +352,30 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               </div>
 
               {/* 지표 행 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "24px", marginTop: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "12px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: config.barColor, fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
                     {issue.severity}
                   </span>
-                  <span style={{ color: "#64748B", fontSize: 13, fontWeight: 600 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
                     위기지수
                   </span>
                 </div>
-                <div style={{ display: "flex", width: "1px", height: "36px", background: "#334155" }} />
+                <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
                     K{kscore.toFixed(1)}
                   </span>
-                  <span style={{ color: "#64748B", fontSize: 13, fontWeight: 600 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
                     KScore
                   </span>
                 </div>
-                <div style={{ display: "flex", width: "1px", height: "36px", background: "#334155" }} />
+                <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 36, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
                     {issue.event_count}
                   </span>
-                  <span style={{ color: "#64748B", fontSize: 13, fontWeight: 600 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
                     보도 건수
                   </span>
                 </div>
@@ -388,11 +388,11 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  width: "400px",
+                  width: "440px",
                   gap: "8px",
                 }}
               >
-                <span style={{ color: "#64748B", fontSize: 14, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
                   KScore 7일 추이
                 </span>
                 <div
@@ -419,21 +419,21 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                       </linearGradient>
                     </defs>
                     <path d={svgAreaPath} fill="url(#kGrad)" />
-                    <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="3" />
+                    <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="4" />
                     {(() => {
                       const maxK = Math.max(...graphPoints.map((p) => p.kscore), 1);
                       const lastPt = graphPoints[graphPoints.length - 1];
                       const lx = graphWidth;
                       const ly = graphHeight - (lastPt.kscore / maxK) * (graphHeight - 8);
-                      return <circle cx={lx - 1} cy={ly} r="5" fill={config.barColor} />;
+                      return <circle cx={lx - 1} cy={ly} r="7" fill={config.barColor} />;
                     })()}
                   </svg>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
-                  <span style={{ color: "#475569", fontSize: 12 }}>
+                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
                     {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
-                  <span style={{ color: "#475569", fontSize: 12 }}>
+                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
                     {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
                 </div>
@@ -450,7 +450,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               marginTop: "auto",
             }}
           >
-            <span style={{ color: "#64748B", fontSize: 16, fontWeight: 600 }}>
+            <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
               wewantpeace.live
             </span>
           </div>

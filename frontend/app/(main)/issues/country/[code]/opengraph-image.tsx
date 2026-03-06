@@ -122,8 +122,8 @@ export default async function OGImage({ params }: { params: { code: string } }) 
 
   // 7일 히스토리 → SVG path for sparkline
   const graphPoints = history.length >= 2 ? history : [];
-  const graphWidth = 480;
-  const graphHeight = 120;
+  const graphWidth = 500;
+  const graphHeight = 140;
   let svgPath = "";
   let svgAreaPath = "";
   if (graphPoints.length >= 2) {
@@ -203,7 +203,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
             top: 0,
             left: 0,
             width: "100%",
-            height: "4px",
+            height: "6px",
             background: `linear-gradient(90deg, transparent 0%, ${config.barColor} 30%, ${config.barColor} 70%, transparent 100%)`,
           }}
         />
@@ -229,22 +229,22 @@ export default async function OGImage({ params }: { params: { code: string } }) 
               justifyContent: "space-between",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               {logoSrc ? (
                 <img
                   src={logoSrc}
-                  width={100}
-                  height={43}
+                  width={140}
+                  height={60}
                   alt=""
-                  style={{ width: "100px", height: "43px" }}
+                  style={{ width: "140px", height: "60px" }}
                 />
               ) : null}
-              <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 700, letterSpacing: "-0.3px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 800, letterSpacing: "-0.3px" }}>
                 WeWantPeace
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ color: "#64748B", fontSize: 16, fontWeight: 600 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
                 실시간 세계정세 모니터링
               </span>
               <div
@@ -253,9 +253,9 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                   alignItems: "center",
                   background: config.bg,
                   color: config.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-                  padding: "8px 20px",
-                  borderRadius: "20px",
-                  fontSize: 16,
+                  padding: "10px 26px",
+                  borderRadius: "24px",
+                  fontSize: 20,
                   fontWeight: 800,
                   letterSpacing: "0.5px",
                 }}
@@ -288,15 +288,15 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                 <span
                   style={{
                     color: "#FFFFFF",
-                    fontSize: 56,
+                    fontSize: 68,
                     fontWeight: 900,
                     lineHeight: 1.1,
-                    letterSpacing: "-1px",
+                    letterSpacing: "-1.5px",
                   }}
                 >
                   {countryKo}
                 </span>
-                <span style={{ color: "#64748B", fontSize: 24, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 700 }}>
                   {countryEn}
                 </span>
               </div>
@@ -313,19 +313,19 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                 <span
                   style={{
                     color: config.barColor,
-                    fontSize: 72,
+                    fontSize: 88,
                     fontWeight: 900,
-                    letterSpacing: "-2px",
+                    letterSpacing: "-3px",
                     lineHeight: 1,
                   }}
                 >
                   {score.toFixed(1)}
                 </span>
-                <span style={{ color: "#64748B", fontSize: 20, fontWeight: 700 }}>
+                <span style={{ color: "#94A3B8", fontSize: 24, fontWeight: 800 }}>
                   / 100
                 </span>
               </div>
-              <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600, marginTop: "2px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 700, marginTop: "2px" }}>
                 Tension Index
               </span>
 
@@ -335,7 +335,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                   display: "flex",
                   width: "100%",
                   maxWidth: "360px",
-                  height: "12px",
+                  height: "16px",
                   background: "#1E293B",
                   borderRadius: "6px",
                   marginTop: "16px",
@@ -365,7 +365,7 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                   gap: "8px",
                 }}
               >
-                <span style={{ color: "#64748B", fontSize: 14, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
                   7일 추이
                 </span>
                 <div
@@ -393,23 +393,23 @@ export default async function OGImage({ params }: { params: { code: string } }) 
                       </linearGradient>
                     </defs>
                     <path d={svgAreaPath} fill="url(#areaGrad)" />
-                    <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="3" />
+                    <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="4" />
                     {/* 마지막 포인트 강조 */}
                     {(() => {
                       const maxS = Math.max(...graphPoints.map((p) => p.raw_score), 10);
                       const lastPt = graphPoints[graphPoints.length - 1];
                       const lx = graphWidth;
                       const ly = graphHeight - (lastPt.raw_score / maxS) * (graphHeight - 8);
-                      return <circle cx={lx - 1} cy={ly} r="5" fill={config.barColor} />;
+                      return <circle cx={lx - 1} cy={ly} r="7" fill={config.barColor} />;
                     })()}
                   </svg>
                 </div>
                 {/* 날짜 라벨 */}
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
-                  <span style={{ color: "#475569", fontSize: 12 }}>
+                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
                     {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
-                  <span style={{ color: "#475569", fontSize: 12 }}>
+                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
                     {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
                 </div>
@@ -428,19 +428,19 @@ export default async function OGImage({ params }: { params: { code: string } }) 
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {topIssues.length > 0 && (
-                <span style={{ color: "#475569", fontSize: 13, fontWeight: 600, marginBottom: "2px" }}>
+                <span style={{ color: "#64748B", fontSize: 16, fontWeight: 700, marginBottom: "2px" }}>
                   주요 이슈
                 </span>
               )}
               {topIssues.map((t, i) => (
-                <span key={i} style={{ color: "#94A3B8", fontSize: 16, fontWeight: 500 }}>
+                <span key={i} style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 600 }}>
                   {i + 1}. {t}
                 </span>
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ color: "#334155", fontSize: 14 }}>|</span>
-              <span style={{ color: "#64748B", fontSize: 16, fontWeight: 600 }}>
+              <span style={{ color: "#334155", fontSize: 18 }}>|</span>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
                 wewantpeace.live
               </span>
             </div>
