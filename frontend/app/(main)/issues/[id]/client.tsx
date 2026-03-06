@@ -94,7 +94,7 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
   return (
-    <div className="mt-4 pt-4 border-t border-border">
+    <div className="mt-4 pt-4 border-t border-border fade-in-up">
       <p className="text-xs font-medium text-muted-foreground mb-3">{t(lang, "issue_kscore_history_section")}</p>
       <div className="relative h-32">
         <svg viewBox={`0 0 ${data.length - 1} 100`} className="w-full h-full" preserveAspectRatio="none">
@@ -107,6 +107,7 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
           <path
             d={`M0,${100 - (data[0].kscore / maxKscore) * 90} ${data.map((d, i) => `L${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")} L${data.length - 1},100 L0,100 Z`}
             fill="url(#kscoreGrad)"
+            className="kscore-area"
           />
           <polyline
             points={data.map((d, i) => `${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")}
@@ -114,9 +115,11 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
             stroke="hsl(var(--primary))"
             strokeWidth="1.5"
             vectorEffect="non-scaling-stroke"
+            pathLength={1}
+            className="kscore-line"
           />
         </svg>
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1">
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 kscore-label">
           <span className="text-[9px] text-muted-foreground">
             {new Date(data[0].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
           </span>
@@ -124,7 +127,7 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
             {new Date(data[data.length - 1].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
           </span>
         </div>
-        <div className="absolute top-0 right-1">
+        <div className="absolute top-0 right-1 kscore-label">
           <span className="text-[9px] text-muted-foreground">max {maxKscore.toFixed(1)}</span>
         </div>
       </div>
