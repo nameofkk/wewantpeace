@@ -1682,13 +1682,14 @@ def generate_daily_social(self):
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                post = await generate_daily_movers(db)
-                if not post:
+                posts = await generate_daily_movers(db)
+                if not posts:
                     return {"status": "skipped"}
 
             # Telegram 승인 요청 (트랜잭션 밖에서)
-            await send_review_message(post)
-            return {"status": "ok", "post_id": str(post.id)}
+            for post in posts:
+                await send_review_message(post)
+            return {"status": "ok", "count": len(posts)}
 
     try:
         return run_async(_run())
@@ -1733,18 +1734,17 @@ def generate_spike_social(self):
 
                 posts_to_notify = []
                 for spike, cluster in rows:
-                    # 이미 생성된 포스트가 있는지 확인
-                    dedup_key = f"spike_alert:{spike.id}"
+                    # 이미 생성된 포스트가 있는지 확인 (ko/en 둘 다)
+                    dedup_key_ko = f"spike_alert:ko:{spike.id}"
                     existing = await db.execute(
-                        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
+                        select(SocialPost).where(SocialPost.dedup_key == dedup_key_ko)
                     )
                     if existing.scalar_one_or_none():
                         continue
 
-                    post = await generate_spike_alert(spike, cluster, db)
-                    if post:
-                        posts_to_notify.append(post)
-                        created += 1
+                    new_posts = await generate_spike_alert(spike, cluster, db)
+                    posts_to_notify.extend(new_posts)
+                    created += len(new_posts)
 
             # Telegram 알림 (트랜잭션 밖)
             for post in posts_to_notify:
@@ -1778,12 +1778,13 @@ def generate_weekly_social(self):
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                post = await generate_weekly_recap(db)
-                if not post:
+                posts = await generate_weekly_recap(db)
+                if not posts:
                     return {"status": "skipped"}
 
-            await send_review_message(post)
-            return {"status": "ok", "post_id": str(post.id)}
+            for post in posts:
+                await send_review_message(post)
+            return {"status": "ok", "count": len(posts)}
 
     try:
         return run_async(_run())
