@@ -297,7 +297,7 @@ export default function OnboardingPage() {
 
       {/* 메인 콘텐츠 */}
       <div className="relative z-10 flex-1 flex flex-col items-center overflow-hidden px-4 pt-4">
-        <div className="w-full max-w-md flex-1 flex flex-col">
+        <div className="w-full max-w-md flex-1 flex flex-col min-h-0">
 
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
