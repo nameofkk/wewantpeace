@@ -75,24 +75,6 @@ function condenseTitle(raw: string, maxLen = 35): string {
   return slice.trim() + "…";
 }
 
-/** 외부 이미지를 fetch하여 base64 data URI로 변환. 실패 시 null. */
-async function fetchImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return null;
-    const contentLength = res.headers.get("content-length");
-    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) return null;
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > 2 * 1024 * 1024) return null;
-    const ct = res.headers.get("content-type") || "image/jpeg";
-    return `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
-
 interface TensionData {
   country_code: string;
   raw_score: number;
@@ -154,13 +136,8 @@ export default async function OGImage({ params }: { params: { code: string } }) 
   const topIssueRaw = topIssue ? (topIssue.title_ko || topIssue.title) : "";
   const displayTopIssue = condenseTitle(topIssueRaw, 40);
 
-  // top_cluster의 image_url로 배경 이미지 fetch
-  const topImageUrl = topIssue?.image_url;
-  let bgImageSrc: string | null = null;
-  if (topImageUrl) {
-    bgImageSrc = await fetchImageAsBase64(topImageUrl);
-  }
-  const hasBackground = !!bgImageSrc;
+  const topImageUrl = topIssue?.image_url ?? null;
+  const hasBackground = !!topImageUrl;
 
   return new ImageResponse(
     (
@@ -173,16 +150,18 @@ export default async function OGImage({ params }: { params: { code: string } }) 
           fontFamily: "sans-serif",
         }}
       >
-        {/* 배경 이미지 */}
+        {/* 배경 이미지 — Satori가 URL을 직접 fetch */}
         {hasBackground ? (
           <img
-            src={bgImageSrc!}
+            src={topImageUrl!}
+            width={1200}
+            height={630}
             style={{
               position: "absolute",
               top: 0,
               left: 0,
-              width: "100%",
-              height: "100%",
+              width: 1200,
+              height: 630,
               objectFit: "cover",
               filter: "brightness(0.45)",
             }}
