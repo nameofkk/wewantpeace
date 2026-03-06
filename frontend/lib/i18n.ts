@@ -1036,6 +1036,29 @@ export const translations = {
     admin_filter_date_to: "종료일",
     admin_page_guide: "이 페이지 가이드",
     admin_redis_warning: "설정값은 Redis에 저장됩니다. Redis 재시작 시 기본값으로 초기화될 수 있습니다.",
+
+    // 주간 리포트 공개 페이지
+    weekly_report_title: "주간 리포트",
+    weekly_report_top_issues: "주간 TOP 이슈",
+    weekly_report_tension_rank: "긴장도 순위",
+    weekly_report_stats: "주간 통계",
+    weekly_report_total_events: "총 이벤트",
+    weekly_report_new_clusters: "신규 클러스터",
+    weekly_report_crisis_countries: "위기 국가",
+    weekly_report_cta: "앱에서 관심국가 추이 확인",
+
+    // 대시보드 주간비교
+    dashboard_week_comparison: "주간 비교",
+    dashboard_this_week: "이번 주",
+    dashboard_vs_last_week: "지난 주 대비",
+    dashboard_wc_users: "신규 가입",
+    dashboard_wc_events: "이벤트",
+    dashboard_wc_subs: "구독",
+    dashboard_wc_trials: "트라이얼",
+
+    // 국가 긴장도
+    country_tension_title: "긴장도 추이",
+    country_tension_current: "현재 긴장도",
   },
   en: {
     // bottom nav
@@ -2070,6 +2093,29 @@ export const translations = {
     admin_filter_date_to: "To",
     admin_page_guide: "Page Guide",
     admin_redis_warning: "Settings are stored in Redis. Values may reset to defaults on Redis restart.",
+
+    // Weekly report public page
+    weekly_report_title: "Weekly Report",
+    weekly_report_top_issues: "Top Issues This Week",
+    weekly_report_tension_rank: "Tension Rankings",
+    weekly_report_stats: "Weekly Stats",
+    weekly_report_total_events: "Total Events",
+    weekly_report_new_clusters: "New Clusters",
+    weekly_report_crisis_countries: "Crisis Countries",
+    weekly_report_cta: "Track your countries in the app",
+
+    // Dashboard week comparison
+    dashboard_week_comparison: "Week Comparison",
+    dashboard_this_week: "This Week",
+    dashboard_vs_last_week: "vs Last Week",
+    dashboard_wc_users: "New Users",
+    dashboard_wc_events: "Events",
+    dashboard_wc_subs: "Subscriptions",
+    dashboard_wc_trials: "Trials",
+
+    // Country tension
+    country_tension_title: "Tension Trend",
+    country_tension_current: "Current Tension",
   },
 } as const;
 

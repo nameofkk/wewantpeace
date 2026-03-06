@@ -2,13 +2,14 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, AlertTriangle, Loader2 } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Loader2, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { COUNTRY_MAP, getCountryName } from "@/lib/countries";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
+import { TensionHistoryChart } from "@/components/tension/TensionHistoryChart";
 
 interface ClusterOut {
   id: string;
@@ -65,6 +66,32 @@ export default function CountryIssuesPage() {
     staleTime: 2 * 60 * 1000,
   });
 
+  const { data: tensionData } = useQuery<{
+    raw_score: number;
+    tension_level: number;
+    tension_label: string;
+  }>({
+    queryKey: ["tension", "country", code],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/tension/country/${code}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: historyData } = useQuery<
+    { time: string; raw_score: number; tension_level: number; percentile_30d: number }[]
+  >({
+    queryKey: ["tension", "history", code, "7d"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/tension/country/${code}/history?range=7d`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 헤더 */}
@@ -81,6 +108,38 @@ export default function CountryIssuesPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {/* 긴장도 요약 섹션 */}
+        {tensionData && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {t(lang, "country_tension_title")}
+              </h2>
+            </div>
+            <div className="flex items-baseline gap-3 mb-3">
+              <span className="text-3xl font-bold tabular-nums">{tensionData.raw_score.toFixed(1)}</span>
+              <span className={cn(
+                "rounded-full px-2.5 py-1 text-xs font-medium",
+                TENSION_BG[tensionData.tension_level] ?? TENSION_BG[0],
+              )}>
+                {getTensionLevelLabel(tensionData.tension_level as 0 | 1 | 2 | 3 | 4, lang)}
+              </span>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {t(lang, "country_tension_current")}
+              </span>
+            </div>
+            {historyData && historyData.length > 0 && (
+              <TensionHistoryChart
+                data={historyData}
+                countryCode={code}
+                range="7d"
+                lang={lang}
+              />
+            )}
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

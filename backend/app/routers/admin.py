@@ -128,6 +128,51 @@ async def get_stats(
     translation_fail_rate = round(translation_fail_24h / max(1, events_24h) * 100, 1)
     geo_fail_rate = round(geo_fail_24h / max(1, events_24h) * 100, 1)
 
+    # ── 주간 비교 (이번 주 vs 지난 주) ──
+    this_week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    last_week_start = this_week_start - timedelta(days=7)
+    last_week_end = this_week_start
+
+    wc_new_users_this = (await db.execute(
+        select(func.count()).select_from(User).where(User.created_at >= this_week_start)
+    )).scalar() or 0
+    wc_new_users_last = (await db.execute(
+        select(func.count()).select_from(User).where(User.created_at >= last_week_start, User.created_at < last_week_end)
+    )).scalar() or 0
+
+    wc_events_this = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= this_week_start)
+    )).scalar() or 0
+    wc_events_last = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= last_week_start, NormalizedEvent.created_at < last_week_end)
+    )).scalar() or 0
+
+    wc_subs_this = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.created_at >= this_week_start,
+            Subscription.status.in_(["active", "trial"]),
+        )
+    )).scalar() or 0
+    wc_subs_last = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.created_at >= last_week_start,
+            Subscription.created_at < last_week_end,
+            Subscription.status.in_(["active", "trial"]),
+        )
+    )).scalar() or 0
+
+    wc_trials_this = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.trial_start >= this_week_start,
+        )
+    )).scalar() or 0
+    wc_trials_last = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.trial_start >= last_week_start,
+            Subscription.trial_start < last_week_end,
+        )
+    )).scalar() or 0
+
     return {
         "total_users": total_users,
         "new_today": new_today,
@@ -143,6 +188,13 @@ async def get_stats(
         "unclassified_rate": unclassified_rate,
         "translation_fail_rate": translation_fail_rate,
         "geo_fail_rate": geo_fail_rate,
+        # 주간 비교
+        "week_comparison": {
+            "new_users": {"this": wc_new_users_this, "last": wc_new_users_last},
+            "events": {"this": wc_events_this, "last": wc_events_last},
+            "subscriptions": {"this": wc_subs_this, "last": wc_subs_last},
+            "trials": {"this": wc_trials_this, "last": wc_trials_last},
+        },
     }
 
 
