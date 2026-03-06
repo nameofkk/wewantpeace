@@ -97,7 +97,7 @@ export default function CountryIssuesPage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* 헤더 */}
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
-        <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+        <button onClick={() => window.history.length > 1 ? router.back() : router.push("/")} className="text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">

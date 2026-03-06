@@ -114,7 +114,7 @@ export default function IssueDetailClient({ initialData }: Props) {
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="rounded-lg p-1.5 hover:bg-secondary transition-colors">
+          <button onClick={() => window.history.length > 1 ? router.back() : router.push("/")} className="rounded-lg p-1.5 hover:bg-secondary transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h1 className="text-sm font-bold flex-1 truncate">{displayTitle}</h1>

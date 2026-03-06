@@ -189,10 +189,34 @@ def _translate_cached(text: str) -> str | None:
 
 def _is_junk_title(title: str) -> bool:
     """해시태그만 있거나 의미 없는 제목인지 판별."""
-    import re
-    stripped = re.sub(r'#\w+', '', title).strip()
-    # 해시태그 제거 후 남은 글자가 5자 미만이면 쓰레기 제목
-    return len(stripped) < 5
+    # 해시태그 + 이모지(국기 포함) + 특수문자 제거
+    stripped = re.sub(r'#\S+', '', title)
+    stripped = re.sub(
+        '[\U0001F1E0-\U0001F1FF\U0001F000-\U0001FFFF\u2600-\u27BF'
+        '\uFE00-\uFE0F\u200D\u20E3\U000E0020-\U000E007F'
+        '⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]',
+        '', stripped,
+    ).strip()
+    # 제거 후 남은 글자가 너무 짧으면 쓰레기 제목
+    # 한국어 포함 시 5자, 영어만일 때 8자 (도시명만 남는 케이스 방지)
+    has_ko = bool(re.search(r'[가-힣]', stripped))
+    min_len = 5 if has_ko else 8
+    if len(stripped) < min_len:
+        return True
+    # 인사 패턴
+    low = stripped.lower()
+    if re.match(r'^(good\s+(morning|afternoon|evening)|좋은\s+(아침|오후|저녁))', low):
+        return True
+    # 날짜/도시만 있는 패턴 (예: "Tehran 20 February 2026 #1")
+    date_stripped = re.sub(r'\d+', '', stripped).strip()
+    date_stripped = re.sub(r'(january|february|march|april|may|june|july|august|'
+                           r'september|october|november|december)', '', date_stripped,
+                           flags=re.IGNORECASE).strip()
+    has_ko_date = bool(re.search(r'[가-힣]', date_stripped))
+    min_len_date = 5 if has_ko_date else 8
+    if len(date_stripped) < min_len_date:
+        return True
+    return False
 
 
 _TOPIC_LABELS_EN: dict[str, str] = {
@@ -392,6 +416,10 @@ async def assign_cluster(
                 cluster.title_ko = _make_cluster_title_ko(
                     cluster.title, cluster.topic, cluster.country_code,
                 )
+        # junk 이벤트 제목 교체: 이벤트 제목이 junk이고 클러스터 제목이 정상이면 교체
+        if _is_junk_title(event.title) and not _is_junk_title(cluster.title):
+            event.title = cluster.title
+            logger.debug("junk 이벤트 제목 교체: %s → %s", event.id, cluster.title[:40])
         # image_url: 아직 없으면 이벤트 것으로 채우기
         if not cluster.image_url and event.image_url:
             cluster.image_url = event.image_url
