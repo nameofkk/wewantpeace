@@ -2,9 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
-import { Eye, EyeOff, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Circle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   signInWithGoogle,
@@ -23,6 +22,7 @@ import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
 import { detectPlatform } from "@/lib/platform-detect";
+import { TERMS_KO, TERMS_EN, PRIVACY_KO, PRIVACY_EN } from "@/lib/legal-data";
 
 type Tab = "login" | "register" | "google-register";
 
@@ -68,6 +68,7 @@ export default function LoginPage() {
 
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
+  const [termsModal, setTermsModal] = useState<"terms" | "privacy" | null>(null);
 
   // iOS 플랫폼 감지 (Apple 로그인 버튼 표시용)
   const platform = detectPlatform();
@@ -573,9 +574,9 @@ export default function LoginPage() {
     || !!birthYearError;
 
   const termsItems = [
-    { key: "terms" as const, label: t(lang, "login_terms_label"), required: true, href: "/terms" as string | null, value: agreedTerms, setter: setAgreedTerms },
-    { key: "privacy" as const, label: t(lang, "login_privacy_label"), required: true, href: "/privacy" as string | null, value: agreedPrivacy, setter: setAgreedPrivacy },
-    { key: "marketing" as const, label: t(lang, "login_marketing_label"), required: false, href: null as string | null, value: agreedMarketing, setter: setAgreedMarketing },
+    { key: "terms" as const, label: t(lang, "login_terms_label"), required: true, modal: "terms" as "terms" | "privacy" | null, value: agreedTerms, setter: setAgreedTerms },
+    { key: "privacy" as const, label: t(lang, "login_privacy_label"), required: true, modal: "privacy" as "terms" | "privacy" | null, value: agreedPrivacy, setter: setAgreedPrivacy },
+    { key: "marketing" as const, label: t(lang, "login_marketing_label"), required: false, modal: null as "terms" | "privacy" | null, value: agreedMarketing, setter: setAgreedMarketing },
   ];
 
   if (checkingRedirect) {
@@ -894,8 +895,8 @@ export default function LoginPage() {
                 <span className="text-sm flex-1">
                   {item.required && <span className="text-primary font-medium">{t(lang, "login_terms_required")} </span>}
                   {!item.required && <span className="text-muted-foreground">{t(lang, "login_terms_optional")} </span>}
-                  {item.href ? (
-                    <Link href={item.href} className="hover:underline" target="_blank">{item.label}</Link>
+                  {item.modal ? (
+                    <button type="button" onClick={() => setTermsModal(item.modal)} className="hover:underline text-left">{item.label}</button>
                   ) : item.label}
                 </span>
               </div>
@@ -994,8 +995,8 @@ export default function LoginPage() {
                 <span className="text-sm flex-1">
                   {item.required && <span className="text-primary font-medium">{t(lang, "login_terms_required")} </span>}
                   {!item.required && <span className="text-muted-foreground">{t(lang, "login_terms_optional")} </span>}
-                  {item.href ? (
-                    <Link href={item.href} className="hover:underline" target="_blank">{item.label}</Link>
+                  {item.modal ? (
+                    <button type="button" onClick={() => setTermsModal(item.modal)} className="hover:underline text-left">{item.label}</button>
                   ) : item.label}
                 </span>
               </div>
@@ -1013,6 +1014,58 @@ export default function LoginPage() {
             <button type="button" onClick={() => setTab("login")} className="text-primary hover:underline">{t(lang, "login_login_link")}</button>
           </p>
         </form>
+      )}
+
+      {/* 약관/개인정보 모달 */}
+      {termsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setTermsModal(null)}
+        >
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-full max-w-lg max-h-[85dvh] bg-background rounded-t-2xl sm:rounded-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <h2 className="text-base font-bold">
+                {termsModal === "terms"
+                  ? t(lang, "login_terms_label")
+                  : t(lang, "login_privacy_label")}
+              </h2>
+              <button
+                onClick={() => setTermsModal(null)}
+                className="p-1 rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+            {/* 본문 */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {(termsModal === "terms"
+                ? lang === "en" ? TERMS_EN : TERMS_KO
+                : lang === "en" ? PRIVACY_EN : PRIVACY_KO
+              ).map((section) => (
+                <div key={section.title}>
+                  <h3 className="text-sm font-bold text-primary mb-1.5">{section.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+                    {section.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {/* 닫기 버튼 */}
+            <div className="px-5 py-3 border-t border-border shrink-0">
+              <button
+                onClick={() => setTermsModal(null)}
+                className="w-full rounded-lg bg-primary py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                {lang === "ko" ? "확인" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
