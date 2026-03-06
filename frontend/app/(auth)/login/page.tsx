@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { Eye, EyeOff, CheckCircle2, Circle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const MAX_BIRTH_YEAR = CURRENT_YEAR - 14;
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const lang = useAppStore((s) => s.lang);
   const [tab, setTab] = useState<Tab>("login");
 
@@ -404,6 +406,7 @@ export default function LoginPage() {
           : (typeof detail === "string" ? detail : (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
         throw new Error(msg);
       }
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
       router.push("/home");
     } catch (e: unknown) {
@@ -548,6 +551,7 @@ export default function LoginPage() {
         throw new Error(msg);
       }
 
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
       router.push("/home");
     } catch (e: unknown) {
