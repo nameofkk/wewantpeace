@@ -21,7 +21,6 @@ const TOPIC_KO: Record<string, string> = {
   unknown: "이슈",
 };
 
-/* severity → 작은 pill 뱃지 색상만 (배경은 항상 동일) */
 const SEVERITY_BADGE = [
   { min: 80, bg: "#DC2626", label: "Critical" },
   { min: 60, bg: "#D97706", label: "Serious" },
@@ -31,10 +30,78 @@ const SEVERITY_BADGE = [
 ];
 
 function getBadge(severity: number) {
-  return SEVERITY_BADGE.find((b) => severity >= b.min) || SEVERITY_BADGE[SEVERITY_BADGE.length - 1];
+  return (
+    SEVERITY_BADGE.find((b) => severity >= b.min) ||
+    SEVERITY_BADGE[SEVERITY_BADGE.length - 1]
+  );
 }
 
-export default async function OGImage({ params }: { params: { id: string } }) {
+/**
+ * OG용 타이틀 압축:
+ * 1. 이모지 제거
+ * 2. 노이즈 접두사 제거 (중동 라이브:, 요약, Recap 등)
+ * 3. 콜론/대시 뒤 핵심 추출
+ * 4. 불필요한 후위절 제거 (~ 밝혔습니다, ~발표했습니다 등)
+ * 5. 35자 이내로 자연스럽게 잘라냄
+ */
+function condenseTitle(raw: string, maxLen = 35): string {
+  // 이모지/특수문자 제거
+  let t = raw
+    .replace(
+      /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
+      ""
+    )
+    .replace(/[⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]/g, "")
+    .trim();
+
+  // 노이즈 접두사 제거
+  t = t
+    .replace(/^(중동 라이브|MIDDLE EAST LIVE|요약|Recap|속보|BREAKING|URGENT)\s*[:：\-–—]\s*/i, "")
+    .replace(/^(좋은 아침입니다|Good morning).*$/i, "")
+    .trim();
+
+  // 콜론 뒤 핵심 추출 (앞부분이 지역/카테고리인 경우)
+  const colonIdx = t.indexOf(": ");
+  if (colonIdx > 0 && colonIdx < 15) {
+    t = t.slice(colonIdx + 2).trim();
+  }
+
+  // 한국어 장황한 어미 축약
+  t = t
+    .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
+    .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
+    .replace(/고\s+(있|밝혔|전했)습니다\.?$/, "")
+    .replace(/습니다\.?$/, "")
+    .replace(/했다$/, "")
+    .trim();
+
+  // 마침표 제거
+  t = t.replace(/\.$/, "").trim();
+
+  if (!t) return raw.slice(0, maxLen);
+
+  // 길이 제한: 자연스러운 끊김점에서 자르기
+  if (t.length <= maxLen) return t;
+
+  // 쉼표, 세미콜론, 공백 등에서 자르기
+  const slice = t.slice(0, maxLen);
+  const lastBreak = Math.max(
+    slice.lastIndexOf(", "),
+    slice.lastIndexOf(" "),
+    slice.lastIndexOf("·"),
+    slice.lastIndexOf(" – "),
+  );
+  if (lastBreak > maxLen * 0.6) {
+    return slice.slice(0, lastBreak).trim();
+  }
+  return slice.trim();
+}
+
+export default async function OGImage({
+  params,
+}: {
+  params: { id: string };
+}) {
   let logoSrc: string | null = null;
   try {
     const logoRes = await fetch(
@@ -79,7 +146,12 @@ export default async function OGImage({ params }: { params: { id: string } }) {
           }}
         >
           {logoSrc ? (
-            <img src={logoSrc} width={64} height={28} style={{ marginRight: "16px" }} />
+            <img
+              src={logoSrc}
+              width={64}
+              height={28}
+              style={{ marginRight: "16px" }}
+            />
           ) : null}
           WeWantPeace
         </div>
@@ -88,9 +160,9 @@ export default async function OGImage({ params }: { params: { id: string } }) {
     );
   }
 
-  const title = issue.title_ko || issue.title;
-  const displayTitle = title.length > 90 ? title.slice(0, 87) + "..." : title;
-  const titleSize = title.length > 50 ? 40 : 48;
+  const rawTitle = issue.title_ko || issue.title;
+  const headline = condenseTitle(rawTitle, 35);
+  const titleSize = headline.length <= 20 ? 60 : headline.length <= 30 ? 52 : 44;
   const badge = getBadge(issue.severity);
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryCode = issue.country_code || "";
@@ -105,7 +177,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
           width: "100%",
           height: "100%",
           background: "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
-          padding: "48px",
+          padding: "48px 56px",
           fontFamily: "sans-serif",
         }}
       >
@@ -117,7 +189,9 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "12px" }}
+          >
             {logoSrc ? (
               <img
                 src={logoSrc}
@@ -126,13 +200,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
                 style={{ width: "64px", height: "28px" }}
               />
             ) : null}
-            <span
-              style={{
-                color: "#94A3B8",
-                fontSize: 18,
-                fontWeight: 500,
-              }}
-            >
+            <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 500 }}>
               WeWantPeace
             </span>
           </div>
@@ -153,7 +221,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Headline */}
+        {/* Headline — 큰 글자, 자동 줄바꿈 */}
         <div
           style={{
             display: "flex",
@@ -162,12 +230,13 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             color: "#F8FAFC",
             fontSize: titleSize,
             fontWeight: 700,
-            lineHeight: 1.25,
+            lineHeight: 1.3,
             letterSpacing: "-0.5px",
-            maxWidth: "95%",
+            wordBreak: "keep-all",
+            overflowWrap: "break-word",
           }}
         >
-          {displayTitle}
+          {headline}
         </div>
 
         {/* Bottom row: badges + url */}
@@ -178,7 +247,9 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             justifyContent: "space-between",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
             {countryCode ? (
               <div
                 style={{

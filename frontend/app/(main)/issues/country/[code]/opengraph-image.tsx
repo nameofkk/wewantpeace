@@ -42,6 +42,41 @@ function getBadge(level: number) {
   return LEVEL_BADGE.find((b) => b.level === level) || LEVEL_BADGE[LEVEL_BADGE.length - 1];
 }
 
+function condenseTitle(raw: string, maxLen = 35): string {
+  let t = raw
+    .replace(
+      /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
+      ""
+    )
+    .replace(/[⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]/g, "")
+    .trim();
+  t = t
+    .replace(/^(중동 라이브|MIDDLE EAST LIVE|요약|Recap|속보|BREAKING|URGENT)\s*[:：\-–—]\s*/i, "")
+    .replace(/^(좋은 아침입니다|Good morning).*$/i, "")
+    .trim();
+  const colonIdx = t.indexOf(": ");
+  if (colonIdx > 0 && colonIdx < 15) t = t.slice(colonIdx + 2).trim();
+  t = t
+    .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
+    .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
+    .replace(/고\s+(있|밝혔|전했)습니다\.?$/, "")
+    .replace(/습니다\.?$/, "")
+    .replace(/했다$/, "")
+    .replace(/\.$/, "")
+    .trim();
+  if (!t) return raw.slice(0, maxLen);
+  if (t.length <= maxLen) return t;
+  const slice = t.slice(0, maxLen);
+  const lastBreak = Math.max(
+    slice.lastIndexOf(", "),
+    slice.lastIndexOf(" "),
+    slice.lastIndexOf("·"),
+    slice.lastIndexOf(" – "),
+  );
+  if (lastBreak > maxLen * 0.6) return slice.slice(0, lastBreak).trim();
+  return slice.trim();
+}
+
 interface TensionData {
   country_code: string;
   raw_score: number;
@@ -100,8 +135,8 @@ export default async function OGImage({ params }: { params: { code: string } }) 
   const countryEn = country ? country.en : code;
   const badge = getBadge(tension.tension_level);
   const topIssue = tension.top5_clusters?.[0];
-  const topIssueTitle = topIssue ? (topIssue.title_ko || topIssue.title) : "";
-  const displayTopIssue = topIssueTitle.length > 70 ? topIssueTitle.slice(0, 67) + "..." : topIssueTitle;
+  const topIssueRaw = topIssue ? (topIssue.title_ko || topIssue.title) : "";
+  const displayTopIssue = condenseTitle(topIssueRaw, 40);
 
   return new ImageResponse(
     (
