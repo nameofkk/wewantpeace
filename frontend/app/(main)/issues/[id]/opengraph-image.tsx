@@ -97,6 +97,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
     event_count: number;
     country_code?: string;
     kscore?: number;
+    image_url?: string;
   } | null = null;
 
   try {
@@ -148,6 +149,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
   const kscore = issue.kscore ?? 0;
+  const hasBackground = !!issue.image_url;
 
   // KScore 그래프
   const graphWidth = 380;
@@ -178,20 +180,41 @@ export default async function OGImage({ params }: { params: { id: string } }) {
           position: "relative",
         }}
       >
-        {/* 배경 그리드 패턴 */}
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            opacity: 0.04,
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
+        {/* 배경 이미지 (RSS) */}
+        {hasBackground ? (
+          <img
+            src={issue.image_url!}
+            width={1200}
+            height={630}
+            alt=""
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: 1200,
+              height: 630,
+              objectFit: "cover",
+              filter: "brightness(0.5) saturate(0.8)",
+            }}
+          />
+        ) : null}
+
+        {/* 배경 그리드 패턴 (이미지 없을 때만) */}
+        {!hasBackground && (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0.04,
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+        )}
 
         {/* 상단 악센트 라인 */}
         <div
@@ -214,6 +237,9 @@ export default async function OGImage({ params }: { params: { id: string } }) {
             height: "100%",
             padding: "44px 56px 40px",
             position: "relative",
+            background: hasBackground
+              ? "linear-gradient(180deg, rgba(15,23,42,0.4) 0%, rgba(15,23,42,0.75) 40%, rgba(15,23,42,0.9) 100%)"
+              : "transparent",
           }}
         >
           {/* ── 상단: 로고 + 뱃지들 ── */}

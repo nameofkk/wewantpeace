@@ -137,6 +137,10 @@ export default async function OGImage({ params }: { params: { code: string } }) 
     svgAreaPath = `${svgPath} L${pts[pts.length - 1].x},${graphHeight} L${pts[0].x},${graphHeight} Z`;
   }
 
+  // 상위 이슈 이미지를 배경으로
+  const topImageUrl = tension.top5_clusters?.[0]?.image_url ?? null;
+  const hasBackground = !!topImageUrl;
+
   // 상위 이슈 2개 표시
   const topIssues = tension.top5_clusters.slice(0, 2).map((c) => {
     const raw = c.title_ko || c.title;
@@ -155,20 +159,41 @@ export default async function OGImage({ params }: { params: { code: string } }) 
           position: "relative",
         }}
       >
-        {/* 배경 패턴 — 은은한 그리드 */}
-        <div
-          style={{
-            display: "flex",
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            opacity: 0.04,
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
+        {/* 배경 이미지 (RSS) */}
+        {hasBackground ? (
+          <img
+            src={topImageUrl!}
+            width={1200}
+            height={630}
+            alt=""
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: 1200,
+              height: 630,
+              objectFit: "cover",
+              filter: "brightness(0.5) saturate(0.8)",
+            }}
+          />
+        ) : null}
+
+        {/* 배경 패턴 — 은은한 그리드 (이미지 없을 때만) */}
+        {!hasBackground && (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0.04,
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+        )}
 
         {/* 상단 악센트 라인 */}
         <div
@@ -191,6 +216,9 @@ export default async function OGImage({ params }: { params: { code: string } }) 
             height: "100%",
             padding: "44px 56px 40px",
             position: "relative",
+            background: hasBackground
+              ? "linear-gradient(180deg, rgba(15,23,42,0.4) 0%, rgba(15,23,42,0.75) 40%, rgba(15,23,42,0.9) 100%)"
+              : "transparent",
           }}
         >
           {/* ── 상단: 로고 + 레벨 배지 ── */}
