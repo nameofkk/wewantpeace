@@ -26,6 +26,7 @@ from backend.app.models.app_event import AppEvent
 from backend.app.models.partner import Partner
 from backend.app.models.short_link import ShortLink, LinkClick
 from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
+from backend.app.services.area_activation import sync_area_activation
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -306,6 +307,8 @@ async def update_user(
     if body.plan is not None:
         user.plan = body.plan
         changes["plan"] = body.plan
+        # 플랜 변경 시 관심국가 활성화 동기화
+        await sync_area_activation(user.id, body.plan, db)
         # 어드민이 free로 변경 시 활성 구독도 취소 (웹훅이 플랜 복원하는 버그 방지)
         if body.plan == "free":
             active_subs = await db.execute(
@@ -2554,6 +2557,7 @@ async def update_subscription(
         user = user_result.scalar_one_or_none()
         if user:
             user.plan = body.plan
+            await sync_area_activation(user.id, body.plan, db)
         changes["plan"] = body.plan
     if body.status:
         sub.status = body.status
