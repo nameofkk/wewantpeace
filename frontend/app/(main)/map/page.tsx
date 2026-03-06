@@ -328,11 +328,8 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
 // ── 메인 ──────────────────────────────────────────────────────────────────
 export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const maplibreRef = useRef<any>(null);   // 모듈 캐시 (동기 사용용)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
@@ -431,8 +428,7 @@ export default function MapPage() {
     const map = mapRef.current;
     if (!map || !isMapReady || clusters.length === 0) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const doRender = (maplibregl: any) => {
+      const doRender = (maplibregl: any) => {
       const currentMap = mapRef.current;
       if (!currentMap) return;
 

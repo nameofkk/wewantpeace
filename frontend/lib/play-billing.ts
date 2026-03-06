@@ -114,7 +114,6 @@ export async function purchaseSubscription(
 
   try {
     const response = await request.show();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const purchaseToken = (response.details as any)?.purchaseToken;
 
     if (!purchaseToken) {

@@ -124,9 +124,10 @@ async def _check_sns_failures(db: AsyncSession) -> CheckResult:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
     result = await db.execute(
         text(
-            "SELECT COUNT(*) FROM social_post_platform"
-            " WHERE status = 'failed' AND published_at IS NULL"
-            " AND created_at >= :cutoff"
+            "SELECT COUNT(*) FROM social_post_platform spp"
+            " JOIN social_posts sp ON spp.post_id = sp.id"
+            " WHERE spp.status = 'failed' AND spp.published_at IS NULL"
+            " AND sp.created_at >= :cutoff"
         ),
         {"cutoff": cutoff},
     )

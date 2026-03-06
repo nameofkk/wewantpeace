@@ -577,7 +577,6 @@ export default function HomePage() {
   const { data: clusterData, isLoading: clusterLoading, isFetching: clusterFetching, isError: clusterError, refetch: refetchClusters } = useClusters({ limit: "2000" });
   const globalData = React.useMemo(() => {
     if (!clusterData || !Array.isArray(clusterData)) return undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (clusterData as any[])
       .filter((c) => c.severity > 0 && c.kscore > 0)
       .sort((a, b) => b.kscore - a.kscore || b.severity - a.severity)
