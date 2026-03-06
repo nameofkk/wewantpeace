@@ -1,7 +1,11 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const size = { width: 1200, height: 630 };
+
+// size를 export하지 않으면 Next.js가 og:image:width/height 메타 태그를 생성하지 않음
+// 카카오톡은 og:image:width >= 800이면 "대형 카드"로 렌더링하여 description을 숨기므로
+// 메타 태그를 생략하여 카카오톡이 description을 표시하는 소형 카드를 사용하도록 함
+const size = { width: 1200, height: 630 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 

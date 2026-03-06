@@ -469,22 +469,24 @@ async def kscore_history(
             for row in rows
         ]
 
-    # 폴백: trending_keywords에 히스토리가 없으면 클러스터 현재 kscore 반환
+    # 폴백: trending_keywords에 히스토리가 없으면 클러스터 메타데이터로 2포인트 생성
     from backend.app.models.issue_cluster import IssueCluster
     cluster_result = await db.execute(
         sa_text("""
-            SELECT kscore, last_event_at
+            SELECT kscore, first_event_at, last_event_at
             FROM issue_clusters
             WHERE id = CAST(:cid AS uuid) AND kscore > 0
         """).bindparams(cid=str(cid))
     )
     cluster_row = cluster_result.fetchone()
     if cluster_row:
+        kscore = round(float(cluster_row[0]), 2)
+        first_at = cluster_row[1] or datetime.now(timezone.utc) - timedelta(hours=1)
+        last_at = cluster_row[2] or datetime.now(timezone.utc)
+        # 최소 2포인트 생성: 시작(0) → 현재(kscore)
         return [
-            KScoreHistoryPoint(
-                time=(cluster_row[1] or datetime.now(timezone.utc)).isoformat(),
-                kscore=round(float(cluster_row[0]), 2),
-            )
+            KScoreHistoryPoint(time=first_at.isoformat(), kscore=0.0),
+            KScoreHistoryPoint(time=last_at.isoformat(), kscore=kscore),
         ]
     return []
 

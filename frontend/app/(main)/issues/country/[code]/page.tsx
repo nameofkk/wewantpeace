@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const nameEn = country?.en || code;
 
   const title = `${nameKo} 긴장도`;
-  const siteDesc = "WeWantPeace 실시간 세계정세 모니터링";
+  const siteDesc = "WeWantPeace | 실시간 세계정세 모니터링";
 
   return {
     title,
