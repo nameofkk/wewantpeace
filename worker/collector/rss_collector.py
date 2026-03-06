@@ -225,8 +225,40 @@ def _compute_guid(entry: dict[str, Any]) -> str:
     return hashlib.md5(raw).hexdigest()
 
 
+def _fetch_og_image(article_url: str) -> str | None:
+    """기사 페이지에서 og:image 메타 태그 추출 (RSS에 이미지가 없을 때 폴백)."""
+    if not article_url or not article_url.startswith("http"):
+        return None
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            article_url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; WeWantPeace/1.0)"},
+        )
+        resp = urllib.request.urlopen(req, timeout=3)
+        # head만 읽기 (og:image는 <head> 안에 있으므로 처음 20KB면 충분)
+        html = resp.read(20480).decode("utf-8", errors="ignore")
+        # og:image 추출 (property="og:image" content="..." 또는 반대 순서)
+        m = re.search(
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            html, re.IGNORECASE,
+        )
+        if not m:
+            m = re.search(
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+                html, re.IGNORECASE,
+            )
+        if m:
+            url = m.group(1).strip()
+            if url.startswith("http") and len(url) > 20:
+                return url[:1024]
+    except Exception:
+        pass
+    return None
+
+
 def _extract_image_url(entry: dict[str, Any]) -> str | None:
-    """RSS entry에서 대표 이미지 URL 추출. 우선순위: media_content → media_thumbnail → enclosures → 본문 img."""
+    """RSS entry에서 대표 이미지 URL 추출. 우선순위: media_content → media_thumbnail → enclosures → 본문 img → 기사 og:image."""
     # 1. media_content (medium=image)
     for mc in entry.get("media_content", []):
         url = mc.get("url", "")
@@ -262,7 +294,8 @@ def _extract_image_url(entry: dict[str, Any]) -> str | None:
                 continue
             if url.startswith("http"):
                 return url[:1024]
-    return None
+    # 5. 폴백: 기사 페이지의 og:image 메타 태그
+    return _fetch_og_image(entry.get("link", ""))
 
 
 def _extract_text(entry: dict[str, Any]) -> str:
