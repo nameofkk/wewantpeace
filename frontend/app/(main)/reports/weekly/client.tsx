@@ -4,7 +4,8 @@ import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
 import { getCountryName } from "@/lib/countries";
 import { cn } from "@/lib/utils";
-import { BarChart3, Globe, Layers, AlertTriangle, ExternalLink } from "lucide-react";
+import { BarChart3, Globe, Layers, AlertTriangle, ExternalLink, ChevronLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -56,6 +57,7 @@ interface WeeklySummary {
 }
 
 export default function WeeklyReportClient({ data }: { data: WeeklySummary | null }) {
+  const router = useRouter();
   const lang = useAppStore((s) => s.lang);
 
   if (!data) {
@@ -82,10 +84,20 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border bg-background/95 backdrop-blur-sm px-4 py-4">
-        <h1 className="text-xl font-bold">{t(lang, "weekly_report_title")}</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {periodStart} — {periodEnd}
-        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.back()}
+            className="shrink-0 rounded-lg p-1.5 -ml-1.5 hover:bg-secondary transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold">{t(lang, "weekly_report_title")}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {periodStart} — {periodEnd}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 max-w-3xl mx-auto w-full">
