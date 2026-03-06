@@ -2,9 +2,9 @@
 
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
-import { getCountryName } from "@/lib/countries";
+import { getCountryName, getFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
-import { BarChart3, Globe, Layers, AlertTriangle, ExternalLink, ChevronLeft } from "lucide-react";
+import { BarChart3, Layers, AlertTriangle, ExternalLink, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -191,7 +191,7 @@ export default function WeeklyReportClient({ data }: { data: WeeklySummary | nul
                   <span className="text-xs font-bold text-muted-foreground tabular-nums w-5 shrink-0">
                     {idx + 1}
                   </span>
-                  <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm shrink-0">{getFlag(item.country_code)}</span>
                   <span className="text-sm font-medium w-24 shrink-0 truncate">
                     {getCountryName(item.country_code, lang)}
                   </span>
