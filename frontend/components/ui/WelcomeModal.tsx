@@ -46,7 +46,7 @@ export default function WelcomeModal() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex items-end sm:items-center justify-center",
+        "fixed inset-0 z-50 flex items-center justify-center",
         closing ? "animate-out fade-out" : "animate-in fade-in"
       )}
       onKeyDown={(e) => e.key === "Escape" && handleClose()}
@@ -60,7 +60,7 @@ export default function WelcomeModal() {
       {/* Modal */}
       <div
         className={cn(
-          "relative w-full max-w-md mx-4 sm:mx-auto rounded-t-3xl sm:rounded-3xl bg-card border border-border/60 overflow-hidden"
+          "relative w-full max-w-md mx-4 sm:mx-auto rounded-3xl bg-card border border-border/60 overflow-hidden"
         )}
         style={{
           animation: closing
@@ -70,12 +70,12 @@ export default function WelcomeModal() {
       >
         <style>{`
           @keyframes welcomeSlideUp {
-            from { opacity: 0; transform: translateY(100%); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
           }
           @keyframes welcomeSlideDown {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(100%); }
+            from { opacity: 1; transform: scale(1) translateY(0); }
+            to { opacity: 0; transform: scale(0.95) translateY(20px); }
           }
         `}</style>
 
@@ -92,10 +92,10 @@ export default function WelcomeModal() {
           <div className="flex justify-center mb-4">
             <LogoIcon height={40} hideText />
           </div>
-          <h3 className="text-xl font-black tracking-tight">
+          <h3 className="text-xl font-black tracking-tight break-keep">
             {t(lang, "welcome_title")}
           </h3>
-          <p className="mt-1.5 text-sm text-muted-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground break-keep">
             {t(lang, "welcome_subtitle")}
           </p>
         </div>

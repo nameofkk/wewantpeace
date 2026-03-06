@@ -38,8 +38,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const nameKo = country?.ko || code;
   const nameEn = country?.en || code;
 
-  const title = `${nameKo} (${nameEn}) 이슈`;
-  const description = `${nameKo} 관련 분쟁·갈등 이슈를 실시간으로 추적합니다. Track ${nameEn} conflict issues in real time.`;
+  const title = `${nameKo} 긴장도`;
+  const description = `${nameKo} 실시간 긴장도 지수 · 분쟁·갈등 이슈 모니터링 | WeWantPeace 세계정세 분석`;
 
   return {
     title,
