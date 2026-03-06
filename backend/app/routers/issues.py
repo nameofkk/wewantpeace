@@ -40,6 +40,7 @@ class ClusterOut(BaseModel):
     is_verified: bool
     kscore: float
     independent_sources: int = 0
+    image_url: Optional[str] = None
     first_event_at: str
     last_event_at: str
 
@@ -94,6 +95,7 @@ def _cluster_to_out(c: IssueCluster) -> ClusterOut:
         is_verified=c.is_verified,
         kscore=round(c.kscore, 3),
         independent_sources=c.independent_sources or 0,
+        image_url=c.image_url,
         first_event_at=c.first_event_at.isoformat(),
         last_event_at=c.last_event_at.isoformat(),
     )

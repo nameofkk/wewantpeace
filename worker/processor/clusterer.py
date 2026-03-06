@@ -252,6 +252,9 @@ async def assign_cluster(
                 cluster.title_ko = _make_cluster_title_ko(
                     cluster.title, cluster.topic, cluster.country_code,
                 )
+        # image_url: 아직 없으면 이벤트 것으로 채우기
+        if not cluster.image_url and event.image_url:
+            cluster.image_url = event.image_url
         # geo: 아직 없으면 이벤트 것으로 채우기
         if cluster.lat is None and event.lat is not None:
             cluster.lat = event.lat
@@ -309,6 +312,7 @@ async def assign_cluster(
             last_event_at=event.event_time,
             window_start=window_cutoff,
             window_end=event.event_time + timedelta(minutes=WINDOW_MINUTES),
+            image_url=event.image_url,
             is_verified=False,
         )
         db.add(cluster)

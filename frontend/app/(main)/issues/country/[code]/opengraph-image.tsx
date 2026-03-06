@@ -77,11 +77,29 @@ function condenseTitle(raw: string, maxLen = 35): string {
   return slice.trim();
 }
 
+/** 외부 이미지를 fetch하여 base64 data URI로 변환. 실패 시 null. */
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const contentLength = res.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 2 * 1024 * 1024) return null;
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    return `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 interface TensionData {
   country_code: string;
   raw_score: number;
   tension_level: number;
-  top5_clusters: { title_ko?: string; title: string }[];
+  top5_clusters: { title_ko?: string; title: string; image_url?: string }[];
 }
 
 export default async function OGImage({ params }: { params: { code: string } }) {
@@ -138,166 +156,204 @@ export default async function OGImage({ params }: { params: { code: string } }) 
   const topIssueRaw = topIssue ? (topIssue.title_ko || topIssue.title) : "";
   const displayTopIssue = condenseTitle(topIssueRaw, 40);
 
+  // top_cluster의 image_url로 배경 이미지 fetch
+  const topImageUrl = topIssue?.image_url;
+  let bgImageSrc: string | null = null;
+  if (topImageUrl) {
+    bgImageSrc = await fetchImageAsBase64(topImageUrl);
+  }
+  const hasBackground = !!bgImageSrc;
+
   return new ImageResponse(
     (
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
           width: "100%",
           height: "100%",
-          background: "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
-          padding: "48px",
+          position: "relative",
           fontFamily: "sans-serif",
         }}
       >
-        {/* Top row: logo + level badge */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                width={64}
-                height={28}
-                style={{ width: "64px", height: "28px" }}
-              />
-            ) : null}
-            <span
-              style={{
-                color: "#94A3B8",
-                fontSize: 18,
-                fontWeight: 500,
-              }}
-            >
-              WeWantPeace
-            </span>
-          </div>
-          <div
+        {/* 배경 이미지 */}
+        {hasBackground ? (
+          <img
+            src={bgImageSrc!}
             style={{
-              display: "flex",
-              alignItems: "center",
-              background: badge.bg,
-              color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-              padding: "6px 16px",
-              borderRadius: "20px",
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: "0.5px",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              filter: "brightness(0.45)",
             }}
-          >
-            {badge.label}
-          </div>
-        </div>
+          />
+        ) : null}
 
-        {/* Country name + score */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            flex: 1,
-            justifyContent: "center",
-            gap: "8px",
-          }}
-        >
-          <div
-            style={{
-              color: "#F8FAFC",
-              fontSize: 56,
-              fontWeight: 700,
-              lineHeight: 1.1,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            {countryKo}
-          </div>
-          <div
-            style={{
-              color: "#64748B",
-              fontSize: 24,
-              fontWeight: 400,
-            }}
-          >
-            {countryEn}
-          </div>
-
-          {/* Score */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              gap: "12px",
-              marginTop: "12px",
-            }}
-          >
-            <span
-              style={{
-                color: "#F8FAFC",
-                fontSize: 56,
-                fontWeight: 800,
-                letterSpacing: "-1px",
-              }}
-            >
-              {tension.raw_score.toFixed(1)}
-            </span>
-            <span
-              style={{
-                color: "#64748B",
-                fontSize: 20,
-                fontWeight: 500,
-              }}
-            >
-              Tension Index
-            </span>
-          </div>
-
-          {/* Top issue */}
-          {displayTopIssue ? (
-            <div
-              style={{
-                display: "flex",
-                marginTop: "8px",
-                color: "#94A3B8",
-                fontSize: 18,
-                lineHeight: 1.4,
-              }}
-            >
-              {displayTopIssue}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Bottom row: country code badge + url */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
+            width: "100%",
+            height: "100%",
+            padding: "48px",
+            position: "relative",
+            background: hasBackground
+              ? "linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.85) 60%, rgba(11,17,32,0.95) 100%)"
+              : "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
           }}
         >
+          {/* Top row: logo + level badge */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              background: "#334155",
-              color: "#E2E8F0",
-              padding: "5px 14px",
-              borderRadius: "14px",
-              fontSize: 14,
-              fontWeight: 500,
+              justifyContent: "space-between",
             }}
           >
-            {code}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  width={64}
+                  height={28}
+                  style={{ width: "64px", height: "28px" }}
+                />
+              ) : null}
+              <span
+                style={{
+                  color: "#94A3B8",
+                  fontSize: 18,
+                  fontWeight: 500,
+                }}
+              >
+                WeWantPeace
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: badge.bg,
+                color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
+                padding: "6px 16px",
+                borderRadius: "20px",
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+              }}
+            >
+              {badge.label}
+            </div>
           </div>
-          <span style={{ color: "#64748B", fontSize: 14 }}>
-            wewantpeace.live
-          </span>
+
+          {/* Country name + score */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <div
+              style={{
+                color: "#F8FAFC",
+                fontSize: 56,
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: "-0.5px",
+                textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+              }}
+            >
+              {countryKo}
+            </div>
+            <div
+              style={{
+                color: "#64748B",
+                fontSize: 24,
+                fontWeight: 400,
+              }}
+            >
+              {countryEn}
+            </div>
+
+            {/* Score */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: "12px",
+                marginTop: "12px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#F8FAFC",
+                  fontSize: 56,
+                  fontWeight: 800,
+                  letterSpacing: "-1px",
+                  textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+                }}
+              >
+                {tension.raw_score.toFixed(1)}
+              </span>
+              <span
+                style={{
+                  color: "#64748B",
+                  fontSize: 20,
+                  fontWeight: 500,
+                }}
+              >
+                Tension Index
+              </span>
+            </div>
+
+            {/* Top issue */}
+            {displayTopIssue ? (
+              <div
+                style={{
+                  display: "flex",
+                  marginTop: "8px",
+                  color: "#94A3B8",
+                  fontSize: 18,
+                  lineHeight: 1.4,
+                }}
+              >
+                {displayTopIssue}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Bottom row: country code badge + url */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: hasBackground ? "rgba(51,65,85,0.8)" : "#334155",
+                color: "#E2E8F0",
+                padding: "5px 14px",
+                borderRadius: "14px",
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              {code}
+            </div>
+            <span style={{ color: "#64748B", fontSize: 14 }}>
+              wewantpeace.live
+            </span>
+          </div>
         </div>
       </div>
     ),

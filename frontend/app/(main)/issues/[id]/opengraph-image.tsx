@@ -97,6 +97,24 @@ function condenseTitle(raw: string, maxLen = 35): string {
   return slice.trim();
 }
 
+/** 외부 이미지를 fetch하여 base64 data URI로 변환. 실패 시 null. */
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const contentLength = res.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 2 * 1024 * 1024) return null;
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    return `data:${contentType};base64,${Buffer.from(buf).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 export default async function OGImage({
   params,
 }: {
@@ -120,6 +138,7 @@ export default async function OGImage({
     country_code?: string;
     kscore?: number;
     independent_sources?: number;
+    image_url?: string;
   } | null = null;
 
   try {
@@ -160,6 +179,12 @@ export default async function OGImage({
     );
   }
 
+  // 배경 이미지 fetch
+  let bgImageSrc: string | null = null;
+  if (issue.image_url) {
+    bgImageSrc = await fetchImageAsBase64(issue.image_url);
+  }
+
   const rawTitle = issue.title_ko || issue.title;
   const headline = condenseTitle(rawTitle, 35);
   const titleSize = headline.length <= 20 ? 60 : headline.length <= 30 ? 52 : 44;
@@ -167,124 +192,156 @@ export default async function OGImage({
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryCode = issue.country_code || "";
 
+  const hasBackground = !!bgImageSrc;
+
   return new ImageResponse(
     (
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
           width: "100%",
           height: "100%",
-          background: "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
-          padding: "48px 56px",
+          position: "relative",
           fontFamily: "sans-serif",
         }}
       >
-        {/* Top row: logo + severity badge */}
+        {/* 배경 이미지 (있을 때) */}
+        {hasBackground ? (
+          <img
+            src={bgImageSrc!}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              filter: "brightness(0.45)",
+            }}
+          />
+        ) : null}
+
+        {/* 하단 그라데이션 오버레이 (이미지 있을 때) / 기존 배경 (없을 때) */}
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            flexDirection: "column",
             justifyContent: "space-between",
+            width: "100%",
+            height: "100%",
+            padding: "48px 56px",
+            position: "relative",
+            background: hasBackground
+              ? "linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.85) 60%, rgba(11,17,32,0.95) 100%)"
+              : "linear-gradient(180deg, #0B1120 0%, #162036 100%)",
           }}
         >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "12px" }}
-          >
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                width={64}
-                height={28}
-                style={{ width: "64px", height: "28px" }}
-              />
-            ) : null}
-            <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 500 }}>
-              WeWantPeace
-            </span>
-          </div>
+          {/* Top row: logo + severity badge */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              background: badge.bg,
-              color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
-              padding: "6px 16px",
-              borderRadius: "20px",
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: "0.5px",
+              justifyContent: "space-between",
             }}
           >
-            {badge.label}
-          </div>
-        </div>
-
-        {/* Headline — 큰 글자, 자동 줄바꿈 */}
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            alignItems: "center",
-            color: "#F8FAFC",
-            fontSize: titleSize,
-            fontWeight: 700,
-            lineHeight: 1.3,
-            letterSpacing: "-0.5px",
-            wordBreak: "keep-all",
-            overflowWrap: "break-word",
-          }}
-        >
-          {headline}
-        </div>
-
-        {/* Bottom row: badges + url */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "8px" }}
-          >
-            {countryCode ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: "#334155",
-                  color: "#E2E8F0",
-                  padding: "5px 14px",
-                  borderRadius: "14px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                }}
-              >
-                {countryCode}
-              </div>
-            ) : null}
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "12px" }}
+            >
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  width={64}
+                  height={28}
+                  style={{ width: "64px", height: "28px" }}
+                />
+              ) : null}
+              <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 500 }}>
+                WeWantPeace
+              </span>
+            </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                background: "#1E293B",
-                color: "#94A3B8",
-                padding: "5px 14px",
-                borderRadius: "14px",
+                background: badge.bg,
+                color: badge.bg === "#CA8A04" ? "#1A1A2E" : "#FFFFFF",
+                padding: "6px 16px",
+                borderRadius: "20px",
                 fontSize: 14,
-                fontWeight: 500,
-                border: "1px solid #334155",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
               }}
             >
-              {topicKo}
+              {badge.label}
             </div>
           </div>
-          <span style={{ color: "#64748B", fontSize: 14 }}>
-            wewantpeace.live
-          </span>
+
+          {/* Headline */}
+          <div
+            style={{
+              display: "flex",
+              flex: 1,
+              alignItems: "center",
+              color: "#F8FAFC",
+              fontSize: titleSize,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              letterSpacing: "-0.5px",
+              wordBreak: "keep-all",
+              overflowWrap: "break-word",
+              textShadow: hasBackground ? "0 2px 8px rgba(0,0,0,0.6)" : "none",
+            }}
+          >
+            {headline}
+          </div>
+
+          {/* Bottom row: badges + url */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              {countryCode ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    background: hasBackground ? "rgba(51,65,85,0.8)" : "#334155",
+                    color: "#E2E8F0",
+                    padding: "5px 14px",
+                    borderRadius: "14px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                  }}
+                >
+                  {countryCode}
+                </div>
+              ) : null}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: hasBackground ? "rgba(30,41,59,0.8)" : "#1E293B",
+                  color: "#94A3B8",
+                  padding: "5px 14px",
+                  borderRadius: "14px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  border: "1px solid #334155",
+                }}
+              >
+                {topicKo}
+              </div>
+            </div>
+            <span style={{ color: "#64748B", fontSize: 14 }}>
+              wewantpeace.live
+            </span>
+          </div>
         </div>
       </div>
     ),

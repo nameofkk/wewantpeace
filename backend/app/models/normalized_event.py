@@ -32,6 +32,7 @@ class NormalizedEvent(Base):
     is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     translation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok | failed | skipped
     geo_method: Mapped[str | None] = mapped_column(String(16), nullable=True)  # keyword | geocoder | fallback | none
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     event_time: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),

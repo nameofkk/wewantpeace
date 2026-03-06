@@ -33,6 +33,7 @@ class ClusterSummary(BaseModel):
     confidence: float
     topic: str
     kscore: float = 0.0
+    image_url: Optional[str] = None
 
 
 class TensionOut(BaseModel):
@@ -99,6 +100,7 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
             confidence=round(c.confidence, 3),
             topic=c.topic,
             kscore=round(c.kscore, 2),
+            image_url=c.image_url,
         )
         for c in clusters
     ]
@@ -128,6 +130,7 @@ async def _get_top5_batch(
             IssueCluster.confidence,
             IssueCluster.topic,
             IssueCluster.kscore,
+            IssueCluster.image_url,
             rn_col,
         )
         .where(
@@ -156,6 +159,7 @@ async def _get_top5_batch(
             confidence=round(row.confidence, 3),
             topic=row.topic,
             kscore=round(row.kscore, 2),
+            image_url=row.image_url,
         )
         top5_map.setdefault(row.country_code, []).append(cs)
     return top5_map

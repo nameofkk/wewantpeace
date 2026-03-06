@@ -1364,6 +1364,7 @@ class NormalizeResult:
     translation_status: str  # ok | failed | skipped
     geo_method: str  # keyword | none
     event_time: datetime
+    image_url: Optional[str] = None
 
 
 # ── 내부 함수들 ──────────────────────────────────────────────────────────────
@@ -1758,6 +1759,7 @@ def normalize(
     collected_at: datetime,
     source_title: Optional[str] = None,
     published_at: Optional[datetime] = None,
+    image_url: Optional[str] = None,
 ) -> NormalizeResult:
     """
     RawEvent 텍스트 → NormalizeResult (동기).
@@ -1839,4 +1841,5 @@ def normalize(
         translation_status=translation_status,
         geo_method=geo_method,
         event_time=published_at if published_at is not None else collected_at,
+        image_url=image_url,
     )

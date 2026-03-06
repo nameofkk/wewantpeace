@@ -225,6 +225,46 @@ def _compute_guid(entry: dict[str, Any]) -> str:
     return hashlib.md5(raw).hexdigest()
 
 
+def _extract_image_url(entry: dict[str, Any]) -> str | None:
+    """RSS entry에서 대표 이미지 URL 추출. 우선순위: media_content → media_thumbnail → enclosures → 본문 img."""
+    # 1. media_content (medium=image)
+    for mc in entry.get("media_content", []):
+        url = mc.get("url", "")
+        if url and mc.get("medium") == "image":
+            return url[:1024]
+    # media_content에 medium 미지정이지만 image URL인 경우
+    for mc in entry.get("media_content", []):
+        url = mc.get("url", "")
+        if url and re.search(r"\.(jpe?g|png|webp)", url, re.IGNORECASE):
+            return url[:1024]
+    # 2. media_thumbnail
+    for mt in entry.get("media_thumbnail", []):
+        url = mt.get("url", "")
+        if url:
+            return url[:1024]
+    # 3. enclosures (type=image/*)
+    for enc in entry.get("enclosures", []):
+        url = enc.get("href", "") or enc.get("url", "")
+        enc_type = enc.get("type", "")
+        if url and enc_type.startswith("image/"):
+            return url[:1024]
+    # 4. 본문 HTML의 첫 <img src> (트래킹 픽셀 제외)
+    content = ""
+    if entry.get("content"):
+        content = entry["content"][0].get("value", "")
+    if not content:
+        content = entry.get("summary", "")
+    if content:
+        for m in re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', content, re.IGNORECASE):
+            url = m.group(1)
+            # 트래킹 픽셀 제외: 1x1, pixel, tracking, beacon 등
+            if re.search(r"(1x1|pixel|tracking|beacon|spacer|blank\.gif)", url, re.IGNORECASE):
+                continue
+            if url.startswith("http"):
+                return url[:1024]
+    return None
+
+
 def _extract_text(entry: dict[str, Any]) -> str:
     """entry에서 본문 텍스트 추출 후 홍보 문장 제거."""
     content = ""
@@ -398,6 +438,7 @@ class RSSCollector:
 
             collected_at = datetime.now(timezone.utc)
             event_time = _parse_datetime(entry) or collected_at
+            image_url = _extract_image_url(entry)
             raw_metadata = {
                 "title": entry.get("title", "")[:512],
                 "link": entry.get("link", ""),
@@ -406,6 +447,8 @@ class RSSCollector:
                 "published": event_time.isoformat(),  # 실제 발행 시간 (정규화에서 사용)
                 "time_source": "parsed" if _parse_datetime(entry) else "collected_at",
             }
+            if image_url:
+                raw_metadata["image_url"] = image_url
 
             raw_event = RawEvent(
                 source_channel_id=source.id,

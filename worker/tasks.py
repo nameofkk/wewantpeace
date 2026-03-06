@@ -190,6 +190,7 @@ def process_raw_event(self, raw_event_id: str):
                             except Exception:
                                 published_at = None
 
+                image_url = (raw_event.raw_metadata or {}).get("image_url") if raw_event.raw_metadata else None
                 norm = await asyncio.to_thread(
                     normalize,
                     raw_text=raw_event.raw_text,
@@ -197,6 +198,7 @@ def process_raw_event(self, raw_event_id: str):
                     collected_at=raw_event.collected_at,
                     source_title=rss_title,
                     published_at=published_at,
+                    image_url=image_url,
                 )
 
                 # 3-1. 관련성 필터: topic=unknown & 지리정보 없으면 버림
@@ -230,6 +232,7 @@ def process_raw_event(self, raw_event_id: str):
                     is_duplicate=is_dup,
                     translation_status=norm.translation_status,
                     geo_method=norm.geo_method,
+                    image_url=norm.image_url,
                     event_time=norm.event_time,
                 )
                 db.add(ne)
