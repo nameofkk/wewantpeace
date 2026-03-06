@@ -30,21 +30,17 @@ const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
   IQ: { ko: "이라크", en: "Iraq" },
 };
 
-const LEVEL_LABELS: Record<number, { ko: string; en: string }> = {
-  0: { ko: "안정", en: "Stable" },
-  1: { ko: "주의", en: "Caution" },
-  2: { ko: "경계", en: "Warning" },
-  3: { ko: "심각", en: "Serious" },
-  4: { ko: "극심", en: "Critical" },
-};
+const LEVEL_CONFIG = [
+  { level: 4, gradStart: "#450a0a", barColor: "#ef4444", label: "극심", labelEn: "Critical" },
+  { level: 3, gradStart: "#7f1d1d", barColor: "#f97316", label: "심각", labelEn: "Serious" },
+  { level: 2, gradStart: "#78350f", barColor: "#f59e0b", label: "경계", labelEn: "Warning" },
+  { level: 1, gradStart: "#1e3a5f", barColor: "#3b82f6", label: "주의", labelEn: "Caution" },
+  { level: 0, gradStart: "#1e293b", barColor: "#10b981", label: "안정", labelEn: "Stable" },
+];
 
-const LEVEL_BG: Record<number, string> = {
-  0: "#166534",
-  1: "#92400e",
-  2: "#c2410c",
-  3: "#991b1b",
-  4: "#7f1d1d",
-};
+function getLevelConfig(level: number) {
+  return LEVEL_CONFIG.find((c) => c.level === level) || LEVEL_CONFIG[LEVEL_CONFIG.length - 1];
+}
 
 interface TensionData {
   country_code: string;
@@ -56,16 +52,38 @@ interface TensionData {
 export default async function OGImage({ params }: { params: { code: string } }) {
   const code = params.code.toUpperCase();
 
+  let logoSrc: string | null = null;
+  try {
+    const logoRes = await fetch(
+      new URL("../../../../../public/logo-eye.png", import.meta.url)
+    );
+    const logoBuf = await logoRes.arrayBuffer();
+    logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
+  } catch {}
+
   let tension: TensionData | null = null;
   try {
-    const res = await fetch(`${API_BASE}/tension/country/${code}`, { next: { revalidate: 300 } });
+    const res = await fetch(`${API_BASE}/tension/country/${code}`, {
+      next: { revalidate: 300 },
+    });
     if (res.ok) tension = await res.json();
   } catch {}
 
   if (!tension) {
     return new ImageResponse(
       (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", background: "#0f172a", color: "#fff", fontSize: 48 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            background: "#0f172a",
+            color: "#fff",
+            fontSize: 48,
+          }}
+        >
           WeWantPeace
         </div>
       ),
@@ -74,60 +92,248 @@ export default async function OGImage({ params }: { params: { code: string } }) 
   }
 
   const country = COUNTRY_NAMES[code];
-  const countryName = country ? `${country.ko} (${country.en})` : code;
-  const level = tension.tension_level;
-  const levelLabel = LEVEL_LABELS[level] || LEVEL_LABELS[0];
-  const bgColor = LEVEL_BG[level] || LEVEL_BG[0];
+  const countryKo = country ? country.ko : code;
+  const countryEn = country ? country.en : code;
+  const config = getLevelConfig(tension.tension_level);
   const topIssue = tension.top5_clusters?.[0];
-  const topIssueTitle = topIssue ? (topIssue.title_ko || topIssue.title) : "";
+  const topIssueTitle = topIssue
+    ? topIssue.title_ko || topIssue.title
+    : "";
+  const displayTopIssue =
+    topIssueTitle.length > 80
+      ? topIssueTitle.slice(0, 77) + "..."
+      : topIssueTitle;
 
   return new ImageResponse(
     (
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
           width: "100%",
           height: "100%",
-          background: bgColor,
-          padding: "60px",
+          background: `linear-gradient(135deg, ${config.gradStart} 0%, #0f172a 100%)`,
           fontFamily: "sans-serif",
         }}
       >
-        {/* Top bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", color: "rgba(255,255,255,0.7)", fontSize: 24 }}>
-            WeWantPeace
-          </div>
-          <div style={{ display: "flex", background: "rgba(255,255,255,0.15)", borderRadius: "8px", padding: "6px 16px", color: "#fff", fontSize: 20 }}>
-            {code}
-          </div>
-        </div>
+        {/* Left tension bar */}
+        <div
+          style={{
+            display: "flex",
+            width: "8px",
+            height: "100%",
+            background: config.barColor,
+          }}
+        />
 
-        {/* Country name + score */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", flex: 1, justifyContent: "center" }}>
-          <div style={{ color: "#fff", fontSize: 52, fontWeight: 700, lineHeight: 1.2 }}>
-            {countryName}
+        {/* Main content */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            flex: 1,
+            padding: "40px 48px",
+          }}
+        >
+          {/* Header: Logo + LIVE */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "12px" }}
+            >
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  width={73}
+                  height={32}
+                  style={{ width: "73px", height: "32px" }}
+                />
+              ) : null}
+              <span
+                style={{
+                  color: "rgba(255,255,255,0.8)",
+                  fontSize: 22,
+                  fontWeight: 600,
+                }}
+              >
+                WeWantPeace
+              </span>
+            </div>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: "8px" }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  width: "12px",
+                  height: "12px",
+                  borderRadius: "50%",
+                  background: "#ef4444",
+                }}
+              />
+              <span
+                style={{
+                  color: "#ef4444",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  letterSpacing: "1px",
+                }}
+              >
+                LIVE
+              </span>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "16px" }}>
-            <div style={{ color: "#fff", fontSize: 72, fontWeight: 800 }}>
+
+          {/* Divider */}
+          <div
+            style={{
+              display: "flex",
+              width: "100%",
+              height: "1px",
+              background: "rgba(255,255,255,0.1)",
+              marginTop: "16px",
+            }}
+          />
+
+          {/* Country code badge */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginTop: "24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                background: "rgba(255,255,255,0.12)",
+                borderRadius: "8px",
+                padding: "4px 12px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#fff",
+                  fontSize: 20,
+                  fontWeight: 700,
+                }}
+              >
+                {code}
+              </span>
+            </div>
+            <span
+              style={{ color: "rgba(255,255,255,0.5)", fontSize: 20 }}
+            >
+              Tension Index
+            </span>
+          </div>
+
+          {/* Country name */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              marginTop: "12px",
+            }}
+          >
+            <div
+              style={{
+                color: "#fff",
+                fontSize: 52,
+                fontWeight: 700,
+                lineHeight: 1.2,
+              }}
+            >
+              {countryKo}
+            </div>
+            <div
+              style={{
+                color: "rgba(255,255,255,0.5)",
+                fontSize: 28,
+                fontWeight: 400,
+              }}
+            >
+              {countryEn}
+            </div>
+          </div>
+
+          {/* Score + Level badge */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              marginTop: "16px",
+            }}
+          >
+            <div
+              style={{
+                color: "#fff",
+                fontSize: 64,
+                fontWeight: 800,
+              }}
+            >
               {tension.raw_score.toFixed(1)}
             </div>
-            <div style={{ display: "flex", background: "rgba(255,255,255,0.2)", borderRadius: "12px", padding: "8px 20px", color: "#fff", fontSize: 28, fontWeight: 600 }}>
-              {levelLabel.ko} / {levelLabel.en}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: config.barColor,
+                borderRadius: "10px",
+                padding: "8px 18px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#fff",
+                  fontSize: 24,
+                  fontWeight: 700,
+                }}
+              >
+                {config.label}
+              </span>
             </div>
           </div>
-          {topIssueTitle && (
-            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 24, lineHeight: 1.3, maxHeight: "64px", overflow: "hidden" }}>
-              TOP: {topIssueTitle.length > 80 ? topIssueTitle.slice(0, 77) + "..." : topIssueTitle}
-            </div>
-          )}
-        </div>
 
-        {/* Bottom */}
-        <div style={{ display: "flex", color: "rgba(255,255,255,0.6)", fontSize: 20 }}>
-          Tension Index · wewantpeace.live
+          {/* Top issue */}
+          {displayTopIssue ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginTop: "12px",
+                color: "rgba(255,255,255,0.6)",
+                fontSize: 22,
+                lineHeight: 1.3,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>TOP</span>
+              <span style={{ color: "rgba(255,255,255,0.3)" }}>|</span>
+              <span>{displayTopIssue}</span>
+            </div>
+          ) : null}
+
+          {/* Footer */}
+          <div
+            style={{
+              display: "flex",
+              marginTop: "auto",
+              paddingTop: "20px",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 18,
+            }}
+          >
+            wewantpeace.live · 실시간 세계정세 모니터링
+          </div>
         </div>
       </div>
     ),
