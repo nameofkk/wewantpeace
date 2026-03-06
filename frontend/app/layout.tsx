@@ -19,14 +19,14 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: "WeWantPeace",
     title: "WeWantPeace — 세계정세 모니터링",
-    description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
-    // images는 app/opengraph-image.png 파일 기반 메타데이터가 자동 적용됨
+    description: "WeWantPeace | 실시간 세계정세 모니터링",
+    images: [{ url: `${SITE_URL}/og-image.png` }],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "WeWantPeace — 세계정세 모니터링",
-    description: "긴장도 지수 · 이슈 알림 · 실시간 지도",
-    // images는 app/twitter-image.png 파일 기반 메타데이터가 자동 적용됨
+    description: "WeWantPeace | 실시간 세계정세 모니터링",
+    images: [{ url: `${SITE_URL}/og-image-twitter.png` }],
   },
   appleWebApp: {
     capable: true,
