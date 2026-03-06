@@ -1,9 +1,10 @@
 """
 EventClusterer: 60분 윈도우 기반 이슈 클러스터링.
 
-클러스터 키: {geohash5}:{topic}
-60분 윈도우 내 같은 키 → 같은 IssueCluster에 묶음.
+클러스터 키: {country_code}:{topic} 또는 {geohash4}:{topic}
+60분 윈도우 내 같은 키 + 제목 유사도 검사 → 서브토픽별 분리.
 """
+import re
 import logging
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
@@ -21,27 +22,114 @@ WINDOW_MINUTES = 60
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2
 
-# 제목 단어 최소 겹침 비율 — 이 미만이면 같은 키라도 새 클러스터 생성
-# 국가+토픽 기반 클러스터링에서 같은 버킷 내 다른 이슈 분리
-MIN_TITLE_OVERLAP = 0.35
+# 제목 유사도 임계값
+MIN_TITLE_OVERLAP = 0.25           # 일반 이벤트
+MIN_TITLE_OVERLAP_HIGH_SEV = 0.10  # 고심각도 (severity >= 50 양쪽)
+
+# 활성 클러스터 후보 최대 조회 수
+MAX_CANDIDATE_CLUSTERS = 10
+
+# ── 제목 유사도 (스테밍 + 이중 언어) ──────────────────────────────────────────
+
+_STOP_WORDS = frozenset({
+    "the", "a", "an", "in", "on", "at", "to", "of", "and", "or",
+    "is", "are", "was", "were", "has", "have", "had", "for", "with",
+    "that", "this", "it", "its", "by", "be", "as", "not", "but",
+    "from", "after", "how", "what", "who", "why", "will", "says",
+    "say", "said", "new", "been", "more", "over", "amid", "into",
+})
+
+# 국가 형용사 → 국가명 정규화
+_DEMONYM_TO_STEM: dict[str, str] = {
+    "russian": "russia", "russians": "russia",
+    "iranian": "iran", "iranians": "iran",
+    "israeli": "israel", "israelis": "israel",
+    "american": "america", "americans": "america",
+    "ukrainian": "ukraine", "ukrainians": "ukraine",
+    "chinese": "china",
+    "turkish": "turkey", "turks": "turkey", "türkiye": "turkey",
+    "indian": "india", "indians": "india",
+    "syrian": "syria", "syrians": "syria",
+    "iraqi": "iraq", "iraqis": "iraq",
+    "palestinian": "palestine", "palestinians": "palestine",
+    "finnish": "finland", "finns": "finland",
+    "yemeni": "yemen", "yemenis": "yemen",
+    "lebanese": "lebanon",
+    "pakistani": "pakistan", "pakistanis": "pakistan",
+    "somali": "somalia", "somalis": "somalia",
+    "sudanese": "sudan",
+    "ethiopian": "ethiopia", "ethiopians": "ethiopia",
+    "afghan": "afghanistan", "afghans": "afghanistan",
+    "japanese": "japan",
+    "korean": "korea", "koreans": "korea",
+    "british": "britain", "brits": "britain",
+    "french": "france",
+    "german": "germany", "germans": "germany",
+    "italian": "italy", "italians": "italy",
+    "spanish": "spain",
+    "egyptian": "egypt", "egyptians": "egypt",
+    "saudi": "saudiarabia", "saudis": "saudiarabia",
+    "kuwaiti": "kuwait", "kuwaitis": "kuwait",
+    "emirati": "uae", "emiratis": "uae",
+    "bahraini": "bahrain", "bahrainis": "bahrain",
+    "qatari": "qatar", "qataris": "qatar",
+    "omani": "oman", "omanis": "oman",
+}
 
 
-def _title_overlap(title_a: str, title_b: str) -> float:
-    """두 제목의 단어 집합 교집합 비율 (Jaccard 유사도)."""
-    _stop = {"the", "a", "an", "in", "on", "at", "to", "of", "and", "or",
-             "is", "are", "was", "were", "has", "have", "had", "for", "with",
-             "that", "this", "it", "its", "by", "be", "as", "not", "but"}
-    def _words(t: str) -> set[str]:
-        import re
-        tokens = re.findall(r"[a-zA-Z가-힣]+", t.lower())
-        # 한국어(가-힣)는 2글자 이상, 영어는 3글자 이상 유지
-        return {w for w in tokens if w not in _stop and (
-            len(w) >= 2 if any('\uac00' <= c <= '\ud7a3' for c in w) else len(w) > 2
-        )}
-    a, b = _words(title_a), _words(title_b)
-    if not a or not b:
-        return 0.0
-    return len(a & b) / len(a | b)
+def _stem_word(w: str) -> str:
+    """영어 단어 기본 스테밍: 국가 형용사 통일 + 접미사 제거."""
+    if w in _DEMONYM_TO_STEM:
+        return _DEMONYM_TO_STEM[w]
+    if len(w) > 4:
+        if w.endswith("ies"):
+            return w[:-3] + "y"
+        if w.endswith("ing"):
+            return w[:-3]
+        if w.endswith("ed") and not w.endswith("eed"):
+            return w[:-2]
+        if w.endswith("es"):
+            return w[:-2]
+        if w.endswith("s") and not w.endswith("ss"):
+            return w[:-1]
+    return w
+
+
+def _stemmed_en_words(text: str) -> set[str]:
+    """영어 제목에서 스테밍된 단어 집합 추출."""
+    tokens = re.findall(r"[a-zA-Z]+", text.lower())
+    return {_stem_word(w) for w in tokens if w not in _STOP_WORDS and len(w) > 2}
+
+
+def _ko_words(text: str) -> set[str]:
+    """한국어 제목에서 2글자 이상 단어 집합 추출."""
+    tokens = re.findall(r"[가-힣]+", text)
+    return {w for w in tokens if len(w) >= 2}
+
+
+def _title_similarity(
+    en_a: str, en_b: str,
+    ko_a: str | None = None, ko_b: str | None = None,
+) -> float:
+    """
+    두 제목의 유사도 (0.0 ~ 1.0).
+    영어(스테밍 Jaccard)와 한국어(Jaccard)를 각각 계산 후 max 반환.
+    언어가 다른 제목 간 교차 비교 문제를 해결.
+    """
+    # 영어 스테밍 Jaccard
+    a_en = _stemmed_en_words(en_a)
+    b_en = _stemmed_en_words(en_b)
+    en_sim = (len(a_en & b_en) / len(a_en | b_en)) if (a_en and b_en) else 0.0
+
+    # 한국어 Jaccard
+    ko_sim = 0.0
+    if ko_a and ko_b:
+        a_ko = _ko_words(ko_a)
+        b_ko = _ko_words(ko_b)
+        if a_ko and b_ko:
+            ko_sim = len(a_ko & b_ko) / len(a_ko | b_ko)
+
+    return max(en_sim, ko_sim)
 
 # ── 클러스터 제목 생성 ────────────────────────────────────────────────────────
 
@@ -215,32 +303,49 @@ async def assign_cluster(
     key = _cluster_key(event)
     window_cutoff = event.event_time - timedelta(minutes=WINDOW_MINUTES)
 
-    # 윈도우 내 기존 클러스터 조회 (window_end가 현재 이벤트 시각 이후면 아직 활성)
+    # 윈도우 내 활성 클러스터 전체 조회 → 제목 유사도로 최적 매칭
     result = await db.execute(
         select(IssueCluster).where(
             IssueCluster.cluster_key == key,
             IssueCluster.window_end >= event.event_time,
-        ).order_by(IssueCluster.last_event_at.desc()).limit(1)
+        ).order_by(IssueCluster.last_event_at.desc()).limit(MAX_CANDIDATE_CLUSTERS)
     )
-    cluster = result.scalar_one_or_none()
+    candidates = list(result.scalars().all())
     now = datetime.now(timezone.utc)
 
-    # ── 클러스터 혼입 방지 체크 ─────────────────────────────────────────────
-    if cluster:
+    # ── 후보 클러스터 중 최적 매칭 선택 ──────────────────────────────────────
+    cluster: IssueCluster | None = None
+    best_sim = -1.0
+
+    for cand in candidates:
         no_country = not event.country_code
         no_geo = not event.geohash5
 
-        # (1) 지오/국가 미분류 버킷이 MAX_EVENTS 초과 → 새 클러스터
-        if no_country and no_geo and cluster.event_count >= MAX_EVENTS_UNKNOWN_GEO:
-            cluster = None
+        # (1) 지오/국가 미분류 버킷이 MAX_EVENTS 초과 → 이 후보 건너뛰기
+        if no_country and no_geo and cand.event_count >= MAX_EVENTS_UNKNOWN_GEO:
+            continue
 
-        # (2) 제목 단어 겹침이 너무 낮으면 → 다른 이슈로 판단, 새 클러스터
-        #     단, 고심각도 이벤트(양쪽 모두 >=50)는 같은 키(국가+토픽) 내에서
-        #     영어/한국어 제목 간 겹침이 0%일 수 있으므로 검사 생략
-        elif event.severity >= 50 and cluster.severity >= 50:
-            pass  # 고심각도 속보 — 같은 국가+토픽이면 병합
-        elif _title_overlap(event.title, cluster.title) < MIN_TITLE_OVERLAP:
-            cluster = None
+        # (2) 제목 유사도 계산 (스테밍 + 이중 언어)
+        sim = _title_similarity(
+            event.title, cand.title,
+            ko_a=getattr(event, "title_ko", None),
+            ko_b=cand.title_ko,
+        )
+
+        # 고심각도(양쪽 모두 >=50)는 낮은 임계값, 일반은 높은 임계값
+        threshold = MIN_TITLE_OVERLAP_HIGH_SEV \
+            if event.severity >= 50 and cand.severity >= 50 \
+            else MIN_TITLE_OVERLAP
+
+        if sim >= threshold and sim > best_sim:
+            best_sim = sim
+            cluster = cand
+
+    if cluster:
+        logger.debug(
+            "클러스터 매칭: event=%s → cluster=%s (sim=%.3f, candidates=%d)",
+            event.title[:40], cluster.title[:40], best_sim, len(candidates),
+        )
 
     if cluster:
         n = cluster.event_count
