@@ -249,18 +249,17 @@ def process_raw_event(self, raw_event_id: str):
                     if cluster is not None:
                         cluster_id = str(cluster.id)
 
-                        # 스파이크 감지 (Redis 필요)
+                        # 스파이크 감지 (누적 기반)
                         try:
                             redis = get_redis()
-                            # source_id: 소스 채널 ID (가짜 스파이크 방지용)
-                            _source_id = str(raw_event.source_channel_id) if raw_event.source_channel_id else ""
                             is_spike, spike_event_id = await evaluate_spike(
                                 cluster_id=cluster_id,
-                                cluster_key=cluster.cluster_key,
                                 severity=cluster.severity,
-                                redis=redis,
-                                source_id=_source_id,
+                                event_count=cluster.event_count,
+                                independent_sources=cluster.independent_sources or 1,
+                                first_event_at=cluster.first_event_at,
                                 kscore=cluster.kscore,
+                                redis=redis,
                             )
                             if is_spike and not cluster.is_spike:
                                 cluster.is_spike = True
@@ -489,16 +488,17 @@ def reprocess_orphans(self):
                         cluster, _ = await assign_cluster(ev, db)
                         if cluster:
                             reassigned += 1
-                            # 스파이크 재평가
+                            # 스파이크 재평가 (누적 기반)
                             try:
                                 redis = get_redis()
                                 is_spike, _spike_eid = await evaluate_spike(
                                     cluster_id=str(cluster.id),
-                                    cluster_key=cluster.cluster_key,
                                     severity=cluster.severity,
-                                    redis=redis,
-                                    source_id="",
+                                    event_count=cluster.event_count,
+                                    independent_sources=cluster.independent_sources or 1,
+                                    first_event_at=cluster.first_event_at,
                                     kscore=cluster.kscore,
+                                    redis=redis,
                                 )
                                 if is_spike and not cluster.is_spike:
                                     cluster.is_spike = True
