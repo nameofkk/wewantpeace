@@ -133,7 +133,11 @@ def generate_card(
         M = 40
 
         # ── 배경 ──
-        img = Image.new("RGBA", (W, H), (*_BG_DARK, 255))
+        is_spike = content_type == "spike_alert"
+        if is_spike:
+            img = Image.new("RGBA", (W, H), (25, 5, 5, 255))
+        else:
+            img = Image.new("RGBA", (W, H), (*_BG_DARK, 255))
         if bg_image_url:
             bg_path = _download_image(bg_image_url)
             if bg_path:
@@ -147,12 +151,30 @@ def generate_card(
                     lx = (bg.width - W) // 2
                     ly = (bg.height - H) // 2
                     bg = bg.crop((lx, ly, lx + W, ly + H))
-                    overlay = Image.new("RGBA", (W, H), (10, 10, 18, 140))
+                    if content_type == "spike_alert":
+                        # 긴박한 빨간 틴트 오버레이
+                        overlay = Image.new("RGBA", (W, H), (40, 5, 5, 150))
+                    else:
+                        overlay = Image.new("RGBA", (W, H), (10, 10, 18, 140))
                     img = Image.alpha_composite(bg, overlay)
                     os.unlink(bg_path)
                 except Exception:
                     if bg_path and os.path.exists(bg_path):
                         os.unlink(bg_path)
+
+        # ── spike_alert 긴박감 효과 ──
+        if is_spike:
+            # 상하단 빨간 경고 바
+            alert_bar = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            ab_draw = ImageDraw.Draw(alert_bar)
+            ab_draw.rectangle([(0, 0), (W, 6)], fill=(239, 68, 68, 220))
+            ab_draw.rectangle([(0, H - 6), (W, H)], fill=(239, 68, 68, 220))
+            # 좌우 빨간 비네팅
+            for i in range(20):
+                alpha = int(60 * (1 - i / 20))
+                ab_draw.rectangle([(i, 0), (i + 1, H)], fill=(180, 20, 20, alpha))
+                ab_draw.rectangle([(W - i - 1, 0), (W - i, H)], fill=(180, 20, 20, alpha))
+            img = Image.alpha_composite(img, alert_bar)
 
         draw = ImageDraw.Draw(img)
         text_w = W - M * 2
@@ -179,16 +201,28 @@ def generate_card(
 
         # 타입 뱃지 (오른쪽)
         type_label, type_color = _TYPE_CONFIG.get(content_type, ("POST", _ACCENT))
-        tw_badge = _tw(draw, type_label, f_badge_label)
-        bx = W - M - tw_badge - 12
-        draw.rounded_rectangle(
-            [(bx, y - 18), (bx + tw_badge + 12, y)],
-            radius=4, fill=type_color,
-        )
-        draw.text((bx + 6, y - 17), type_label, fill=_WHITE, font=f_badge_label)
+        if is_spike:
+            # BREAKING: 더 크고 강렬한 뱃지
+            f_badge_big = _load_font(_FONT_BOLD, 16)
+            tw_badge = _tw(draw, type_label, f_badge_big)
+            bx = W - M - tw_badge - 16
+            draw.rounded_rectangle(
+                [(bx, y - 22), (bx + tw_badge + 16, y + 2)],
+                radius=5, fill=type_color,
+            )
+            draw.text((bx + 8, y - 20), type_label, fill=_WHITE, font=f_badge_big)
+        else:
+            tw_badge = _tw(draw, type_label, f_badge_label)
+            bx = W - M - tw_badge - 12
+            draw.rounded_rectangle(
+                [(bx, y - 18), (bx + tw_badge + 12, y)],
+                radius=4, fill=type_color,
+            )
+            draw.text((bx + 6, y - 17), type_label, fill=_WHITE, font=f_badge_label)
         y += 16
 
-        draw.line([(M, y), (W - M, y)], fill=_DIVIDER, width=1)
+        hdr_line_color = (239, 68, 68) if is_spike else _DIVIDER
+        draw.line([(M, y), (W - M, y)], fill=hdr_line_color, width=2 if is_spike else 1)
         y += 12
 
         # ── 날짜 (상단 고정) ──
