@@ -195,8 +195,8 @@ export function NewEventBanner() {
     const dot = TENSION_DOT[td.tension_level] ?? "bg-slate-400";
     const countryName = COUNTRY_MAP[td.country_code]?.name ?? td.country_code;
     const flag = getFlag(td.country_code);
-    const prevLabel = getTensionLevelLabel(td.prev_level, lang);
-    const newLabel = getTensionLevelLabel(td.tension_level, lang);
+    const prevLabel = getTensionLevelLabel(td.prev_level as 0 | 1 | 2 | 3 | 4, lang);
+    const newLabel = getTensionLevelLabel(td.tension_level as 0 | 1 | 2 | 3 | 4, lang);
 
     return (
       <div
