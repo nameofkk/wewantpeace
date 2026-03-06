@@ -1039,7 +1039,6 @@ export const translations = {
 
     // 주간 리포트 공개 페이지
     weekly_report_title: "주간 리포트",
-    weekly_report_top_issues: "주간 TOP 이슈",
     weekly_report_tension_rank: "긴장도 순위",
     weekly_report_stats: "주간 통계",
     weekly_report_total_events: "총 이벤트",
@@ -2096,7 +2095,6 @@ export const translations = {
 
     // Weekly report public page
     weekly_report_title: "Weekly Report",
-    weekly_report_top_issues: "Top Issues This Week",
     weekly_report_tension_rank: "Tension Rankings",
     weekly_report_stats: "Weekly Stats",
     weekly_report_total_events: "Total Events",
