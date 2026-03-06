@@ -199,7 +199,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
           />
         ) : null}
 
-        {/* 배경 그리드 패턴 (이미지 없을 때만) */}
+        {/* 배경 패턴 — 은은한 그라데이션 (이미지 없을 때만) */}
         {!hasBackground && (
           <div
             style={{
@@ -209,9 +209,7 @@ export default async function OGImage({ params }: { params: { id: string } }) {
               left: 0,
               width: "100%",
               height: "100%",
-              opacity: 0.04,
-              backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-              backgroundSize: "40px 40px",
+              background: "linear-gradient(135deg, rgba(30,41,59,0.5) 0%, transparent 50%, rgba(30,41,59,0.5) 100%)",
             }}
           />
         )}
