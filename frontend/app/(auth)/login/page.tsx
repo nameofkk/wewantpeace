@@ -73,6 +73,17 @@ export default function LoginPage() {
   const platform = detectPlatform();
   const isIOS = platform === "ios-native" || platform === "ios-app";
 
+  // URL ?tab=google-register로 진입 시: Firebase 현재 유저 확인 후 바로 등록 폼 표시
+  useEffect(() => {
+    const urlTab = new URLSearchParams(window.location.search).get("tab");
+    if (urlTab !== "google-register") return;
+    const auth = getFirebaseAuth();
+    if (!auth?.currentUser) return;
+    setGoogleUser(auth.currentUser);
+    setTab("google-register");
+    setCheckingRedirect(false);
+  }, []);
+
   // React Native WebView: Google 리다이렉트 로그인 결과 확인
   useEffect(() => {
     checkGoogleRedirectResult().then(async (user) => {
