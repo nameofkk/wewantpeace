@@ -8,9 +8,14 @@ import { API_BASE } from "@/lib/admin-utils";
 import {
   Share2, Search, ChevronLeft, ChevronRight, HelpCircle,
   ChevronDown, X, CheckCircle, XCircle, RefreshCw, Eye,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t, type Lang } from "@/lib/i18n";
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
+} from "recharts";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -54,6 +59,13 @@ interface SocialStats {
   failed: number;
 }
 
+interface ChartData {
+  daily: { date: string; published: number; failed: number; pending: number; rejected: number; total: number }[];
+  platforms: { platform: string; published: number; failed: number; skipped: number }[];
+  content_types: { type: string; count: number }[];
+  langs: { lang: string; count: number }[];
+}
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -93,6 +105,8 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "📷",
 };
 
+const PIE_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"];
+
 /* ------------------------------------------------------------------ */
 /*  Inline Guide                                                       */
 /* ------------------------------------------------------------------ */
@@ -113,6 +127,170 @@ function InlineGuide({ lang }: { lang: Lang }) {
       {open && (
         <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground space-y-1">
           <p>{t(lang, "admin_social_guide")}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Charts Section                                                     */
+/* ------------------------------------------------------------------ */
+function ChartsSection({ lang, chartData }: { lang: Lang; chartData: ChartData }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Daily Trend — Area Chart */}
+      {chartData.daily.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4 md:col-span-2">
+          <h3 className="text-xs font-medium text-muted-foreground mb-3">
+            {t(lang, "admin_social_chart_daily")}
+          </h3>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData.daily}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  name={t(lang, "admin_social_total")}
+                  stroke="#3b82f6"
+                  fill="#3b82f6"
+                  fillOpacity={0.1}
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="published"
+                  name={t(lang, "admin_social_published_label")}
+                  stroke="#22c55e"
+                  fill="#22c55e"
+                  fillOpacity={0.15}
+                  strokeWidth={2}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="failed"
+                  name={t(lang, "admin_social_failed_label")}
+                  stroke="#ef4444"
+                  fill="#ef4444"
+                  fillOpacity={0.1}
+                  strokeWidth={1.5}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Platform Bar Chart */}
+      {chartData.platforms.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="text-xs font-medium text-muted-foreground mb-3">
+            {t(lang, "admin_social_chart_platform")}
+          </h3>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData.platforms} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.3} />
+                <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
+                />
+                <Bar
+                  dataKey="published"
+                  name={t(lang, "admin_social_published_label")}
+                  fill="#22c55e"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="failed"
+                  name={t(lang, "admin_social_failed_label")}
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Content Type Pie Chart */}
+      {chartData.content_types.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="text-xs font-medium text-muted-foreground mb-3">
+            {t(lang, "admin_social_chart_type")}
+          </h3>
+          <div className="h-40 flex items-center">
+            <ResponsiveContainer width="60%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData.content_types}
+                  dataKey="count"
+                  nameKey="type"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={55}
+                  innerRadius={30}
+                  strokeWidth={0}
+                >
+                  {chartData.content_types.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 11,
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex-1 space-y-1.5">
+              {chartData.content_types.map((ct, i) => (
+                <div key={ct.type} className="flex items-center gap-2 text-[11px]">
+                  <div
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                  />
+                  <span className="text-muted-foreground truncate">{ct.type}</span>
+                  <span className="ml-auto font-medium">{ct.count}</span>
+                </div>
+              ))}
+              {chartData.langs.length > 0 && (
+                <>
+                  <div className="border-t border-border/40 pt-1.5 mt-1.5">
+                    <p className="text-[10px] text-muted-foreground/60 mb-1">
+                      {t(lang, "admin_social_chart_lang")}
+                    </p>
+                  </div>
+                  {chartData.langs.map((l) => (
+                    <div key={l.lang} className="flex items-center gap-2 text-[11px]">
+                      <span className="text-muted-foreground uppercase">{l.lang}</span>
+                      <span className="ml-auto font-medium">{l.count}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -149,6 +327,17 @@ function DetailModal({
             <p className="text-xs text-muted-foreground mb-1">{t(lang, "admin_social_body")}</p>
             <p className="text-sm whitespace-pre-wrap">{post.body_text}</p>
           </div>
+
+          {post.image_url && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Card Image</p>
+              <img
+                src={post.image_url}
+                alt="card"
+                className="rounded-lg border border-border max-w-full"
+              />
+            </div>
+          )}
 
           {post.hashtags.length > 0 && (
             <div className="flex flex-wrap gap-1">
@@ -219,6 +408,7 @@ export default function AdminSocialPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedPost, setSelectedPost] = useState<SocialPostItem | null>(null);
+  const [showCharts, setShowCharts] = useState(true);
 
   const fetchWithToken = async <T,>(path: string, opts?: { method?: string; body?: unknown }): Promise<T> => {
     const token = await user?.getIdToken();
@@ -240,6 +430,13 @@ export default function AdminSocialPage() {
     queryKey: ["social-stats"],
     queryFn: () => fetchWithToken("/admin/social/stats"),
     refetchInterval: 30_000,
+  });
+
+  // Chart data
+  const { data: chartData } = useQuery<ChartData>({
+    queryKey: ["social-chart"],
+    queryFn: () => fetchWithToken("/admin/social/chart-data?days=14"),
+    refetchInterval: 60_000,
   });
 
   // List
@@ -275,9 +472,23 @@ export default function AdminSocialPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <Share2 className="h-5 w-5 text-primary" />
-        <h1 className="text-lg font-bold">{t(lang, "admin_social")}</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Share2 className="h-5 w-5 text-primary" />
+          <h1 className="text-lg font-bold">{t(lang, "admin_social")}</h1>
+        </div>
+        <button
+          onClick={() => setShowCharts(!showCharts)}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors",
+            showCharts
+              ? "bg-primary/10 text-primary"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          {t(lang, "admin_social_chart_daily")}
+        </button>
       </div>
 
       <InlineGuide lang={lang} />
@@ -303,6 +514,9 @@ export default function AdminSocialPage() {
           </div>
         </div>
       )}
+
+      {/* Charts */}
+      {showCharts && chartData && <ChartsSection lang={lang} chartData={chartData} />}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">

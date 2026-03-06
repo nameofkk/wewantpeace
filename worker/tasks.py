@@ -1899,6 +1899,56 @@ def publish_approved_social(self):
 
 
 @app.task(
+    name="worker.tasks.send_daily_social_report",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_daily_social_report(self):
+    """매일 SNS 운영 일일 리포트 Telegram 전송."""
+
+    async def _run():
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED
+        if not SOCIAL_AUTOGEN_ENABLED:
+            return {"status": "disabled"}
+
+        from worker.social.reporting import send_daily_ops_report
+        async with AsyncSessionLocal() as db:
+            return await send_daily_ops_report(db)
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_daily_social_report 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.send_weekly_social_report",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_weekly_social_report(self):
+    """매주 SNS 운영 주간 리포트 Telegram 전송."""
+
+    async def _run():
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED
+        if not SOCIAL_AUTOGEN_ENABLED:
+            return {"status": "disabled"}
+
+        from worker.social.reporting import send_weekly_ops_report
+        async with AsyncSessionLocal() as db:
+            return await send_weekly_ops_report(db)
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_weekly_social_report 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.aggregate_link_clicks",
     queue="process",
     bind=True,

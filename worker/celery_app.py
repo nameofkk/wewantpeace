@@ -130,6 +130,17 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/2"),  # 2분마다 approved 상태 게시물 발행
         "options": {"queue": "process"},
     },
+    # ── SNS 운영 리포트 ──
+    "send-daily-social-report": {
+        "task": "worker.tasks.send_daily_social_report",
+        "schedule": crontab(minute=0, hour=23),  # 매일 23:00 UTC = KST 08:00
+        "options": {"queue": "process"},
+    },
+    "send-weekly-social-report": {
+        "task": "worker.tasks.send_weekly_social_report",
+        "schedule": crontab(minute=0, hour=23, day_of_week=0),  # 매주 일요일 23:00 UTC
+        "options": {"queue": "process"},
+    },
 }
 
 

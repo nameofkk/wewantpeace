@@ -2878,6 +2878,90 @@ async def retry_social_post(
     return {"status": "ok"}
 
 
+@router.get("/social/chart-data")
+async def social_chart_data(
+    days: int = 14,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """일별 SNS 포스트 추이 데이터 (차트용)."""
+    days = min(days, 90)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # 일별 생성 건수 (status별)
+    daily_result = await db.execute(
+        select(
+            func.date_trunc("day", SocialPost.created_at).label("day"),
+            SocialPost.status,
+            func.count().label("cnt"),
+        )
+        .where(SocialPost.created_at >= cutoff)
+        .group_by("day", SocialPost.status)
+        .order_by("day")
+    )
+    daily_rows = daily_result.all()
+
+    # 날짜별로 집계
+    daily_map: dict[str, dict] = {}
+    for row in daily_rows:
+        day_str = row.day.strftime("%m/%d")
+        if day_str not in daily_map:
+            daily_map[day_str] = {"date": day_str, "published": 0, "failed": 0, "pending": 0, "rejected": 0, "total": 0}
+        daily_map[day_str][row.status if row.status in ("published", "failed", "rejected") else "pending"] += row.cnt
+        daily_map[day_str]["total"] += row.cnt
+
+    daily = list(daily_map.values())
+
+    # 플랫폼별 발행 현황
+    plat_result = await db.execute(
+        select(
+            SocialPostPlatform.platform,
+            SocialPostPlatform.status,
+            func.count().label("cnt"),
+        )
+        .where(SocialPostPlatform.published_at >= cutoff)
+        .group_by(SocialPostPlatform.platform, SocialPostPlatform.status)
+    )
+    plat_rows = plat_result.all()
+
+    plat_map: dict[str, dict] = {}
+    for row in plat_rows:
+        if row.platform not in plat_map:
+            plat_map[row.platform] = {"platform": row.platform, "published": 0, "failed": 0, "skipped": 0}
+        plat_map[row.platform][row.status if row.status in ("published", "failed", "skipped") else "published"] += row.cnt
+
+    platforms = list(plat_map.values())
+
+    # 콘텐츠 타입별 통계
+    type_result = await db.execute(
+        select(
+            SocialPost.content_type,
+            func.count().label("cnt"),
+        )
+        .where(SocialPost.created_at >= cutoff)
+        .group_by(SocialPost.content_type)
+    )
+    content_types = [{"type": row.content_type, "count": row.cnt} for row in type_result.all()]
+
+    # 언어별 통계
+    lang_result = await db.execute(
+        select(
+            SocialPost.lang,
+            func.count().label("cnt"),
+        )
+        .where(SocialPost.created_at >= cutoff)
+        .group_by(SocialPost.lang)
+    )
+    langs = [{"lang": row.lang, "count": row.cnt} for row in lang_result.all()]
+
+    return {
+        "daily": daily,
+        "platforms": platforms,
+        "content_types": content_types,
+        "langs": langs,
+    }
+
+
 @router.patch("/social/{post_id}")
 async def update_social_post(
     post_id: str,
