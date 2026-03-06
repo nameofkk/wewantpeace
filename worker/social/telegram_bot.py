@@ -1,4 +1,5 @@
-"""SNS Telegram 승인 봇 — 콘텐츠 검수 및 승인/거절 처리."""
+"""SNS Telegram 승인 봇 — 콘텐츠 검수 및 승인/거절 처리 + AI 에이전트."""
+import json
 import logging
 import os
 import uuid
@@ -56,15 +57,28 @@ async def send_review_message(post: SocialPost) -> bool:
             ]
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-                json={
-                    "chat_id": SOCIAL_TG_CHAT_ID,
-                    "text": text,
-                    "reply_markup": keyboard,
-                },
-            )
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # 카드 이미지가 있으면 sendPhoto, 없으면 sendMessage
+            if post.image_url and os.path.exists(post.image_url):
+                with open(post.image_url, "rb") as img_file:
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendPhoto",
+                        data={
+                            "chat_id": SOCIAL_TG_CHAT_ID,
+                            "caption": text,
+                            "reply_markup": json.dumps(keyboard),
+                        },
+                        files={"photo": ("card.png", img_file, "image/png")},
+                    )
+            else:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": SOCIAL_TG_CHAT_ID,
+                        "text": text,
+                        "reply_markup": keyboard,
+                    },
+                )
             if resp.status_code == 200:
                 logger.info("Telegram 승인 메시지 전송 완료: post=%s", post.id)
                 return True
@@ -221,10 +235,44 @@ async def _poll_updates():
                                 f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
                                 json={"chat_id": chat_id, "text": reply},
                             )
+                        # 관리자 채팅의 일반 텍스트 → AI 에이전트
+                        elif chat_id and str(chat_id) == SOCIAL_TG_CHAT_ID and text:
+                            await _handle_agent_message(client, chat_id, text)
 
         except Exception:
             logger.exception("Telegram polling 오류")
             await _sleep(5)
+
+
+async def _handle_agent_message(client, chat_id: int, text: str):
+    """관리자 채팅에서 온 일반 텍스트를 AI 에이전트로 처리."""
+    from worker.social.monitor import handle_ai_question, handle_status_command
+
+    try:
+        # /status 명령어
+        if text.strip().lower() == "/status":
+            reply = await handle_status_command()
+        else:
+            # 타이핑 표시
+            await client.post(
+                f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendChatAction",
+                json={"chat_id": chat_id, "action": "typing"},
+            )
+            reply = await handle_ai_question(text)
+
+        # 4096자 초과 시 분할 전송
+        for i in range(0, len(reply), 4096):
+            chunk = reply[i:i + 4096]
+            await client.post(
+                f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": chunk},
+            )
+    except Exception:
+        logger.exception("AI 에이전트 메시지 처리 오류")
+        await client.post(
+            f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": "⚠️ 처리 중 오류가 발생했습니다."},
+        )
 
 
 async def _sleep(seconds: float):

@@ -141,6 +141,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=23, day_of_week=0),  # 매주 일요일 23:00 UTC
         "options": {"queue": "process"},
     },
+    # ── 서비스 모니터링 ──
+    "monitor-service-health": {
+        "task": "worker.tasks.monitor_service_health",
+        "schedule": crontab(minute="*/5"),  # 5분마다
+        "options": {"queue": "process"},
+    },
 }
 
 

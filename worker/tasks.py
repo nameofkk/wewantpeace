@@ -2035,3 +2035,29 @@ def aggregate_link_clicks(self):
     except Exception as exc:
         logger.error("aggregate_link_clicks 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── 서비스 모니터링 ──────────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.monitor_service_health",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def monitor_service_health(self):
+    """서비스 헬스 체크 (5분마다)."""
+
+    async def _run():
+        from worker.social.monitor import check_service_health, send_monitoring_alert
+        results = await check_service_health()
+        await send_monitoring_alert(results)
+        ok_count = sum(1 for r in results if r.ok)
+        return {"status": "ok", "checks": len(results), "healthy": ok_count}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("monitor_service_health 오류: %s", exc)
+        raise self.retry(exc=exc)
