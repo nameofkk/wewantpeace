@@ -185,7 +185,7 @@ def generate_card(
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         draw.text((40, bottom_y), now_str, fill=_MUTED_COLOR, font=font_label)
 
-        watermark = "wewantpeace.live"
+        watermark = "www.wewantpeace.live"
         bbox = draw.textbbox((0, 0), watermark, font=font_label)
         ww = bbox[2] - bbox[0]
         draw.text((W - 40 - ww, bottom_y), watermark, fill=_MUTED_COLOR, font=font_label)
@@ -200,40 +200,31 @@ def generate_card(
         return None
 
 
-def upload_to_firebase(image_bytes: bytes, filename: str) -> str | None:
-    """Firebase Storage에 이미지 업로드 후 public URL 반환."""
+def save_card_temp(image_bytes: bytes, post_id: str) -> str | None:
+    """이미지 바이트를 임시 파일로 저장. X 어댑터에서 직접 업로드용."""
+    import tempfile
     try:
-        import firebase_admin
-        from firebase_admin import storage
-
-        if not firebase_admin._apps:
-            logger.warning("Firebase 미초기화, 이미지 업로드 불가")
-            return None
-
-        # storageBucket 설정
-        bucket_name = os.getenv(
-            "FIREBASE_STORAGE_BUCKET",
-            "wewantpeace-14660.firebasestorage.app",
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".png", prefix=f"social-card-{post_id}-",
+            delete=False,
         )
-        bucket = storage.bucket(bucket_name)
-        blob = bucket.blob(f"social-cards/{filename}")
-        blob.upload_from_string(image_bytes, content_type="image/png")
-        blob.make_public()
-        return blob.public_url
-
+        tmp.write(image_bytes)
+        tmp.close()
+        logger.info("카드 이미지 임시 저장: %s", tmp.name)
+        return tmp.name
     except Exception:
-        logger.exception("Firebase Storage 업로드 실패")
+        logger.exception("카드 이미지 임시 저장 실패")
         return None
 
 
-async def generate_and_upload_card(
+async def generate_card_for_post(
     post,
     cluster=None,
 ) -> str | None:
-    """카드 이미지 생성 + 업로드 + post.image_url 업데이트.
+    """카드 이미지 생성 + 임시 파일 저장 + post.image_url에 경로 저장.
 
     Returns:
-        image_url 또는 None
+        임시 파일 경로 또는 None
     """
     severity = None
     country_code = None
@@ -252,9 +243,9 @@ async def generate_and_upload_card(
     if not image_bytes:
         return None
 
-    filename = f"{post.id}.png"
-    url = upload_to_firebase(image_bytes, filename)
-    if url:
-        post.image_url = url
-        logger.info("카드 이미지 업로드 완료: %s → %s", post.id, url)
-    return url
+    tmp_path = save_card_temp(image_bytes, str(post.id))
+    if tmp_path:
+        # image_url에 로컬 파일 경로 저장 (X 어댑터에서 사용)
+        post.image_url = tmp_path
+        logger.info("카드 이미지 생성 완료: %s → %s", post.id, tmp_path)
+    return tmp_path

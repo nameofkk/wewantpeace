@@ -1,14 +1,11 @@
 """X (Twitter) 어댑터 — tweepy v4+ OAuth 1.0a.
 
-이미지 첨부: v1.1 media_upload → v2 create_tweet(media_ids)
-Thread 지원: in_reply_to_tweet_id 로 ko reply 연결
+이미지 첨부: v1.1 media_upload(로컬파일) → v2 create_tweet(media_ids)
 """
 import logging
 import os
-import tempfile
-from urllib.request import urlretrieve
 
-from backend.app.models.social_post import SocialPost, SocialPostPlatform
+from backend.app.models.social_post import SocialPost
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +19,7 @@ def is_configured() -> bool:
     return bool(X_API_KEY and X_API_SECRET and X_ACCESS_TOKEN and X_ACCESS_SECRET)
 
 
-_CTA = "🔗 wewantpeace.live"
+_CTA = "🔗 www.wewantpeace.live"
 
 
 def _build_text(post: SocialPost) -> str:
@@ -38,10 +35,14 @@ def _build_text(post: SocialPost) -> str:
     return full_text
 
 
-def _upload_media(image_url: str) -> str | None:
-    """이미지 URL → tweepy v1.1 media_upload → media_id 반환."""
+def _upload_media(image_path: str) -> str | None:
+    """로컬 이미지 파일 → tweepy v1.1 media_upload → media_id 반환."""
     try:
         import tweepy
+
+        if not os.path.exists(image_path):
+            logger.warning("이미지 파일 없음: %s", image_path)
+            return None
 
         auth = tweepy.OAuth1UserHandler(
             X_API_KEY, X_API_SECRET,
@@ -49,35 +50,24 @@ def _upload_media(image_url: str) -> str | None:
         )
         api = tweepy.API(auth)
 
-        # 이미지 다운로드 → 임시 파일
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp_path = tmp.name
-            urlretrieve(image_url, tmp_path)
-
-        media = api.media_upload(filename=tmp_path)
-        os.unlink(tmp_path)
+        media = api.media_upload(filename=image_path)
         logger.info("미디어 업로드 완료: media_id=%s", media.media_id)
+
+        # 업로드 완료 후 임시 파일 정리
+        try:
+            os.unlink(image_path)
+        except Exception:
+            pass
+
         return str(media.media_id)
 
     except Exception:
         logger.exception("미디어 업로드 실패")
-        # 임시 파일 정리
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
         return None
 
 
-def publish(
-    post: SocialPost,
-    reply_to_tweet_id: str | None = None,
-) -> tuple[str | None, str | None]:
+def publish(post: SocialPost) -> tuple[str | None, str | None]:
     """X에 트윗 발행.
-
-    Args:
-        post: 발행할 소셜 포스트
-        reply_to_tweet_id: 이 트윗에 대한 reply로 발행 (Thread 연결)
 
     Returns:
         (platform_post_id, error_message)
@@ -97,9 +87,9 @@ def publish(
 
         full_text = _build_text(post)
 
-        # 이미지 첨부
+        # 이미지 첨부 (로컬 임시 파일 경로)
         media_ids = None
-        if post.image_url:
+        if post.image_url and os.path.exists(post.image_url):
             media_id = _upload_media(post.image_url)
             if media_id:
                 media_ids = [media_id]
@@ -108,15 +98,10 @@ def publish(
         kwargs = {"text": full_text}
         if media_ids:
             kwargs["media_ids"] = media_ids
-        if reply_to_tweet_id:
-            kwargs["in_reply_to_tweet_id"] = reply_to_tweet_id
 
         response = client.create_tweet(**kwargs)
         tweet_id = str(response.data["id"])
-        logger.info(
-            "X 트윗 발행 완료: tweet_id=%s, post_id=%s, reply_to=%s",
-            tweet_id, post.id, reply_to_tweet_id,
-        )
+        logger.info("X 트윗 발행 완료: tweet_id=%s, post_id=%s", tweet_id, post.id)
         return tweet_id, None
 
     except Exception as e:

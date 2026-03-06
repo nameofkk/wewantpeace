@@ -67,10 +67,10 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
 
 
 async def _generate_card_for_post(post: SocialPost, cluster=None):
-    """포스트에 카드 이미지 생성 + 업로드 (실패해도 무시)."""
+    """포스트에 카드 이미지 생성 (실패해도 무시)."""
     try:
-        from worker.social.card_generator import generate_and_upload_card
-        await generate_and_upload_card(post, cluster)
+        from worker.social.card_generator import generate_card_for_post
+        await generate_card_for_post(post, cluster)
     except Exception:
         logger.warning("카드 이미지 생성 실패 (무시): post=%s", post.id)
 
