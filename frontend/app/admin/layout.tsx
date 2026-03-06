@@ -75,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/partners", icon: Handshake, labelKey: "admin_partners" },
       { href: "/admin/links", icon: Link2, labelKey: "admin_links" },
+      { href: "/admin/weekly-report", icon: FileBarChart, labelKey: "admin_weekly_report" },
       { href: "/admin/reports-perf", icon: FileBarChart, labelKey: "admin_reports_perf" },
       { href: "/admin/guide", icon: BookOpen, labelKey: "admin_guide" },
     ],
