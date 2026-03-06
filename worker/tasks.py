@@ -1793,6 +1793,76 @@ def generate_weekly_social(self):
         raise self.retry(exc=exc)
 
 
+async def _publish_post_to_platforms(
+    db,
+    post,
+    x_enabled: bool,
+    threads_enabled: bool,
+    reply_to_tweet_id: str | None = None,
+) -> bool:
+    """단일 포스트를 X/Threads에 발행. 성공 여부 반환."""
+    from sqlalchemy import select
+    from backend.app.models.social_post import SocialPostPlatform
+
+    all_ok = True
+
+    # X (Twitter)
+    if x_enabled:
+        existing_x = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == "x",
+            )
+        )
+        x_record = existing_x.scalar_one_or_none()
+
+        if not x_record:
+            from worker.social.adapters.x_adapter import publish as x_publish
+            platform_id, error = x_publish(post, reply_to_tweet_id=reply_to_tweet_id)
+            x_record = SocialPostPlatform(
+                post_id=post.id,
+                platform="x",
+                platform_post_id=platform_id,
+                status="published" if platform_id else "failed",
+                error_message=error,
+                published_at=datetime.now(timezone.utc) if platform_id else None,
+            )
+            db.add(x_record)
+            if not platform_id:
+                all_ok = False
+        elif x_record.status == "failed":
+            all_ok = False
+
+    # Threads
+    if threads_enabled:
+        existing_th = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == "threads",
+            )
+        )
+        th_record = existing_th.scalar_one_or_none()
+
+        if not th_record:
+            from worker.social.adapters.threads_adapter import publish as threads_publish
+            platform_id, error = threads_publish(post)
+            th_record = SocialPostPlatform(
+                post_id=post.id,
+                platform="threads",
+                platform_post_id=platform_id,
+                status="published" if platform_id else "failed",
+                error_message=error,
+                published_at=datetime.now(timezone.utc) if platform_id else None,
+            )
+            db.add(th_record)
+            if not platform_id:
+                all_ok = False
+        elif th_record.status == "failed":
+            all_ok = False
+
+    return all_ok
+
+
 @app.task(
     name="worker.tasks.publish_approved_social",
     queue="process",
@@ -1800,7 +1870,11 @@ def generate_weekly_social(self):
     max_retries=1,
 )
 def publish_approved_social(self):
-    """approved 상태 포스트를 X/Threads에 발행."""
+    """approved 상태 포스트를 X/Threads에 발행.
+
+    같은 dedup_key 기반(content_type + 날짜)의 en/ko 포스트를 그룹핑하여
+    X에서 Thread로 연결: en 먼저 발행 → ko를 reply로 발행.
+    """
 
     async def _run():
         from sqlalchemy import select
@@ -1816,70 +1890,72 @@ def publish_approved_social(self):
                     select(SocialPost)
                     .where(SocialPost.status == "approved")
                     .order_by(SocialPost.approved_at.asc())
-                    .limit(5)
+                    .limit(10)
                 )
                 posts = result.scalars().all()
 
+                # ── dedup_key 기반 그룹핑 (en/ko 쌍 찾기) ──
+                # dedup_key 형식: "daily_movers:ko:2026-03-07" → base="daily_movers:2026-03-07"
+                groups: dict[str, dict[str, SocialPost]] = {}
+                standalone: list[SocialPost] = []
+
                 for post in posts:
-                    all_ok = True
+                    parts = post.dedup_key.split(":")
+                    if len(parts) >= 3 and parts[1] in ("ko", "en"):
+                        base_key = f"{parts[0]}:{':'.join(parts[2:])}"
+                        groups.setdefault(base_key, {})[post.lang] = post
+                    else:
+                        standalone.append(post)
 
-                    # X (Twitter)
-                    if SOCIAL_PLATFORM_X_ENABLED:
-                        # 이미 발행된 플랫폼 레코드 확인
-                        existing_x = await db.execute(
-                            select(SocialPostPlatform).where(
-                                SocialPostPlatform.post_id == post.id,
-                                SocialPostPlatform.platform == "x",
-                            )
+                # ── 그룹 발행: en 먼저 → ko를 reply로 ──
+                for base_key, lang_posts in groups.items():
+                    en_post = lang_posts.get("en")
+                    ko_post = lang_posts.get("ko")
+
+                    # en/ko 중 하나만 approved면 그것만 발행
+                    ordered = []
+                    if en_post:
+                        ordered.append(en_post)
+                    if ko_post:
+                        ordered.append(ko_post)
+
+                    parent_tweet_id: str | None = None
+
+                    for post in ordered:
+                        ok = await _publish_post_to_platforms(
+                            db, post,
+                            SOCIAL_PLATFORM_X_ENABLED,
+                            SOCIAL_PLATFORM_THREADS_ENABLED,
+                            reply_to_tweet_id=parent_tweet_id,
                         )
-                        x_record = existing_x.scalar_one_or_none()
+                        if ok:
+                            post.status = "published"
+                            post.published_at = datetime.now(timezone.utc)
+                            published += 1
+                            # en 발행 성공 시 tweet_id를 가져와서 ko reply에 사용
+                            if post.lang == "en" and parent_tweet_id is None:
+                                x_rec = await db.execute(
+                                    select(SocialPostPlatform).where(
+                                        SocialPostPlatform.post_id == post.id,
+                                        SocialPostPlatform.platform == "x",
+                                        SocialPostPlatform.status == "published",
+                                    )
+                                )
+                                x_plat = x_rec.scalar_one_or_none()
+                                if x_plat and x_plat.platform_post_id:
+                                    parent_tweet_id = x_plat.platform_post_id
+                        else:
+                            post.status = "failed"
+                            failed += 1
 
-                        if not x_record:
-                            from worker.social.adapters.x_adapter import publish as x_publish
-                            platform_id, error = x_publish(post)
-                            x_record = SocialPostPlatform(
-                                post_id=post.id,
-                                platform="x",
-                                platform_post_id=platform_id,
-                                status="published" if platform_id else "failed",
-                                error_message=error,
-                                published_at=datetime.now(timezone.utc) if platform_id else None,
-                            )
-                            db.add(x_record)
-                            if not platform_id:
-                                all_ok = False
-                        elif x_record.status == "failed":
-                            all_ok = False
-
-                    # Threads
-                    if SOCIAL_PLATFORM_THREADS_ENABLED:
-                        existing_th = await db.execute(
-                            select(SocialPostPlatform).where(
-                                SocialPostPlatform.post_id == post.id,
-                                SocialPostPlatform.platform == "threads",
-                            )
-                        )
-                        th_record = existing_th.scalar_one_or_none()
-
-                        if not th_record:
-                            from worker.social.adapters.threads_adapter import publish as threads_publish
-                            platform_id, error = threads_publish(post)
-                            th_record = SocialPostPlatform(
-                                post_id=post.id,
-                                platform="threads",
-                                platform_post_id=platform_id,
-                                status="published" if platform_id else "failed",
-                                error_message=error,
-                                published_at=datetime.now(timezone.utc) if platform_id else None,
-                            )
-                            db.add(th_record)
-                            if not platform_id:
-                                all_ok = False
-                        elif th_record.status == "failed":
-                            all_ok = False
-
-                    # 전체 발행 상태 업데이트
-                    if all_ok:
+                # ── standalone 발행 (그룹에 속하지 않는 포스트) ──
+                for post in standalone:
+                    ok = await _publish_post_to_platforms(
+                        db, post,
+                        SOCIAL_PLATFORM_X_ENABLED,
+                        SOCIAL_PLATFORM_THREADS_ENABLED,
+                    )
+                    if ok:
                         post.status = "published"
                         post.published_at = datetime.now(timezone.utc)
                         published += 1
