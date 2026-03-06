@@ -66,11 +66,14 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
         return None
 
 
-async def _generate_card_for_post(post: SocialPost, cluster=None):
+async def _generate_card_for_post(
+    post: SocialPost,
+    clusters=None,
+):
     """포스트에 카드 이미지 생성 (실패해도 무시)."""
     try:
         from worker.social.card_generator import generate_card_for_post
-        await generate_card_for_post(post, cluster)
+        await generate_card_for_post(post, clusters)
     except Exception:
         logger.warning("카드 이미지 생성 실패 (무시): post=%s", post.id)
 
@@ -203,7 +206,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
     )
     db.add(post)
     await db.flush()
-    await _generate_card_for_post(post, top_clusters[0])
+    await _generate_card_for_post(post, top_clusters)
     logger.info("Daily Movers [bi] 생성: %s (risk=%s)", post.id, risk)
     return post
 
@@ -264,7 +267,7 @@ async def generate_spike_alert(
     )
     db.add(post)
     await db.flush()
-    await _generate_card_for_post(post, cluster)
+    await _generate_card_for_post(post, [cluster])
     logger.info("Spike Alert [bi] 생성: %s (risk=%s)", post.id, risk)
     return post
 

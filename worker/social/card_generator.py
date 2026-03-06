@@ -1,32 +1,44 @@
-"""SNS 카드 이미지 생성기 — Pillow 기반 720x720 다크 카드."""
+"""SNS 카드 이미지 생성기 — 720x720.
+
+각 이슈를 국가 + EN/KO 제목 + 개별 severity로 표시.
+"""
 import io
 import logging
 import os
-import uuid
+import tempfile
 from datetime import datetime, timezone
+from urllib.request import urlretrieve
 
 logger = logging.getLogger(__name__)
 
-# 폰트 경로 (Railway Docker에서도 사용 가능한 범용 경로)
-_FONT_PATHS = [
+_FONT_BOLD = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 ]
+_FONT_REGULAR = [
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+]
 
-# 색상 팔레트 (다크 테마)
-_BG_COLOR = (15, 15, 25)       # 짙은 남색 배경
-_TEXT_COLOR = (240, 240, 245)   # 밝은 흰색
-_ACCENT_COLOR = (59, 130, 246) # 파란색 (primary)
-_MUTED_COLOR = (148, 163, 184) # 회색 텍스트
-_SEVERITY_COLORS = {
-    "low": (34, 197, 94),       # 녹색
-    "medium": (234, 179, 8),    # 노란색
-    "high": (239, 68, 68),      # 빨간색
+_WHITE = (255, 255, 255)
+_LIGHT = (220, 225, 235)
+_MUTED = (140, 148, 165)
+_ACCENT = (96, 165, 250)
+_BG_DARK = (10, 10, 18)
+_DIVIDER = (45, 50, 65)
+
+_SEV_COLORS = {
+    "low": (34, 197, 94),
+    "medium": (250, 204, 21),
+    "high": (239, 68, 68),
 }
 
-# 국가 플래그 이모지 → 텍스트 대체
+_TYPE_CONFIG = {
+    "daily_movers": ("DAILY BRIEF", _ACCENT),
+    "spike_alert": ("BREAKING", (239, 68, 68)),
+    "weekly_recap": ("WEEKLY", (168, 85, 247)),
+}
+
 _COUNTRY_NAMES = {
     "UA": "Ukraine", "RU": "Russia", "IL": "Israel", "PS": "Palestine",
     "IR": "Iran", "CN": "China", "TW": "Taiwan", "KP": "N.Korea",
@@ -34,165 +46,273 @@ _COUNTRY_NAMES = {
     "MM": "Myanmar", "SD": "Sudan", "ET": "Ethiopia", "AF": "Afghanistan",
     "IQ": "Iraq", "LB": "Lebanon", "PK": "Pakistan", "IN": "India",
     "JP": "Japan", "TR": "Turkey", "EG": "Egypt", "SA": "Saudi Arabia",
+    "NG": "Nigeria", "CD": "Congo", "SO": "Somalia", "LY": "Libya",
 }
 
 
-def _find_font(size: int):
-    """사용 가능한 폰트를 찾아 반환."""
+def _load_font(paths, size):
     from PIL import ImageFont
-    for path in _FONT_PATHS:
-        if os.path.exists(path):
+    for p in paths:
+        if os.path.exists(p):
             try:
-                return ImageFont.truetype(path, size)
+                return ImageFont.truetype(p, size)
             except Exception:
                 continue
-    # 폴백: 기본 폰트
     return ImageFont.load_default()
 
 
-def _wrap_text(text: str, font, max_width: int, draw) -> list[str]:
-    """텍스트를 max_width에 맞게 줄바꿈."""
-    words = text.split()
+def _tw(draw, text, font):
+    bbox = draw.textbbox((0, 0), text, font=font)
+    return bbox[2] - bbox[0]
+
+
+def _wrap(text, font, max_w, draw):
     lines = []
-    current_line = ""
-    for word in words:
-        test = f"{current_line} {word}".strip()
-        bbox = draw.textbbox((0, 0), test, font=font)
-        if bbox[2] - bbox[0] <= max_width:
-            current_line = test
-        else:
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-    if current_line:
-        lines.append(current_line)
+    for raw in text.split("\n"):
+        if not raw.strip():
+            continue
+        words = raw.split(" ")
+        cur = ""
+        for w in words:
+            test = f"{cur} {w}".strip() if cur else w
+            if _tw(draw, test, font) <= max_w:
+                cur = test
+            else:
+                if cur:
+                    lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
     return lines or [text]
 
 
-def generate_card(
-    body_text: str,
-    content_type: str,
-    risk_level: str,
-    country_code: str | None = None,
-    severity: int | None = None,
-    hashtags: list[str] | None = None,
-) -> bytes | None:
-    """720x720 SNS 카드 이미지 생성.
+def _sev_color(severity):
+    if severity < 40:
+        return _SEV_COLORS["low"]
+    if severity < 70:
+        return _SEV_COLORS["medium"]
+    return _SEV_COLORS["high"]
 
-    Returns:
-        PNG 이미지 바이트 또는 실패 시 None
+
+def _download_image(url):
+    try:
+        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        tmp.close()
+        urlretrieve(url, tmp.name)
+        return tmp.name
+    except Exception:
+        return None
+
+
+def generate_card(
+    content_type: str,
+    issues: list[dict] | None = None,
+    body_text: str | None = None,
+    hashtags: list[str] | None = None,
+    bg_image_url: str | None = None,
+    date_str: str | None = None,
+) -> bytes | None:
+    """720x720 SNS 카드.
+
+    issues: [{"title_en", "title_ko", "country_code", "severity"}, ...]
+    body_text: issues 없을 때 폴백용 flat 텍스트
     """
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
     except ImportError:
-        logger.error("Pillow 미설치, 카드 생성 불가")
+        logger.error("Pillow 미설치")
         return None
 
     try:
         W, H = 720, 720
-        img = Image.new("RGB", (W, H), _BG_COLOR)
+        M = 40
+
+        # ── 배경 ──
+        img = Image.new("RGBA", (W, H), (*_BG_DARK, 255))
+        if bg_image_url:
+            bg_path = _download_image(bg_image_url)
+            if bg_path:
+                try:
+                    bg = Image.open(bg_path).convert("RGBA")
+                    ratio = max(W / bg.width, H / bg.height)
+                    bg = bg.resize(
+                        (int(bg.width * ratio), int(bg.height * ratio)),
+                        Image.LANCZOS,
+                    )
+                    lx = (bg.width - W) // 2
+                    ly = (bg.height - H) // 2
+                    bg = bg.crop((lx, ly, lx + W, ly + H))
+                    overlay = Image.new("RGBA", (W, H), (10, 10, 18, 185))
+                    img = Image.alpha_composite(bg, overlay)
+                    os.unlink(bg_path)
+                except Exception:
+                    if bg_path and os.path.exists(bg_path):
+                        os.unlink(bg_path)
+
         draw = ImageDraw.Draw(img)
+        text_w = W - M * 2
 
-        # 폰트
-        font_title = _find_font(28)
-        font_body = _find_font(22)
-        font_small = _find_font(16)
-        font_label = _find_font(14)
+        # ── 폰트 ──
+        f_brand = _load_font(_FONT_BOLD, 22)
+        f_tag = _load_font(_FONT_REGULAR, 11)
+        f_badge_label = _load_font(_FONT_BOLD, 12)
+        f_date = _load_font(_FONT_BOLD, 14)
+        f_cc = _load_font(_FONT_BOLD, 12)
+        f_cn = _load_font(_FONT_REGULAR, 12)
+        f_issue = _load_font(_FONT_REGULAR, 16)
+        f_sev = _load_font(_FONT_REGULAR, 11)
+        f_tiny = _load_font(_FONT_REGULAR, 11)
 
-        y = 40
+        if not date_str:
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        # ── 상단: WeWantPeace 브랜딩 ──
-        draw.text((40, y), "WeWantPeace", fill=_ACCENT_COLOR, font=font_title)
-        y += 45
+        # ── 헤더 (상단 고정) ──
+        y = M
+        draw.text((M, y), "WeWantPeace", fill=_ACCENT, font=f_brand)
+        y += 24
+        draw.text((M, y), "Real-time Global Conflict Monitor", fill=_MUTED, font=f_tag)
 
-        # 구분선
-        draw.line([(40, y), (W - 40, y)], fill=(50, 50, 70), width=2)
-        y += 20
+        # 타입 뱃지 (오른쪽)
+        type_label, type_color = _TYPE_CONFIG.get(content_type, ("POST", _ACCENT))
+        tw_badge = _tw(draw, type_label, f_badge_label)
+        bx = W - M - tw_badge - 12
+        draw.rounded_rectangle(
+            [(bx, y - 18), (bx + tw_badge + 12, y)],
+            radius=4, fill=type_color,
+        )
+        draw.text((bx + 6, y - 17), type_label, fill=_WHITE, font=f_badge_label)
+        y += 16
 
-        # ── 콘텐츠 타입 라벨 ──
-        type_labels = {
-            "daily_movers": "DAILY MOVERS",
-            "spike_alert": "⚡ SPIKE ALERT",
-            "weekly_recap": "WEEKLY RECAP",
-        }
-        type_label = type_labels.get(content_type, content_type.upper())
-        draw.text((40, y), type_label, fill=_ACCENT_COLOR, font=font_small)
+        draw.line([(M, y), (W - M, y)], fill=_DIVIDER, width=1)
+        y += 12
 
-        # 국가 표시 (오른쪽)
-        if country_code:
-            country_name = _COUNTRY_NAMES.get(country_code, country_code)
-            bbox = draw.textbbox((0, 0), country_name, font=font_small)
-            cw = bbox[2] - bbox[0]
-            draw.text((W - 40 - cw, y), country_name, fill=_MUTED_COLOR, font=font_small)
-        y += 35
+        # ── 날짜 (상단 고정) ──
+        draw.text((M, y), date_str, fill=_LIGHT, font=f_date)
+        y += 28
 
-        # ── 본문 텍스트 ──
-        max_text_width = W - 80
-        lines = _wrap_text(body_text, font_body, max_text_width, draw)
-        max_lines = 10
-        for i, line in enumerate(lines[:max_lines]):
-            draw.text((40, y), line, fill=_TEXT_COLOR, font=font_body)
-            y += 32
-            if i >= max_lines - 1 and len(lines) > max_lines:
-                draw.text((40, y), "...", fill=_MUTED_COLOR, font=font_body)
-                y += 32
-                break
-        y += 15
+        header_bottom = y  # 헤더 아래 끝
 
-        # ── Severity 바 ──
-        if severity is not None:
-            bar_y = y
-            bar_width = W - 80
-            bar_height = 8
+        # ── 이슈 높이 계산 (중앙 정렬용) ──
+        footer_h = 44
+        issue_h_total = 0
 
-            # 배경 바
-            draw.rounded_rectangle(
-                [(40, bar_y), (40 + bar_width, bar_y + bar_height)],
-                radius=4, fill=(40, 40, 55),
-            )
+        if issues:
+            for idx, iss in enumerate(issues[:3]):
+                en_lines = _wrap(iss.get("title_en", ""), f_issue, text_w - 24, draw)
+                ko_lines = _wrap(iss.get("title_ko", ""), f_issue, text_w - 24, draw)
+                issue_h_total += 24 + min(len(en_lines), 2) * 22 + min(len(ko_lines), 2) * 22 + 6 + 14
+                if idx < len(issues[:3]) - 1:
+                    issue_h_total += 14
+        else:
+            issue_h_total = 200
 
-            # 채운 바
-            sev_color = _SEVERITY_COLORS.get(risk_level, _SEVERITY_COLORS["medium"])
-            fill_width = int(bar_width * min(severity, 100) / 100)
-            if fill_width > 0:
+        # 이슈 영역: header_bottom ~ (H - M - footer_h)
+        avail_h = H - M - footer_h - header_bottom
+        issue_y_start = max(header_bottom, header_bottom + (avail_h - issue_h_total) // 2)
+        y = issue_y_start
+
+        # ── 이슈 목록 ──
+        max_y = H - M - footer_h - 6
+
+        if issues:
+            for idx, iss in enumerate(issues[:3]):
+                if y >= max_y:
+                    break
+
+                cc = iss.get("country_code", "")
+                cn = _COUNTRY_NAMES.get(cc, cc)
+                sev = iss.get("severity", 0)
+                title_en = iss.get("title_en", "")
+                title_ko = iss.get("title_ko", title_en)
+                sc = _sev_color(sev)
+
+                # 국가 뱃지 + severity 수치
+                if cc:
+                    # 국가코드 뱃지
+                    ccw = _tw(draw, f" {cc} ", f_cc)
+                    draw.rounded_rectangle(
+                        [(M, y), (M + ccw + 2, y + 19)],
+                        radius=4, fill=(*sc, 80),
+                        outline=sc, width=1,
+                    )
+                    draw.text((M + 2, y + 2), f" {cc} ", fill=_WHITE, font=f_cc)
+                    # 국가명
+                    draw.text((M + ccw + 8, y + 3), cn, fill=_MUTED, font=f_cn)
+                    # severity 오른쪽 (라벨 포함)
+                    sev_txt = f"Severity {sev}/100"
+                    sw = _tw(draw, sev_txt, f_sev)
+                    draw.text((W - M - sw, y + 4), sev_txt, fill=sc, font=f_sev)
+                    y += 24
+
+                # EN 라인 (- 접두사)
+                en_lines = _wrap(title_en, f_issue, text_w - 24, draw)
+                for li, line in enumerate(en_lines[:2]):
+                    if y >= max_y:
+                        break
+                    prefix = "- " if li == 0 else "  "
+                    draw.text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
+                    y += 22
+
+                # KO 라인 (- 접두사)
+                ko_lines = _wrap(title_ko, f_issue, text_w - 24, draw)
+                for li, line in enumerate(ko_lines[:2]):
+                    if y >= max_y:
+                        break
+                    prefix = "- " if li == 0 else "  "
+                    draw.text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
+                    y += 22
+
+                # 글자-바 간격
+                y += 6
+
+                # 개별 severity 바
+                bar_w = text_w - 16
                 draw.rounded_rectangle(
-                    [(40, bar_y), (40 + fill_width, bar_y + bar_height)],
-                    radius=4, fill=sev_color,
+                    [(M + 8, y), (M + 8 + bar_w, y + 5)],
+                    radius=2, fill=(35, 38, 50),
                 )
+                fill_w = int(bar_w * min(sev, 100) / 100)
+                if fill_w > 0:
+                    draw.rounded_rectangle(
+                        [(M + 8, y), (M + 8 + fill_w, y + 5)],
+                        radius=2, fill=sc,
+                    )
+                y += 14
 
-            # Severity 라벨
-            y = bar_y + bar_height + 8
-            sev_text = f"Severity: {severity}/100"
-            draw.text((40, y), sev_text, fill=_MUTED_COLOR, font=font_label)
+                # 이슈 간 구분선
+                if idx < len(issues) - 1 and y < max_y:
+                    draw.line(
+                        [(M, y), (W - M, y)],
+                        fill=_DIVIDER, width=1,
+                    )
+                    y += 14
 
-            risk_text = risk_level.upper()
-            bbox = draw.textbbox((0, 0), risk_text, font=font_label)
-            rw = bbox[2] - bbox[0]
-            draw.text((W - 40 - rw, y), risk_text, fill=sev_color, font=font_label)
-            y += 30
-
-        # ── 해시태그 ──
-        if hashtags:
-            hashtag_str = " ".join(hashtags[:5])
-            ht_lines = _wrap_text(hashtag_str, font_label, max_text_width, draw)
-            for line in ht_lines[:2]:
-                draw.text((40, y), line, fill=_ACCENT_COLOR, font=font_label)
+        elif body_text:
+            # 폴백: flat 텍스트
+            lines = _wrap(body_text, f_issue, text_w, draw)
+            for line in lines[:12]:
+                if y >= max_y:
+                    break
+                draw.text((M, y), line, fill=_LIGHT, font=f_issue)
                 y += 22
 
-        # ── 하단: 날짜 + 워터마크 ──
-        bottom_y = H - 50
-        draw.line([(40, bottom_y - 15), (W - 40, bottom_y - 15)], fill=(50, 50, 70), width=1)
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        draw.text((40, bottom_y), now_str, fill=_MUTED_COLOR, font=font_label)
+        # ── 하단 ──
+        bottom = H - M - 34
+        draw.line([(M, bottom - 6), (W - M, bottom - 6)], fill=_DIVIDER, width=1)
 
-        watermark = "www.wewantpeace.live"
-        bbox = draw.textbbox((0, 0), watermark, font=font_label)
-        ww = bbox[2] - bbox[0]
-        draw.text((W - 40 - ww, bottom_y), watermark, fill=_MUTED_COLOR, font=font_label)
+        if hashtags:
+            draw.text((M, bottom), " ".join(hashtags[:4]), fill=_ACCENT, font=f_tiny)
 
-        # PNG로 인코딩
+        bottom += 16
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        draw.text((M, bottom), ts, fill=_MUTED, font=f_tiny)
+        url = "www.wewantpeace.live"
+        uw = _tw(draw, url, f_tiny)
+        draw.text((W - M - uw, bottom), url, fill=_ACCENT, font=f_tiny)
+
+        final = img.convert("RGB")
         buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=True)
+        final.save(buf, format="PNG", optimize=True)
         return buf.getvalue()
 
     except Exception:
@@ -201,8 +321,6 @@ def generate_card(
 
 
 def save_card_temp(image_bytes: bytes, post_id: str) -> str | None:
-    """이미지 바이트를 임시 파일로 저장. X 어댑터에서 직접 업로드용."""
-    import tempfile
     try:
         tmp = tempfile.NamedTemporaryFile(
             suffix=".png", prefix=f"social-card-{post_id}-",
@@ -210,42 +328,43 @@ def save_card_temp(image_bytes: bytes, post_id: str) -> str | None:
         )
         tmp.write(image_bytes)
         tmp.close()
-        logger.info("카드 이미지 임시 저장: %s", tmp.name)
         return tmp.name
     except Exception:
         logger.exception("카드 이미지 임시 저장 실패")
         return None
 
 
-async def generate_card_for_post(
-    post,
-    cluster=None,
-) -> str | None:
-    """카드 이미지 생성 + 임시 파일 저장 + post.image_url에 경로 저장.
+async def generate_card_for_post(post, clusters=None) -> str | None:
+    """카드 이미지 생성 + post.image_url에 경로 저장.
 
-    Returns:
-        임시 파일 경로 또는 None
+    clusters: list[IssueCluster] — 구조화된 이슈 데이터
     """
-    severity = None
-    country_code = None
-    if cluster:
-        severity = cluster.severity
-        country_code = cluster.country_code
+    issues = None
+    bg_image_url = None
+
+    if clusters:
+        issues = []
+        for c in clusters[:3]:
+            issues.append({
+                "title_en": c.title or "",
+                "title_ko": c.title_ko or c.title or "",
+                "country_code": c.country_code or "",
+                "severity": c.severity or 0,
+            })
+        # 첫 클러스터의 이미지를 배경으로
+        bg_image_url = getattr(clusters[0], "image_url", None)
 
     image_bytes = generate_card(
-        body_text=post.body_text,
         content_type=post.content_type,
-        risk_level=post.risk_level,
-        country_code=country_code,
-        severity=severity,
+        issues=issues,
+        body_text=post.body_text if not issues else None,
         hashtags=post.hashtags,
+        bg_image_url=bg_image_url,
     )
     if not image_bytes:
         return None
 
     tmp_path = save_card_temp(image_bytes, str(post.id))
     if tmp_path:
-        # image_url에 로컬 파일 경로 저장 (X 어댑터에서 사용)
         post.image_url = tmp_path
-        logger.info("카드 이미지 생성 완료: %s → %s", post.id, tmp_path)
     return tmp_path
