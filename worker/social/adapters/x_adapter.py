@@ -25,13 +25,13 @@ _CTA = "🔗 www.wewantpeace.live"
 def _build_text(post: SocialPost) -> str:
     """본문 + 해시태그 + CTA 조합 (280자 제한)."""
     hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
-    footer = f"\n{hashtag_str}\n{_CTA}" if hashtag_str else f"\n{_CTA}"
+    footer = f"\n\n{hashtag_str}\n{_CTA}" if hashtag_str else f"\n\n{_CTA}"
     full_text = post.body_text
     if len(full_text) + len(footer) <= 280:
         full_text = full_text + footer
-    elif len(full_text) + len(f"\n{_CTA}") <= 280:
+    elif len(full_text) + len(f"\n\n{_CTA}") <= 280:
         # 해시태그 빼고 CTA만
-        full_text = f"{full_text}\n{_CTA}"
+        full_text = f"{full_text}\n\n{_CTA}"
     return full_text
 
 
