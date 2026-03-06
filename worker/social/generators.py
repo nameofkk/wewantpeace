@@ -155,6 +155,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         .where(
             IssueCluster.severity > 0,
             IssueCluster.last_event_at >= cutoff,
+            IssueCluster.country_code.isnot(None),
         )
         .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
         .limit(3)

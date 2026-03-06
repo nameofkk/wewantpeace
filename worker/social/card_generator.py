@@ -5,15 +5,24 @@
 import io
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime, timezone
 from urllib.request import urlretrieve
 
-try:
-    from pilmoji import Pilmoji as _Pilmoji
-    _HAS_PILMOJI = True
-except ImportError:
-    _HAS_PILMOJI = False
+# 이모지/특수 유니코드 제거 (카드에는 국가배지가 별도 표시됨)
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F1E0-\U0001F1FF"  # 국기
+    "\U0001F300-\U0001FAFF"  # 이모지
+    "\u2600-\u27BF"          # 기호
+    "\u200d\ufe0f\u20e3"     # ZWJ, variation selector
+    "]+", re.UNICODE,
+)
+
+
+def _strip_emoji(text: str) -> str:
+    return _EMOJI_RE.sub("", text).strip()
 
 logger = logging.getLogger(__name__)
 
@@ -275,9 +284,6 @@ def generate_card(
             img = Image.alpha_composite(img, panel)
             draw = ImageDraw.Draw(img)
 
-            # pilmoji: 이모지 포함 텍스트 렌더링용
-            _pj = _Pilmoji(img) if _HAS_PILMOJI else None
-
             for idx, iss in enumerate(issues[:3]):
                 if y >= max_y:
                     break
@@ -285,8 +291,8 @@ def generate_card(
                 cc = iss.get("country_code", "")
                 cn = _COUNTRY_NAMES.get(cc, cc)
                 sev = iss.get("severity", 0)
-                title_en = iss.get("title_en", "")
-                title_ko = iss.get("title_ko", title_en)
+                title_en = _strip_emoji(iss.get("title_en", ""))
+                title_ko = _strip_emoji(iss.get("title_ko", title_en))
                 sc = _sev_color(sev)
 
                 # 국가 뱃지 + severity 수치
@@ -309,12 +315,11 @@ def generate_card(
 
                 # EN 라인 (- 접두사)
                 en_lines = _wrap(title_en, f_issue, text_w - 24, draw)
-                _text = _pj.text if _pj else draw.text
                 for li, line in enumerate(en_lines[:2]):
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
-                    _text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
+                    draw.text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
                     y += 22
 
                 # KO 라인 (- 접두사)
@@ -323,7 +328,7 @@ def generate_card(
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
-                    _text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
+                    draw.text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
                     y += 22
 
                 # 글자-바 간격
@@ -353,13 +358,11 @@ def generate_card(
 
         elif body_text:
             # 폴백: flat 텍스트
-            _pj_fb = _Pilmoji(img) if _HAS_PILMOJI else None
-            _text_fb = _pj_fb.text if _pj_fb else draw.text
-            lines = _wrap(body_text, f_issue, text_w, draw)
+            lines = _wrap(_strip_emoji(body_text), f_issue, text_w, draw)
             for line in lines[:12]:
                 if y >= max_y:
                     break
-                _text_fb((M, y), line, fill=_LIGHT, font=f_issue)
+                draw.text((M, y), line, fill=_LIGHT, font=f_issue)
                 y += 22
 
         # ── 하단 ──

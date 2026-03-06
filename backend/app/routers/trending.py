@@ -460,13 +460,33 @@ async def kscore_history(
         )
     rows = result.fetchall()
 
-    return [
-        KScoreHistoryPoint(
-            time=row[0].isoformat(),
-            kscore=round(float(row[1]), 2),
-        )
-        for row in rows
-    ]
+    if rows:
+        return [
+            KScoreHistoryPoint(
+                time=row[0].isoformat(),
+                kscore=round(float(row[1]), 2),
+            )
+            for row in rows
+        ]
+
+    # 폴백: trending_keywords에 히스토리가 없으면 클러스터 현재 kscore 반환
+    from backend.app.models.issue_cluster import IssueCluster
+    cluster_result = await db.execute(
+        sa_text("""
+            SELECT kscore, last_event_at
+            FROM issue_clusters
+            WHERE id = CAST(:cid AS uuid) AND kscore > 0
+        """).bindparams(cid=str(cid))
+    )
+    cluster_row = cluster_result.fetchone()
+    if cluster_row:
+        return [
+            KScoreHistoryPoint(
+                time=(cluster_row[1] or datetime.now(timezone.utc)).isoformat(),
+                kscore=round(float(cluster_row[0]), 2),
+            )
+        ]
+    return []
 
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
