@@ -13,6 +13,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
+import WelcomeModal from "@/components/ui/WelcomeModal";
 
 const TOPIC_COLORS: Record<string, string> = {
   conflict:  "bg-red-500/20 text-red-600 dark:text-red-400",
@@ -735,6 +736,7 @@ export default function HomePage() {
         </button>
       )}
       <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
+      <WelcomeModal />
 
       {/* ── 내 관심지역 국가 표시 바 ──────────────────────────────── */}
       {trendingTab === "mine" && hydrated && myCountries.length > 0 && (

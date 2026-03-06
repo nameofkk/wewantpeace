@@ -1082,6 +1082,17 @@ export const translations = {
     // 국가 긴장도
     country_tension_title: "긴장도 추이",
     country_tension_current: "현재 긴장도",
+
+    // Welcome Modal
+    welcome_title: "WeWantPeace에 오신 것을 환영합니다",
+    welcome_subtitle: "실시간 글로벌 분쟁 모니터링 플랫폼",
+    welcome_feat_1: "전 세계 분쟁 지역을 실시간으로 추적합니다",
+    welcome_feat_2: "뉴스 데이터 기반 긴장도 분석을 제공합니다",
+    welcome_feat_3: "위기 상황 발생 시 즉시 알림을 보내드립니다",
+    welcome_trust_1: "다국적 뉴스 소스 실시간 수집",
+    welcome_trust_2: "AI 기반 심각도 분석",
+    welcome_trust_3: "무료 이용 가능",
+    welcome_cta: "시작하기",
   },
   en: {
     // bottom nav
@@ -2162,6 +2173,17 @@ export const translations = {
     // Country tension
     country_tension_title: "Tension Trend",
     country_tension_current: "Current Tension",
+
+    // Welcome Modal
+    welcome_title: "Welcome to WeWantPeace",
+    welcome_subtitle: "Real-time Global Conflict Monitoring Platform",
+    welcome_feat_1: "Track conflict zones worldwide in real-time",
+    welcome_feat_2: "AI-powered tension analysis from news data",
+    welcome_feat_3: "Instant alerts when crises emerge",
+    welcome_trust_1: "Multi-source global news aggregation",
+    welcome_trust_2: "AI-powered severity analysis",
+    welcome_trust_3: "Free to use",
+    welcome_cta: "Get Started",
   },
 } as const;
 
