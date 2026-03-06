@@ -17,7 +17,7 @@ from worker.processor.ai_title import generate_ai_title
 
 logger = logging.getLogger(__name__)
 
-WINDOW_MINUTES = 60
+WINDOW_MINUTES = 720  # 12시간 — 같은 국가+토픽 이벤트가 12시간 이내면 동일 클러스터
 
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2

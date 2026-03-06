@@ -401,7 +401,7 @@ def calculate_trending(self):
                     winner.first_event_at = loser.first_event_at
                 if loser.last_event_at and (not winner.last_event_at or loser.last_event_at > winner.last_event_at):
                     winner.last_event_at = loser.last_event_at
-                    winner.window_end = loser.last_event_at + timedelta(minutes=60)
+                    winner.window_end = loser.last_event_at + timedelta(minutes=720)
                 await db.execute(
                     text("UPDATE cluster_events SET cluster_id = :w WHERE cluster_id = :l"),
                     {"w": winner.id, "l": loser.id},
