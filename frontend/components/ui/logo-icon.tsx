@@ -54,6 +54,7 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
           src="/logo-eye.png"
           alt="WeWantPeace"
           fill
+          sizes={`${width}px`}
           priority
           className="object-contain"
           style={{ zIndex: 1 }}
