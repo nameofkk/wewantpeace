@@ -109,7 +109,7 @@ function isNew(isoString?: string | null): boolean {
   return Date.now() - new Date(isoString).getTime() < 2 * 60 * 60 * 1000;
 }
 
-// RISING 태그 기준: 6시간 이내 + KScore >= 3
+// RISING 태그 기준: 6시간 이내 + raw KScore >= 3 (personalizedKScore 아님)
 function isRising(firstEventAt?: string | null, kscore?: number): boolean {
   if (!firstEventAt || !kscore) return false;
   const ageMs = Date.now() - new Date(firstEventAt).getTime();
@@ -424,7 +424,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
                 <InfoTooltip direction="down" text={t(lang, "signal_new_tooltip")} />
               </span>
             )}
-            {isRising(item.first_event_at, pKScore) && !isNew(item.first_event_at) && (
+            {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
               <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none animate-pulse">
                 RISING
                 <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
@@ -670,14 +670,16 @@ export default function HomePage() {
         return bK - aK || (b.severity ?? 0) - (a.severity ?? 0);
       }) as TrendingItem[];
   }, [clusterData, homeCountry]);
-  // 급상승 데이터: 6시간 이내 생성 + KScore >= 3 (글로벌 탭 전용)
+  // 급상승 데이터: 6시간 이내 생성 + raw KScore >= 3 (글로벌 탭 전용)
+  // raw 기준으로 필터 후 personalizedKScore로 정렬 — 모든 홈 국가에서 Rising 표시 보장
   const risingData = useMemo(() => {
     if (!globalData) return [];
     const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
     return globalData
       .filter(item => item.first_event_at &&
         new Date(item.first_event_at).getTime() > sixHoursAgo &&
-        personalizedKScore(item, homeCountry) >= 3)
+        (item.kscore ?? 0) >= 3)
+      .sort((a, b) => personalizedKScore(b, homeCountry) - personalizedKScore(a, homeCountry))
       .slice(0, 5);
   }, [globalData, homeCountry]);
 
