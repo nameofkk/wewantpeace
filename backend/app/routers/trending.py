@@ -298,7 +298,8 @@ async def mine_trending(
             source_tiers=c.source_tiers or [],
             age_hours=age_hours,
         )
-        if kscore < KSCORE_MIN:
+        # 스파이크 클러스터는 KSCORE_MIN 미달이어도 항상 포함
+        if kscore < KSCORE_MIN and not c.is_spike:
             continue
         scored.append(TrendingItem(
             id=abs(hash(str(c.id))) % (2 ** 31),

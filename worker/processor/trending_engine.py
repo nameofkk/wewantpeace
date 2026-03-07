@@ -137,8 +137,8 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             source_tiers=c.source_tiers or [],
             age_hours=age_hours,
         )
-        # 포함 조건 완화: event_count >= 1 이상이면 포함
-        if kscore < KSCORE_MIN:
+        # 포함 조건: KSCORE_MIN 이상 또는 스파이크 클러스터는 항상 포함
+        if kscore < KSCORE_MIN and not c.is_spike:
             continue
 
         scored.append({
