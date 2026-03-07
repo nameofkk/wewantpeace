@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -41,6 +41,15 @@ interface EventOut {
   entity_anchor: string | null;
 }
 
+interface ChangeLog {
+  field: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  reason: string;
+  updated_by: string;
+  created_at: string;
+}
+
 interface ClusterDetail {
   id: string;
   cluster_key: string;
@@ -56,9 +65,12 @@ interface ClusterDetail {
   is_spike: boolean;
   is_verified: boolean;
   kscore: number;
+  independent_sources?: number;
+  source_tiers?: string[];
   first_event_at: string;
   last_event_at: string;
   events: EventOut[];
+  change_logs?: ChangeLog[];
 }
 
 interface Props {
@@ -233,6 +245,36 @@ export default function IssueDetailClient({ initialData }: Props) {
             <KScoreBar kscore={issue.kscore} />
           </div>
 
+          {/* T14: 출처 투명성 배지 */}
+          {(issue.independent_sources || issue.source_tiers?.length) && (
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <Shield className="h-3 w-3 text-muted-foreground" />
+              {issue.independent_sources != null && issue.independent_sources > 0 && (
+                <span className="text-[10px] font-medium text-blue-400 bg-blue-400/10 rounded-full px-2 py-0.5">
+                  {t(lang, "issue_independent_sources", { n: issue.independent_sources })}
+                </span>
+              )}
+              {(() => {
+                const gradeA = issue.source_tiers?.filter(t => t === "A").length ?? 0;
+                return gradeA > 0 ? (
+                  <span className="text-[10px] font-medium text-green-400 bg-green-400/10 rounded-full px-2 py-0.5">
+                    {t(lang, "issue_grade_a_count", { n: gradeA })}
+                  </span>
+                ) : null;
+              })()}
+              {issue.is_verified && (
+                <span className="text-[10px] font-medium text-emerald-400 bg-emerald-400/10 rounded-full px-2 py-0.5" title={t(lang, "issue_verified_tooltip")}>
+                  Verified
+                </span>
+              )}
+              {issue.change_logs && issue.change_logs.length > 0 && (
+                <span className="text-[10px] font-medium text-amber-400 bg-amber-400/10 rounded-full px-2 py-0.5">
+                  {t(lang, "issue_updated_badge")}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
             <span>{t(lang, "issue_first_report")} {new Date(issue.first_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
             <span>{t(lang, "issue_last_report")} {new Date(issue.last_event_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
@@ -255,6 +297,37 @@ export default function IssueDetailClient({ initialData }: Props) {
 
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
+
+        {/* T15: 정정/업데이트 이력 */}
+        {issue.change_logs && issue.change_logs.length > 0 && (
+          <div className="rounded-xl border border-amber-500/20 bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-3.5 w-3.5 text-amber-400" />
+              <h3 className="text-xs font-semibold text-amber-400">{t(lang, "issue_correction_history")}</h3>
+            </div>
+            <div className="space-y-2">
+              {issue.change_logs.map((log, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-[10px]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400/50 mt-1 shrink-0" />
+                  <div>
+                    <span className="text-muted-foreground">
+                      {new Date(log.created_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="text-muted-foreground mx-1">·</span>
+                    <span className="font-medium text-foreground">{log.field}</span>
+                    {log.old_value && log.new_value && (
+                      <span className="text-muted-foreground">
+                        {" "}{log.old_value.length > 30 ? log.old_value.slice(0, 30) + "..." : log.old_value}
+                        {" → "}
+                        {log.new_value.length > 30 ? log.new_value.slice(0, 30) + "..." : log.new_value}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 타임라인 */}
         {issue.events.length === 0 ? (

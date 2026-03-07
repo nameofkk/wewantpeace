@@ -318,6 +318,13 @@ export const translations = {
     confidence_low: "낮음",
     confidence_uncertain: "불확실",
     issue_source_fallback: "출처",
+    issue_independent_sources: "독립 출처 {n}개",
+    issue_grade_a_count: "A등급 {n}개",
+    issue_verified_tooltip: "공식/주요언론에서 확인된 이슈",
+    issue_fast_tooltip: "미확인 보도 포함 빠른 알림",
+    issue_updated_badge: "수정됨",
+    issue_correction_history: "수정 이력",
+    issue_correction_no_history: "수정 이력이 없습니다",
     issue_load_error: "이슈를 불러올 수 없습니다.",
 
     // 국가별 이슈
@@ -1431,6 +1438,13 @@ export const translations = {
     confidence_low: "Low",
     confidence_uncertain: "Uncertain",
     issue_source_fallback: "Source",
+    issue_independent_sources: "{n} independent sources",
+    issue_grade_a_count: "{n} grade A",
+    issue_verified_tooltip: "Verified by official/major media",
+    issue_fast_tooltip: "Fast alert including unverified reports",
+    issue_updated_badge: "Updated",
+    issue_correction_history: "Correction History",
+    issue_correction_no_history: "No corrections",
     issue_load_error: "Failed to load issue.",
 
     // country issues

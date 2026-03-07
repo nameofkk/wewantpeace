@@ -681,11 +681,25 @@ async def update_cluster(
     if not cluster:
         raise HTTPException(404)
 
+    from backend.app.models.cluster_change_log import ClusterChangeLog
+
     changes = {}
-    if body.severity is not None:
+    change_logs = []
+
+    if body.severity is not None and cluster.severity != body.severity:
+        change_logs.append(ClusterChangeLog(
+            cluster_id=cluster.id, field="severity",
+            old_value=str(cluster.severity), new_value=str(body.severity),
+            reason="admin_edit", updated_by=admin.email or "admin",
+        ))
         cluster.severity = body.severity
         changes["severity"] = body.severity
-    if body.topic is not None:
+    if body.topic is not None and cluster.topic != body.topic:
+        change_logs.append(ClusterChangeLog(
+            cluster_id=cluster.id, field="topic",
+            old_value=cluster.topic, new_value=body.topic,
+            reason="admin_edit", updated_by=admin.email or "admin",
+        ))
         cluster.topic = body.topic
         changes["topic"] = body.topic
     if body.is_active is not None:
@@ -696,7 +710,12 @@ async def update_cluster(
         changes["is_active"] = body.is_active
 
     # 제목 수정 (title_ko만 전달되면 ko→en 자동 번역)
-    if body.title_ko is not None:
+    if body.title_ko is not None and cluster.title_ko != body.title_ko:
+        change_logs.append(ClusterChangeLog(
+            cluster_id=cluster.id, field="title_ko",
+            old_value=cluster.title_ko, new_value=body.title_ko,
+            reason="admin_edit", updated_by=admin.email or "admin",
+        ))
         cluster.title_ko = body.title_ko
         changes["title_ko"] = body.title_ko
         if body.title is None:
@@ -708,9 +727,17 @@ async def update_cluster(
                     changes["title"] = cluster.title
             except Exception:
                 pass
-    if body.title is not None:
+    if body.title is not None and cluster.title != body.title:
+        change_logs.append(ClusterChangeLog(
+            cluster_id=cluster.id, field="title",
+            old_value=cluster.title, new_value=body.title,
+            reason="admin_edit", updated_by=admin.email or "admin",
+        ))
         cluster.title = body.title
         changes["title"] = body.title
+
+    if change_logs:
+        db.add_all(change_logs)
 
     await db.flush()
 

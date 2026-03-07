@@ -18,6 +18,7 @@ from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.raw_event import RawEvent
 from backend.app.models.source_channel import SourceChannel
+from backend.app.models.cluster_change_log import ClusterChangeLog
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -40,6 +41,7 @@ class ClusterOut(BaseModel):
     is_verified: bool
     kscore: float
     independent_sources: int = 0
+    source_tiers: list[str] = []
     image_url: Optional[str] = None
     first_event_at: str
     last_event_at: str
@@ -65,8 +67,18 @@ class EventOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ChangeLogOut(BaseModel):
+    field: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    reason: str
+    updated_by: str
+    created_at: str
+
+
 class ClusterDetailOut(ClusterOut):
     events: list[EventOut]
+    change_logs: list[ChangeLogOut] = []
 
 
 # ── DB 세션 의존성 ────────────────────────────────────────────────────────────
@@ -95,6 +107,7 @@ def _cluster_to_out(c: IssueCluster) -> ClusterOut:
         is_verified=c.is_verified,
         kscore=round(c.kscore, 3),
         independent_sources=c.independent_sources or 0,
+        source_tiers=c.source_tiers or [],
         image_url=c.image_url,
         first_event_at=c.first_event_at.isoformat(),
         last_event_at=c.last_event_at.isoformat(),
@@ -229,8 +242,28 @@ async def get_cluster(
     )
     rows = ev_result.all()
 
+    # 변경 로그 조회 (T15)
+    log_result = await db.execute(
+        select(ClusterChangeLog)
+        .where(ClusterChangeLog.cluster_id == uid)
+        .order_by(ClusterChangeLog.created_at.desc())
+        .limit(20)
+    )
+    logs = log_result.scalars().all()
+
     detail = ClusterDetailOut(
         **_cluster_to_out(cluster).model_dump(),
         events=[_event_to_out(ne, raw, sc) for ne, raw, sc in rows],
+        change_logs=[
+            ChangeLogOut(
+                field=log.field,
+                old_value=log.old_value,
+                new_value=log.new_value,
+                reason=log.reason,
+                updated_by=log.updated_by,
+                created_at=log.created_at.isoformat(),
+            )
+            for log in logs
+        ],
     )
     return detail
