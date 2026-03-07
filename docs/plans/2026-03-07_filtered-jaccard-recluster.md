@@ -1,59 +1,51 @@
-# Filtered Jaccard + AI 매칭 + KScore v6 리밸런싱
+# Filtered Jaccard + 재클러스터링 플랜 (2026-03-07)
 
-## 완료일: 2026-03-08
+## 문제
 
-## Context
+1. 클러스터링 임계값이 너무 높아 76.6%가 단일이벤트 클러스터
+2. 윈도우 12시간 → 24시간으로 확장 필요
+3. Time decay 반감기 17h → 28h로 완화 필요
+4. KScore에서 severity 가중치 40% → 30%로 균형 필요
+5. 같은 country:topic 버킷 내에서 국가/토픽 단어가 Jaccard 유사도를 왜곡
 
-클러스터링 품질 문제:
-- 기존 Jaccard threshold(0.25)가 너무 높아서 같은 사건의 다른 매체 기사가 별도 클러스터로 분리됨
-- 그런데 낮추면 "Iran nuclear talks"와 "Iran missile strikes"처럼 다른 사건이 한 클러스터에 합쳐짐
-- 원인: Jaccard가 국가명/토픽 키워드(iran, attack, conflict...)를 유사도로 카운팅
+## 해결
 
-## 해결: Filtered Jaccard
+### Filtered Jaccard (clusterer.py)
+- 국가명/토픽 키워드를 Jaccard 계산에서 제거
+- 순수 컨텐츠 유사도만 측정
+- `_COUNTRY_STEMS`, `_TOPIC_FILTER_STEMS` frozenset 추가
+- `_filtered_en_words()` → `_title_similarity()`에서 사용
+- 임계값: 0.25→0.15 (일반), 0.10→0.08 (고severity)
+- 윈도우: 720분→1440분 (24h)
 
-국가명/토픽 키워드를 Jaccard 계산에서 제거 → 콘텐츠 고유 단어만으로 유사도 측정
+### AI 경계 판정 (clusterer.py)
+- Filtered Jaccard 0.10~0.20 범위: GPT-4o-mini로 "같은 사건?" 판정
+- `_ai_same_event()` 함수 (LRU cache 256)
+- `skip_ai=True` 파라미터로 배치 처리 시 비용 절약
 
-### 변경 파일
+### KScore v6 (trending_engine.py + calibration.py)
+- 가중치: velocity 0.30, quality 0.10, severity 0.30, spread 0.30
+- Decay: λ=0.025 (반감기 28h), floor=0.30
 
-1. **`worker/processor/clusterer.py`**
-   - `_COUNTRY_STEMS`, `_TOPIC_FILTER_STEMS` frozenset 추가
-   - `_filtered_en_words()` 함수 추가
-   - `_title_similarity()` → filtered Jaccard 사용
-   - `MIN_TITLE_OVERLAP`: 0.25 → 0.15
-   - `MIN_TITLE_OVERLAP_HIGH_SEV`: 0.10 → 0.08
-   - `WINDOW_MINUTES`: 720 → 1440 (24h)
-   - AI 매칭: `AI_MATCH_LOW=0.10`, `AI_MATCH_HIGH=0.20` 경계 구간에서 GPT-4o-mini 판정
+### 재클러스터링 (scripts/recluster.py)
+- **Raw SQL 전용** — ORM identity map 문제 완전 제거
+- Supabase Pooler 대응: 배치마다 DB 연결 재생성
+- `ON CONFLICT DO NOTHING`으로 duplicate key 방지
+- `--resume N` 옵션으로 중단 시 재개 가능
 
-2. **`worker/processor/calibration.py`**
-   - `DECAY_LAMBDA`: 0.04 → 0.025 (더 완만한 감쇠)
-   - `DECAY_FLOOR`: 0.15 → 0.30 (최소 30% 유지)
+## 결과
 
-3. **`worker/processor/trending_engine.py`**
-   - KScore 가중치: velocity 30%, quality 10%, severity 30%, spread 30%
-   - (기존: 25/15/40/20 → severity 편중 해소)
+- 6,523개 이벤트 처리, skip 0, deadlock 0
+- 3,680개 클러스터 (새 생성), 2,843개 병합 (43.6% 병합율)
+- 단일이벤트 76.7%, 2+이벤트 23.3%, 5+이벤트 178개
+- 최대 이벤트 93개, 평균 독립출처 1.45
+- 실행 시간: 42.5분
 
-4. **`scripts/recluster.py`** (신규)
-   - 전체 재클러스터링 스크립트
-   - flock 파일 잠금 (중복 실행 방지)
-   - 데드락 재시도 로직
-   - Raw SQL 배치 처리
+## 수정 파일
 
-## 재클러스터링 결과
-
-| 항목 | Before | After |
-|------|--------|-------|
-| 클러스터 수 | 1,286 | 3,680 |
-| 매핑 수 | 1,580 | 6,523 |
-| 단일이벤트 | - | 76.7% |
-| 2+이벤트 | - | 23.3% |
-| 5+이벤트 | - | 178개 |
-| 최대 이벤트 | - | 93개 |
-| 평균 독립출처 | - | 1.45 |
-| 소요시간 | - | 42분 |
-
-## 주의사항
-
-- Supabase Pooler(port 5432)는 session mode → `SET statement_timeout = 0` 동작함
-- Direct connection(`db.xxx.supabase.co`)은 WSL에서 unreachable
-- recluster 실행 시 Railway 워커 반드시 중지 후 실행
-- 재클러스터링 완료 후 워커 재배포 필요
+| 파일 | 변경 |
+|------|------|
+| `worker/processor/clusterer.py` | Filtered Jaccard, AI 매칭, 임계값/윈도우 조정 |
+| `worker/processor/calibration.py` | decay λ=0.025, floor=0.30 |
+| `worker/processor/trending_engine.py` | KScore v6 가중치 |
+| `scripts/recluster.py` | Raw SQL 전체 재클러스터링 스크립트 |
