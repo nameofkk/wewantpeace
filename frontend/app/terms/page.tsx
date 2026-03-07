@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { TERMS_KO, TERMS_EN } from "@/lib/legal-data";
+import { TERMS_KO, TERMS_EN, CONTACT_EMAIL } from "@/lib/legal-data";
 
 export default function TermsPage() {
   const lang = useAppStore((s) => s.lang);
@@ -46,8 +46,8 @@ export default function TermsPage() {
 
         <div className="mt-8 text-center text-xs text-muted-foreground">
           {t(lang, "terms_contact")}:{" "}
-          <a href="mailto:krshin7@gmail.com" className="hover:underline">
-            krshin7@gmail.com
+          <a href={`mailto:${CONTACT_EMAIL}`} className="hover:underline">
+            {CONTACT_EMAIL}
           </a>
           {" · "}
           <Link href="/privacy" className="hover:underline">{t(lang, "terms_privacy_link")}</Link>

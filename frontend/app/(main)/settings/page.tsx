@@ -9,6 +9,7 @@ import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, u
 import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
 import { ALL_COUNTRIES, getCountryName, getRegionName, getFlag } from "@/lib/countries";
 import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
+import { CONTACT_EMAIL } from "@/lib/legal-data";
 import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
@@ -1208,13 +1209,13 @@ export default function SettingsPage() {
               <span className="text-muted-foreground text-xs">→</span>
             </a>
             <a
-              href="mailto:krshin7@gmail.com"
+              href={`mailto:${CONTACT_EMAIL}`}
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
             >
               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1">
                 <p>{t(lang, "settings_support_email")}</p>
-                <p className="text-[11px] text-muted-foreground">krshin7@gmail.com</p>
+                <p className="text-[11px] text-muted-foreground">{CONTACT_EMAIL}</p>
               </div>
               <span className="text-muted-foreground text-xs">→</span>
             </a>
@@ -1229,7 +1230,7 @@ export default function SettingsPage() {
               </button>
             ) : (
               <a
-                href="mailto:krshin7@gmail.com?subject=WeWantPeace%20의견"
+                href={`mailto:${CONTACT_EMAIL}?subject=WeWantPeace%20의견`}
                 className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
               >
                 <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
