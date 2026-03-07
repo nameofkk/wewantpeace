@@ -75,7 +75,7 @@ def _build_text(post: SocialPost) -> str:
 
     # Threads CTA: 링크 + 해시태그
     hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
-    link = "\n\n🔗 www.wewantpeace.live"
+    link = "\n\n🔗 WeWantPeace · 실시간 분쟁 추적\nwww.wewantpeace.live"
 
     full_text = body + engage + link
     if hashtag_str and len(full_text) + len(hashtag_str) + 1 <= 500:
