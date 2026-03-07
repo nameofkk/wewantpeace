@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { Bell, ArrowLeft, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNotifications, useMarkRead, useMarkAllRead, NotificationItem } from "@/lib/api";
+import { useNotifications, useMarkRead, useMarkAllRead, useSubmitFeedback, NotificationItem } from "@/lib/api";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { t, Lang } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 
@@ -25,6 +26,7 @@ export default function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications();
   const markRead = useMarkRead();
   const markAllRead = useMarkAllRead();
+  const submitFeedback = useSubmitFeedback();
 
   const hasUnread = notifications?.some((n) => !n.is_read);
 
@@ -119,6 +121,37 @@ export default function NotificationsPage() {
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {notif.body}
                   </p>
+                  {/* 피드백 버튼 */}
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        submitFeedback.mutate({ id: notif.id, feedback: "thumbs_up" });
+                      }}
+                      className={cn(
+                        "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                        notif.feedback === "thumbs_up"
+                          ? "bg-green-500/20 text-green-400"
+                          : "text-muted-foreground hover:text-green-400"
+                      )}
+                    >
+                      <ThumbsUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        submitFeedback.mutate({ id: notif.id, feedback: "thumbs_down" });
+                      }}
+                      className={cn(
+                        "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                        notif.feedback === "thumbs_down"
+                          ? "bg-red-500/20 text-red-400"
+                          : "text-muted-foreground hover:text-red-400"
+                      )}
+                    >
+                      <ThumbsDown className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </li>
             ))}

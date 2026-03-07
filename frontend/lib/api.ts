@@ -132,6 +132,22 @@ export function useTensionHistory(countryCode: string, range: "7d" | "30d" | "90
   });
 }
 
+// --- 전체 국가 긴장도 (히트맵용) ---
+export interface TensionAllItem {
+  country_code: string;
+  raw_score: number;
+  tension_level: number;
+}
+
+export function useTensionAll() {
+  return useQuery({
+    queryKey: ["tension", "all"],
+    queryFn: () => apiFetch<TensionAllItem[]>("/tension/all"),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
 export function getTensionLevelColor(level: number): string {
   const colors: Record<number, string> = {
     0: "#10b981",
@@ -278,6 +294,7 @@ export interface NotificationItem {
   title: string;
   body: string;
   is_read: boolean;
+  feedback: string | null;  // "thumbs_up" | "thumbs_down" | null
   created_at: string;
 }
 
@@ -322,6 +339,20 @@ export function useMarkAllRead() {
   return useMutation({
     mutationFn: () =>
       apiFetch("/me/notifications/read-all", undefined, { method: "PATCH" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me", "notifications"] });
+    },
+  });
+}
+
+export function useSubmitFeedback() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, feedback }: { id: number; feedback: "thumbs_up" | "thumbs_down" }) =>
+      apiFetch(`/me/notifications/${id}/feedback`, undefined, {
+        method: "PATCH",
+        body: JSON.stringify({ feedback }),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me", "notifications"] });
     },
