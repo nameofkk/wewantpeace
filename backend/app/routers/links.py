@@ -48,15 +48,32 @@ async def redirect_short_link(
 
     # Redis cache check first
     try:
+        import json as _json
         from backend.app.core.redis import get_redis
         redis = get_redis()
         cached = await redis.get(f"sl:{code}")
         if cached:
-            # Log click in background
-            ip = request.client.host if request.client else ""
-            ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
-            # Need link_id for logging - skip for cached redirects for simplicity
-            return RedirectResponse(url=cached.decode() if isinstance(cached, bytes) else cached, status_code=302)
+            raw = cached.decode() if isinstance(cached, bytes) else cached
+            try:
+                data = _json.loads(raw)
+                target_url = data["url"]
+                link_id = data.get("link_id")
+            except (ValueError, KeyError):
+                # 이전 형식 (URL 문자열만 저장) 호환
+                target_url = raw
+                link_id = None
+            # 캐시 히트에서도 클릭 로그 기록
+            if link_id:
+                ip = request.client.host if request.client else ""
+                ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+                background_tasks.add_task(
+                    _log_click,
+                    link_id=link_id,
+                    ip_hash=ip_hash,
+                    user_agent=request.headers.get("user-agent"),
+                    referer=request.headers.get("referer"),
+                )
+            return RedirectResponse(url=target_url, status_code=302)
     except Exception:
         pass
 
@@ -87,11 +104,12 @@ async def redirect_short_link(
         separator = "&" if "?" in target else "?"
         target = f"{target}{separator}{'&'.join(utm_params)}"
 
-    # Cache in Redis (5 min TTL)
+    # Cache in Redis (5 min TTL) — link_id 포함하여 캐시 히트에서도 클릭 로그 가능
     try:
+        import json as _json
         from backend.app.core.redis import get_redis
         redis = get_redis()
-        await redis.set(f"sl:{code}", target, ex=300)
+        await redis.set(f"sl:{code}", _json.dumps({"url": target, "link_id": str(link.id)}), ex=300)
     except Exception:
         pass
 

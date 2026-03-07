@@ -1920,9 +1920,17 @@ def publish_approved_social(self):
                     .where(SocialPost.status == "approved")
                     .order_by(SocialPost.approved_at.asc())
                     .limit(5)
+                    .with_for_update(skip_locked=True)
                 )
                 posts = result.scalars().all()
 
+                # 먼저 publishing 상태로 전환 (다른 워커가 동일 포스트를 잡지 못하게)
+                for post in posts:
+                    post.status = "publishing"
+                await db.flush()
+
+            # 실제 발행은 별도 트랜잭션 (외부 API 호출이 길어질 수 있으므로)
+            async with db.begin():
                 for post in posts:
                     ok = await _publish_post_to_platforms(
                         db, post,
