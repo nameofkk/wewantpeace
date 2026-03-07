@@ -14,9 +14,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("posts", sa.Column("title_en", sa.String(400), nullable=True))
-    op.add_column("posts", sa.Column("content_en", sa.Text(), nullable=True))
-    op.add_column("comments", sa.Column("content_en", sa.Text(), nullable=True))
+    op.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS title_en VARCHAR(400)")
+    op.execute("ALTER TABLE posts ADD COLUMN IF NOT EXISTS content_en TEXT")
+    op.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS content_en TEXT")
 
 
 def downgrade() -> None:
