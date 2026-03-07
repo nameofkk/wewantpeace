@@ -11,7 +11,7 @@ interface Props {
 }
 
 const SITE_URL = "https://www.wewantpeace.live";
-const SITE_DESC = "195개국 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
+const SITE_DESC = "195개국 분쟁·안보 실시간 모니터링 플랫폼";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
