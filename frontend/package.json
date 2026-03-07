@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "python3 ../scripts/sync_impact_factors.py",
+    "prebuild": "if command -v python3 >/dev/null 2>&1 && test -f ../scripts/sync_impact_factors.py; then python3 ../scripts/sync_impact_factors.py; fi",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
