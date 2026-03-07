@@ -433,34 +433,37 @@ def process_raw_event(self, raw_event_id: str):
                 spike_event_id = None
 
                 just_verified = False
+                is_new_spike = False
                 if not is_dup:
                     cluster, just_verified = await assign_cluster(ne, db)
                     if cluster is not None:
                         cluster_id = str(cluster.id)
 
-                        # 스파이크 감지 (누적 기반)
-                        try:
-                            redis = get_redis()
-                            is_spike, spike_event_id = await evaluate_spike(
-                                cluster_id=cluster_id,
-                                severity=cluster.severity,
-                                event_count=cluster.event_count,
-                                independent_sources=cluster.independent_sources or 1,
-                                first_event_at=cluster.first_event_at,
-                                kscore=cluster.kscore,
-                                redis=redis,
-                            )
-                            if is_spike and not cluster.is_spike:
-                                cluster.is_spike = True
-                                cluster.spike_at = datetime.now(timezone.utc)
-                        except Exception as e:
-                            logger.warning("스파이크 감지 오류 (무시): %s", e)
+                        # 스파이크 감지 (누적 기반) — 이미 스파이크인 클러스터는 스킵
+                        if not cluster.is_spike:
+                            try:
+                                redis = get_redis()
+                                is_spike, spike_event_id = await evaluate_spike(
+                                    cluster_id=cluster_id,
+                                    severity=cluster.severity,
+                                    event_count=cluster.event_count,
+                                    independent_sources=cluster.independent_sources or 1,
+                                    first_event_at=cluster.first_event_at,
+                                    kscore=cluster.kscore,
+                                    redis=redis,
+                                )
+                                if is_spike:
+                                    cluster.is_spike = True
+                                    cluster.spike_at = datetime.now(timezone.utc)
+                                    is_new_spike = True
+                            except Exception as e:
+                                logger.warning("스파이크 감지 오류 (무시): %s", e)
 
                 # 7. 처리 완료 플래그
                 raw_event.processed = True
 
-        # 스파이크이면 알림 태스크 체이닝 (트랜잭션 밖에서)
-        if is_spike and cluster_id:
+        # 새 스파이크만 알림 태스크 체이닝 (트랜잭션 밖에서)
+        if is_new_spike and cluster_id:
             push_spike_alert.delay(cluster_id, spike_event_id)
 
         # 공식확인 전환 시 verified 알림 태스크 체이닝
@@ -1919,8 +1922,10 @@ def generate_spike_social(self):
                 rows = result.all()
 
                 posts_to_notify = []
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 for spike, cluster in rows:
-                    dedup_key = f"spike_alert:{spike.id}"
+                    # cluster_id + 날짜 기반 dedup (generate_spike_alert와 동일)
+                    dedup_key = f"spike_alert:{cluster.id}:{today}"
                     existing = await db.execute(
                         select(SocialPost).where(SocialPost.dedup_key == dedup_key)
                     )
