@@ -223,6 +223,13 @@ async def create_area(
     )
     db.add(area)
     await db.flush()
+
+    # 플랜에 맞게 is_active 동기화 (플랜 변경 후 미동기화 상태 복구 포함)
+    from backend.app.services.area_activation import sync_area_activation
+    await sync_area_activation(current_user.id, current_user.plan, db)
+
+    # flush 후 area 다시 읽기 (is_active가 sync에 의해 변경되었을 수 있음)
+    await db.refresh(area)
     return _area_to_out(area)
 
 

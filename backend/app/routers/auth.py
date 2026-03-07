@@ -332,6 +332,8 @@ async def register(
             user.referral_pro_expires_at = now + timedelta(days=7)
             if user.plan == "free":
                 user.plan = "pro"
+                from backend.app.services.area_activation import sync_area_activation
+                await sync_area_activation(user.id, "pro", db)
 
             # referral_rewards 기록 (추천인 보상은 onboarding_complete 이벤트 후)
             await db.execute(sa_text("""
@@ -350,6 +352,8 @@ async def register(
                 referrer.referral_pro_expires_at = referrer.referral_pro_expires_at + timedelta(days=7)
             if referrer.plan == "free":
                 referrer.plan = "pro"
+                from backend.app.services.area_activation import sync_area_activation
+                await sync_area_activation(referrer.id, "pro", db)
 
             await db.execute(sa_text("""
                 UPDATE referral_rewards SET rewarded_at = now()
