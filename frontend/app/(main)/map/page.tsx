@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Layers, AlertTriangle, RefreshCw, Radio, Lock } from "lucide-react";
+import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useClusters, useMe } from "@/lib/api";
+import { useClusters, useMe, useTensionAll } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
@@ -339,10 +340,13 @@ export default function MapPage() {
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mapViewport, setMapViewport, lang, userPlan } = useAppStore();
   const { data: me, isLoading: meLoading } = useMe();
+  const { loading: authLoading } = useAuth();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
-  const isLocked = !meLoading && plan === "free";
+  const isLocked = !meLoading && !authLoading && plan === "free";
   const [showPreview, setShowPreview] = useState(false);
   const showPreviewRef = useRef(false);  // 클릭 핸들러에서 최신 값 참조
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const { data: tensionAll } = useTensionAll();
 
   // showPreview → ref 동기화
   useEffect(() => { showPreviewRef.current = showPreview; }, [showPreview]);
@@ -423,6 +427,85 @@ export default function MapPage() {
     return () => { if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current); mapRef.current?.remove(); mapRef.current = null; setIsMapReady(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── 히트맵 choropleth 레이어 ──────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    if (!showHeatmap || !tensionAll || tensionAll.length === 0) {
+      // 히트맵 비활성화: 레이어/소스 제거
+      try {
+        if (map.getLayer("choropleth-fill")) map.removeLayer("choropleth-fill");
+        if (map.getLayer("choropleth-line")) map.removeLayer("choropleth-line");
+        if (map.getSource("countries")) map.removeSource("countries");
+      } catch { /* noop */ }
+      return;
+    }
+
+    // 국가별 color 매핑 구축
+    const tensionMap = new Map<string, number>();
+    for (const item of tensionAll as { country_code: string; raw_score: number }[]) {
+      tensionMap.set(item.country_code, item.raw_score);
+    }
+
+    const scoreToColor = (s: number) => {
+      if (s >= 80) return "rgba(153,27,27,0.5)";
+      if (s >= 60) return "rgba(239,68,68,0.4)";
+      if (s >= 40) return "rgba(249,115,22,0.35)";
+      if (s >= 20) return "rgba(245,158,11,0.25)";
+      return "rgba(16,185,129,0.15)";
+    };
+
+    const addChoropleth = async () => {
+      try {
+        if (!map.getSource("countries")) {
+          map.addSource("countries", {
+            type: "geojson",
+            data: "/countries-110m.geojson",
+          });
+        }
+
+        // 매치 표현식: [match, ["get", "cc"], cc1, color1, ..., default]
+        const matchExpr: any[] = ["match", ["get", "cc"]];
+        tensionMap.forEach((score, cc) => {
+          matchExpr.push(cc, scoreToColor(score));
+        });
+        matchExpr.push("rgba(0,0,0,0)"); // default
+
+        if (!map.getLayer("choropleth-fill")) {
+          map.addLayer({
+            id: "choropleth-fill",
+            type: "fill",
+            source: "countries",
+            paint: {
+              "fill-color": matchExpr as any,
+              "fill-opacity": [
+                "interpolate", ["linear"], ["zoom"],
+                2, 0.6,
+                5, 0.3,
+                8, 0.1,
+              ],
+            },
+          }, map.getLayer("waterway") ? "waterway" : undefined);
+        }
+
+        if (!map.getLayer("choropleth-line")) {
+          map.addLayer({
+            id: "choropleth-line",
+            type: "line",
+            source: "countries",
+            paint: {
+              "line-color": "rgba(255,255,255,0.08)",
+              "line-width": 0.5,
+            },
+          }, map.getLayer("waterway") ? "waterway" : undefined);
+        }
+      } catch { /* noop */ }
+    };
+
+    addChoropleth();
+  }, [showHeatmap, tensionAll, isMapReady]);
 
   const renderMarkers = useCallback(() => {
     const map = mapRef.current;
@@ -579,6 +662,18 @@ export default function MapPage() {
               </span>
             ))}
             <InfoTooltip direction="down" text={t(lang, "map_kscore_legend")} />
+            <button
+              onClick={() => setShowHeatmap((v) => !v)}
+              className={cn(
+                "ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors border",
+                showHeatmap
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <MapIcon className="h-2.5 w-2.5" />
+              {lang === "ko" ? "히트맵" : "Heatmap"}
+            </button>
           </div>
         </div>
       </div>
@@ -595,7 +690,7 @@ export default function MapPage() {
 
       {/* ── 팝업 ─────────────────────────────────────────────────── */}
       {selectedCluster && (
-        <div className="absolute bottom-24 left-3 right-3 z-10">
+        <div className="absolute inset-x-3 top-1/2 -translate-y-1/2 z-10 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <ClusterPopup
             cluster={selectedCluster}
             onClose={() => setSelectedCluster(null)}

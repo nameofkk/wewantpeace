@@ -83,7 +83,11 @@ export async function checkGoogleRedirectResult(): Promise<FirebaseUser | null> 
   const auth = getFirebaseAuth();
   if (!auth) return null;
   try {
-    const result = await getRedirectResult(auth);
+    // 3초 타임아웃 — 일부 브라우저(Whale 등)에서 getRedirectResult가 hang하는 문제 방지
+    const result = await Promise.race([
+      getRedirectResult(auth),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
     return result?.user ?? null;
   } catch {
     return null;

@@ -89,8 +89,10 @@ export default function LoginPage() {
 
   // React Native WebView: Google 리다이렉트 로그인 결과 확인
   useEffect(() => {
+    // 안전장치: 5초 내에 완료되지 않으면 강제로 로딩 해제 (Whale 등 일부 브라우저 hang 방지)
+    const safetyTimeout = setTimeout(() => setCheckingRedirect(false), 5000);
     checkGoogleRedirectResult().then(async (user) => {
-      if (!user) { setCheckingRedirect(false); return; }
+      if (!user) { clearTimeout(safetyTimeout); setCheckingRedirect(false); return; }
       try {
         const token = await user.getIdToken();
         const meRes = await fetch(`${API_BASE}/me`, {
@@ -102,10 +104,12 @@ export default function LoginPage() {
           if (!meData.nickname || !meData.agreed_terms_at) {
             setGoogleUser(user);
             setTab("google-register");
+            clearTimeout(safetyTimeout);
             setCheckingRedirect(false);
             return;
           }
           localStorage.setItem("onboarding_done", "true");
+          clearTimeout(safetyTimeout);
           router.push("/home");
           return; // 홈으로 이동 중 — 로딩 유지
         } else {
@@ -115,8 +119,10 @@ export default function LoginPage() {
       } catch {
         // 무시 — 리다이렉트 결과 없음
       }
+      clearTimeout(safetyTimeout);
       setCheckingRedirect(false);
-    }).catch(() => setCheckingRedirect(false));
+    }).catch(() => { clearTimeout(safetyTimeout); setCheckingRedirect(false); });
+    return () => clearTimeout(safetyTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
