@@ -74,7 +74,7 @@ def upgrade() -> None:
         INSERT INTO source_channels (display_name, tier, base_confidence, language, topics, geo_focus, source_type, feed_url, api_endpoint, api_params, is_active)
         VALUES
         ('GDELT Project', 'B', 0.75, 'en', '{conflict,protest,diplomacy}', '{}', 'api', NULL, 'https://api.gdeltproject.org/api/v2/doc/doc', '{"mode":"ArtList","maxrecords":"50","timespan":"15min","format":"json","sort":"DateDesc"}', true),
-        ('ACLED', 'A', 0.90, 'en', '{conflict,protest,terror}', '{}', 'api', NULL, 'https://api.acleddata.com/acled/read', '{"limit":"200","event_date_where":">=","fields":"event_id_cnty|event_date|event_type|sub_event_type|actor1|country|admin1|latitude|longitude|fatalities|notes|source"}', true),
+        ('ACLED', 'A', 0.90, 'en', '{conflict,protest,terror}', '{}', 'api', NULL, 'https://acleddata.com/api/acled/read', '{"limit":"200","event_date_where":">="}', true),
         ('ReliefWeb', 'B', 0.75, 'en', '{conflict,disaster,health}', '{}', 'api', NULL, 'https://api.reliefweb.int/v1/reports', '{"appname":"wewantpeace","limit":"50","preset":"latest","fields[include][]":["title","body","date.created","country.name","disaster_type.name","source.name","url"]}', true)
         ON CONFLICT DO NOTHING
     """)

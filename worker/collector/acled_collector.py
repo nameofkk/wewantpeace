@@ -4,9 +4,13 @@ ACLED REST API 수집기.
 
 ACLED는 완전 구조화된 데이터 (event_type, fatalities, geo)를 제공하므로
 GPT 호출 없이 topic/severity/geo 직접 매핑 → 비용 절감.
+
+인증: 2025년부터 API 키 폐지 → OAuth 토큰 방식.
+  - POST https://acleddata.com/oauth/token (email+password → Bearer 토큰)
+  - 토큰 유효: 24시간, refresh_token: 14일
+  - Redis에 토큰 캐싱하여 매 수집마다 재인증 방지
 """
 import asyncio
-import hashlib
 import logging
 import os
 from dataclasses import dataclass, field
@@ -41,6 +45,10 @@ _EVENT_TYPE_SEVERITY: dict[str, int] = {
     "Strategic developments": 30,
 }
 
+# OAuth 토큰 Redis 키
+_REDIS_TOKEN_KEY = "acled:oauth:access_token"
+_REDIS_REFRESH_KEY = "acled:oauth:refresh_token"
+
 
 @dataclass
 class ACLEDCollectResult:
@@ -52,14 +60,15 @@ class ACLEDCollectResult:
 
 
 class ACLEDCollector:
-    """ACLED REST API 수집기."""
+    """ACLED REST API 수집기 (OAuth 토큰 인증)."""
 
-    TIMEOUT = 60  # ACLED 응답이 느릴 수 있음
+    TIMEOUT = 60
+    OAUTH_URL = "https://acleddata.com/oauth/token"
+    API_BASE = "https://acleddata.com/api/acled/read"
 
     def _calc_severity(self, event_type: str, fatalities: int) -> int:
         """ACLED event_type + fatalities → severity."""
         base = _EVENT_TYPE_SEVERITY.get(event_type, 40)
-        # 사망자 수에 따른 severity 상승
         if fatalities >= 100:
             base = min(100, base + 25)
         elif fatalities >= 10:
@@ -67,6 +76,97 @@ class ACLEDCollector:
         elif fatalities >= 1:
             base = min(100, base + 5)
         return base
+
+    async def _get_access_token(self, redis=None) -> str | None:
+        """OAuth 토큰 획득. Redis 캐싱 → refresh → 재인증 순."""
+        # 1. Redis 캐시 확인
+        if redis:
+            cached = await redis.get(_REDIS_TOKEN_KEY)
+            if cached:
+                return cached.decode() if isinstance(cached, bytes) else cached
+
+        acled_email = os.environ.get("ACLED_EMAIL", "")
+        acled_password = os.environ.get("ACLED_PASSWORD", "")
+        if not acled_email or not acled_password:
+            logger.warning("ACLED_EMAIL 또는 ACLED_PASSWORD 환경변수 없음")
+            return None
+
+        # 2. refresh_token으로 갱신 시도
+        if redis:
+            refresh = await redis.get(_REDIS_REFRESH_KEY)
+            if refresh:
+                refresh_str = refresh.decode() if isinstance(refresh, bytes) else refresh
+                token = await self._refresh_token(refresh_str)
+                if token:
+                    await self._cache_tokens(redis, token)
+                    return token["access_token"]
+
+        # 3. 신규 인증
+        token = await self._authenticate(acled_email, acled_password)
+        if token and redis:
+            await self._cache_tokens(redis, token)
+        return token["access_token"] if token else None
+
+    async def _authenticate(self, email: str, password: str) -> dict | None:
+        """이메일+비밀번호로 OAuth 토큰 발급."""
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.post(
+                    self.OAUTH_URL,
+                    data={
+                        "username": email,
+                        "password": password,
+                        "grant_type": "password",
+                        "client_id": "acled",
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                ) as resp:
+                    if resp.status != 200:
+                        logger.error("ACLED OAuth 인증 실패: HTTP %d", resp.status)
+                        return None
+                    data = await resp.json(content_type=None)
+                    if "access_token" not in data:
+                        logger.error("ACLED OAuth 응답에 access_token 없음: %s", data)
+                        return None
+                    logger.info("ACLED OAuth 인증 성공 (expires_in=%s)", data.get("expires_in"))
+                    return data
+        except Exception as e:
+            logger.error("ACLED OAuth 인증 오류: %s", e)
+            return None
+
+    async def _refresh_token(self, refresh_token: str) -> dict | None:
+        """refresh_token으로 access_token 갱신."""
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.post(
+                    self.OAUTH_URL,
+                    data={
+                        "refresh_token": refresh_token,
+                        "grant_type": "refresh_token",
+                        "client_id": "acled",
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                ) as resp:
+                    if resp.status != 200:
+                        logger.warning("ACLED refresh_token 갱신 실패: HTTP %d", resp.status)
+                        return None
+                    data = await resp.json(content_type=None)
+                    if "access_token" in data:
+                        logger.info("ACLED 토큰 갱신 성공")
+                        return data
+                    return None
+        except Exception as e:
+            logger.warning("ACLED refresh_token 오류: %s", e)
+            return None
+
+    async def _cache_tokens(self, redis, token_data: dict):
+        """Redis에 토큰 캐싱."""
+        expires_in = int(token_data.get("expires_in", 86400))
+        # access_token: 만료 10분 전까지 캐싱
+        await redis.setex(_REDIS_TOKEN_KEY, max(60, expires_in - 600), token_data["access_token"])
+        # refresh_token: 14일
+        if token_data.get("refresh_token"):
+            await redis.setex(_REDIS_REFRESH_KEY, 86400 * 13, token_data["refresh_token"])
 
     async def collect(
         self,
@@ -77,29 +177,34 @@ class ACLEDCollector:
         """ACLED API에서 최근 1주일 이벤트 수집."""
         result = ACLEDCollectResult(display_name=source.display_name)
 
-        api_endpoint = source.api_endpoint
-        if not api_endpoint:
-            result.errors.append("api_endpoint 없음")
+        # OAuth 토큰 획득
+        access_token = await self._get_access_token(redis=redis)
+        if not access_token:
+            result.errors.append("ACLED OAuth 토큰 획득 실패 (ACLED_EMAIL/ACLED_PASSWORD 환경변수 확인)")
             return result
-
-        # ACLED API 키 (환경변수)
-        acled_key = os.environ.get("ACLED_API_KEY", "")
-        acled_email = os.environ.get("ACLED_EMAIL", "")
 
         # 최근 7일 이벤트만 조회
         since_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
 
-        api_params = source.api_params or {}
         params = {
-            **api_params,
+            "limit": "200",
             "event_date": since_date,
-            "key": acled_key,
-            "email": acled_email,
+            "event_date_where": ">=",
         }
 
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
-                async with session.get(api_endpoint, params=params) as resp:
+                async with session.get(
+                    self.API_BASE,
+                    params=params,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                ) as resp:
+                    if resp.status == 401:
+                        # 토큰 만료 → 캐시 삭제 후 재인증
+                        if redis:
+                            await redis.delete(_REDIS_TOKEN_KEY)
+                        result.errors.append("ACLED 토큰 만료 (다음 사이클에서 재인증)")
+                        return result
                     if resp.status != 200:
                         result.errors.append(f"HTTP {resp.status}")
                         return result
@@ -145,13 +250,11 @@ class ACLEDCollector:
             topic = _EVENT_TYPE_TO_TOPIC.get(event_type, "conflict")
             severity = self._calc_severity(event_type, fatalities)
 
-            # 텍스트 구성: ACLED notes를 본문으로 사용
             title = f"{event_type}: {sub_event_type} in {admin1}, {country}"
             if actor1:
                 title = f"{actor1} — {title}"
             text = notes if notes else title
 
-            # event_date 파싱
             event_date_str = event.get("event_date", "")
             published_at = None
             if event_date_str:
@@ -165,7 +268,7 @@ class ACLEDCollector:
             collected_at = datetime.now(timezone.utc)
             raw_metadata = {
                 "title": title[:512],
-                "link": f"https://acleddata.com/data-export-tool/",
+                "link": "https://acleddata.com/data-export-tool/",
                 "event_type": event_type,
                 "sub_event_type": sub_event_type,
                 "actor1": actor1,
@@ -177,7 +280,6 @@ class ACLEDCollector:
                 "source": event.get("source", ""),
                 "published": published_at.isoformat() if published_at else collected_at.isoformat(),
                 "time_source": "acled_event_date" if published_at else "collected_at",
-                # 구조화 데이터 (normalizer에서 GPT 스킵용)
                 "structured_topic": topic,
                 "structured_severity": severity,
                 "structured_country": country,
