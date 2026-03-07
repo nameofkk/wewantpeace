@@ -182,7 +182,7 @@ async def create_area(
             status_code=403,
             detail={
                 "code": "FREE_AREA_LIMIT",
-                "message": f"Free 플랜은 관심지역 {FREE_AREA_LIMIT}개까지 가능합니다.",
+                "limit": FREE_AREA_LIMIT,
                 "upgrade_url": "/upgrade",
             },
         )
@@ -251,12 +251,12 @@ async def update_area(
     )
     area = result.scalar_one_or_none()
     if not area:
-        raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"code": "AREA_NOT_FOUND"})
 
     if not area.is_active:
         raise HTTPException(
             status_code=403,
-            detail={"code": "AREA_INACTIVE", "message": "비활성 관심지역은 수정할 수 없습니다. 플랜을 업그레이드하세요."},
+            detail={"code": "AREA_INACTIVE", "upgrade_url": "/upgrade"},
         )
 
     if body.notify_verified is not None:
@@ -284,7 +284,7 @@ async def delete_area(
     )
     area = result.scalar_one_or_none()
     if not area:
-        raise HTTPException(status_code=404, detail="관심지역을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"code": "AREA_NOT_FOUND"})
 
     await db.delete(area)
     await db.flush()
@@ -536,7 +536,7 @@ async def mark_read(
     )
     notif = result.scalar_one_or_none()
     if not notif:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"code": "NOTIFICATION_NOT_FOUND"})
     notif.is_read = True
     await db.flush()
     return {"status": "ok"}
@@ -582,7 +582,7 @@ async def submit_feedback(
     )
     notif = result.scalar_one_or_none()
     if not notif:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"code": "NOTIFICATION_NOT_FOUND"})
     notif.feedback = body.feedback
     await db.flush()
     return {"status": "ok"}
@@ -744,7 +744,7 @@ async def mark_missed_spike_shown(
     )
     summary = result.scalar_one_or_none()
     if not summary:
-        raise HTTPException(status_code=401, detail="놓친 알림을 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail={"code": "MISSED_SPIKE_NOT_FOUND"})
     summary.is_shown = True
     await db.flush()
     return {"status": "ok"}

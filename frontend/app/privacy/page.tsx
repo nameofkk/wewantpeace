@@ -42,8 +42,8 @@ export default function PrivacyPage() {
 
         <div className="mt-8 text-center text-xs text-muted-foreground">
           {t(lang, "privacy_contact")}:{" "}
-          <a href="mailto:krshin7@naver.com" className="hover:underline">
-            krshin7@naver.com
+          <a href="mailto:contact@wewantpeace.app" className="hover:underline">
+            contact@wewantpeace.app
           </a>
           {" · "}
           <Link href="/terms" className="hover:underline">{t(lang, "privacy_terms_link")}</Link>
