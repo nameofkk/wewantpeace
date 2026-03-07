@@ -2026,8 +2026,10 @@ async def _publish_post_to_platforms(
     x_enabled: bool,
     threads_enabled: bool,
     instagram_enabled: bool = False,
+    linkedin_enabled: bool = False,
+    telegram_channel_enabled: bool = False,
 ) -> bool:
-    """단일 포스트를 X/Threads/Instagram에 발행. 성공 여부 반환."""
+    """단일 포스트를 X/Threads/Instagram/LinkedIn/Telegram 채널에 발행. 성공 여부 반환."""
     from sqlalchemy import select
     from backend.app.models.social_post import SocialPostPlatform
 
@@ -2128,6 +2130,64 @@ async def _publish_post_to_platforms(
         elif ig_record.status == "failed":
             all_ok = False
 
+    # LinkedIn
+    if linkedin_enabled:
+        existing_li = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == "linkedin",
+            )
+        )
+        li_record = existing_li.scalar_one_or_none()
+
+        if not li_record:
+            from worker.social.adapters.linkedin_adapter import publish as li_publish
+            platform_id, error = li_publish(post)
+            li_record = SocialPostPlatform(
+                post_id=post.id,
+                platform="linkedin",
+                platform_post_id=platform_id,
+                status="published" if platform_id else "failed",
+                error_message=error,
+                published_at=datetime.now(timezone.utc) if platform_id else None,
+            )
+            db.add(li_record)
+            if not platform_id:
+                all_ok = False
+        elif li_record.status == "skipped":
+            pass  # 의도적 스킵
+        elif li_record.status == "failed":
+            all_ok = False
+
+    # Telegram Channel (Broadcast)
+    if telegram_channel_enabled:
+        existing_tg = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == "telegram_channel",
+            )
+        )
+        tg_record = existing_tg.scalar_one_or_none()
+
+        if not tg_record:
+            from worker.social.adapters.telegram_channel_adapter import publish as tg_publish
+            platform_id, error = tg_publish(post)
+            tg_record = SocialPostPlatform(
+                post_id=post.id,
+                platform="telegram_channel",
+                platform_post_id=platform_id,
+                status="published" if platform_id else "failed",
+                error_message=error,
+                published_at=datetime.now(timezone.utc) if platform_id else None,
+            )
+            db.add(tg_record)
+            if not platform_id:
+                all_ok = False
+        elif tg_record.status == "skipped":
+            pass  # 의도적 스킵
+        elif tg_record.status == "failed":
+            all_ok = False
+
     return all_ok
 
 
@@ -2138,7 +2198,7 @@ async def _publish_post_to_platforms(
     max_retries=1,
 )
 def publish_approved_social(self):
-    """approved 상태 포스트를 X/Threads/Instagram에 발행."""
+    """approved 상태 포스트를 X/Threads/Instagram/LinkedIn/Telegram 채널에 발행."""
 
     async def _run():
         from sqlalchemy import select
@@ -2147,6 +2207,8 @@ def publish_approved_social(self):
             SOCIAL_PLATFORM_X_ENABLED,
             SOCIAL_PLATFORM_THREADS_ENABLED,
             SOCIAL_PLATFORM_INSTAGRAM_ENABLED,
+            SOCIAL_PLATFORM_LINKEDIN_ENABLED,
+            SOCIAL_PLATFORM_TELEGRAM_CHANNEL_ENABLED,
         )
 
         published = 0
@@ -2176,6 +2238,8 @@ def publish_approved_social(self):
                         SOCIAL_PLATFORM_X_ENABLED,
                         SOCIAL_PLATFORM_THREADS_ENABLED,
                         SOCIAL_PLATFORM_INSTAGRAM_ENABLED,
+                        SOCIAL_PLATFORM_LINKEDIN_ENABLED,
+                        SOCIAL_PLATFORM_TELEGRAM_CHANNEL_ENABLED,
                     )
                     if ok:
                         post.status = "published"
