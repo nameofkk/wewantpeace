@@ -11,7 +11,7 @@ interface Props {
 }
 
 const SITE_URL = "https://www.wewantpeace.live";
-const SITE_DESC = "110개국+ 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
+const SITE_DESC = "195개국 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
@@ -25,13 +25,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         type: "website",
         url: SITE_URL,
         siteName: "WeWantPeace",
-        images: [{ url: `${SITE_URL}/og-image.png?v=2` }],
+        images: [{ url: `${SITE_URL}/og-image.png?v=3` }],
       },
       twitter: {
         card: "summary_large_image",
         title: "WeWantPeace | 실시간 글로벌 분쟁 모니터링",
         description: SITE_DESC,
-        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=2` }],
+        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=3` }],
       },
     };
   }

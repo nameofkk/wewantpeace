@@ -82,7 +82,7 @@ def draw_text_center(draw: ImageDraw.ImageDraw, y: int, text: str, font, fill):
 def draw_feature_tags(draw: ImageDraw.ImageDraw, y: int):
     """피처 태그: 2개 배지 (AI 제거)"""
     tags = [
-        ("110+ Countries", GREEN),
+        ("195 Countries", GREEN),
         ("Spike Alert", RED),
     ]
     font = get_font(20, bold=True)
