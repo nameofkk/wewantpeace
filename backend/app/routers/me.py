@@ -457,6 +457,7 @@ class NotificationOut(BaseModel):
     title: str
     body: str
     is_read: bool
+    feedback: Optional[str] = None
     created_at: str
 
 
@@ -468,6 +469,7 @@ def _notif_to_out(n: Notification) -> NotificationOut:
         title=n.title,
         body=n.body,
         is_read=n.is_read,
+        feedback=n.feedback,
         created_at=n.created_at.isoformat(),
     )
 
@@ -540,6 +542,34 @@ async def mark_all_read(
         )
         .values(is_read=True)
     )
+    await db.flush()
+    return {"status": "ok"}
+
+
+class FeedbackBody(BaseModel):
+    feedback: str  # "thumbs_up" | "thumbs_down"
+
+
+@router.patch("/notifications/{notif_id}/feedback")
+async def submit_feedback(
+    notif_id: int,
+    body: FeedbackBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if body.feedback not in ("thumbs_up", "thumbs_down"):
+        raise HTTPException(status_code=400, detail="feedback must be 'thumbs_up' or 'thumbs_down'")
+
+    result = await db.execute(
+        select(Notification).where(
+            Notification.id == notif_id,
+            Notification.user_id == current_user.id,
+        )
+    )
+    notif = result.scalar_one_or_none()
+    if not notif:
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    notif.feedback = body.feedback
     await db.flush()
     return {"status": "ok"}
 

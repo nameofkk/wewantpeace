@@ -23,6 +23,7 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     body: Mapped[str] = mapped_column(String(512), nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    feedback: Mapped[str | None] = mapped_column(String(16), nullable=True)  # "thumbs_up" | "thumbs_down"
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,

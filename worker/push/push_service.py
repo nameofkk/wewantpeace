@@ -51,6 +51,14 @@ COOLDOWN_SECONDS = 3600  # 1시간 (기본)
 COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
 _COOLDOWN_KEY_PREFIX = "push:cooldown:"
 
+# T12: 일일 푸시 상한
+DAILY_PUSH_LIMITS = {
+    "free": 3,
+    "pro": 10,
+    "pro_plus": 50,
+}
+_DAILY_PUSH_KEY_PREFIX = "push:daily:"
+
 
 def _cooldown_key(cluster_id: str) -> str:
     return f"{_COOLDOWN_KEY_PREFIX}{cluster_id}"
@@ -64,6 +72,28 @@ async def _set_cooldown(cluster_id: str, redis, severity: int = 0):
     """쿨다운 설정. severity >= 90이면 30분, 그 외 1시간."""
     ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
     await redis.setex(_cooldown_key(cluster_id), ttl, "1")
+
+
+def _daily_push_key(user_id: str) -> str:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return f"{_DAILY_PUSH_KEY_PREFIX}{user_id}:{today}"
+
+
+async def _check_daily_limit(user_id: str, plan: str, redis) -> bool:
+    """일일 푸시 상한 확인. 초과 시 True 반환."""
+    limit = DAILY_PUSH_LIMITS.get(plan, DAILY_PUSH_LIMITS["free"])
+    key = _daily_push_key(user_id)
+    current = await redis.get(key)
+    return int(current or 0) >= limit
+
+
+async def _increment_daily_push(user_id: str, redis):
+    """일일 푸시 카운터 증가."""
+    key = _daily_push_key(user_id)
+    pipe = redis.pipeline()
+    pipe.incr(key)
+    pipe.expire(key, 86400)  # 24시간 TTL
+    await pipe.execute()
 
 
 def _is_in_quiet_hours(current: dt_time, start: dt_time, end: dt_time) -> bool:
@@ -214,6 +244,46 @@ async def _get_target_tokens_by_platform(
         tokens.append(_TokenInfo(best[0], best[1], user_id))
 
     return _TargetResult(tokens, suppressed)
+
+
+async def _apply_daily_limits(
+    target: _TargetResult, db: AsyncSession, redis,
+) -> _TargetResult:
+    """T12: 일일 푸시 상한 초과 유저를 tokens에서 제거하고 suppressed로 이동."""
+    if not target.tokens:
+        return target
+
+    # 유저 ID 수집
+    user_ids = list({t.user_id for t in target.tokens})
+
+    # 유저별 plan 조회
+    plan_result = await db.execute(
+        select(User.id, User.plan).where(User.id.in_(user_ids))
+    )
+    user_plans = {row[0]: row[1] for row in plan_result.fetchall()}
+
+    allowed_tokens: list[_TokenInfo] = []
+    extra_suppressed: list[_SuppressedInfo] = []
+
+    for t in target.tokens:
+        plan = user_plans.get(t.user_id, "free")
+        exceeded = await _check_daily_limit(str(t.user_id), plan, redis)
+        if exceeded:
+            extra_suppressed.append(_SuppressedInfo(t.user_id, t.platform, "daily_limit"))
+        else:
+            allowed_tokens.append(t)
+
+    return _TargetResult(allowed_tokens, target.suppressed + extra_suppressed)
+
+
+async def _increment_daily_push_for_tokens(tokens: list[_TokenInfo], redis):
+    """발송 성공한 토큰들의 유저에 대해 일일 카운터 증가."""
+    seen_users = set()
+    for t in tokens:
+        uid = str(t.user_id)
+        if uid not in seen_users:
+            seen_users.add(uid)
+            await _increment_daily_push(uid, redis)
 
 
 async def _get_plan_locked_users(
@@ -632,6 +702,7 @@ async def send_spike_alert(
         target_v = await _get_target_tokens_by_platform(
             country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
         )
+        target_v = await _apply_daily_limits(target_v, db, redis)
 
         # 1. suppressed 로그
         await _insert_suppressed_logs(
@@ -657,10 +728,14 @@ async def send_spike_alert(
         await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
         all_invalid.extend(invalid_v)
 
+        # 5. 일일 카운터 증가
+        await _increment_daily_push_for_tokens(target_v.tokens, redis)
+
     # Fast 레인 (항상)
     target_f = await _get_target_tokens_by_platform(
         country_code, notify_fast=True, kscore=kscore, cluster_topic=cluster_topic, db=db
     )
+    target_f = await _apply_daily_limits(target_f, db, redis)
 
     # plan_locked 억제: Free 유저 중 해당 국가를 관심 등록했지만 Fast 알림 불가한 유저
     plan_locked = await _get_plan_locked_users(country_code, db)
@@ -689,6 +764,9 @@ async def send_spike_alert(
     # 4. 결과 반영
     await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
     all_invalid.extend(invalid_f)
+
+    # 5. 일일 카운터 증가
+    await _increment_daily_push_for_tokens(target_f.tokens, redis)
 
     # 만료/무효 토큰 자동 정리
     await cleanup_invalid_tokens(all_invalid, db)
