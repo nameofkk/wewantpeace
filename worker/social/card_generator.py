@@ -299,13 +299,17 @@ def generate_card(
         footer_h = 44
         issue_h_total = 0
 
+        # 이슈 수에 따른 줄 수 제한 (spike_alert=1이슈→충분한 공간)
+        n_issues = len(issues[:3]) if issues else 0
+        max_lines = 8 if n_issues <= 1 else (5 if n_issues == 2 else 3)
+
         if issues:
             for idx, iss in enumerate(issues[:3]):
                 en_lines = _wrap(iss.get("title_en", ""), f_issue_en, text_w - 24, draw)
                 ko_lines = _wrap(iss.get("title_ko", ""), f_issue_ko, text_w - 24, draw)
                 issue_h_total += 24  # 국가 뱃지 줄
-                issue_h_total += min(len(en_lines), 3) * line_h_en
-                issue_h_total += min(len(ko_lines), 3) * line_h_ko
+                issue_h_total += min(len(en_lines), max_lines) * line_h_en
+                issue_h_total += min(len(ko_lines), max_lines) * line_h_ko
                 # 신뢰도 라인
                 cred = _build_credibility_text(iss)
                 if cred:
@@ -365,7 +369,7 @@ def generate_card(
 
                 # EN 라인
                 en_lines = _wrap(title_en, f_issue_en, text_w - 24, draw)
-                for li, line in enumerate(en_lines[:3]):
+                for li, line in enumerate(en_lines[:max_lines]):
                     if y >= max_y:
                         break
                     if is_spike:
@@ -377,7 +381,7 @@ def generate_card(
 
                 # KO 라인
                 ko_lines = _wrap(title_ko, f_issue_ko, text_w - 24, draw)
-                for li, line in enumerate(ko_lines[:3]):
+                for li, line in enumerate(ko_lines[:max_lines]):
                     if y >= max_y:
                         break
                     if is_spike:
