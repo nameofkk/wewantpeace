@@ -5,12 +5,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 
 from backend.app.core.auth import get_db
+from backend.app.core.limiter import limiter
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.tension_index import TensionIndex
@@ -135,4 +136,189 @@ async def weekly_summary(
             "total_events": prev_total_events,
             "new_clusters": prev_new_clusters,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# 1) GET /public/tension/all — 전체 국가 긴장도 (최신 값)
+# ---------------------------------------------------------------------------
+@router.get("/tension/all")
+@limiter.limit("60/minute")
+async def tension_all(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 국가별 최신 긴장도 — 인증 불필요."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
+
+    # 각 국가별 최신 레코드 1건
+    latest_subq = (
+        select(
+            TensionIndex.country_code,
+            TensionIndex.raw_score,
+            TensionIndex.tension_level,
+            TensionIndex.event_score,
+            TensionIndex.accel_score,
+            TensionIndex.spillover_score,
+            TensionIndex.percentile_30d,
+            TensionIndex.time,
+            func.row_number()
+            .over(
+                partition_by=TensionIndex.country_code,
+                order_by=TensionIndex.time.desc(),
+            )
+            .label("rn"),
+        )
+        .subquery()
+    )
+
+    rows = (await db.execute(
+        select(
+            latest_subq.c.country_code,
+            latest_subq.c.raw_score,
+            latest_subq.c.tension_level,
+            latest_subq.c.event_score,
+            latest_subq.c.accel_score,
+            latest_subq.c.spillover_score,
+            latest_subq.c.percentile_30d,
+            latest_subq.c.time,
+        )
+        .where(latest_subq.c.rn == 1)
+        .order_by(latest_subq.c.raw_score.desc())
+    )).all()
+
+    return {
+        "count": len(rows),
+        "data": [
+            {
+                "country_code": r.country_code,
+                "raw_score": round(r.raw_score, 2),
+                "tension_level": r.tension_level,
+                "event_score": round(r.event_score, 2) if r.event_score else 0,
+                "accel_score": round(r.accel_score, 2) if r.accel_score else 0,
+                "spillover_score": round(r.spillover_score, 2) if r.spillover_score else 0,
+                "percentile_30d": round(r.percentile_30d, 2) if r.percentile_30d else 0,
+                "updated_at": r.time.isoformat(),
+            }
+            for r in rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 2) GET /public/tension/{country_code} — 개별 국가 긴장도 + 히스토리
+# ---------------------------------------------------------------------------
+@router.get("/tension/{country_code}")
+@limiter.limit("60/minute")
+async def tension_by_country(
+    country_code: str,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """개별 국가 긴장도 최신 값 + 최근 30일 히스토리 — 인증 불필요."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
+
+    cc = country_code.upper()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # 최근 30일 히스토리 (시간순)
+    history_q = await db.execute(
+        select(
+            TensionIndex.time,
+            TensionIndex.raw_score,
+            TensionIndex.tension_level,
+            TensionIndex.event_score,
+            TensionIndex.accel_score,
+            TensionIndex.spillover_score,
+            TensionIndex.percentile_30d,
+        )
+        .where(TensionIndex.country_code == cc, TensionIndex.time >= cutoff)
+        .order_by(TensionIndex.time.asc())
+    )
+    history_rows = history_q.all()
+
+    if not history_rows:
+        return {"country_code": cc, "latest": None, "history": []}
+
+    latest = history_rows[-1]
+
+    return {
+        "country_code": cc,
+        "latest": {
+            "raw_score": round(latest.raw_score, 2),
+            "tension_level": latest.tension_level,
+            "event_score": round(latest.event_score, 2) if latest.event_score else 0,
+            "accel_score": round(latest.accel_score, 2) if latest.accel_score else 0,
+            "spillover_score": round(latest.spillover_score, 2) if latest.spillover_score else 0,
+            "percentile_30d": round(latest.percentile_30d, 2) if latest.percentile_30d else 0,
+            "updated_at": latest.time.isoformat(),
+        },
+        "history": [
+            {
+                "time": r.time.isoformat(),
+                "raw_score": round(r.raw_score, 2),
+                "tension_level": r.tension_level,
+            }
+            for r in history_rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 3) GET /public/trending/top — 상위 20개 트렌딩 이슈
+# ---------------------------------------------------------------------------
+@router.get("/trending/top")
+@limiter.limit("60/minute")
+async def trending_top(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """상위 20개 트렌딩 이슈 (kscore 내림차순) — 인증 불필요."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
+
+    rows_q = await db.execute(
+        select(
+            IssueCluster.id,
+            IssueCluster.title,
+            IssueCluster.title_ko,
+            IssueCluster.severity,
+            IssueCluster.kscore,
+            IssueCluster.event_count,
+            IssueCluster.country_code,
+            IssueCluster.topic,
+            IssueCluster.lat,
+            IssueCluster.lon,
+            IssueCluster.is_spike,
+            IssueCluster.last_event_at,
+            IssueCluster.image_url,
+        )
+        .where(IssueCluster.is_active.is_(True), IssueCluster.severity > 0)
+        .order_by(IssueCluster.kscore.desc())
+        .limit(20)
+    )
+    rows = rows_q.all()
+
+    return {
+        "count": len(rows),
+        "data": [
+            {
+                "id": str(r.id),
+                "title": r.title,
+                "title_ko": r.title_ko,
+                "severity": r.severity,
+                "kscore": round(r.kscore, 2),
+                "event_count": r.event_count,
+                "country_code": r.country_code,
+                "topic": r.topic,
+                "lat": r.lat,
+                "lon": r.lon,
+                "is_spike": r.is_spike,
+                "last_event_at": r.last_event_at.isoformat() if r.last_event_at else None,
+                "image_url": r.image_url,
+            }
+            for r in rows
+        ],
     }

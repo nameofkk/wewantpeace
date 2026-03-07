@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from backend.app.core.limiter import limiter
 from backend.app.core.config import settings
 from backend.app.core.redis import close_redis
 from backend.app.core.sentry import init_sentry
@@ -25,7 +25,7 @@ logger = structlog.get_logger()
 init_sentry()
 
 # Rate limiter (IP 기반, 기본 200req/분 전체 적용) (H-1)
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+# limiter instance imported from backend.app.core.limiter
 
 
 async def _bootstrap_admin():
