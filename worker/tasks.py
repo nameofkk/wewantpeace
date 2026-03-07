@@ -235,6 +235,44 @@ def collect_reliefweb(self):
 
 
 @app.task(
+    name="worker.tasks.collect_usgs",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=120,
+)
+def collect_usgs(self):
+    """USGS 지진 API 수집 (5분마다, M5.0+)."""
+
+    async def _run():
+        from worker.collector.usgs_earthquake import USGSEarthquakeCollector
+        async with AsyncSessionLocal() as db:
+            collector = USGSEarthquakeCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("USGS 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("USGS 수집 완료: 새 이벤트 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("USGS 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
     bind=True,
