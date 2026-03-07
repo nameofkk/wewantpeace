@@ -109,8 +109,23 @@ async def send_review_message(post: SocialPost) -> bool:
                 ]]
             }
 
-            if post.image_url and os.path.exists(post.image_url):
-                with open(post.image_url, "rb") as img_file:
+            image_sent = False
+            if post.image_url:
+                img_data = None
+                if post.image_url.startswith("http"):
+                    # Supabase 등 원격 URL → 다운로드
+                    try:
+                        dl_resp = await client.get(post.image_url, timeout=15.0)
+                        if dl_resp.status_code == 200:
+                            img_data = dl_resp.content
+                    except Exception:
+                        logger.warning("카드 이미지 다운로드 실패: %s", post.image_url)
+                elif os.path.exists(post.image_url):
+                    # 로컬 파일
+                    with open(post.image_url, "rb") as f:
+                        img_data = f.read()
+
+                if img_data:
                     resp = await client.post(
                         f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendPhoto",
                         data={
@@ -118,9 +133,11 @@ async def send_review_message(post: SocialPost) -> bool:
                             "caption": summary_text,
                             "reply_markup": json.dumps(summary_keyboard, ensure_ascii=False),
                         },
-                        files={"photo": ("card.png", img_file, "image/png")},
+                        files={"photo": ("card.png", img_data, "image/png")},
                     )
-            else:
+                    image_sent = True
+
+            if not image_sent:
                 resp = await client.post(
                     f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
                     json={
