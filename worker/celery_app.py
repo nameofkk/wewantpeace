@@ -32,7 +32,7 @@ app.conf.update(
 app.conf.beat_schedule = {
     "collect-telegram": {
         "task": "worker.tasks.collect_telegram",
-        "schedule": crontab(minute="*/3"),  # 3분마다
+        "schedule": crontab(minute="*/5"),  # 5분마다 (채널 12개 대응)
         "options": {"queue": "collect"},
     },
     "collect-rss": {
