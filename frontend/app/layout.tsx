@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     default: "WeWantPeace",
     template: "%s | WeWantPeace",
   },
-  description: "실시간 세계정세 모니터링 · 긴장도 지수 · 이슈 알림",
+  description: "실시간 글로벌 분쟁 모니터링 · 40개국 긴장도 지수 · AI 이슈 분석 · 스파이크 알림 — WeWantPeace",
   manifest: "/manifest.json",
   metadataBase: new URL(SITE_URL),
   openGraph: {
@@ -18,14 +18,14 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 세계정세 모니터링",
-    description: "WeWantPeace | 실시간 세계정세 모니터링",
-    images: [{ url: `${SITE_URL}/og-image.png` }],
+    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    description: "40개국 긴장도 지수 · AI 이슈 분석 · 스파이크 알림 — 전 세계 분쟁 이슈를 실시간으로 추적합니다",
+    images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630 }],
   },
   twitter: {
-    card: "summary",
-    title: "WeWantPeace — 세계정세 모니터링",
-    description: "WeWantPeace | 실시간 세계정세 모니터링",
+    card: "summary_large_image",
+    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    description: "40개국 긴장도 지수 · AI 이슈 분석 · 실시간 스파이크 알림",
     images: [{ url: `${SITE_URL}/og-image-twitter.png` }],
   },
   appleWebApp: {
@@ -136,7 +136,7 @@ export default function RootLayout({
 
           {/* 서브타이틀 — 서비스 설명 */}
           <p style={{ marginTop: 6, fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", color: "rgba(148,163,184,0.8)", textTransform: "uppercase" }}>
-            Real-time Global Situation Monitor
+            Real-time Global Conflict Monitor
           </p>
 
           {/* 로딩 인디케이터 */}

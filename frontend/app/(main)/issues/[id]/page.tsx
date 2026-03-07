@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = issue.title_ko || issue.title;
-  const siteDesc = "WeWantPeace | 실시간 세계정세 모니터링";
+  const siteDesc = "WeWantPeace | 실시간 글로벌 분쟁 모니터링";
   // 카카오톡: og:title이 길면 description 영역을 밀어내서 숨김
   // 띄어쓰기 기준으로 자연스럽게 자름
   let ogTitle = title;

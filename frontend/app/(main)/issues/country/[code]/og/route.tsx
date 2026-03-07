@@ -246,7 +246,7 @@ export async function GET(
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
-                실시간 세계정세 모니터링
+                실시간 글로벌 분쟁 모니터링
               </span>
               <div
                 style={{

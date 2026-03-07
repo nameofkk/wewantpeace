@@ -96,7 +96,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
 
       {/* 서브타이틀 */}
       <p className="mt-1.5 text-xs font-medium tracking-widest uppercase text-slate-400/80">
-        Real-time Global Situation Monitor
+        Real-time Global Conflict Monitor
       </p>
 
       {/* 로딩 인디케이터 */}

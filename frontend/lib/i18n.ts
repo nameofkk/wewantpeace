@@ -785,7 +785,7 @@ export const translations = {
 
     // upgrade
     upgrade_title: "플랜 선택",
-    upgrade_subtitle: "세계정세를 더 깊이 파악하세요",
+    upgrade_subtitle: "글로벌 분쟁을 더 깊이 파악하세요",
     upgrade_free_label: "무료",
     upgrade_per_month: "/월",
     upgrade_popular: "인기",
