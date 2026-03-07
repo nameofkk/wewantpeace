@@ -191,7 +191,7 @@ async def create_area(
             status_code=403,
             detail={
                 "code": "PRO_AREA_LIMIT",
-                "message": f"Pro 플랜은 관심지역 {PRO_AREA_LIMIT}개까지 가능합니다. Pro+로 업그레이드하세요.",
+                "limit": PRO_AREA_LIMIT,
                 "upgrade_url": "/upgrade",
             },
         )
@@ -200,7 +200,7 @@ async def create_area(
     if body.notify_fast and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
         raise HTTPException(
             status_code=403,
-            detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "Fast 알림은 Pro 플랜 전용입니다."},
+            detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_fast"},
         )
 
     # 중복 방지: 같은 country_code가 이미 있으면 기존 레코드 반환
@@ -328,7 +328,7 @@ async def update_preferences(
         if _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "Fast 알림은 Pro 플랜 전용입니다."},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_fast"},
             )
 
     if body.language is not None:
@@ -345,13 +345,13 @@ async def update_preferences(
         if body.topics and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "토픽 필터는 Pro 플랜 전용입니다."},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "topics"},
             )
         pref.topics = body.topics
     if body.timezone is not None:
         from zoneinfo import available_timezones
         if body.timezone and body.timezone not in available_timezones():
-            raise HTTPException(400, detail=f"유효하지 않은 timezone: {body.timezone}")
+            raise HTTPException(400, detail={"code": "INVALID_TIMEZONE", "value": body.timezone})
         pref.timezone = body.timezone
     # quiet_hours: "" = 해제, "HH:MM" = 설정 (Pro 이상만 허용)
     if body.quiet_hours_start is not None:
@@ -361,7 +361,7 @@ async def update_preferences(
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "방해금지 시간은 Pro 플랜 전용입니다."},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
             )
         else:
             try:
@@ -371,7 +371,7 @@ async def update_preferences(
                 h, m = int(parts[0]), int(parts[1])
                 pref.quiet_hours_start = dt_time(h, m)
             except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail="quiet_hours_start 형식 오류: HH:MM")
+                raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_start", "expected": "HH:MM"})
     if body.quiet_hours_end is not None:
         from datetime import time as dt_time
         if body.quiet_hours_end == "":
@@ -379,7 +379,7 @@ async def update_preferences(
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "message": "방해금지 시간은 Pro 플랜 전용입니다."},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
             )
         else:
             try:
@@ -389,18 +389,17 @@ async def update_preferences(
                 h, m = int(parts[0]), int(parts[1])
                 pref.quiet_hours_end = dt_time(h, m)
             except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail="quiet_hours_end 형식 오류: HH:MM")
+                raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_end", "expected": "HH:MM"})
 
     if body.home_country is not None:
         # Free 플랜은 기준 국가 변경 불가 (기본값 고정)
         if current_user.plan.lower() == "free":
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro",
-                        "message": "기준 국가 변경은 Pro 플랜 전용입니다."},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},
             )
         if len(body.home_country) != 2 or not body.home_country.isalpha():
-            raise HTTPException(400, detail="유효하지 않은 국가 코드")
+            raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
         pref.home_country = body.home_country.upper()
 
     await db.flush()

@@ -135,7 +135,7 @@ export const TOPIC_WEIGHTS: Record<string, ImpactFactors> = {
   unknown:   { geo: 0.33, sec: 0.34, eco: 0.33 },
 };
 
-const DEFAULT_FACTOR = 0.3;
+const DEFAULT_FACTOR = 0.5;
 
 export function calcImpactFactor(
   eventCountry: string,

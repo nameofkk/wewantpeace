@@ -297,7 +297,7 @@ TOPIC_IMPACT_WEIGHTS: dict[str, dict[str, float]] = {
     "unknown":    {"geo": 0.33, "sec": 0.34, "eco": 0.33},
 }
 
-DEFAULT_IMPACT_FACTOR: float = 0.3
+DEFAULT_IMPACT_FACTOR: float = 0.5
 
 
 # ── KScore 계산 상수 (trending_engine.py) ────────────────────────────────────

@@ -648,7 +648,6 @@ export default function HomePage() {
     if (!clusterData || !Array.isArray(clusterData)) return undefined;
     return (clusterData as any[])
       .filter((c) => c.severity > 0 && c.kscore > 0)
-      .sort((a, b) => b.kscore - a.kscore || b.severity - a.severity)
       .map((c, i) => ({
         id: i,
         keyword: c.title,
@@ -664,17 +663,23 @@ export default function HomePage() {
         calculated_at: c.last_event_at,
         first_event_at: c.first_event_at,
         independent_sources: c.independent_sources ?? 1,
-      })) as TrendingItem[];
-  }, [clusterData]);
+      }))
+      .sort((a, b) => {
+        const aK = personalizedKScore(a, homeCountry);
+        const bK = personalizedKScore(b, homeCountry);
+        return bK - aK || (b.severity ?? 0) - (a.severity ?? 0);
+      }) as TrendingItem[];
+  }, [clusterData, homeCountry]);
   // 급상승 데이터: 6시간 이내 생성 + KScore >= 3 (글로벌 탭 전용)
   const risingData = useMemo(() => {
     if (!globalData) return [];
     const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
     return globalData
       .filter(item => item.first_event_at &&
-        new Date(item.first_event_at).getTime() > sixHoursAgo && item.kscore >= 3)
+        new Date(item.first_event_at).getTime() > sixHoursAgo &&
+        personalizedKScore(item, homeCountry) >= 3)
       .slice(0, 5);
-  }, [globalData]);
+  }, [globalData, homeCountry]);
 
   const globalLoading = clusterLoading;
   const globalFetching = clusterFetching;
@@ -835,16 +840,14 @@ export default function HomePage() {
           {userPlan === "free" && myCountries.length >= FREE_COUNTRY_LIMIT && (
             <div className="flex items-center justify-between gap-2 px-4 pb-2">
               <p className="text-[10px] text-muted-foreground" style={{ wordBreak: "keep-all" }}>
-                {lang === "ko"
-                  ? `📍 Pro 5개 · Pro+ 무제한`
-                  : `📍 Pro: 5 regions · Pro+: Unlimited`}
+                {t(lang, "plan_country_limit_hint")}
               </p>
               <a
                 href="/upgrade"
                 className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold text-white"
                 style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
               >
-                {lang === "ko" ? "업그레이드" : "Upgrade"}
+                {t(lang, "btn_upgrade")}
               </a>
             </div>
           )}
@@ -868,16 +871,14 @@ export default function HomePage() {
           {userPlan === "free" && (
             <div className="mt-4 flex items-center justify-between gap-2 w-full max-w-xs rounded-lg px-3 py-2" style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
               <p className="text-[11px] text-muted-foreground text-left whitespace-nowrap">
-                {lang === "ko"
-                  ? `📍 Pro 5개 · Pro+ 무제한`
-                  : `📍 Pro: 5 regions · Pro+: Unlimited`}
+                {t(lang, "plan_country_limit_hint")}
               </p>
               <a
                 href="/upgrade"
                 className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold text-white"
                 style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
               >
-                {lang === "ko" ? "업그레이드" : "Upgrade"}
+                {t(lang, "btn_upgrade")}
               </a>
             </div>
           )}

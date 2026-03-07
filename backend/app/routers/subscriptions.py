@@ -21,16 +21,19 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 PLANS = {
     "pro": {"name": "Pro", "amount": 4900, "features": [
-        "관심국가 무제한",
-        "Fast 알림",
-        "긴장도 히스토리 30일",
-        "커뮤니티 우선 노출",
+        {"ko": "관심국가 5개", "en": "5 monitored countries"},
+        {"ko": "실시간 이슈 지도", "en": "Real-time issue map"},
+        {"ko": "속보 알림 (미확인 포함)", "en": "Fast alerts (breaking news)"},
+        {"ko": "긴장도 히스토리 30일", "en": "30-day tension history"},
+        {"ko": "KScore 필터 조정 (3.0~10.0)", "en": "KScore filter (3.0–10.0)"},
+        {"ko": "토픽 필터", "en": "Topic filter"},
+        {"ko": "방해금지 시간", "en": "Quiet hours"},
     ]},
     "pro_plus": {"name": "Pro+", "amount": 9900, "features": [
-        "Pro 기능 전체",
-        "긴장도 히스토리 90일",
-        "개인 API 접근",
-        "알림 룰 설정",
+        {"ko": "Pro 기능 전체", "en": "All Pro features"},
+        {"ko": "관심국가 무제한", "en": "Unlimited monitored countries"},
+        {"ko": "긴장도 히스토리 90일", "en": "90-day tension history"},
+        {"ko": "KScore 필터 조정 (1.5~10.0)", "en": "KScore filter (1.5–10.0)"},
     ]},
 }
 

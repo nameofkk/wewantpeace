@@ -717,16 +717,14 @@ export default function TensionPage() {
       {viewMode === "mine" && userPlan === "free" && (
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border/40" style={{ background: "rgba(99,102,241,0.06)" }}>
           <p className="text-[10px] text-muted-foreground whitespace-nowrap">
-            {lang === "ko"
-              ? "📍 Pro 5개 · Pro+ 무제한"
-              : "📍 Pro: 5 regions · Pro+: Unlimited"}
+            {t(lang, "plan_country_limit_hint")}
           </p>
           <a
             href="/upgrade"
             className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold text-white"
             style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
           >
-            {lang === "ko" ? "업그레이드" : "Upgrade"}
+            {t(lang, "btn_upgrade")}
           </a>
         </div>
       )}
@@ -748,16 +746,14 @@ export default function TensionPage() {
           {userPlan === "free" && (
             <div className="mt-4 flex items-center justify-between gap-2 w-full max-w-xs rounded-lg px-3 py-2" style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
               <p className="text-[11px] text-muted-foreground text-left whitespace-nowrap">
-                {lang === "ko"
-                  ? `📍 Pro 5개 · Pro+ 무제한`
-                  : `📍 Pro: 5 regions · Pro+: Unlimited`}
+                {t(lang, "plan_country_limit_hint")}
               </p>
               <a
                 href="/upgrade"
                 className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold text-white"
                 style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
               >
-                {lang === "ko" ? "업그레이드" : "Upgrade"}
+                {t(lang, "btn_upgrade")}
               </a>
             </div>
           )}

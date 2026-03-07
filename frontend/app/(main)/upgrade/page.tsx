@@ -80,7 +80,7 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
 
 // 스토어 링크 (등록 후 실제 URL로 교체)
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
-const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // TODO: 실제 ID
+const APP_STORE_URL = ""; // App Store 미출시 — 실제 ID 확보 시 업데이트
 
 function FeatureValue({
   val, planId, lang,
@@ -134,7 +134,7 @@ function AppInstallPrompt({ lang }: { lang: Lang }) {
             {t(lang, "store_download_android")}
           </a>
         )}
-        {(!isAndroid) && (
+        {(!isAndroid) && APP_STORE_URL && (
           <a
             href={APP_STORE_URL}
             target="_blank"
