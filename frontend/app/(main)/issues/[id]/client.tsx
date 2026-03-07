@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText } from "lucide-react";
+import {
+  LineChart as RCLineChart,
+  Line as RCLine,
+  XAxis as RCXAxis,
+  YAxis as RCYAxis,
+  CartesianGrid as RCCartesianGrid,
+  Tooltip as RCTooltip,
+  ResponsiveContainer as RCContainer,
+} from "recharts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -93,6 +102,23 @@ function KScoreHistorySection({ clusterId, lang }: { clusterId: string; lang: La
   return <KScoreHistoryChart data={data ?? []} lang={lang} />;
 }
 
+function KScoreTooltip({ active, payload, lang }: { active?: boolean; payload?: { payload: KScoreHistoryPoint }[]; lang: Lang }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+  const scoreColor = d.kscore >= 7 ? "#ef4444" : d.kscore >= 4 ? "#f59e0b" : "#10b981";
+  return (
+    <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm px-3 py-2 text-xs shadow-lg">
+      <p className="text-muted-foreground mb-1">
+        {new Date(d.time).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+      </p>
+      <p className="font-bold" style={{ color: scoreColor }}>
+        KScore <span className="font-normal text-foreground">{d.kscore.toFixed(1)}</span>
+      </p>
+    </div>
+  );
+}
+
 function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: Lang }) {
   if (data.length < 2) {
     return (
@@ -102,46 +128,43 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
     );
   }
 
-  const maxKscore = Math.max(...data.map((d) => d.kscore), 1);
   const locale = lang === "en" ? "en-US" : "ko-KR";
+  const maxKscore = Math.max(...data.map((d) => d.kscore), 1);
+  const lineColor = maxKscore >= 7 ? "#ef4444" : maxKscore >= 4 ? "#f59e0b" : "#10b981";
 
   return (
     <div className="mt-4 pt-4 border-t border-border fade-in-up">
       <p className="text-xs font-medium text-muted-foreground mb-3">{t(lang, "issue_kscore_history_section")}</p>
-      <div className="relative h-32">
-        <svg viewBox={`0 0 ${data.length - 1} 100`} className="w-full h-full" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="kscoreGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          <path
-            d={`M0,${100 - (data[0].kscore / maxKscore) * 90} ${data.map((d, i) => `L${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")} L${data.length - 1},100 L0,100 Z`}
-            fill="url(#kscoreGrad)"
-            className="kscore-area"
-          />
-          <polyline
-            points={data.map((d, i) => `${i},${100 - (d.kscore / maxKscore) * 90}`).join(" ")}
-            fill="none"
-            stroke="hsl(var(--primary))"
-            strokeWidth="1.5"
-            vectorEffect="non-scaling-stroke"
-            pathLength={1}
-            className="kscore-line"
-          />
-        </svg>
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-1 kscore-label">
-          <span className="text-[9px] text-muted-foreground">
-            {new Date(data[0].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
-          </span>
-          <span className="text-[9px] text-muted-foreground">
-            {new Date(data[data.length - 1].time).toLocaleDateString(locale, { month: "short", day: "numeric" })}
-          </span>
-        </div>
-        <div className="absolute top-0 right-1 kscore-label">
-          <span className="text-[9px] text-muted-foreground">max {maxKscore.toFixed(1)}</span>
-        </div>
+      <div className="h-36">
+        <RCContainer width="100%" height="100%">
+          <RCLineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+            <RCCartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+            <RCXAxis
+              dataKey="time"
+              tickFormatter={(v: string) => new Date(v).toLocaleDateString(locale, { month: "numeric", day: "numeric" })}
+              tick={{ fontSize: 9, fill: "#6b7280" }}
+              axisLine={false}
+              tickLine={false}
+              interval="preserveStartEnd"
+            />
+            <RCYAxis
+              domain={[0, Math.ceil(maxKscore + 1)]}
+              tick={{ fontSize: 9, fill: "#6b7280" }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <RCTooltip content={<KScoreTooltip lang={lang} />} />
+            <RCLine
+              type="monotone"
+              dataKey="kscore"
+              stroke={lineColor}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: lineColor }}
+              animationDuration={400}
+            />
+          </RCLineChart>
+        </RCContainer>
       </div>
     </div>
   );
