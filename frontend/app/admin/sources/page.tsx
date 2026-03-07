@@ -28,6 +28,9 @@ interface SourceItem {
   base_confidence: number;
   language: string | null;
   feed_url: string | null;
+  api_endpoint: string | null;
+  topics: string[];
+  geo_focus: string[];
   is_active: boolean;
   created_at: string;
   collect_status: CollectStatus | null;
@@ -40,10 +43,68 @@ const TIER_COLORS: Record<string, string> = {
   D: "bg-red-500/20 text-red-400",
 };
 
-function StatusDot({ status }: { status: CollectStatus | null; }) {
-  if (!status) return <span title="Idle">&#9898;</span>;
-  if (status.status === "ok") return <span title="OK">&#128994;</span>;
-  return <span title="Error">&#128308;</span>;
+const TYPE_COLORS: Record<string, string> = {
+  rss: "bg-orange-500/20 text-orange-400",
+  telegram: "bg-blue-500/20 text-blue-400",
+  api: "bg-purple-500/20 text-purple-400",
+};
+
+// 소스 카테고리 자동 판별
+function getCategory(ch: SourceItem): string {
+  if (ch.source_type === "api") return "api";
+  if (ch.source_type === "telegram") return "osint";
+  // RSS 세분화
+  const name = ch.display_name.toLowerCase();
+  const govKeywords = ["state dept", "fcdo", "un security", "un news", "government"];
+  if (govKeywords.some(k => name.includes(k))) return "gov";
+  const thinkKeywords = ["crisis group", "icg", "iiss", "carnegie", "bellingcat", "foreign policy"];
+  if (thinkKeywords.some(k => name.includes(k))) return "think";
+  const wireKeywords = ["reuters", "ap news", "afp", "anadolu", "tass", "efe", "nhk"];
+  if (wireKeywords.some(k => name.includes(k))) return "wire";
+  const regionalKeywords = ["dawn", "daily sabah", "moscow times", "irrawaddy", "ethiopia insight",
+    "caucasus", "libya observer", "sudan tribune", "kurdistan", "sana", "syria direct",
+    "jerusalem post", "iran international", "meduza", "global voices"];
+  if (regionalKeywords.some(k => name.includes(k))) return "regional";
+  return "news";
+}
+
+const CAT_COLORS: Record<string, string> = {
+  news: "bg-slate-500/20 text-slate-400",
+  gov: "bg-emerald-500/20 text-emerald-400",
+  think: "bg-indigo-500/20 text-indigo-400",
+  regional: "bg-amber-500/20 text-amber-400",
+  wire: "bg-cyan-500/20 text-cyan-400",
+  osint: "bg-rose-500/20 text-rose-400",
+  api: "bg-purple-500/20 text-purple-400",
+};
+
+function catLabel(lang: string, cat: string): string {
+  const key = `admin_source_cat_${cat}` as Parameters<typeof t>[1];
+  return t(lang, key) || cat.toUpperCase();
+}
+
+function StatusDot({ status }: { status: CollectStatus | null }) {
+  if (!status) return <span className="text-gray-500" title="Idle">&#9679;</span>;
+  if (status.status === "ok") return <span className="text-green-400" title="OK">&#9679;</span>;
+  return <span className="text-red-400" title="Error">&#9679;</span>;
+}
+
+// 비활성 사유 추정
+function getInactiveReason(ch: SourceItem, lang: string): string {
+  if (ch.is_active) return "";
+  const cs = ch.collect_status;
+  if (ch.source_type === "api" && ch.display_name === "ACLED") {
+    return t(lang, "admin_source_reason_no_access");
+  }
+  if (cs?.error) {
+    if (cs.error.includes("404") || cs.error.includes("410") || cs.error.includes("비활성화")) {
+      return t(lang, "admin_source_reason_feed_error");
+    }
+    if (cs.error.includes("연속") || cs.error.includes("consecutive")) {
+      return t(lang, "admin_source_reason_consecutive");
+    }
+  }
+  return t(lang, "admin_source_reason_manual");
 }
 
 export default function AdminSourcesPage() {
@@ -95,11 +156,37 @@ export default function AdminSourcesPage() {
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
+  // 요약 통계 (현재 필터 결과 기준)
+  const activeCount = data?.items.filter(i => i.is_active).length ?? 0;
+  const inactiveCount = data?.items.filter(i => !i.is_active).length ?? 0;
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">{t(lang, "admin_sources_title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t(lang, "admin_sources_subtitle")}</p>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold">{data?.total ?? 0}</p>
+          <p className="text-xs text-muted-foreground">{lang === "ko" ? "전체 소스" : "Total"}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold text-green-400">{activeCount}</p>
+          <p className="text-xs text-muted-foreground">{t(lang, "admin_source_active_count")}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold text-red-400">{inactiveCount}</p>
+          <p className="text-xs text-muted-foreground">{t(lang, "admin_source_inactive_count")}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold text-blue-400">
+            {data?.items.filter(i => i.collect_status?.status === "error").length ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">{t(lang, "admin_source_status_error")}</p>
+        </div>
       </div>
 
       {/* Filters */}
@@ -110,8 +197,9 @@ export default function AdminSourcesPage() {
           className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"
         >
           <option value="">{t(lang, "admin_source_all_types")}</option>
-          <option value="telegram">Telegram</option>
           <option value="rss">RSS</option>
+          <option value="telegram">Telegram</option>
+          <option value="api">API</option>
         </select>
         <select
           value={tierFilter}
@@ -180,9 +268,11 @@ export default function AdminSourcesPage() {
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_status")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_name")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_type")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_category")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_tier")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_language")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_confidence")}</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_topics")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_last_collected")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_error")}</th>
                   <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_source_active_toggle")}</th>
@@ -191,26 +281,44 @@ export default function AdminSourcesPage() {
               <tbody className="divide-y divide-border">
                 {data.items.map((ch) => {
                   const cs = ch.collect_status;
+                  const cat = getCategory(ch);
+                  const inactiveReason = getInactiveReason(ch, lang);
                   return (
                     <tr key={ch.id} className={cn("hover:bg-secondary/20", !ch.is_active && "opacity-50")}>
                       {/* 상태 dot */}
-                      <td className="px-3 py-3 text-center text-base">
+                      <td className="px-3 py-3 text-center text-sm">
                         <StatusDot status={ch.is_active ? cs : null} />
                       </td>
                       {/* 채널명 */}
-                      <td className="px-3 py-3 max-w-[200px]">
+                      <td className="px-3 py-3 max-w-[220px]">
                         <p className="text-sm font-medium truncate">{ch.display_name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {ch.source_type === "telegram" ? `@${ch.username}` : ch.feed_url}
+                          {ch.source_type === "telegram"
+                            ? `@${ch.username}`
+                            : ch.source_type === "api"
+                              ? ch.api_endpoint
+                              : ch.feed_url}
                         </p>
+                        {!ch.is_active && inactiveReason && (
+                          <p className="text-[10px] text-red-400 mt-0.5">{inactiveReason}</p>
+                        )}
                       </td>
                       {/* 유형 */}
                       <td className="px-3 py-3">
                         <span className={cn(
                           "text-xs rounded-full px-2 py-0.5 font-medium",
-                          ch.source_type === "telegram" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
+                          TYPE_COLORS[ch.source_type] ?? "bg-gray-500/20 text-gray-400"
                         )}>
                           {ch.source_type}
+                        </span>
+                      </td>
+                      {/* 분류 */}
+                      <td className="px-3 py-3">
+                        <span className={cn(
+                          "text-[10px] rounded-full px-2 py-0.5 font-medium",
+                          CAT_COLORS[cat] ?? ""
+                        )}>
+                          {catLabel(lang, cat)}
                         </span>
                       </td>
                       {/* 등급 (드롭다운) */}
@@ -243,6 +351,31 @@ export default function AdminSourcesPage() {
                           }}
                           className="w-16 rounded border border-border bg-background px-2 py-0.5 text-xs tabular-nums outline-none focus:border-primary"
                         />
+                      </td>
+                      {/* 주제 */}
+                      <td className="px-3 py-3 max-w-[140px]">
+                        <div className="flex flex-wrap gap-0.5">
+                          {(ch.topics || []).slice(0, 3).map((topic) => (
+                            <span key={topic} className="text-[9px] rounded bg-secondary px-1.5 py-0.5 text-muted-foreground">
+                              {topic}
+                            </span>
+                          ))}
+                          {(ch.topics || []).length > 3 && (
+                            <span className="text-[9px] text-muted-foreground">+{ch.topics.length - 3}</span>
+                          )}
+                        </div>
+                        {ch.geo_focus?.length > 0 && (
+                          <div className="flex flex-wrap gap-0.5 mt-0.5">
+                            {ch.geo_focus.slice(0, 3).map((geo) => (
+                              <span key={geo} className="text-[9px] rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400">
+                                {geo}
+                              </span>
+                            ))}
+                            {ch.geo_focus.length > 3 && (
+                              <span className="text-[9px] text-blue-400">+{ch.geo_focus.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       {/* 최근 수집 */}
                       <td className="px-3 py-3 text-xs text-muted-foreground">
@@ -292,6 +425,8 @@ export default function AdminSourcesPage() {
           <div className="md:hidden space-y-3">
             {data.items.map((ch) => {
               const cs = ch.collect_status;
+              const cat = getCategory(ch);
+              const inactiveReason = getInactiveReason(ch, lang);
               return (
                 <div key={ch.id} className={cn("rounded-xl border border-border bg-card p-4", !ch.is_active && "opacity-50")}>
                   <div className="flex items-start justify-between mb-2">
@@ -301,8 +436,15 @@ export default function AdminSourcesPage() {
                         <p className="text-sm font-medium truncate">{ch.display_name}</p>
                       </div>
                       <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                        {ch.source_type === "telegram" ? `@${ch.username}` : ch.feed_url}
+                        {ch.source_type === "telegram"
+                          ? `@${ch.username}`
+                          : ch.source_type === "api"
+                            ? ch.api_endpoint
+                            : ch.feed_url}
                       </p>
+                      {!ch.is_active && inactiveReason && (
+                        <p className="text-[10px] text-red-400 mt-0.5">{inactiveReason}</p>
+                      )}
                     </div>
                     <button
                       onClick={() => patchMutation.mutate({ id: ch.id, body: { is_active: !ch.is_active } })}
@@ -312,7 +454,8 @@ export default function AdminSourcesPage() {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    <span className={cn("text-xs rounded-full px-2 py-0.5 font-medium", ch.source_type === "telegram" ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400")}>{ch.source_type}</span>
+                    <span className={cn("text-xs rounded-full px-2 py-0.5 font-medium", TYPE_COLORS[ch.source_type] ?? "bg-gray-500/20 text-gray-400")}>{ch.source_type}</span>
+                    <span className={cn("text-[10px] rounded-full px-2 py-0.5 font-medium", CAT_COLORS[cat] ?? "")}>{catLabel(lang, cat)}</span>
                     <select
                       value={ch.tier}
                       onChange={(e) => patchMutation.mutate({ id: ch.id, body: { tier: e.target.value } })}
@@ -322,6 +465,17 @@ export default function AdminSourcesPage() {
                     </select>
                     <span className="text-xs text-muted-foreground">{ch.language ?? "—"}</span>
                   </div>
+                  {/* Topics & Geo */}
+                  {((ch.topics?.length ?? 0) > 0 || (ch.geo_focus?.length ?? 0) > 0) && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {(ch.topics || []).slice(0, 4).map((topic) => (
+                        <span key={topic} className="text-[9px] rounded bg-secondary px-1.5 py-0.5 text-muted-foreground">{topic}</span>
+                      ))}
+                      {(ch.geo_focus || []).slice(0, 3).map((geo) => (
+                        <span key={geo} className="text-[9px] rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400">{geo}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-muted-foreground">{t(lang, "admin_confidence")}</span>
