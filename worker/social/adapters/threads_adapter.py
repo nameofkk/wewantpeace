@@ -28,16 +28,24 @@ def is_configured() -> bool:
     return bool(THREADS_USER_ID and THREADS_ACCESS_TOKEN)
 
 
-_ENGAGE_KO = [
-    "여러분은 어떻게 생각하시나요?",
-    "이 상황, 어떻게 보시나요?",
-    "여러분의 생각을 들려주세요.",
-]
-_ENGAGE_EN = [
-    "What are your thoughts?",
-    "How do you see this situation?",
-    "Share your perspective below.",
-]
+# content_type별 맥락적 대화 유도 (generic 질문은 bait로 분류될 수 있음)
+_ENGAGE_BY_TYPE = {
+    "spike_alert": [
+        ("How will this affect the region?", "이 지역에 어떤 영향을 미칠까요?"),
+        ("Is de-escalation still possible here?", "아직 상황 완화가 가능할까요?"),
+        ("What's the bigger picture behind this?", "이 사건의 더 큰 맥락은 뭘까요?"),
+    ],
+    "daily_movers": [
+        ("Which of these changes concerns you most?", "이 중 가장 우려되는 변화는?"),
+        ("Any of these on your radar?", "이 중 주목하고 있던 이슈가 있나요?"),
+        ("What pattern do you see here?", "어떤 패턴이 보이시나요?"),
+    ],
+    "weekly_recap": [
+        ("What was the most significant development this week?", "이번 주 가장 중요한 변화는 뭐였을까요?"),
+        ("Anything missing from this recap?", "이 요약에서 빠진 게 있나요?"),
+        ("How does this week compare to the last?", "지난주와 비교하면 어떤가요?"),
+    ],
+}
 
 
 def _build_text(post: SocialPost) -> str:
@@ -59,9 +67,11 @@ def _build_text(post: SocialPost) -> str:
     body = re.sub(r'www\.\S+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
-    # 대화 유도 문구 추가 (post ID 기반 고정 선택)
-    idx = int(hashlib.md5(str(post.id).encode()).hexdigest(), 16) % len(_ENGAGE_KO)
-    engage = f"\n\n💬 {_ENGAGE_EN[idx]}\n{_ENGAGE_KO[idx]}"
+    # content_type에 맞는 맥락적 대화 유도 문구 (generic → 콘텐츠 연관)
+    engage_list = _ENGAGE_BY_TYPE.get(post.content_type, _ENGAGE_BY_TYPE["spike_alert"])
+    idx = int(hashlib.md5(str(post.id).encode()).hexdigest(), 16) % len(engage_list)
+    en_q, ko_q = engage_list[idx]
+    engage = f"\n\n💬 {en_q}\n{ko_q}"
 
     # Threads CTA: 링크 + 해시태그
     hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""

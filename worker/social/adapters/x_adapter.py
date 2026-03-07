@@ -28,7 +28,7 @@ def is_configured() -> bool:
     return bool(X_API_KEY and X_API_SECRET and X_ACCESS_TOKEN and X_ACCESS_SECRET)
 
 
-_CTA = "— WeWantPeace"
+_CTA = "— WeWantPeace · 실시간 분쟁 추적"
 
 
 def _build_text(post: SocialPost) -> str:
