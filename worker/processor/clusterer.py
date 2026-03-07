@@ -1,9 +1,15 @@
 """
-EventClusterer: 60분 윈도우 기반 이슈 클러스터링.
+EventClusterer: 24시간 윈도우 기반 이슈 클러스터링.
 
 클러스터 키: {country_code}:{topic} 또는 {geohash4}:{topic}
-60분 윈도우 내 같은 키 + 제목 유사도 검사 → 서브토픽별 분리.
+같은 키 + Filtered Jaccard 유사도 검사 → 서브토픽별 분리.
+
+Filtered Jaccard: 국가명/토픽 키워드를 제거한 후 콘텐츠 단어만으로
+유사도 계산 → 같은 country:topic 버킷에서 다른 사건의 오병합 방지.
+경계 영역(0.10~0.20)에서는 GPT-4o-mini AI 판정으로 보완.
 """
+import json
+import os
 import re
 import logging
 from datetime import datetime, timezone, timedelta
@@ -17,14 +23,17 @@ from worker.processor.ai_title import generate_ai_title
 
 logger = logging.getLogger(__name__)
 
-WINDOW_MINUTES = 720  # 12시간 — 같은 국가+토픽 이벤트가 12시간 이내면 동일 클러스터
+WINDOW_MINUTES = 1440  # 24시간 — 국제 뉴스 시차 고려, Filtered Jaccard로 오병합 방지
 
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2
 
-# 제목 유사도 임계값
-MIN_TITLE_OVERLAP = 0.25           # 일반 이벤트
-MIN_TITLE_OVERLAP_HIGH_SEV = 0.10  # 고심각도 (severity >= 50 양쪽)
+# 제목 유사도 임계값 (Filtered Jaccard 기준 — 노이즈 단어 제거 후)
+MIN_TITLE_OVERLAP = 0.15           # 일반 이벤트 (0.25→0.15, 필터링이 노이즈 제거)
+MIN_TITLE_OVERLAP_HIGH_SEV = 0.08  # 고심각도 (severity >= 50 양쪽)
+# AI 판정 경계 영역: 이 구간에서만 GPT-4o-mini로 "같은 사건?" 확인
+AI_MATCH_LOW = 0.10   # 이 미만은 무조건 분리
+AI_MATCH_HIGH = 0.20  # 이 이상은 무조건 병합 (MIN_TITLE_OVERLAP보다 크면 의미 없음)
 
 # 활성 클러스터 후보 최대 조회 수
 MAX_CANDIDATE_CLUSTERS = 10
@@ -77,6 +86,46 @@ _DEMONYM_TO_STEM: dict[str, str] = {
 }
 
 
+# ── Filtered Jaccard: 국가명/토픽 단어 필터 ────────────────────────────────
+# cluster_key(country:topic)에 이미 반영된 정보를 Jaccard에서 제외하여
+# 콘텐츠 유사도만 정확히 측정 → 오병합 방지 + 정당한 병합 허용
+
+_COUNTRY_STEMS: frozenset[str] = frozenset({
+    "iran", "iraq", "israel", "syria", "russia", "ukraine", "china", "turkey",
+    "yemen", "lebanon", "pakistan", "somalia", "sudan", "ethiopia", "afghanistan",
+    "korea", "egypt", "india", "palestine", "america", "britain", "france",
+    "germany", "japan", "brazil", "mexico", "haiti", "venezuela", "libya",
+    "nigeria", "taiwan", "myanmar", "cuba", "uae", "qatar", "bahrain", "kuwait",
+    "oman", "saudiarabia", "finland",
+})
+
+_TOPIC_FILTER_STEMS: frozenset[str] = frozenset({
+    # conflict
+    "conflict", "attack", "strike", "war", "bomb", "fight", "battl", "milit",
+    "arm", "forc", "shell", "airstrik", "troop", "soldier", "weapon",
+    # terror
+    "terror", "violen", "explos", "extrem", "insurg",
+    # coup
+    "coup", "overthrow",
+    # sanctions
+    "sanction", "embargo",
+    # cyber
+    "cyber", "hack",
+    # protest
+    "protest", "demonstrat", "ralli", "riot",
+    # diplomacy
+    "diplomacy", "diplomat", "negoti", "summit", "treat",
+    # maritime
+    "maritim", "naval",
+    # disaster
+    "disast", "earthquak", "flood", "hurrican", "typhoon",
+    # health
+    "health", "pandem", "epidem", "outbreak", "virus",
+    # generic news words (클러스터 키와 무관하지만 모든 뉴스에 나타나서 가짜 유사도 생성)
+    "govern", "offici", "report", "state", "minist", "presid",
+})
+
+
 def _stem_word(w: str) -> str:
     """영어 단어 기본 스테밍: 국가 형용사 통일 + 접미사 제거."""
     if w in _DEMONYM_TO_STEM:
@@ -107,19 +156,31 @@ def _ko_words(text: str) -> set[str]:
     return {w for w in tokens if len(w) >= 2}
 
 
+def _filtered_en_words(text: str) -> set[str]:
+    """국가명/토픽 키워드 제거 후 콘텐츠 단어만 추출 (Filtered Jaccard용)."""
+    words = _stemmed_en_words(text)
+    return {w for w in words if w not in _COUNTRY_STEMS and w not in _TOPIC_FILTER_STEMS}
+
+
 def _title_similarity(
     en_a: str, en_b: str,
     ko_a: str | None = None, ko_b: str | None = None,
 ) -> float:
     """
-    두 제목의 유사도 (0.0 ~ 1.0).
-    영어(스테밍 Jaccard)와 한국어(Jaccard)를 각각 계산 후 max 반환.
-    언어가 다른 제목 간 교차 비교 문제를 해결.
+    두 제목의 Filtered Jaccard 유사도 (0.0 ~ 1.0).
+
+    영어: 국가명/토픽 단어를 제거한 Filtered Jaccard (콘텐츠 유사도만 측정).
+    한국어: 기존 Jaccard 유지.
+    max(영어, 한국어) 반환.
+
+    Filtered Jaccard가 기존 Jaccard보다 나은 이유:
+    - "Iran nuclear talks" vs "Iran missile strikes" → 기존: 0.11 (iran 공유) → 필터: 0.00 (분리)
+    - "Syria Aleppo fighting" vs "Fighting in Aleppo" → 기존: 0.14 → 필터: 0.50 (병합)
     """
-    # 영어 스테밍 Jaccard
-    a_en = _stemmed_en_words(en_a)
-    b_en = _stemmed_en_words(en_b)
-    en_sim = (len(a_en & b_en) / len(a_en | b_en)) if (a_en and b_en) else 0.0
+    # Filtered Jaccard (영어)
+    a_filt = _filtered_en_words(en_a)
+    b_filt = _filtered_en_words(en_b)
+    en_sim = (len(a_filt & b_filt) / len(a_filt | b_filt)) if (a_filt and b_filt) else 0.0
 
     # 한국어 Jaccard
     ko_sim = 0.0
@@ -130,6 +191,60 @@ def _title_similarity(
             ko_sim = len(a_ko & b_ko) / len(a_ko | b_ko)
 
     return max(en_sim, ko_sim)
+
+# ── AI 클러스터 매칭 (경계 영역 보완) ─────────────────────────────────────────
+
+_AI_MATCH_PROMPT = """\
+You are a news event deduplication classifier.
+Given two news headlines about the same country and topic, determine if they describe the SAME specific event/incident or DIFFERENT events.
+
+Rules:
+- SAME = same incident, just reported by different outlets or at different times
+- DIFFERENT = different incidents, even if in the same country/topic category
+- Focus on specific details: location, actors, timing, nature of event
+- Respond ONLY with JSON: {"same": true} or {"same": false}"""
+
+
+@lru_cache(maxsize=256)
+def _ai_same_event(
+    title_a: str,
+    title_b: str,
+    topic: str,
+    country_code: str | None,
+) -> bool | None:
+    """
+    GPT-4o-mini로 두 제목이 같은 사건인지 판정 (경계 영역에서만 호출).
+    LRU 캐시로 동일 쌍 중복 호출 방지.
+
+    Returns: True(같은 사건), False(다른 사건), None(API 실패)
+    """
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        return None
+
+    user_msg = f"Country: {country_code or 'Unknown'}\nTopic: {topic}\n\nHeadline A: {title_a[:200]}\nHeadline B: {title_b[:200]}"
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _AI_MATCH_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.0,
+            max_tokens=30,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content)
+        result = data.get("same", False)
+        logger.debug("AI 매칭 판정: %s vs %s → %s", title_a[:40], title_b[:40], result)
+        return bool(result)
+    except Exception:
+        logger.warning("AI 매칭 판정 실패, 폴백 (분리)")
+        return None
+
 
 # ── 클러스터 제목 생성 ────────────────────────────────────────────────────────
 
@@ -329,14 +444,23 @@ def _cluster_key(event: "NormalizedEvent") -> str:
 async def assign_cluster(
     event: NormalizedEvent,
     db: AsyncSession,
+    *,
+    skip_ai: bool = False,
 ) -> tuple[IssueCluster | None, bool]:
     """
-    NormalizedEvent를 60분 윈도우 내 같은 cluster_key의 IssueCluster에 할당.
+    NormalizedEvent를 24시간 윈도우 내 같은 cluster_key의 IssueCluster에 할당.
     없으면 새 클러스터 생성.
+
+    Filtered Jaccard + AI 경계 판정:
+    - sim >= threshold  → 무조건 병합
+    - AI_MATCH_LOW <= sim < threshold → GPT-4o-mini로 "같은 사건?" 판정
+    - sim < AI_MATCH_LOW → 무조건 분리
+
+    Args:
+        skip_ai: True면 AI 판정 건너뜀 (재클러스터링 배치에서 비용 절약)
 
     Returns:
         (IssueCluster | None, just_verified: bool)
-        just_verified=True: 이번 업데이트로 is_verified가 False→True로 전환됨.
 
     severity < 20 또는 topic="unknown" + severity < 25이면 (None, False) 반환 (잡음 제거).
     """
@@ -363,6 +487,8 @@ async def assign_cluster(
     # ── 후보 클러스터 중 최적 매칭 선택 ──────────────────────────────────────
     cluster: IssueCluster | None = None
     best_sim = -1.0
+    # AI 경계 판정 후보: (sim, candidate) — 임계값 미만이지만 AI_MATCH_LOW 이상
+    ai_candidates: list[tuple[float, IssueCluster]] = []
 
     for cand in candidates:
         no_country = not event.country_code
@@ -372,7 +498,7 @@ async def assign_cluster(
         if no_country and no_geo and cand.event_count >= MAX_EVENTS_UNKNOWN_GEO:
             continue
 
-        # (2) 제목 유사도 계산 (스테밍 + 이중 언어)
+        # (2) Filtered Jaccard 유사도 계산
         sim = _title_similarity(
             event.title, cand.title,
             ko_a=getattr(event, "title_ko", None),
@@ -387,6 +513,27 @@ async def assign_cluster(
         if sim >= threshold and sim > best_sim:
             best_sim = sim
             cluster = cand
+        elif not skip_ai and AI_MATCH_LOW <= sim < threshold:
+            # 경계 영역: AI 판정 후보로 등록
+            ai_candidates.append((sim, cand))
+
+    # ── AI 경계 판정: 임계값 미만이지만 AI가 "같은 사건"이라 판단하면 병합 ──
+    if cluster is None and ai_candidates:
+        # 유사도 높은 순으로 AI 판정 (최대 2개만 — 비용 절약)
+        ai_candidates.sort(key=lambda x: x[0], reverse=True)
+        for sim, cand in ai_candidates[:2]:
+            ai_result = _ai_same_event(
+                event.title, cand.title,
+                event.topic, event.country_code,
+            )
+            if ai_result is True:
+                cluster = cand
+                best_sim = sim
+                logger.info(
+                    "AI 매칭 승인: event=%s → cluster=%s (sim=%.3f)",
+                    event.title[:40], cand.title[:40], sim,
+                )
+                break
 
     if cluster:
         logger.debug(

@@ -45,6 +45,12 @@
   v5 (2026-03-07): 소스 확장 (37→58채널) 대응
     ACTIVE_CHANNELS=58, SPREAD_SATURATION=12
     소스 58개 체제에서 독립출처 12개 = 상위 20% 수준. 변별력 유지.
+
+  v6 (2026-03-07): Filtered Jaccard + KScore 재조정
+    시간감쇠 완화: DECAY_LAMBDA 0.04→0.025 (반감기 17h→28h)
+    DECAY_FLOOR 0.15→0.30 (48h 후에도 30% 유지)
+    KScore 가중치: severity 지배력 완화 (40%→30%), velocity/spread 강화
+    클러스터링: Filtered Jaccard 도입, 윈도우 12h→24h
 """
 
 # ── 환경 파라미터 (모니터링용) ───────────────────────────────────────────────
@@ -128,9 +134,10 @@ KSCORE_MIN: float = 1.5
 TRENDING_LIMIT: int = 30
 
 # KScore 시간감쇠: decay = max(DECAY_FLOOR, exp(-DECAY_LAMBDA * age_hours))
-# 0.04: 6h→79%, 12h→62%, 24h→38%, 48h→15%(floor)
-DECAY_LAMBDA: float = 0.04
-DECAY_FLOOR: float = 0.15
+# v6: 0.025: 6h→86%, 12h→74%, 24h→55%, 48h→30%(floor)
+# (v5: 0.04: 6h→79%, 12h→62%, 24h→38%, 48h→15% — 이벤트 축적 효과를 감쇠가 압도)
+DECAY_LAMBDA: float = 0.025
+DECAY_FLOOR: float = 0.30
 
 # 트렌딩 키워드 유효 시간 (분)
 KSCORE_VALID_HOURS: int = 24

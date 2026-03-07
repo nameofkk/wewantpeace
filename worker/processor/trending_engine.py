@@ -1,11 +1,14 @@
 """
 TrendingEngine: KScore 기반 트렌딩 키워드 계산.
 
-KScore (v4, 0-10 스케일):
-  raw = 0.25*velocity_norm + 0.15*quality + 0.40*severity_norm + 0.20*spread
-  KScore = raw × KSCORE_SCALE(10)
+KScore (v6, 0-10 스케일):
+  raw = 0.30*velocity_norm + 0.10*quality + 0.30*severity_norm + 0.30*spread
+  KScore = raw × KSCORE_SCALE(10) × decay
 
-  모든 컴포넌트 0~1 정규화 → 가중치가 실제 영향도를 정확히 반영.
+  v6 변경: severity 지배력 완화(40→30%), velocity/spread 강화(25→30%, 20→30%)
+  이벤트가 축적되고 다출처 확인된 사건이 정당한 점수를 받도록 재조정.
+  시간감쇠: λ=0.025(반감기 28h), floor=0.30
+
   UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)
 
 포함 조건: KScore >= calibration.KSCORE_MIN
@@ -53,18 +56,20 @@ def _calc_kscore(
     age_hours: float = 0.0,
 ) -> float:
     """
-    KScore 계산 (v4) — 0~10 스케일.
+    KScore 계산 (v6) — 0~10 스케일.
 
-    모든 컴포넌트를 0~1 정규화 후 가중합산, × KSCORE_SCALE(10).
-    KScore = (0.25*velocity_norm + 0.15*quality + 0.40*severity_norm + 0.20*spread) × 10
+    모든 컴포넌트를 0~1 정규화 후 가중합산, × KSCORE_SCALE(10) × decay.
+    KScore = (0.30*velocity + 0.10*quality + 0.30*severity + 0.30*spread) × 10 × decay
 
-    velocity_norm (0~1):
-    - min(1.0, k10^VELOCITY_EXPONENT × spike_factor / VELOCITY_CAP)
-    - k10=5: 0.52, k10=10: 0.84, k10=15: 1.0(cap)
+    v6 변경: severity 40→30%, velocity 25→30%, spread 20→30%, quality 15→10%
+    - 이벤트 축적(velocity)과 독립출처(spread) 보상 강화
+    - severity만으로 등급이 결정되는 지배 현상 해소
+
+    시간감쇠: decay = max(0.30, exp(-0.025 × age_hours))
+    - 반감기 28시간 (v5: 17시간)
+    - 48시간 후에도 30% 유지 (v5: 15%)
 
     UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)
-
-    상수 변경 시: calibration.py 수정 후 이 함수는 자동 반영됨.
     """
     k10 = max(1, event_count)
 
@@ -86,10 +91,10 @@ def _calc_kscore(
     spread = min(1.0, independent_sources / float(SPREAD_SATURATION))
 
     raw = (
-        0.25 * velocity_norm
-        + 0.15 * quality
-        + 0.40 * severity_norm
-        + 0.20 * spread
+        0.30 * velocity_norm
+        + 0.10 * quality
+        + 0.30 * severity_norm
+        + 0.30 * spread
     )
     decay = max(DECAY_FLOOR, math.exp(-DECAY_LAMBDA * age_hours))
     return round(raw * KSCORE_SCALE * decay, 2)
