@@ -20,6 +20,14 @@ from backend.app.models.issue_cluster import IssueCluster
 
 router = APIRouter(prefix="/community", tags=["community"])
 
+
+def _translate_to_en(text: str) -> str | None:
+    try:
+        from deep_translator import GoogleTranslator
+        return GoogleTranslator(source="ko", target="en").translate(text[:5000])
+    except Exception:
+        return None
+
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
@@ -62,6 +70,8 @@ class PostOut(BaseModel):
     cluster_title_ko: Optional[str] = None   # Korean title
     title: str
     content: str
+    title_en: Optional[str] = None
+    content_en: Optional[str] = None
     post_type: str
     status: str
     view_count: int
@@ -87,6 +97,7 @@ class CommentOut(BaseModel):
     user_id: Optional[str]
     parent_id: Optional[str]
     content: str
+    content_en: Optional[str] = None
     status: str
     like_count: int
     created_at: str
@@ -125,6 +136,8 @@ def _post_to_out(
         cluster_title_ko=cluster_title_ko,
         title=p.title,
         content=p.content,
+        title_en=p.title_en,
+        content_en=p.content_en,
         post_type=p.post_type,
         status=p.status,
         view_count=p.view_count,
@@ -147,6 +160,7 @@ def _comment_to_out(c: Comment, nickname: Optional[str] = None) -> CommentOut:
         user_id=str(c.user_id) if c.user_id else None,
         parent_id=str(c.parent_id) if c.parent_id else None,
         content=c.content if c.status == "active" else "[삭제된 댓글입니다]",
+        content_en=c.content_en if c.status == "active" else "[Deleted comment]",
         status=c.status,
         like_count=c.like_count,
         created_at=c.created_at.isoformat(),
@@ -377,6 +391,8 @@ async def create_post(
         is_pinned=body.post_type == "notice",
         images=images_val,
     )
+    post.title_en = _translate_to_en(body.title[:200])
+    post.content_en = _translate_to_en(body.content[:5000])
     db.add(post)
     await db.flush()
 
@@ -459,6 +475,8 @@ async def update_post(
 
     post.title = body.title[:200]
     post.content = body.content
+    post.title_en = _translate_to_en(body.title[:200])
+    post.content_en = _translate_to_en(body.content[:5000])
     if body.images is not None:
         post.images = body.images[:5] if body.images else None
     post.updated_at = datetime.now(timezone.utc)
@@ -601,6 +619,7 @@ async def create_comment(
         parent_id=parent_uuid,
         content=body.content,
     )
+    comment.content_en = _translate_to_en(body.content[:5000])
     db.add(comment)
     post.comment_count += 1
     await db.flush()
@@ -656,6 +675,7 @@ async def update_comment(
         raise HTTPException(403)
 
     comment.content = body.content
+    comment.content_en = _translate_to_en(body.content[:5000])
     comment.updated_at = datetime.now(timezone.utc)
     await db.flush()
     return _comment_to_out(comment, current_user.nickname)

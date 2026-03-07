@@ -29,6 +29,8 @@ interface Post {
   cluster_title?: string | null;      // English
   cluster_title_ko?: string | null;   // Korean
   title: string;
+  title_en?: string | null;
+  content_en?: string | null;
   author_nickname?: string;
   author_plan?: string | null;
   created_at: string;
@@ -95,7 +97,7 @@ function PostCard({ post, index = 0, lang }: { post: Post; index?: number; lang:
                 </span>
               )}
             </div>
-            <h3 className="text-sm font-semibold leading-snug line-clamp-2">{post.title}</h3>
+            <h3 className="text-sm font-semibold leading-snug line-clamp-2">{lang === "en" && post.title_en ? post.title_en : post.title}</h3>
             <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
               {post.author_nickname || t(lang, "community_anonymous")}
               <PlanBadge plan={post.author_plan} />
@@ -233,7 +235,7 @@ export default function CommunityPage() {
               <Link key={notice.id} href={`/community/${notice.id}`}>
                 <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 hover:bg-yellow-500/10 transition-colors cursor-pointer">
                   <Megaphone className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-                  <span className="text-sm font-medium truncate flex-1">{notice.title}</span>
+                  <span className="text-sm font-medium truncate flex-1">{lang === "en" && notice.title_en ? notice.title_en : notice.title}</span>
                   <span className="text-[10px] text-muted-foreground shrink-0">{relativeTime(notice.created_at, lang)}</span>
                 </div>
               </Link>
@@ -267,7 +269,7 @@ export default function CommunityPage() {
                           <span className="text-[11px] font-bold text-orange-400">#{i + 1}</span>
                           <span className="text-[10px] text-muted-foreground truncate flex-1">{post.author_nickname || t(lang, "community_anonymous")}</span>
                         </div>
-                        <p className="text-xs font-medium line-clamp-2 leading-snug">{post.title}</p>
+                        <p className="text-xs font-medium line-clamp-2 leading-snug">{lang === "en" && post.title_en ? post.title_en : post.title}</p>
                         <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
                           <span className="flex items-center gap-0.5"><ThumbsUp className="h-2.5 w-2.5" />{post.like_count}</span>
                           <span className="flex items-center gap-0.5"><Eye className="h-2.5 w-2.5" />{post.view_count}</span>

@@ -26,6 +26,7 @@ interface Comment {
   id: string;
   user_id: string | null;
   content: string;
+  content_en?: string | null;
   author_nickname: string | null;
   created_at: string;
   like_count: number;
@@ -37,7 +38,9 @@ interface Post {
   id: string;
   user_id: string | null;
   title: string;
+  title_en?: string | null;
   content: string;
+  content_en?: string | null;
   post_type: string;
   author_nickname: string | null;
   author_plan: string | null;
@@ -93,7 +96,7 @@ function CommentItem({
   onEditCancel: () => void;
   onEditTextChange: (text: string) => void;
 }) {
-  const isDeleted = comment.content === "[삭제된 댓글입니다]";
+  const isDeleted = comment.content === "[삭제된 댓글입니다]" || comment.content === "[Deleted comment]";
   const isMine = !!(myUserId && comment.user_id && comment.user_id === myUserId);
   const isEditing = editingCommentId === comment.id;
 
@@ -153,7 +156,7 @@ function CommentItem({
           </div>
         ) : (
           <p className={cn("mt-1 text-sm leading-relaxed", isDeleted && "text-muted-foreground italic")}>
-            {comment.content}
+            {lang === "en" && comment.content_en ? comment.content_en : comment.content}
           </p>
         )}
 
@@ -429,7 +432,7 @@ export default function PostDetailPage() {
             </Link>
           )}
         </div>
-        <h1 className="text-lg font-bold leading-snug">{post.title}</h1>
+        <h1 className="text-lg font-bold leading-snug">{lang === "en" && post.title_en ? post.title_en : post.title}</h1>
         <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1">
             {post.author_nickname || t(lang, "community_anonymous")}
@@ -441,7 +444,7 @@ export default function PostDetailPage() {
           <span>{t(lang, "post_views", { n: post.view_count })}</span>
         </div>
 
-        <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap">{post.content}</div>
+        <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap">{lang === "en" && post.content_en ? post.content_en : post.content}</div>
 
         {/* 이미지 그리드 */}
         {post.images && post.images.length > 0 && (
