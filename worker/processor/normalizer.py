@@ -435,8 +435,13 @@ SEVERITY_DOWN: list[tuple[str, int]] = [
     ("routine patrol", -8), ("scheduled exercise", -10), ("war games", -8),
     ("training exercise", -10), ("annual exercise", -8),
     # 과거 사건 (현재 위협 아님)
-    ("anniversary", -6), ("memorial", -6), ("years ago", -8),
+    ("anniversary", -8), ("memorial", -10), ("years ago", -10),
     ("looking back", -8), ("retrospective", -8),
+    # 추모/기념 (활성 분쟁 아님)
+    ("commemorate", -10), ("commemorat", -10), ("remembrance", -10),
+    ("tribute", -10), ("in memory of", -12), ("memorialize", -12),
+    ("museum", -10), ("monument", -8), ("memorial service", -15),
+    ("vigil", -8), ("honor the victims", -10), ("pay respects", -8),
 ]
 
 # ── 사상자 수 기반 추가 보정 ────────────────────────────────────────────────
@@ -1481,6 +1486,11 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"la tomatina",    # 스페인 토마토 축제
     r"carnival of ",   # 카니발 이벤트
     r"mardi gras",
+    # 추모/기념/박물관 — 활성 분쟁이 아님
+    r"(memorial|memorialize|commemorate|commemorat).{0,80}(museum|service|ceremony|event|day|march|park)",
+    r"(museum|monument|memorial).{0,80}(honor|remember|tribute|victim|survivor)",
+    r"(remembrance|vigil|tribute).{0,80}(held|ceremony|service|gather|candle)",
+    r"(in memory of|pay respects|laying wreaths?|wreath.laying)",
 ]]
 
 

@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const nameEn = country?.en || code;
 
   const title = `${nameKo} 긴장도`;
-  const siteDesc = "WeWantPeace | 실시간 글로벌 분쟁 모니터링";
+  const siteDesc = "40개국 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
 
   const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og`;
 
