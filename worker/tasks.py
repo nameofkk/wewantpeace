@@ -570,8 +570,8 @@ def calculate_trending(self):
                 # 광범위 토픽: 제목 유사도 체크 (다른 이슈 오병합 방지)
                 topic = winner.topic or ""
                 if topic in _BROAD_TOPICS:
-                    from worker.processor.clusterer import _title_overlap
-                    if _title_overlap(winner.title or "", loser.title or "") < 0.25:
+                    from worker.processor.clusterer import _title_similarity
+                    if _title_similarity(winner.title or "", loser.title or "") < 0.25:
                         continue
 
                 # 제목 교체: winner가 쓰레기 제목이면 loser 것으로 승격
