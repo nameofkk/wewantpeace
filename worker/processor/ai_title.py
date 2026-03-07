@@ -17,8 +17,8 @@ You are a concise news headline writer for a global conflict/crisis monitoring a
 Given event titles and article bodies about the same issue, write ONE best headline in both English and Korean.
 
 Rules:
-- English: max 80 chars, AP style, no quotes
-- Korean: max 40 chars, 뉴스 헤드라인 스타일, 간결체
+- English: max 160 chars, AP style, no quotes
+- Korean: max 80 chars, 뉴스 헤드라인 스타일, 간결체
 - Read the article body carefully to understand the full context before writing the headline
 - Focus on WHAT happened, WHERE — be specific and accurate
 - No hashtags, no emojis, no commentary
@@ -97,10 +97,10 @@ def generate_ai_title(
             logger.warning("AI 제목 응답 불완전: %s", raw[:200])
             return None
         # 길이 제한 적용
-        if len(title_en) > 80:
-            title_en = title_en[:78] + "…"
-        if len(title_ko) > 40:
-            title_ko = title_ko[:38] + "…"
+        if len(title_en) > 160:
+            title_en = title_en[:158] + "…"
+        if len(title_ko) > 80:
+            title_ko = title_ko[:78] + "…"
         logger.info("AI 제목 생성: en=%s / ko=%s", title_en[:50], title_ko)
         return title_en, title_ko
     except Exception:
