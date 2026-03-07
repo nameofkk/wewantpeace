@@ -1995,12 +1995,13 @@ async def _publish_post_to_platforms(
 
     all_ok = True
 
-    # Threads/Instagram에 이미지가 필요하면 Supabase Storage에 업로드
-    if (threads_enabled or instagram_enabled) and post.image_url and not post.image_url.startswith(("http://", "https://")):
-        from worker.social.image_uploader import upload_image
-        public_url = upload_image(post.image_url, str(post.id))
-        if public_url:
-            post.image_url = public_url
+    # 이미지 업로드: card_generator에서 즉시 업로드됨 (로컬 경로 폴백 처리)
+    if post.image_url and not post.image_url.startswith(("http://", "https://")):
+        from worker.social.image_uploader import upload_image, is_configured
+        if is_configured():
+            public_url = upload_image(post.image_url, str(post.id))
+            if public_url:
+                post.image_url = public_url
 
     # X (Twitter)
     if x_enabled:

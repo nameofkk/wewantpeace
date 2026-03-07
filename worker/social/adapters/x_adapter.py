@@ -85,13 +85,45 @@ def _build_text(post: SocialPost) -> str:
     return f"{body[:max_body]}...\n\n{_CTA}"
 
 
-def _upload_media(image_path: str) -> str | None:
-    """로컬 이미지 파일 → tweepy v1.1 media_upload → media_id 반환."""
+def _download_to_temp(url: str) -> str | None:
+    """URL 이미지를 로컬 임시 파일로 다운로드."""
+    try:
+        import tempfile
+        import httpx
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url)
+            if resp.status_code != 200:
+                logger.warning("이미지 다운로드 실패 [%s]: %s", resp.status_code, url[:80])
+                return None
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.write(resp.content)
+            tmp.close()
+            return tmp.name
+    except Exception:
+        logger.warning("이미지 다운로드 오류: %s", url[:80])
+        return None
+
+
+def _upload_media(image_source: str) -> str | None:
+    """이미지 → tweepy v1.1 media_upload → media_id 반환.
+
+    image_source: 로컬 경로 또는 http(s) URL
+    """
     try:
         import tweepy
 
-        if not os.path.exists(image_path):
-            logger.warning("이미지 파일 없음: %s", image_path)
+        # URL이면 먼저 로컬로 다운로드
+        if image_source.startswith(("http://", "https://")):
+            local_path = _download_to_temp(image_source)
+            if not local_path:
+                return None
+            is_temp = True
+        else:
+            local_path = image_source
+            is_temp = False
+
+        if not os.path.exists(local_path):
+            logger.warning("이미지 파일 없음: %s", local_path)
             return None
 
         auth = tweepy.OAuth1UserHandler(
@@ -100,14 +132,15 @@ def _upload_media(image_path: str) -> str | None:
         )
         api = tweepy.API(auth)
 
-        media = api.media_upload(filename=image_path)
+        media = api.media_upload(filename=local_path)
         logger.info("미디어 업로드 완료: media_id=%s", media.media_id)
 
         # 업로드 완료 후 임시 파일 정리
-        try:
-            os.unlink(image_path)
-        except Exception:
-            pass
+        if is_temp:
+            try:
+                os.unlink(local_path)
+            except Exception:
+                pass
 
         return str(media.media_id)
 
@@ -137,9 +170,9 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
 
         full_text = _build_text(post)
 
-        # 이미지 첨부 (로컬 임시 파일 경로)
+        # 이미지 첨부 (로컬 경로 또는 Supabase URL)
         media_ids = None
-        if post.image_url and os.path.exists(post.image_url):
+        if post.image_url:
             media_id = _upload_media(post.image_url)
             if media_id:
                 media_ids = [media_id]

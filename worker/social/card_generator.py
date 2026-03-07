@@ -1,6 +1,6 @@
-"""SNS 카드 이미지 생성기 — 720x720.
+"""SNS 카드 이미지 생성기 — 720x900 (직사각형).
 
-각 이슈를 국가 + EN/KO 제목 + 개별 severity로 표시.
+각 이슈를 국가 + EN/KO 제목 + 개별 severity + 신뢰도로 표시.
 """
 import io
 import logging
@@ -64,6 +64,14 @@ _COUNTRY_NAMES = {
     "NG": "Nigeria", "CD": "Congo", "SO": "Somalia", "LY": "Libya",
 }
 
+# source_tier → 표시 라벨
+_TIER_LABELS = {
+    "t1": "Major Wire",
+    "t2": "National",
+    "t3": "Regional",
+    "gov": "Official",
+}
+
 
 def _load_font(paths, size):
     from PIL import ImageFont
@@ -124,6 +132,34 @@ def _download_image(url):
         return None
 
 
+def _build_credibility_text(issue: dict) -> str | None:
+    """신뢰도 한 줄 텍스트 생성."""
+    parts = []
+    sources = issue.get("independent_sources", 0)
+    if sources > 0:
+        parts.append(f"{sources} independent sources")
+
+    tiers = issue.get("source_tiers", [])
+    top_tier = None
+    for t in ("gov", "t1", "t2"):
+        if t in tiers:
+            top_tier = _TIER_LABELS.get(t, t)
+            break
+    if top_tier:
+        parts.append(top_tier)
+
+    if issue.get("is_verified"):
+        parts.append("Verified")
+
+    events = issue.get("event_count", 0)
+    if events > 1:
+        parts.append(f"{events} reports")
+
+    if not parts:
+        return None
+    return " · ".join(parts)
+
+
 def generate_card(
     content_type: str,
     issues: list[dict] | None = None,
@@ -132,9 +168,10 @@ def generate_card(
     bg_image_url: str | None = None,
     date_str: str | None = None,
 ) -> bytes | None:
-    """720x720 SNS 카드.
+    """720x900 SNS 카드 (직사각형).
 
-    issues: [{"title_en", "title_ko", "country_code", "severity"}, ...]
+    issues: [{"title_en", "title_ko", "country_code", "severity",
+              "independent_sources", "source_tiers", "is_verified", "event_count"}, ...]
     body_text: issues 없을 때 폴백용 flat 텍스트
     """
     try:
@@ -144,11 +181,12 @@ def generate_card(
         return None
 
     try:
-        W, H = 720, 720
+        W, H = 720, 900
         M = 40
 
-        # ── 배경 ──
         is_spike = content_type == "spike_alert"
+
+        # ── 배경 ──
         if is_spike:
             img = Image.new("RGBA", (W, H), (25, 5, 5, 255))
         else:
@@ -166,8 +204,7 @@ def generate_card(
                     lx = (bg.width - W) // 2
                     ly = (bg.height - H) // 2
                     bg = bg.crop((lx, ly, lx + W, ly + H))
-                    if content_type == "spike_alert":
-                        # 긴박한 빨간 틴트 오버레이
+                    if is_spike:
                         overlay = Image.new("RGBA", (W, H), (40, 5, 5, 150))
                     else:
                         overlay = Image.new("RGBA", (W, H), (10, 10, 18, 140))
@@ -179,12 +216,10 @@ def generate_card(
 
         # ── spike_alert 긴박감 효과 ──
         if is_spike:
-            # 상하단 빨간 경고 바
             alert_bar = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             ab_draw = ImageDraw.Draw(alert_bar)
             ab_draw.rectangle([(0, 0), (W, 6)], fill=(239, 68, 68, 220))
             ab_draw.rectangle([(0, H - 6), (W, H)], fill=(239, 68, 68, 220))
-            # 좌우 빨간 비네팅
             for i in range(20):
                 alpha = int(60 * (1 - i / 20))
                 ab_draw.rectangle([(i, 0), (i + 1, H)], fill=(180, 20, 20, alpha))
@@ -201,9 +236,21 @@ def generate_card(
         f_date = _load_font(_FONT_BOLD, 14)
         f_cc = _load_font(_FONT_BOLD, 12)
         f_cn = _load_font(_FONT_REGULAR, 12)
-        f_issue = _load_font(_FONT_REGULAR, 16)
         f_sev = _load_font(_FONT_REGULAR, 11)
         f_tiny = _load_font(_FONT_REGULAR, 11)
+        f_cred = _load_font(_FONT_REGULAR, 11)
+
+        # spike_alert 이슈 폰트: 더 크고 볼드
+        if is_spike:
+            f_issue_en = _load_font(_FONT_BOLD, 22)
+            f_issue_ko = _load_font(_FONT_BOLD, 20)
+            line_h_en = 28
+            line_h_ko = 26
+        else:
+            f_issue_en = _load_font(_FONT_REGULAR, 16)
+            f_issue_ko = _load_font(_FONT_REGULAR, 16)
+            line_h_en = 22
+            line_h_ko = 22
 
         if not date_str:
             if is_spike:
@@ -220,7 +267,6 @@ def generate_card(
         # 타입 뱃지 (오른쪽)
         type_label, type_color = _TYPE_CONFIG.get(content_type, ("POST", _ACCENT))
         if is_spike:
-            # BREAKING: 더 크고 강렬한 뱃지
             f_badge_big = _load_font(_FONT_BOLD, 16)
             tw_badge = _tw(draw, type_label, f_badge_big)
             bx = W - M - tw_badge - 16
@@ -247,7 +293,7 @@ def generate_card(
         draw.text((M, y), date_str, fill=_LIGHT, font=f_date)
         y += 28
 
-        header_bottom = y  # 헤더 아래 끝
+        header_bottom = y
 
         # ── 이슈 높이 계산 (중앙 정렬용) ──
         footer_h = 44
@@ -255,9 +301,16 @@ def generate_card(
 
         if issues:
             for idx, iss in enumerate(issues[:3]):
-                en_lines = _wrap(iss.get("title_en", ""), f_issue, text_w - 24, draw)
-                ko_lines = _wrap(iss.get("title_ko", ""), f_issue, text_w - 24, draw)
-                issue_h_total += 24 + min(len(en_lines), 3) * 22 + min(len(ko_lines), 3) * 22 + 6 + 14
+                en_lines = _wrap(iss.get("title_en", ""), f_issue_en, text_w - 24, draw)
+                ko_lines = _wrap(iss.get("title_ko", ""), f_issue_ko, text_w - 24, draw)
+                issue_h_total += 24  # 국가 뱃지 줄
+                issue_h_total += min(len(en_lines), 3) * line_h_en
+                issue_h_total += min(len(ko_lines), 3) * line_h_ko
+                # 신뢰도 라인
+                cred = _build_credibility_text(iss)
+                if cred:
+                    issue_h_total += 20
+                issue_h_total += 6 + 14  # severity bar
                 if idx < len(issues[:3]) - 1:
                     issue_h_total += 14
         else:
@@ -297,7 +350,6 @@ def generate_card(
 
                 # 국가 뱃지 + severity 수치
                 if cc:
-                    # 국가코드 뱃지
                     ccw = _tw(draw, f" {cc} ", f_cc)
                     draw.rounded_rectangle(
                         [(M, y), (M + ccw + 2, y + 19)],
@@ -305,31 +357,44 @@ def generate_card(
                         outline=sc, width=1,
                     )
                     draw.text((M + 2, y + 2), f" {cc} ", fill=_WHITE, font=f_cc)
-                    # 국가명
                     draw.text((M + ccw + 8, y + 3), cn, fill=_MUTED, font=f_cn)
-                    # severity 오른쪽 (라벨 포함)
                     sev_txt = f"Severity {sev}/100"
                     sw = _tw(draw, sev_txt, f_sev)
                     draw.text((W - M - sw, y + 4), sev_txt, fill=sc, font=f_sev)
                     y += 24
 
-                # EN 라인 (- 접두사)
-                en_lines = _wrap(title_en, f_issue, text_w - 24, draw)
+                # EN 라인
+                en_lines = _wrap(title_en, f_issue_en, text_w - 24, draw)
                 for li, line in enumerate(en_lines[:3]):
                     if y >= max_y:
                         break
-                    prefix = "- " if li == 0 else "  "
-                    draw.text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue)
-                    y += 22
+                    if is_spike:
+                        draw.text((M + 8, y), line, fill=_WHITE, font=f_issue_en)
+                    else:
+                        prefix = "- " if li == 0 else "  "
+                        draw.text((M + 8, y), prefix + line, fill=_LIGHT, font=f_issue_en)
+                    y += line_h_en
 
-                # KO 라인 (- 접두사)
-                ko_lines = _wrap(title_ko, f_issue, text_w - 24, draw)
+                # KO 라인
+                ko_lines = _wrap(title_ko, f_issue_ko, text_w - 24, draw)
                 for li, line in enumerate(ko_lines[:3]):
                     if y >= max_y:
                         break
-                    prefix = "- " if li == 0 else "  "
-                    draw.text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue)
-                    y += 22
+                    if is_spike:
+                        draw.text((M + 8, y), line, fill=_LIGHT, font=f_issue_ko)
+                    else:
+                        prefix = "- " if li == 0 else "  "
+                        draw.text((M + 8, y), prefix + line, fill=_WHITE, font=f_issue_ko)
+                    y += line_h_ko
+
+                # 신뢰도 라인
+                cred = _build_credibility_text(iss)
+                if cred:
+                    y += 4
+                    # 방패 아이콘 대신 텍스트 뱃지
+                    cred_display = f"\u2713 {cred}" if iss.get("is_verified") else cred
+                    draw.text((M + 8, y), cred_display, fill=_MUTED, font=f_cred)
+                    y += 16
 
                 # 글자-바 간격
                 y += 6
@@ -357,12 +422,12 @@ def generate_card(
                     y += 14
 
         elif body_text:
-            # 폴백: flat 텍스트
-            lines = _wrap(_strip_emoji(body_text), f_issue, text_w, draw)
-            for line in lines[:12]:
+            f_fallback = _load_font(_FONT_REGULAR, 16)
+            lines = _wrap(_strip_emoji(body_text), f_fallback, text_w, draw)
+            for line in lines[:14]:
                 if y >= max_y:
                     break
-                draw.text((M, y), line, fill=_LIGHT, font=f_issue)
+                draw.text((M, y), line, fill=_LIGHT, font=f_fallback)
                 y += 22
 
         # ── 하단 ──
@@ -419,8 +484,11 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
                 "title_ko": c.title_ko or c.title or "",
                 "country_code": c.country_code or "",
                 "severity": c.severity or 0,
+                "independent_sources": getattr(c, "independent_sources", 0),
+                "source_tiers": getattr(c, "source_tiers", []),
+                "is_verified": getattr(c, "is_verified", False),
+                "event_count": getattr(c, "event_count", 0),
             })
-        # 첫 클러스터의 이미지를 배경으로
         bg_image_url = getattr(clusters[0], "image_url", None)
 
     # spike_alert: 첫 클러스터의 last_event_at을 시간 포함 date_str로
@@ -442,6 +510,20 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
         return None
 
     tmp_path = save_card_temp(image_bytes, str(post.id))
-    if tmp_path:
-        post.image_url = tmp_path
+    if not tmp_path:
+        return None
+
+    # 즉시 Supabase Storage에 업로드 → public URL로 저장
+    try:
+        from worker.social.image_uploader import upload_image, is_configured
+        if is_configured():
+            public_url = upload_image(tmp_path, str(post.id))
+            if public_url:
+                post.image_url = public_url
+                return public_url
+    except Exception:
+        logger.warning("Supabase 업로드 실패, 로컬 경로 유지: %s", tmp_path)
+
+    # Supabase 미설정/실패 시 로컬 경로 폴백
+    post.image_url = tmp_path
     return tmp_path

@@ -369,6 +369,18 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
     )
     db.add(post)
     await db.flush()
-    await _generate_card_for_post(post)
+
+    # 카드 배경/이슈용 top 3 클러스터 가져오기
+    top_clusters_result = await db.execute(
+        select(IssueCluster)
+        .where(
+            IssueCluster.severity > 0,
+            IssueCluster.last_event_at >= cutoff,
+        )
+        .order_by(IssueCluster.severity.desc())
+        .limit(3)
+    )
+    top_clusters = top_clusters_result.scalars().all()
+    await _generate_card_for_post(post, top_clusters or None)
     logger.info("Weekly Recap [bi] 생성: %s", post.id)
     return post
