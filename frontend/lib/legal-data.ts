@@ -25,7 +25,7 @@ export const TERMS_KO = [
   },
   {
     title: "제7조 (유료서비스 및 결제)",
-    content: `① Pro 구독: 월 4,900원 / Pro+ 구독: 월 9,900원 (VAT 포함)\n② 결제는 Google Play 또는 Apple App Store 인앱결제(IAP)로 처리됩니다.\n③ 구독 취소는 각 스토어(Google Play/App Store)에서 직접 진행하며, 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 결제 관련 문의: contact@wewantpeace.app`,
+    content: `① Pro 구독: 월 4,900원 / Pro+ 구독: 월 9,900원 (VAT 포함)\n② 결제는 Google Play 또는 Apple App Store 인앱결제(IAP)로 처리됩니다.\n③ 구독 취소는 각 스토어(Google Play/App Store)에서 직접 진행하며, 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 결제 관련 문의: krshin7@gmail.com`,
   },
   {
     title: "제8조 (책임제한)",
@@ -76,7 +76,7 @@ export const TERMS_EN = [
   },
   {
     title: "Article 7 (Paid Services and Payment)",
-    content: `① Pro subscription: ₩4,900/month / Pro+ subscription: ₩9,900/month (VAT included)\n② Payment is processed via Google Play or Apple App Store in-app purchase (IAP).\n③ Cancellation must be done through the respective store (Google Play/App Store). Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Payment inquiries: contact@wewantpeace.app`,
+    content: `① Pro subscription: ₩4,900/month / Pro+ subscription: ₩9,900/month (VAT included)\n② Payment is processed via Google Play or Apple App Store in-app purchase (IAP).\n③ Cancellation must be done through the respective store (Google Play/App Store). Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Payment inquiries: krshin7@gmail.com`,
   },
   {
     title: "Article 8 (Limitation of Liability)",
@@ -123,7 +123,7 @@ export const PRIVACY_KO = [
   },
   {
     title: "6. 이용자 권리 행사 방법",
-    content: `이용자는 언제든지 다음 권리를 행사할 수 있습니다:\n• 개인정보 열람, 정정, 삭제 요청\n• 개인정보 처리 정지 요청\n• 데이터 삭제 요청 방법:\n  1) 앱 내 설정 > 계정 > 회원 탈퇴\n  2) 이메일 요청: contact@wewantpeace.app\n• 요청 처리: 14일 이내`,
+    content: `이용자는 언제든지 다음 권리를 행사할 수 있습니다:\n• 개인정보 열람, 정정, 삭제 요청\n• 개인정보 처리 정지 요청\n• 데이터 삭제 요청 방법:\n  1) 앱 내 설정 > 계정 > 회원 탈퇴\n  2) 이메일 요청: krshin7@gmail.com\n• 요청 처리: 14일 이내`,
   },
   {
     title: "7. 자동 수집 장치 (쿠키)",
@@ -135,7 +135,7 @@ export const PRIVACY_KO = [
   },
   {
     title: "9. 개인정보 보호책임자",
-    content: `운영사: 도핑연구소\n서비스명: wewantpeace\n이메일: contact@wewantpeace.app`,
+    content: `운영사: 도핑연구소\n서비스명: wewantpeace\n이메일: krshin7@gmail.com`,
   },
   {
     title: "10. 고지의 의무",
@@ -174,7 +174,7 @@ export const PRIVACY_EN = [
   },
   {
     title: "6. How to Exercise User Rights",
-    content: `Users may exercise the following rights at any time:\n• Request access, correction, or deletion of personal information\n• Request suspension of personal information processing\n• How to request data deletion:\n  1) In-app: Settings > Account > Delete Account\n  2) Email: contact@wewantpeace.app\n• Requests handled within 14 days`,
+    content: `Users may exercise the following rights at any time:\n• Request access, correction, or deletion of personal information\n• Request suspension of personal information processing\n• How to request data deletion:\n  1) In-app: Settings > Account > Delete Account\n  2) Email: krshin7@gmail.com\n• Requests handled within 14 days`,
   },
   {
     title: "7. Automated Collection Devices (Cookies)",
@@ -186,7 +186,7 @@ export const PRIVACY_EN = [
   },
   {
     title: "9. Privacy Officer",
-    content: `Operator: 도핑연구소\nService: wewantpeace\nEmail: contact@wewantpeace.app`,
+    content: `Operator: 도핑연구소\nService: wewantpeace\nEmail: krshin7@gmail.com`,
   },
   {
     title: "10. Notification of Changes",

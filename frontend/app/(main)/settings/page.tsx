@@ -1208,13 +1208,13 @@ export default function SettingsPage() {
               <span className="text-muted-foreground text-xs">→</span>
             </a>
             <a
-              href="mailto:contact@wewantpeace.app"
+              href="mailto:krshin7@gmail.com"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
             >
               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1">
                 <p>{t(lang, "settings_support_email")}</p>
-                <p className="text-[11px] text-muted-foreground">contact@wewantpeace.app</p>
+                <p className="text-[11px] text-muted-foreground">krshin7@gmail.com</p>
               </div>
               <span className="text-muted-foreground text-xs">→</span>
             </a>
@@ -1229,7 +1229,7 @@ export default function SettingsPage() {
               </button>
             ) : (
               <a
-                href="mailto:contact@wewantpeace.app?subject=WeWantPeace%20의견"
+                href="mailto:krshin7@gmail.com?subject=WeWantPeace%20의견"
                 className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
               >
                 <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />

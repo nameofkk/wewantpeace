@@ -46,8 +46,8 @@ export default function TermsPage() {
 
         <div className="mt-8 text-center text-xs text-muted-foreground">
           {t(lang, "terms_contact")}:{" "}
-          <a href="mailto:contact@wewantpeace.app" className="hover:underline">
-            contact@wewantpeace.app
+          <a href="mailto:krshin7@gmail.com" className="hover:underline">
+            krshin7@gmail.com
           </a>
           {" · "}
           <Link href="/privacy" className="hover:underline">{t(lang, "terms_privacy_link")}</Link>
