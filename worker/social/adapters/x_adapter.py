@@ -1,9 +1,18 @@
 """X (Twitter) 어댑터 — tweepy v4+ OAuth 1.0a.
 
+X 2026 알고리즘 최적화:
+- Grok이 본문을 직접 읽음 → 해시태그 불필요 (과다 사용 시 페널티)
+- 비프리미엄 계정 링크 포스트 노출 0 → URL 제거, 브랜드명만
+- 네이티브 이미지 = 10x 더 높은 인게이지먼트
+- 초기 6시간 내 engagement가 핵심 (6시간마다 점수 절반 감소)
+- 간결하고 임팩트 있는 뉴스 헤드라인 스타일 (70~100자 최적)
+- 리플/RT 유도 > 좋아요 (13-20x 가치)
+
 이미지 첨부: v1.1 media_upload(로컬파일) → v2 create_tweet(media_ids)
 """
 import logging
 import os
+import re
 
 from backend.app.models.social_post import SocialPost
 
@@ -19,33 +28,36 @@ def is_configured() -> bool:
     return bool(X_API_KEY and X_API_SECRET and X_ACCESS_TOKEN and X_ACCESS_SECRET)
 
 
-# 2026.3 X 알고리즘 변경: 비프리미엄 링크 포스트 노출 0
-# → URL 대신 브랜드명만 언급 (프로필 링크로 유도)
 _CTA = "— WeWantPeace"
 
 
 def _build_text(post: SocialPost) -> str:
-    """본문 + 해시태그 + CTA 조합 (280자 제한).
+    """X 최적화 본문 조합 (280자 제한).
 
-    X 2026 최적화:
-    - 70-100자 본문이 최적 (스캔 용이)
-    - 링크 포함 시 노출 0 → URL 제거, 브랜드명만
-    - 네이티브 이미지 = 40% 더 높은 인게이지먼트
-    - 리플/RT 유도가 좋아요보다 13-20x 가치
+    X 전용 톤:
+    - 뉴스 속보 스타일, 짧고 강렬
+    - URL 완전 제거 (비프리미엄 페널티)
+    - 해시태그 사용 안 함 (Grok이 직접 분류, 과다 시 페널티)
+    - 브랜드명 CTA만 (프로필 링크로 유도)
+    - 영어 + 한국어 bilingual 유지
     """
-    # body_text에서 URL 제거 (AI가 넣었을 수 있음)
-    import re
-    body = re.sub(r'https?://\S+', '', post.body_text).strip()
-    body = re.sub(r'www\.\S+', '', body).strip()
+    body = post.body_text
 
-    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
-    footer = f"\n\n{hashtag_str}\n{_CTA}" if hashtag_str else f"\n\n{_CTA}"
-    full_text = body
-    if len(full_text) + len(footer) <= 280:
-        full_text = full_text + footer
-    elif len(full_text) + len(f"\n\n{_CTA}") <= 280:
-        full_text = f"{full_text}\n\n{_CTA}"
-    return full_text
+    # URL, CTA 라인, 해시태그 제거
+    body = re.sub(r'https?://\S+', '', body).strip()
+    body = re.sub(r'www\.\S+', '', body).strip()
+    body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
+    body = re.sub(r'#\w+', '', body).strip()
+    body = re.sub(r'\n{3,}', '\n\n', body).strip()
+
+    footer = f"\n\n{_CTA}"
+
+    if len(body) + len(footer) <= 280:
+        return body + footer
+
+    # 본문이 길면 잘라서 맞춤
+    max_body = 280 - len(footer) - 3
+    return f"{body[:max_body]}...\n\n{_CTA}"
 
 
 def _upload_media(image_path: str) -> str | None:

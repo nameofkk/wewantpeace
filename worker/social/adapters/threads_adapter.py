@@ -1,6 +1,17 @@
-"""Threads 어댑터 — Meta Graph API v22.0 (텍스트 + 이미지)."""
+"""Threads 어댑터 — Meta Graph API v22.0 (텍스트 + 이미지).
+
+Threads 2026 알고리즘 최적화:
+- 500자 한도 (200~300자 최적 퍼포먼스)
+- 대화형/커뮤니티 톤 (뉴스 속보 < 맥락 설명 + 의견)
+- 답글(reply) > 좋아요 (13-20x 가치) → 질문으로 마무리
+- 포스팅 후 30~90분이 결정적 (초기 engagement)
+- 링크 페널티 없음 → URL 포함 가능
+- 해시태그 적절히 사용 (검색 발견용)
+- 홍보성 문구 ("좋아요 눌러주세요", "팔로우") 페널티
+"""
 import logging
 import os
+import re
 import time
 
 from backend.app.models.social_post import SocialPost
@@ -17,6 +28,39 @@ def is_configured() -> bool:
     return bool(THREADS_USER_ID and THREADS_ACCESS_TOKEN)
 
 
+def _build_text(post: SocialPost) -> str:
+    """Threads 최적화 본문 (500자 한도).
+
+    Threads 전용 톤:
+    - 대화형, 맥락 있는 설명
+    - URL 포함 (프로필 유입)
+    - 해시태그 2~3개 (검색 발견용)
+    - 마무리에 대화 유도 문구
+    """
+    body = post.body_text
+
+    # 기존 CTA/URL 라인 정리 (Threads 전용으로 교체)
+    body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
+    body = re.sub(r'https?://\S+', '', body).strip()
+    body = re.sub(r'www\.\S+', '', body).strip()
+    body = re.sub(r'\n{3,}', '\n\n', body).strip()
+
+    # Threads CTA: 링크 + 대화 유도
+    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
+    cta = "\n\n🔗 www.wewantpeace.live"
+
+    full_text = body + cta
+    if hashtag_str and len(full_text) + len(hashtag_str) + 1 <= 500:
+        full_text = f"{full_text}\n{hashtag_str}"
+
+    # 500자 초과 시 잘라내기
+    if len(full_text) > 500:
+        max_body = 500 - len(cta) - 3
+        full_text = f"{body[:max_body]}...{cta}"
+
+    return full_text
+
+
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
     """Threads에 포스트 발행 (2-step: create container → publish).
 
@@ -31,17 +75,7 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
     try:
         import httpx
 
-        hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
-        full_text = post.body_text
-
-        # Threads 2026 최적화: 대화형 톤, 500자 한도
-        # CTA가 본문에 없으면 추가
-        if "wewantpeace" not in full_text.lower():
-            full_text = f"{full_text}\n\n🔗 www.wewantpeace.live"
-
-        if hashtag_str:
-            if len(full_text) + len(hashtag_str) + 1 <= 500:
-                full_text = f"{full_text}\n{hashtag_str}"
+        full_text = _build_text(post)
 
         # 이미지 URL 확인 — public URL이면 IMAGE 모드
         has_image = (

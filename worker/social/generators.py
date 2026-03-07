@@ -95,7 +95,7 @@ _BILINGUAL_SYSTEM = (
     "www.wewantpeace.live\n"
     "\n"
     "Rules:\n"
-    "- Body (before CTA) MUST be under 200 chars\n"
+    "- Body MUST be under 400 chars total (EN + KO combined)\n"
     "- Use 1-2 relevant emojis (🔴⚡🌍 etc.) for visual punch\n"
     "- Use · or | as separators, NOT full sentences\n"
     "- Be factual but impactful — hook the reader in 2 seconds\n"
@@ -119,7 +119,7 @@ _SPIKE_BILINGUAL_SYSTEM = (
     "www.wewantpeace.live\n"
     "\n"
     "Rules:\n"
-    "- Body (before CTA) MUST be under 200 chars\n"
+    "- Body MUST be under 400 chars total (EN + KO combined)\n"
     "- Start with 🚨 for urgency\n"
     "- Use · or | as separators\n"
     "- Maximum impact in minimum words\n"
@@ -142,7 +142,7 @@ _WEEKLY_BILINGUAL_SYSTEM = (
     "www.wewantpeace.live\n"
     "\n"
     "Rules:\n"
-    "- Body (before CTA) MUST be under 200 chars\n"
+    "- Body MUST be under 400 chars total (EN + KO combined)\n"
     "- Highlight top 2-3 countries with stats\n"
     "- Use · or | as separators\n"
     "- Clean, scannable format\n"
@@ -208,8 +208,8 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         ko_title = (top.title_ko or top.title)[:60]
         body = f"🌍 {en_title}\n\n🌍 {ko_title}"
 
-    if len(body) > 250:
-        body = body[:247] + "..."
+    if len(body) > 500:
+        body = body[:497] + "..."
 
     post = SocialPost(
         content_type="daily_movers",
@@ -266,12 +266,10 @@ async def generate_spike_alert(
 
     body = _call_openai(_SPIKE_BILINGUAL_SYSTEM, user_prompt)
     if not body:
-        en_short = title_en[:80] if len(title_en) > 80 else title_en
-        ko_short = title_ko[:80] if len(title_ko) > 80 else title_ko
-        body = f"🚨 {en_short}\n\n🚨 {ko_short}"
+        body = f"🚨 {title_en}\n\n🚨 {title_ko}"
 
-    if len(body) > 250:
-        body = body[:247] + "..."
+    if len(body) > 500:
+        body = body[:497] + "..."
 
     post = SocialPost(
         content_type="spike_alert",
@@ -357,8 +355,8 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
             f"📊 주간: {total_clusters}개 이슈 | {top3}"
         )
 
-    if len(body) > 250:
-        body = body[:247] + "..."
+    if len(body) > 500:
+        body = body[:497] + "..."
 
     post = SocialPost(
         content_type="weekly_recap",

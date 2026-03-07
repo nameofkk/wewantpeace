@@ -257,7 +257,7 @@ def generate_card(
             for idx, iss in enumerate(issues[:3]):
                 en_lines = _wrap(iss.get("title_en", ""), f_issue, text_w - 24, draw)
                 ko_lines = _wrap(iss.get("title_ko", ""), f_issue, text_w - 24, draw)
-                issue_h_total += 24 + min(len(en_lines), 2) * 22 + min(len(ko_lines), 2) * 22 + 6 + 14
+                issue_h_total += 24 + min(len(en_lines), 3) * 22 + min(len(ko_lines), 3) * 22 + 6 + 14
                 if idx < len(issues[:3]) - 1:
                     issue_h_total += 14
         else:
@@ -315,7 +315,7 @@ def generate_card(
 
                 # EN 라인 (- 접두사)
                 en_lines = _wrap(title_en, f_issue, text_w - 24, draw)
-                for li, line in enumerate(en_lines[:2]):
+                for li, line in enumerate(en_lines[:3]):
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
@@ -324,7 +324,7 @@ def generate_card(
 
                 # KO 라인 (- 접두사)
                 ko_lines = _wrap(title_ko, f_issue, text_w - 24, draw)
-                for li, line in enumerate(ko_lines[:2]):
+                for li, line in enumerate(ko_lines[:3]):
                     if y >= max_y:
                         break
                     prefix = "- " if li == 0 else "  "
