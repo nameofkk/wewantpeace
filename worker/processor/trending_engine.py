@@ -190,9 +190,9 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             TrendingKeyword.calculated_at < history_cutoff,
         )
     )
-    # 2) 1시간 이상 된 엔트리 중 시간별 1개만 남기고 정리 (bloat 방지)
-    #    최근 1시간은 원본 유지 (실시간 표시용)
-    one_hour_ago = now - timedelta(hours=1)
+    # 2) 7일 이상 된 엔트리 중 시간별 1개만 남기고 정리 (bloat 방지)
+    #    최근 7일은 원본 유지 (5분 간격, 긴장도 히스토리와 동일 해상도)
+    seven_days_ago = now - timedelta(days=7)
     await db.execute(
         sa_text("""
             DELETE FROM trending_keywords
@@ -204,7 +204,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             )
             AND calculated_at < :cutoff
         """),
-        {"cutoff": one_hour_ago},
+        {"cutoff": seven_days_ago},
     )
 
     # issue_clusters.kscore 업데이트:

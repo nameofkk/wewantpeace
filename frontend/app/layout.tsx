@@ -73,6 +73,9 @@ export default function RootLayout({
             var s = JSON.parse(localStorage.getItem('wwp-store') || '{}');
             var t = (s.state && s.state.theme) || 'dark';
             document.documentElement.className = t;
+            var l = (s.state && s.state.lang) || 'ko';
+            document.documentElement.lang = l;
+            document.documentElement.dataset.lang = l;
           } catch(e) {}
         ` }} />
         <link rel="icon" href="/favicon.ico" sizes="any" />

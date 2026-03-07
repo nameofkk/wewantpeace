@@ -66,7 +66,7 @@ async def send_review_message(post: SocialPost) -> bool:
                         data={
                             "chat_id": SOCIAL_TG_CHAT_ID,
                             "caption": text,
-                            "reply_markup": json.dumps(keyboard),
+                            "reply_markup": json.dumps(keyboard, ensure_ascii=False),
                         },
                         files={"photo": ("card.png", img_file, "image/png")},
                     )
