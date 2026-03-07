@@ -40,6 +40,22 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/5"),  # 5분마다
         "options": {"queue": "collect"},
     },
+    # ── API 소스 수집 (소스 확장 Phase 3) ──
+    "collect-gdelt": {
+        "task": "worker.tasks.collect_gdelt",
+        "schedule": crontab(minute="*/15"),  # 15분마다
+        "options": {"queue": "collect"},
+    },
+    "collect-acled": {
+        "task": "worker.tasks.collect_acled",
+        "schedule": crontab(minute=30, hour=6, day_of_week=1),  # 매주 월요일 06:30 UTC
+        "options": {"queue": "collect"},
+    },
+    "collect-reliefweb": {
+        "task": "worker.tasks.collect_reliefweb",
+        "schedule": crontab(minute="*/30"),  # 30분마다
+        "options": {"queue": "collect"},
+    },
     "calc-tension": {
         "task": "worker.tasks.calculate_tension",
         "schedule": crontab(minute="1,6,11,16,21,26,31,36,41,46,51,56"),  # 5분마다 (+1분 오프셋)

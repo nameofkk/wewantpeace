@@ -100,6 +100,12 @@ _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"la tomatina",
     r"mardi gras",
     r"(rio|venice|nice|cologne|trinidad).{0,30}carnival",
+    # ── 신규 소스 노이즈 필터 (소스 확장 Phase 1) ──
+    r"(?i)\bsaudi.{0,30}(crown prince|royal|sport|entertainment)\b",
+    r"(?i)\b(turkish football|super lig|galatasaray|fenerbahce|besiktas)\b",
+    r"(?i)\b(recipe|cooking|lifestyle|fashion)\b",
+    r"(?i)\b(book review|film review|album review)\b",
+    r"(?i)\b(weather forecast|horoscope)\b",
 ]]
 
 # 연예/스포츠 태그 집합 (RSS raw_metadata["tags"] 필터링용)

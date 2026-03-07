@@ -41,12 +41,16 @@
     KSCORE_SCALE=10 도입: 최종 KScore = raw(0-1) × 10 → 0-10 범위
     KSCORE_MIN=1.5 (구 0.4에 대응, 새 스케일 기준)
     UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)
+
+  v5 (2026-03-07): 소스 확장 (37→58채널) 대응
+    ACTIVE_CHANNELS=58, SPREAD_SATURATION=12
+    소스 58개 체제에서 독립출처 12개 = 상위 20% 수준. 변별력 유지.
 """
 
 # ── 환경 파라미터 (모니터링용) ───────────────────────────────────────────────
 
-# 현재 활성 RSS/Telegram 채널 수
-ACTIVE_CHANNELS: int = 37
+# 현재 활성 RSS/Telegram/API 채널 수 (v5: 37→58)
+ACTIVE_CHANNELS: int = 58
 
 # 15분 사이클당 평균 이벤트 수 (최근 측정 기준)
 EVENTS_PER_CYCLE: int = 1000
@@ -108,7 +112,8 @@ SPIKE_FACTOR: float = 1.5
 
 # spread 포화점: 독립출처 수가 이 값 이상이면 spread=1.0
 # 공식: spread = min(1.0, independent_sources / SPREAD_SATURATION)
-SPREAD_SATURATION: int = 8
+# v5: 8→12 (58개 소스 체제에서 12개 독립출처 = 상위 20% 수준)
+SPREAD_SATURATION: int = 12
 
 # KScore 출력 스케일: raw(0-1) × KSCORE_SCALE → 0-10 범위
 # 10점 만점 직관적 스케일. UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)

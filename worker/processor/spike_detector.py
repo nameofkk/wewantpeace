@@ -6,9 +6,9 @@ SpikeDetector: 누적 기반 스파이크 감지.
   변경: 클러스터 누적 상태(event_count, severity, independent_sources)로 판단
 
 트리거 조건 (모두 충족):
-  event_count >= 5          — 보도 건수 충분
+  event_count >= 8          — 보도 건수 충분 (v5: 5→8)
   severity >= 40            — 최소 위험도
-  independent_sources >= 2  — 복수 독립 출처
+  independent_sources >= 3  — 복수 독립 출처 (v5: 2→3)
   cluster age <= 48h        — 최근 클러스터만 (오래된 건 제외)
 
 쿨다운: severity >= 90 → 30분, 그 외 → 1시간 (Redis 유지)
@@ -20,9 +20,10 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # ── 상수 ─────────────────────────────────────────────────────────────────────
-EVENT_COUNT_MIN = 5
+# v5 (소스 확장): 5→8, 2→3 (58개 소스에서 스파이크 남발 방지)
+EVENT_COUNT_MIN = 8
 SEVERITY_MIN = 40
-SOURCES_MIN = 2
+SOURCES_MIN = 3
 MAX_AGE_HOURS = 48
 
 COOLDOWN_SECONDS = 21600  # 6시간 (기본) — 같은 이슈 반복 방지

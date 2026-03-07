@@ -516,11 +516,10 @@ async def assign_cluster(
 
     # is_verified 양방향 자동 판별: confidence 하락 시 해제
     # confidence >= 0.70 AND "A" 티어 소스 포함
-    # severity ≥ 75인 경우 independent_sources ≥ 2도 필요 (고위험 이벤트 검증 강화)
+    # v5 (소스 확장): 모든 severity에서 independent_sources >= 2 필요
+    # 단일 매체 보도로 verified 되면 안 됨
     tiers = cluster.source_tiers or []
-    sources_ok = True
-    if cluster.severity >= 75:
-        sources_ok = (cluster.independent_sources or 1) >= 2
+    sources_ok = (cluster.independent_sources or 1) >= 2
     should_verify = cluster.confidence >= 0.70 and "A" in tiers and sources_ok
 
     just_verified = False

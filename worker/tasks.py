@@ -112,6 +112,128 @@ def collect_rss(self):
         raise self.retry(exc=exc)
 
 
+# ── API 소스 수집 태스크 (소스 확장 Phase 3) ──────────────────────────────────
+
+@app.task(
+    name="worker.tasks.collect_gdelt",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=120,
+)
+def collect_gdelt(self):
+    """GDELT DOC API 수집 (15분마다)."""
+
+    async def _run():
+        from worker.collector.gdelt_collector import GDELTCollector
+        from backend.app.core.redis import get_redis
+        async with AsyncSessionLocal() as db:
+            collector = GDELTCollector()
+            redis = get_redis()
+            results = await collector.collect_all(db, redis=redis)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("GDELT 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("GDELT 수집 완료: 총 %d개", total)
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("GDELT 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_acled",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+def collect_acled(self):
+    """ACLED API 수집 (주간 배치)."""
+
+    async def _run():
+        from worker.collector.acled_collector import ACLEDCollector
+        from backend.app.core.redis import get_redis
+        async with AsyncSessionLocal() as db:
+            collector = ACLEDCollector()
+            redis = get_redis()
+            results = await collector.collect_all(db, redis=redis)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("ACLED 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("ACLED 수집 완료: 총 %d개", total)
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("ACLED 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_reliefweb",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=120,
+)
+def collect_reliefweb(self):
+    """ReliefWeb API 수집 (30분마다)."""
+
+    async def _run():
+        from worker.collector.reliefweb_collector import ReliefWebCollector
+        from backend.app.core.redis import get_redis
+        async with AsyncSessionLocal() as db:
+            collector = ReliefWebCollector()
+            redis = get_redis()
+            results = await collector.collect_all(db, redis=redis)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("ReliefWeb 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("ReliefWeb 수집 완료: 총 %d개", total)
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("ReliefWeb 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
 @app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
@@ -189,17 +311,84 @@ def process_raw_event(self, raw_event_id: str):
                                 published_at = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
                             except Exception:
                                 published_at = None
+                    elif raw_event.source_type == "api":
+                        rss_title = raw_event.raw_metadata.get("title") or None
+                        pub_str = raw_event.raw_metadata.get("published")
+                        if pub_str:
+                            try:
+                                published_at = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+                            except Exception:
+                                published_at = None
 
                 image_url = (raw_event.raw_metadata or {}).get("image_url") if raw_event.raw_metadata else None
-                norm = await asyncio.to_thread(
-                    normalize,
-                    raw_text=raw_event.raw_text,
-                    source_tier=tier,
-                    collected_at=raw_event.collected_at,
-                    source_title=rss_title,
-                    published_at=published_at,
-                    image_url=image_url,
-                )
+
+                # API 소스의 구조화 데이터: GDELT/ACLED는 이미 topic/severity/geo가 있으므로 GPT 스킵
+                structured_meta = raw_event.raw_metadata or {}
+                if (raw_event.source_type == "api"
+                        and structured_meta.get("structured_topic")
+                        and structured_meta["structured_topic"] != "unknown"):
+                    from worker.processor.normalizer import (
+                        NormalizeResult, _make_dedup_key, _calculate_confidence,
+                        _make_geohash, _translate_to_korean, _extract_geo,
+                    )
+                    s_topic = structured_meta["structured_topic"]
+                    s_severity = int(structured_meta.get("structured_severity", 50))
+                    s_title = (rss_title or raw_event.raw_text[:120]).strip()
+
+                    # geo: 구조화 데이터 우선, 없으면 키워드 추출
+                    s_lat = structured_meta.get("structured_lat")
+                    s_lon = structured_meta.get("structured_lon")
+                    s_country = structured_meta.get("structured_country")
+                    if s_lat and s_lon and s_country:
+                        # ACLED 구조화 geo 사용
+                        from worker.processor.normalizer import COUNTRY_MAP
+                        s_lat = float(s_lat)
+                        s_lon = float(s_lon)
+                        # 국가명 → 코드 매핑
+                        country_lower = s_country.lower()
+                        if country_lower in COUNTRY_MAP:
+                            s_cc = COUNTRY_MAP[country_lower][0]
+                        else:
+                            s_cc, s_lat, s_lon = _extract_geo(s_title + " " + s_country)
+                    else:
+                        s_cc, s_lat, s_lon = _extract_geo(raw_event.raw_text, title=s_title)
+
+                    s_geohash = _make_geohash(s_lat, s_lon)
+                    s_confidence = _calculate_confidence(tier, s_severity)
+                    s_dedup = _make_dedup_key(raw_event.raw_text)
+                    s_title_ko = _translate_to_korean(s_title)
+
+                    norm = NormalizeResult(
+                        title=s_title[:120],
+                        title_ko=s_title_ko,
+                        body=raw_event.raw_text[:2000],
+                        topic=s_topic,
+                        entity_anchor=s_cc or s_title[:64],
+                        lat=s_lat,
+                        lon=s_lon,
+                        geohash5=s_geohash,
+                        country_code=s_cc,
+                        severity=s_severity,
+                        source_tier=tier,
+                        confidence=s_confidence,
+                        dedup_key=s_dedup,
+                        lang="en",
+                        translation_status="skipped",
+                        geo_method="structured" if s_cc else "none",
+                        event_time=published_at or raw_event.collected_at,
+                        image_url=image_url,
+                    )
+                    logger.debug("구조화 데이터 정규화: topic=%s, sev=%d, cc=%s", s_topic, s_severity, s_cc)
+                else:
+                    norm = await asyncio.to_thread(
+                        normalize,
+                        raw_text=raw_event.raw_text,
+                        source_tier=tier,
+                        collected_at=raw_event.collected_at,
+                        source_title=rss_title,
+                        published_at=published_at,
+                        image_url=image_url,
+                    )
 
                 # 3-1. 관련성 필터: topic=unknown & 지리정보 없으면 버림
                 if not is_relevant(norm):

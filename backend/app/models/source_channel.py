@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Float, Integer, String, TIMESTAMP
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Float, Integer, JSON, String, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 from backend.app.core.database import Base, StringArray
 
@@ -18,6 +18,9 @@ class SourceChannel(Base):
     geo_focus: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
     source_type: Mapped[str] = mapped_column(String(16), nullable=False, default="telegram")
     feed_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    api_endpoint: Mapped[str | None] = mapped_column(String, nullable=True)
+    api_params: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    last_fetch_cursor: Mapped[str | None] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
