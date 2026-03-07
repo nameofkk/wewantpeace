@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
+import { t, type Lang } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,7 @@ const CAT_COLORS: Record<string, string> = {
   api: "bg-purple-500/20 text-purple-400",
 };
 
-function catLabel(lang: string, cat: string): string {
+function catLabel(lang: Lang, cat: string): string {
   const key = `admin_source_cat_${cat}` as Parameters<typeof t>[1];
   return t(lang, key) || cat.toUpperCase();
 }
@@ -90,7 +90,7 @@ function StatusDot({ status }: { status: CollectStatus | null }) {
 }
 
 // 비활성 사유 추정
-function getInactiveReason(ch: SourceItem, lang: string): string {
+function getInactiveReason(ch: SourceItem, lang: Lang): string {
   if (ch.is_active) return "";
   const cs = ch.collect_status;
   if (ch.source_type === "api" && ch.display_name === "ACLED") {
