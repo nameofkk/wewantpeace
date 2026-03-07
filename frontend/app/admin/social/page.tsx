@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { API_BASE } from "@/lib/admin-utils";
 import {
   Share2, Search, ChevronLeft, ChevronRight, HelpCircle,
   ChevronDown, X, CheckCircle, XCircle, RefreshCw, Eye,
-  BarChart3,
+  BarChart3, Edit3, Save,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t, type Lang } from "@/lib/i18n";
@@ -66,6 +66,11 @@ interface ChartData {
   langs: { lang: string; count: number }[];
 }
 
+interface PreviewData {
+  x: { text: string; char_count: number; max: number };
+  threads: { text: string; char_count: number; max: number };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
@@ -77,6 +82,7 @@ const STATUS_COLORS: Record<string, string> = {
   published: "bg-green-500/20 text-green-400",
   rejected: "bg-red-500/20 text-red-400",
   failed: "bg-orange-500/20 text-orange-400",
+  skipped: "bg-gray-500/20 text-gray-400",
 };
 
 const STATUS_LABELS: Record<string, { ko: string; en: string }> = {
@@ -85,6 +91,7 @@ const STATUS_LABELS: Record<string, { ko: string; en: string }> = {
   published: { ko: "발행", en: "Published" },
   rejected: { ko: "거절", en: "Rejected" },
   failed: { ko: "실패", en: "Failed" },
+  skipped: { ko: "스킵", en: "Skipped" },
 };
 
 const RISK_COLORS: Record<string, string> = {
@@ -100,10 +107,16 @@ const CONTENT_TYPE_LABELS: Record<string, { ko: string; en: string }> = {
 };
 
 const PLATFORM_ICONS: Record<string, string> = {
-  x: "𝕏",
-  threads: "🧵",
-  instagram: "📷",
+  x: "\ud835\udd4f",
+  threads: "\ud83e\uddf5",
+  instagram: "\ud83d\udcf7",
 };
+
+const PLATFORM_FILTER_TABS = [
+  { key: "", label: { ko: "전체", en: "All" } },
+  { key: "x", label: { ko: "\ud835\udd4f X", en: "\ud835\udd4f X" } },
+  { key: "threads", label: { ko: "\ud83e\uddf5 Threads", en: "\ud83e\uddf5 Threads" } },
+];
 
 const PIE_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"];
 
@@ -304,11 +317,64 @@ function DetailModal({
   post,
   lang,
   onClose,
+  fetchWithToken,
+  onRefresh,
 }: {
   post: SocialPostItem;
   lang: Lang;
   onClose: () => void;
+  fetchWithToken: <T>(path: string, opts?: { method?: string; body?: unknown }) => Promise<T>;
+  onRefresh: () => void;
 }) {
+  const [previewTab, setPreviewTab] = useState<"source" | "x" | "threads">("source");
+  const [preview, setPreview] = useState<PreviewData | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.body_text);
+  const [saving, setSaving] = useState(false);
+
+  const loadPreview = async () => {
+    if (preview) return;
+    setLoadingPreview(true);
+    try {
+      const data = await fetchWithToken<PreviewData>(`/admin/social/${post.id}/preview`);
+      setPreview(data);
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  useEffect(() => {
+    if (previewTab !== "source" && !preview) {
+      loadPreview();
+    }
+  }, [previewTab]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetchWithToken(`/admin/social/${post.id}`, {
+        method: "PATCH",
+        body: { body_text: editText },
+      });
+      setEditing(false);
+      setPreview(null); // force reload preview
+      onRefresh();
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const previewTabs = [
+    { key: "source" as const, label: t(lang, "admin_social_source_text") },
+    { key: "x" as const, label: t(lang, "admin_social_preview_x") },
+    { key: "threads" as const, label: t(lang, "admin_social_preview_threads") },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
@@ -323,9 +389,123 @@ function DetailModal({
         </div>
 
         <div className="space-y-3">
+          {/* Preview Tabs */}
+          <div className="flex gap-1 border-b border-border pb-2">
+            {previewTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setPreviewTab(tab.key)}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-xs transition-colors",
+                  previewTab === tab.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content Area */}
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{t(lang, "admin_social_body")}</p>
-            <p className="text-sm whitespace-pre-wrap">{post.body_text}</p>
+            {previewTab === "source" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">{t(lang, "admin_social_body")}</p>
+                  {(post.status === "pending_review" || post.status === "approved") && (
+                    <button
+                      onClick={() => { setEditing(!editing); setEditText(post.body_text); }}
+                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                    >
+                      <Edit3 className="h-3 w-3" />
+                      {t(lang, "admin_social_edit_body")}
+                    </button>
+                  )}
+                </div>
+                {editing ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full h-32 p-2 text-sm rounded-lg border border-border bg-background resize-none"
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className={cn(
+                        "text-xs",
+                        editText.length > 500 ? "text-red-400" : "text-muted-foreground"
+                      )}>
+                        {editText.length}/500
+                      </span>
+                      <button
+                        onClick={handleSave}
+                        disabled={saving || editText.length > 500}
+                        className="flex items-center gap-1 px-3 py-1 text-xs rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+                      >
+                        <Save className="h-3 w-3" />
+                        {t(lang, "admin_social_save")}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{post.body_text}</p>
+                )}
+              </div>
+            )}
+
+            {previewTab === "x" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">{t(lang, "admin_social_preview_x")}</p>
+                  {preview && (
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded-full",
+                      preview.x.char_count > preview.x.max
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-green-500/20 text-green-400"
+                    )}>
+                      {preview.x.char_count}/{preview.x.max}
+                    </span>
+                  )}
+                </div>
+                {loadingPreview ? (
+                  <div className="flex justify-center py-4">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : preview ? (
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <p className="text-sm whitespace-pre-wrap font-mono">{preview.x.text}</p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {previewTab === "threads" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">{t(lang, "admin_social_preview_threads")}</p>
+                  {preview && (
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded-full",
+                      preview.threads.char_count > preview.threads.max
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-green-500/20 text-green-400"
+                    )}>
+                      {preview.threads.char_count}/{preview.threads.max}
+                    </span>
+                  )}
+                </div>
+                {loadingPreview ? (
+                  <div className="flex justify-center py-4">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : preview ? (
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <p className="text-sm whitespace-pre-wrap font-mono">{preview.threads.text}</p>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {post.image_url && (
@@ -379,7 +559,7 @@ function DetailModal({
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <span>{PLATFORM_ICONS[p.platform] || p.platform}</span>
                     <span className={cn("px-1.5 py-0.5 rounded text-[10px]", STATUS_COLORS[p.status] || "bg-gray-500/20 text-gray-400")}>
-                      {p.status}
+                      {STATUS_LABELS[p.status]?.[lang] || p.status}
                     </span>
                     {p.error_message && (
                       <span className="text-red-400 truncate max-w-[200px]">{p.error_message}</span>
@@ -405,6 +585,7 @@ export default function AdminSocialPage() {
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("");
+  const [platformFilter, setPlatformFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedPost, setSelectedPost] = useState<SocialPostItem | null>(null);
@@ -444,10 +625,11 @@ export default function AdminSocialPage() {
   params.set("page", String(page));
   if (statusFilter !== "all") params.set("status", statusFilter);
   if (contentTypeFilter) params.set("content_type", contentTypeFilter);
+  if (platformFilter) params.set("platform", platformFilter);
   if (search) params.set("q", search);
 
   const { data, isLoading } = useQuery<SocialResponse>({
-    queryKey: ["social-posts", page, statusFilter, contentTypeFilter, search],
+    queryKey: ["social-posts", page, statusFilter, contentTypeFilter, platformFilter, search],
     queryFn: () => fetchWithToken(`/admin/social?${params.toString()}`),
     refetchInterval: 15_000,
   });
@@ -458,6 +640,14 @@ export default function AdminSocialPage() {
   // Mutations
   const approveMut = useMutation({
     mutationFn: (id: string) => fetchWithToken(`/admin/social/${id}/approve`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["social-posts"] }),
+  });
+  const approveXMut = useMutation({
+    mutationFn: (id: string) => fetchWithToken(`/admin/social/${id}/approve/x`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["social-posts"] }),
+  });
+  const approveThreadsMut = useMutation({
+    mutationFn: (id: string) => fetchWithToken(`/admin/social/${id}/approve/threads`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["social-posts"] }),
   });
   const rejectMut = useMutation({
@@ -540,6 +730,24 @@ export default function AdminSocialPage() {
           ))}
         </div>
 
+        {/* Platform filter tabs */}
+        <div className="flex gap-1">
+          {PLATFORM_FILTER_TABS.map((pf) => (
+            <button
+              key={pf.key}
+              onClick={() => { setPlatformFilter(pf.key); setPage(1); }}
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors",
+                platformFilter === pf.key
+                  ? "bg-primary/20 text-primary border border-primary/30"
+                  : "bg-secondary text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {pf.label[lang]}
+            </button>
+          ))}
+        </div>
+
         {/* Content type dropdown */}
         <select
           value={contentTypeFilter}
@@ -611,7 +819,11 @@ export default function AdminSocialPage() {
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
                         {post.platforms.map((p, i) => (
-                          <span key={i} title={`${p.platform}: ${p.status}`} className="text-sm">
+                          <span
+                            key={i}
+                            title={`${p.platform}: ${p.status}`}
+                            className={cn("text-sm", p.status === "skipped" && "opacity-40")}
+                          >
                             {PLATFORM_ICONS[p.platform] || p.platform}
                           </span>
                         ))}
@@ -634,9 +846,23 @@ export default function AdminSocialPage() {
                             <button
                               onClick={() => approveMut.mutate(post.id)}
                               className="p-1 text-green-400 hover:text-green-300"
-                              title={t(lang, "admin_social_approve")}
+                              title={t(lang, "admin_social_approve_all")}
                             >
                               <CheckCircle className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => approveXMut.mutate(post.id)}
+                              className="p-1 text-blue-400 hover:text-blue-300 text-[10px] font-bold"
+                              title={t(lang, "admin_social_approve_x")}
+                            >
+                              {"\ud835\udd4f"}
+                            </button>
+                            <button
+                              onClick={() => approveThreadsMut.mutate(post.id)}
+                              className="p-1 text-purple-400 hover:text-purple-300 text-[10px]"
+                              title={t(lang, "admin_social_approve_threads")}
+                            >
+                              {"\ud83e\uddf5"}
                             </button>
                             <button
                               onClick={() => rejectMut.mutate(post.id)}
@@ -687,7 +913,12 @@ export default function AdminSocialPage() {
                       {post.risk_level}
                     </span>
                     {post.platforms.map((p, i) => (
-                      <span key={i} className="text-xs">{PLATFORM_ICONS[p.platform] || p.platform}</span>
+                      <span
+                        key={i}
+                        className={cn("text-xs", p.status === "skipped" && "opacity-40")}
+                      >
+                        {PLATFORM_ICONS[p.platform] || p.platform}
+                      </span>
                     ))}
                   </div>
                   <div className="flex items-center gap-1">
@@ -696,8 +927,23 @@ export default function AdminSocialPage() {
                         <button
                           onClick={(e) => { e.stopPropagation(); approveMut.mutate(post.id); }}
                           className="p-1 text-green-400"
+                          title={t(lang, "admin_social_approve_all")}
                         >
                           <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); approveXMut.mutate(post.id); }}
+                          className="p-1 text-blue-400 text-xs font-bold"
+                          title={t(lang, "admin_social_approve_x")}
+                        >
+                          {"\ud835\udd4f"}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); approveThreadsMut.mutate(post.id); }}
+                          className="p-1 text-purple-400 text-xs"
+                          title={t(lang, "admin_social_approve_threads")}
+                        >
+                          {"\ud83e\uddf5"}
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); rejectMut.mutate(post.id); }}
@@ -748,7 +994,15 @@ export default function AdminSocialPage() {
 
       {/* Detail Modal */}
       {selectedPost && (
-        <DetailModal post={selectedPost} lang={lang} onClose={() => setSelectedPost(null)} />
+        <DetailModal
+          post={selectedPost}
+          lang={lang}
+          onClose={() => setSelectedPost(null)}
+          fetchWithToken={fetchWithToken}
+          onRefresh={() => {
+            qc.invalidateQueries({ queryKey: ["social-posts"] });
+          }}
+        />
       )}
     </div>
   );

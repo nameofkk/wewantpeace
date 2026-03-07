@@ -2026,6 +2026,8 @@ async def _publish_post_to_platforms(
             db.add(x_record)
             if not platform_id:
                 all_ok = False
+        elif x_record.status == "skipped":
+            pass  # 의도적 스킵
         elif x_record.status == "failed":
             all_ok = False
 
@@ -2053,6 +2055,8 @@ async def _publish_post_to_platforms(
             db.add(th_record)
             if not platform_id:
                 all_ok = False
+        elif th_record.status == "skipped":
+            pass  # 의도적 스킵
         elif th_record.status == "failed":
             all_ok = False
 
@@ -2080,6 +2084,8 @@ async def _publish_post_to_platforms(
             db.add(ig_record)
             if not platform_id:
                 all_ok = False
+        elif ig_record.status == "skipped":
+            pass  # 의도적 스킵
         elif ig_record.status == "failed":
             all_ok = False
 

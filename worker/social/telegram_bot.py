@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 SOCIAL_TG_BOT_TOKEN = os.getenv("SOCIAL_TG_BOT_TOKEN", "")
 SOCIAL_TG_CHAT_ID = os.getenv("SOCIAL_TG_CHAT_ID", "")
 
-_RISK_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+_RISK_EMOJI = {"low": "\U0001f7e2", "medium": "\U0001f7e1", "high": "\U0001f534"}
 _CONTENT_TYPE_LABEL = {
     "daily_movers": "Daily Movers",
     "spike_alert": "Spike Alert",
@@ -25,48 +25,98 @@ _CONTENT_TYPE_LABEL = {
 
 
 async def send_review_message(post: SocialPost) -> bool:
-    """Telegram으로 승인 요청 메시지 전송."""
+    """Telegram으로 플랫폼별 미리보기 + 요약 승인 메시지 전송."""
     if not SOCIAL_TG_BOT_TOKEN or not SOCIAL_TG_CHAT_ID:
         logger.warning("Telegram 봇 설정 누락 (SOCIAL_TG_BOT_TOKEN / SOCIAL_TG_CHAT_ID)")
         return False
 
     try:
         import httpx
-
-        risk_emoji = _RISK_EMOJI.get(post.risk_level, "⚪")
-        content_label = _CONTENT_TYPE_LABEL.get(post.content_type, post.content_type)
-        hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
-
-        text = (
-            f"📢 [{content_label}]\n"
-            f"──────────\n"
-            f"{post.body_text}\n"
-            f"──────────\n"
-            f"{hashtag_str}\n\n"
-            f"Risk: {risk_emoji} {post.risk_level} | Lang: {post.lang}\n"
-            f"ID: {post.id}"
+        from worker.social.adapters.x_adapter import _build_text as x_build_text
+        from worker.social.adapters.threads_adapter import _build_text as threads_build_text
+        from worker.social.config import (
+            SOCIAL_PLATFORM_X_ENABLED,
+            SOCIAL_PLATFORM_THREADS_ENABLED,
         )
 
-        keyboard = {
-            "inline_keyboard": [
-                [
-                    {"text": "✅ 승인", "callback_data": f"approve:{post.id}"},
-                    {"text": "✏️ 수정", "callback_data": f"edit:{post.id}"},
-                    {"text": "❌ 거절", "callback_data": f"reject:{post.id}"},
-                ]
-            ]
-        }
+        risk_emoji = _RISK_EMOJI.get(post.risk_level, "\u26aa")
+        content_label = _CONTENT_TYPE_LABEL.get(post.content_type, post.content_type)
+        hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
+        post_id_str = str(post.id)
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            # 카드 이미지가 있으면 sendPhoto, 없으면 sendMessage
+            # 1. X 미리보기 메시지
+            if SOCIAL_PLATFORM_X_ENABLED:
+                x_text = x_build_text(post)
+                x_msg = (
+                    f"\U0001d54f [X] [{content_label}]\n"
+                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+                    f"{x_text}\n"
+                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+                    f"280\uc790 \uc911 {len(x_text)}\uc790 | Risk: {risk_emoji} {post.risk_level}"
+                )
+                x_keyboard = {
+                    "inline_keyboard": [[
+                        {"text": "\u2705 X \uc2b9\uc778", "callback_data": f"approve_x:{post_id_str}"},
+                        {"text": "\u274c X \uac70\uc808", "callback_data": f"reject_x:{post_id_str}"},
+                    ]]
+                }
+                await client.post(
+                    f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": SOCIAL_TG_CHAT_ID,
+                        "text": x_msg,
+                        "reply_markup": x_keyboard,
+                    },
+                )
+
+            # 2. Threads 미리보기 메시지
+            if SOCIAL_PLATFORM_THREADS_ENABLED:
+                threads_text = threads_build_text(post)
+                threads_msg = (
+                    f"\U0001f9f5 [Threads] [{content_label}]\n"
+                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+                    f"{threads_text}\n"
+                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+                    f"500\uc790 \uc911 {len(threads_text)}\uc790 | Risk: {risk_emoji} {post.risk_level}"
+                )
+                threads_keyboard = {
+                    "inline_keyboard": [[
+                        {"text": "\u2705 Threads \uc2b9\uc778", "callback_data": f"approve_threads:{post_id_str}"},
+                        {"text": "\u274c Threads \uac70\uc808", "callback_data": f"reject_threads:{post_id_str}"},
+                    ]]
+                }
+                await client.post(
+                    f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": SOCIAL_TG_CHAT_ID,
+                        "text": threads_msg,
+                        "reply_markup": threads_keyboard,
+                    },
+                )
+
+            # 3. 요약 메시지 (항상) — 이미지 있으면 sendPhoto
+            summary_text = (
+                f"\U0001f4e2 [{content_label}] \uc2b9\uc778 \uc694\uccad\n"
+                f"ID: {post_id_str}\n"
+                f"{hashtag_str}"
+            )
+            summary_keyboard = {
+                "inline_keyboard": [[
+                    {"text": "\u2705 \uc804\uccb4 \uc2b9\uc778", "callback_data": f"approve_all:{post_id_str}"},
+                    {"text": "\u270f\ufe0f \uc218\uc815", "callback_data": f"edit:{post_id_str}"},
+                    {"text": "\u274c \uc804\uccb4 \uac70\uc808", "callback_data": f"reject:{post_id_str}"},
+                ]]
+            }
+
             if post.image_url and os.path.exists(post.image_url):
                 with open(post.image_url, "rb") as img_file:
                     resp = await client.post(
                         f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendPhoto",
                         data={
                             "chat_id": SOCIAL_TG_CHAT_ID,
-                            "caption": text,
-                            "reply_markup": json.dumps(keyboard, ensure_ascii=False),
+                            "caption": summary_text,
+                            "reply_markup": json.dumps(summary_keyboard, ensure_ascii=False),
                         },
                         files={"photo": ("card.png", img_file, "image/png")},
                     )
@@ -75,10 +125,11 @@ async def send_review_message(post: SocialPost) -> bool:
                     f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
                     json={
                         "chat_id": SOCIAL_TG_CHAT_ID,
-                        "text": text,
-                        "reply_markup": keyboard,
+                        "text": summary_text,
+                        "reply_markup": summary_keyboard,
                     },
                 )
+
             if resp.status_code == 200:
                 logger.info("Telegram 승인 메시지 전송 완료: post=%s", post.id)
                 return True
@@ -92,17 +143,17 @@ async def send_review_message(post: SocialPost) -> bool:
 
 
 async def handle_callback(callback_data: str, username: str) -> str:
-    """Telegram 콜백 처리 — approve/reject/edit."""
+    """Telegram 콜백 처리 — approve_all/approve_x/approve_threads/reject/reject_x/reject_threads/edit."""
     parts = callback_data.split(":", 1)
     if len(parts) != 2:
-        return "잘못된 콜백 데이터"
+        return "\uc798\ubabb\ub41c \ucf5c\ubc31 \ub370\uc774\ud130"
 
     action, post_id_str = parts
 
     try:
         post_id = uuid.UUID(post_id_str)
     except ValueError:
-        return "잘못된 포스트 ID"
+        return "\uc798\ubabb\ub41c \ud3ec\uc2a4\ud2b8 ID"
 
     async with AsyncSessionLocal() as db:
         async with db.begin():
@@ -111,22 +162,93 @@ async def handle_callback(callback_data: str, username: str) -> str:
             )
             post = result.scalar_one_or_none()
             if not post:
-                return "포스트를 찾을 수 없습니다"
+                return "\ud3ec\uc2a4\ud2b8\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4"
 
-            if action == "approve":
+            # 하위호환: 기존 "approve" → "approve_all"
+            if action in ("approve", "approve_all"):
                 post.status = "approved"
                 post.approved_at = datetime.now(timezone.utc)
                 post.approved_by = username
-                return f"✅ 승인 완료 — 다음 발행 주기에 게시됩니다"
+                return "\u2705 \uc804\uccb4 \uc2b9\uc778 \uc644\ub8cc \u2014 \ub2e4\uc74c \ubc1c\ud589 \uc8fc\uae30\uc5d0 \uac8c\uc2dc\ub429\ub2c8\ub2e4"
+
+            elif action == "approve_x":
+                post.status = "approved"
+                post.approved_at = datetime.now(timezone.utc)
+                post.approved_by = username
+                # Threads skipped
+                existing = await db.execute(
+                    select(SocialPostPlatform).where(
+                        SocialPostPlatform.post_id == post.id,
+                        SocialPostPlatform.platform == "threads",
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    db.add(SocialPostPlatform(
+                        post_id=post.id,
+                        platform="threads",
+                        status="skipped",
+                    ))
+                return "\u2705 X\ub9cc \uc2b9\uc778 \uc644\ub8cc (Threads \uc2a4\ud0b5)"
+
+            elif action == "approve_threads":
+                post.status = "approved"
+                post.approved_at = datetime.now(timezone.utc)
+                post.approved_by = username
+                # X skipped
+                existing = await db.execute(
+                    select(SocialPostPlatform).where(
+                        SocialPostPlatform.post_id == post.id,
+                        SocialPostPlatform.platform == "x",
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    db.add(SocialPostPlatform(
+                        post_id=post.id,
+                        platform="x",
+                        status="skipped",
+                    ))
+                return "\u2705 Threads\ub9cc \uc2b9\uc778 \uc644\ub8cc (X \uc2a4\ud0b5)"
 
             elif action == "reject":
                 post.status = "rejected"
-                return f"❌ 거절 완료"
+                return "\u274c \uc804\uccb4 \uac70\uc808 \uc644\ub8cc"
+
+            elif action == "reject_x":
+                # X만 skipped 생성 (post 상태 유지)
+                existing = await db.execute(
+                    select(SocialPostPlatform).where(
+                        SocialPostPlatform.post_id == post.id,
+                        SocialPostPlatform.platform == "x",
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    db.add(SocialPostPlatform(
+                        post_id=post.id,
+                        platform="x",
+                        status="skipped",
+                    ))
+                return "\u274c X \uac70\uc808 (Threads\ub294 \ubcc4\ub3c4 \uc2b9\uc778 \ud544\uc694)"
+
+            elif action == "reject_threads":
+                # Threads만 skipped 생성 (post 상태 유지)
+                existing = await db.execute(
+                    select(SocialPostPlatform).where(
+                        SocialPostPlatform.post_id == post.id,
+                        SocialPostPlatform.platform == "threads",
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    db.add(SocialPostPlatform(
+                        post_id=post.id,
+                        platform="threads",
+                        status="skipped",
+                    ))
+                return "\u274c Threads \uac70\uc808 (X\ub294 \ubcc4\ub3c4 \uc2b9\uc778 \ud544\uc694)"
 
             elif action == "edit":
-                return f"✏️ 수정할 텍스트를 입력하세요 (post_id: {post_id})"
+                return f"\u270f\ufe0f \uc218\uc815\ud560 \ud14d\uc2a4\ud2b8\ub97c \uc785\ub825\ud558\uc138\uc694 (post_id: {post_id})"
 
-            return "알 수 없는 액션"
+            return "\uc54c \uc218 \uc5c6\ub294 \uc561\uc158"
 
 
 async def handle_edit_text(post_id: uuid.UUID, new_text: str) -> str:
@@ -138,11 +260,11 @@ async def handle_edit_text(post_id: uuid.UUID, new_text: str) -> str:
             )
             post = result.scalar_one_or_none()
             if not post:
-                return "포스트를 찾을 수 없습니다"
+                return "\ud3ec\uc2a4\ud2b8\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4"
 
-            post.body_text = new_text[:280]
+            post.body_text = new_text[:500]
             post.status = "pending_review"
-            return f"✏️ 수정 완료 — 재승인이 필요합니다"
+            return "\u270f\ufe0f \uc218\uc815 \uc644\ub8cc \u2014 \uc7ac\uc2b9\uc778\uc774 \ud544\uc694\ud569\ub2c8\ub2e4"
 
 
 def start_polling_loop():
@@ -271,7 +393,7 @@ async def _handle_agent_message(client, chat_id: int, text: str):
         logger.exception("AI 에이전트 메시지 처리 오류")
         await client.post(
             f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": "⚠️ 처리 중 오류가 발생했습니다."},
+            json={"chat_id": chat_id, "text": "\u26a0\ufe0f \ucc98\ub9ac \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4."},
         )
 
 

@@ -2927,6 +2927,80 @@ async def retry_social_post(
     return {"status": "ok"}
 
 
+@router.get("/social/{post_id}/preview")
+async def preview_social_post(
+    post_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """플랫폼별 미리보기 텍스트 반환."""
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    from worker.social.adapters.x_adapter import _build_text as x_build
+    from worker.social.adapters.threads_adapter import _build_text as threads_build
+
+    x_text = x_build(post)
+    threads_text = threads_build(post)
+
+    return {
+        "x": {"text": x_text, "char_count": len(x_text), "max": 280},
+        "threads": {"text": threads_text, "char_count": len(threads_text), "max": 500},
+    }
+
+
+@router.post("/social/{post_id}/approve/{platform}")
+async def approve_social_post_platform(
+    post_id: str,
+    platform: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """플랫폼별 승인 — platform: x | threads | all."""
+    if platform not in ("x", "threads", "all"):
+        raise HTTPException(400, "platform must be x, threads, or all")
+
+    result = await db.execute(
+        select(SocialPost).where(SocialPost.id == uuid.UUID(post_id))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(404)
+
+    post.status = "approved"
+    post.approved_at = datetime.now(timezone.utc)
+    post.approved_by = admin.nickname or admin.email or str(admin.id)
+
+    # 플랫폼별 승인: 나머지 플랫폼은 skipped 처리
+    skip_platforms = []
+    if platform == "x":
+        skip_platforms = ["threads"]
+    elif platform == "threads":
+        skip_platforms = ["x"]
+
+    for skip_plat in skip_platforms:
+        existing = await db.execute(
+            select(SocialPostPlatform).where(
+                SocialPostPlatform.post_id == post.id,
+                SocialPostPlatform.platform == skip_plat,
+            )
+        )
+        if not existing.scalar_one_or_none():
+            db.add(SocialPostPlatform(
+                post_id=post.id,
+                platform=skip_plat,
+                status="skipped",
+            ))
+
+    await db.flush()
+    await _log_action(db, admin, "approve_social", "social_post", post_id, {"platform": platform})
+    return {"status": "ok"}
+
+
 @router.get("/social/chart-data")
 async def social_chart_data(
     days: int = 14,
@@ -3027,7 +3101,7 @@ async def update_social_post(
 
     changes = {}
     if body.body_text is not None:
-        post.body_text = body.body_text[:280]
+        post.body_text = body.body_text[:500]
         changes["body_text"] = body.body_text[:50] + "..."
     if body.hashtags is not None:
         post.hashtags = body.hashtags
