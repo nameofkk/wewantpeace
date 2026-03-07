@@ -20,18 +20,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: "WeWantPeace",
       description: SITE_DESC,
       openGraph: {
-        title: "WeWantPeace | 실시간 글로벌 분쟁 모니터링",
+        title: "WeWantPeace",
         description: SITE_DESC,
         type: "website",
         url: SITE_URL,
         siteName: "WeWantPeace",
-        images: [{ url: `${SITE_URL}/og-image.png?v=3` }],
+        images: [{ url: `${SITE_URL}/og-image.png?v=4` }],
       },
       twitter: {
         card: "summary_large_image",
-        title: "WeWantPeace | 실시간 글로벌 분쟁 모니터링",
+        title: "WeWantPeace",
         description: SITE_DESC,
-        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=3` }],
+        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
       },
     };
   }

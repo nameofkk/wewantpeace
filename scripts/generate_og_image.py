@@ -5,63 +5,104 @@ OG 이미지 생성 스크립트.
 """
 from PIL import Image, ImageDraw, ImageFont
 import os
+import math
 
 W, H = 1200, 630
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "public")
 LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "public", "logo-eye.png")
 
-# 색상
-BG_DARK = (15, 23, 42)
+# 색상 — 밝게
+BG_DARK = (20, 30, 55)
 GLOW_CENTER = (59, 130, 246)
 WHITE = (241, 245, 249)
-MUTED = (148, 163, 184)
+MUTED = (160, 175, 195)
 GREEN = (16, 185, 129)
 RED = (239, 68, 68)
 
 
 def draw_gradient_bg(draw: ImageDraw.ImageDraw):
-    """다크 그라데이션 배경 — 기존보다 밝게"""
+    """밝은 그라데이션 배경"""
     for y in range(H):
         t = y / H
-        r = int(15 + t * 12)
-        g = int(23 + t * 16)
-        b = int(42 + t * 22)
+        r = int(20 + t * 15)
+        g = int(30 + t * 20)
+        b = int(55 + t * 25)
         draw.line([(0, y), (W, y)], fill=(r, g, b))
 
 
 def draw_grid(draw: ImageDraw.ImageDraw):
-    """배경 그리드 패턴 — 잘 보이게 opacity 높임"""
-    grid_color = (59, 130, 246, 30)
+    """배경 그리드 패턴 — 선명하게"""
+    grid_color = (59, 130, 246, 40)
     for x in range(0, W, 50):
         draw.line([(x, 0), (x, H)], fill=grid_color, width=1)
     for y in range(0, H, 50):
         draw.line([(0, y), (W, y)], fill=grid_color, width=1)
 
 
-def draw_radar_glow(img: Image.Image):
-    """중앙 레이더 글로우 — 더 밝게"""
+def draw_globe(img: Image.Image):
+    """배경 와이어프레임 지구본 — 우측 하단에 크게"""
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
-    cx, cy = W // 2, H // 2
-    for r in range(300, 0, -2):
-        alpha = int(28 * (1 - r / 300))
+
+    # 지구본 중심: 우측으로 치우쳐서 배경 느낌
+    cx, cy = W * 3 // 4, H // 2 + 30
+    radius = 280
+    globe_color = (59, 130, 246, 35)
+
+    # 외곽 원
+    d.ellipse(
+        [cx - radius, cy - radius, cx + radius, cy + radius],
+        outline=(59, 130, 246, 55),
+        width=2,
+    )
+
+    # 위도선 (수평 타원)
+    for lat in [-60, -30, 0, 30, 60]:
+        lat_rad = math.radians(lat)
+        ry = int(radius * math.cos(lat_rad))
+        offset_y = int(radius * math.sin(lat_rad))
+        if ry > 5:
+            d.ellipse(
+                [cx - radius, cy - offset_y - ry // 8, cx + radius, cy - offset_y + ry // 8],
+                outline=globe_color,
+                width=1,
+            )
+
+    # 경도선 (수직 타원)
+    for lon_offset in [-60, -30, 0, 30, 60]:
+        lon_rad = math.radians(lon_offset)
+        rx = int(radius * math.cos(lon_rad))
+        offset_x = int(radius * math.sin(lon_rad))
+        if rx > 5:
+            d.ellipse(
+                [cx + offset_x - rx, cy - radius, cx + offset_x + rx, cy + radius],
+                outline=globe_color,
+                width=1,
+            )
+
+    # 글로우 효과
+    for r in range(radius + 80, radius, -2):
+        alpha = int(12 * (1 - (r - radius) / 80))
+        d.ellipse(
+            [cx - r, cy - r, cx + r, cy + r],
+            fill=(59, 130, 246, max(0, alpha)),
+        )
+
+    img.paste(Image.alpha_composite(Image.new("RGBA", img.size, (0, 0, 0, 0)), overlay), mask=overlay)
+
+
+def draw_radar_glow(img: Image.Image):
+    """좌측 레이더 글로우"""
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    cx, cy = W // 4, H // 2
+    for r in range(250, 0, -2):
+        alpha = int(20 * (1 - r / 250))
         d.ellipse(
             [cx - r, cy - r, cx + r, cy + r],
             fill=(GLOW_CENTER[0], GLOW_CENTER[1], GLOW_CENTER[2], alpha),
         )
     img.paste(Image.alpha_composite(Image.new("RGBA", img.size, (0, 0, 0, 0)), overlay), mask=overlay)
-
-
-def draw_radar_rings(draw: ImageDraw.ImageDraw):
-    """레이더 동심원 — 더 밝게, 더 크게"""
-    cx, cy = W // 2, H // 2
-    ring_color = (59, 130, 246, 50)
-    for r in [100, 180, 260]:
-        draw.ellipse(
-            [cx - r, cy - r, cx + r, cy + r],
-            outline=ring_color,
-            width=1,
-        )
 
 
 def get_font(size: int, bold: bool = False):
@@ -83,7 +124,7 @@ def draw_text_center(draw: ImageDraw.ImageDraw, y: int, text: str, font, fill):
 
 
 def draw_feature_tags(draw: ImageDraw.ImageDraw, y: int):
-    """피처 태그 — 크게"""
+    """피처 태그"""
     tags = [
         ("195 Countries", GREEN),
         ("Spike Alert", RED),
@@ -91,7 +132,7 @@ def draw_feature_tags(draw: ImageDraw.ImageDraw, y: int):
     font = get_font(28, bold=True)
     total_w = 0
     tag_sizes = []
-    pad_x, pad_y = 32, 16
+    pad_x = 32
     gap = 28
     for label, _ in tags:
         bbox = draw.textbbox((0, 0), label, font=font)
@@ -119,7 +160,7 @@ def draw_feature_tags(draw: ImageDraw.ImageDraw, y: int):
 
 
 def draw_live_indicator(draw: ImageDraw.ImageDraw, cx: int, y: int):
-    """LIVE 인디케이터 — 크게"""
+    """LIVE 인디케이터"""
     font = get_font(22, bold=True)
     label = "LIVE"
     dot_r = 8
@@ -140,17 +181,15 @@ def generate():
 
     draw_gradient_bg(draw)
     draw_grid(draw)
+    draw_globe(img)
     draw_radar_glow(img)
     draw = ImageDraw.Draw(img, "RGBA")
-    draw_radar_rings(draw)
 
-    # --- 콘텐츠 수직 정중앙 배치 (하단 URL 제거) ---
-    # 로고(150) + gap(24) + 타이틀(72) + gap(12) + LIVE(22) + gap(20) + 서브(32) + gap(32) + 구분선(1) + gap(28) + 태그(56)
-    # = 449px → 시작 Y = (630 - 449) / 2 ≈ 90
-    content_h = 150 + 24 + 72 + 12 + 22 + 20 + 32 + 32 + 1 + 28 + 56
-    start_y = (H - content_h) // 2
+    # --- 콘텐츠 배치: 정중앙에서 약간 위 (-20px) ---
+    content_h = 150 + 20 + 72 + 10 + 22 + 16 + 32 + 28 + 1 + 24 + 56
+    start_y = (H - content_h) // 2 - 20  # 약간 위로
 
-    # 로고 이미지 — 크게 (150px)
+    # 로고 (150px)
     logo_y = start_y
     if os.path.exists(LOGO_PATH):
         logo = Image.open(LOGO_PATH).convert("RGBA")
@@ -162,31 +201,31 @@ def generate():
         img.paste(logo, (logo_x, logo_y), logo)
         draw = ImageDraw.Draw(img, "RGBA")
 
-    # 타이틀 — 크게 (72pt)
-    title_y = logo_y + 150 + 24
+    # 타이틀 (72pt)
+    title_y = logo_y + 150 + 20
     title_font = get_font(72, bold=True)
     draw_text_center(draw, title_y, "WeWantPeace", title_font, WHITE)
 
-    # LIVE 인디케이터 — 크게 (22pt)
-    live_y = title_y + 72 + 12
+    # LIVE (22pt)
+    live_y = title_y + 72 + 10
     draw_live_indicator(draw, W // 2, live_y)
 
-    # 서브타이틀 — 크게 (32pt)
-    sub_y = live_y + 22 + 20
+    # 서브타이틀 (32pt)
+    sub_y = live_y + 22 + 16
     sub_font = get_font(32)
     draw_text_center(draw, sub_y, "Real-time Global Conflict Monitor", sub_font, MUTED)
 
     # 구분선
-    line_y = sub_y + 32 + 32
+    line_y = sub_y + 32 + 28
     line_w = 300
     draw.line(
         [(W // 2 - line_w, line_y), (W // 2 + line_w, line_y)],
-        fill=(59, 130, 246, 90),
+        fill=(59, 130, 246, 100),
         width=2,
     )
 
-    # 피처 태그 — 크게 (28pt, 56px tall)
-    tag_y = line_y + 28
+    # 피처 태그
+    tag_y = line_y + 24
     draw_feature_tags(draw, tag_y)
 
     # 저장
