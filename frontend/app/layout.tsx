@@ -67,13 +67,20 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark" suppressHydrationWarning>
       <head>
-        {/* 테마 깜빡임 방지: localStorage에서 저장된 테마를 즉시 적용 */}
+        {/* 테마/언어 깜빡임 방지: localStorage → 브라우저 언어 감지 순으로 즉시 적용 */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
             var s = JSON.parse(localStorage.getItem('wwp-store') || '{}');
             var t = (s.state && s.state.theme) || 'dark';
             document.documentElement.className = t;
-            var l = (s.state && s.state.lang) || 'ko';
+            var l = s.state && s.state.lang;
+            if (!l) {
+              l = (navigator.language || '').startsWith('ko') ? 'ko' : 'en';
+              if (!s.state) s.state = {};
+              s.state.lang = l;
+              s.version = 4;
+              localStorage.setItem('wwp-store', JSON.stringify(s));
+            }
             document.documentElement.lang = l;
             document.documentElement.dataset.lang = l;
           } catch(e) {}
