@@ -33,6 +33,7 @@ interface TensionData {
   event_score: number;
   accel_score: number;
   spillover_score: number;
+  delta_24h?: number | null;
   updated_at: string;
   top5_clusters: ClusterSummary[];
 }
@@ -361,6 +362,16 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
           <div className="flex items-center gap-1.5">
             <span className="text-base leading-none">{getFlag(data.country_code)}</span>
             <h3 className="text-sm font-bold">{label}</h3>
+            {data.delta_24h != null && data.delta_24h !== 0 && (
+              <span className={cn(
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums",
+                data.delta_24h > 0
+                  ? "bg-red-500/15 text-red-400"
+                  : "bg-emerald-500/15 text-emerald-400"
+              )}>
+                {data.delta_24h > 0 ? "▲" : "▼"}{Math.abs(data.delta_24h).toFixed(1)}
+              </span>
+            )}
             {isCritical && (
               <span className="flex items-center gap-0.5 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold text-red-400 animate-pulse">
                 <AlertTriangle className="h-2 w-2" /> {t(lang, "tension_crisis_badge")}

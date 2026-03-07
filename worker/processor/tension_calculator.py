@@ -394,6 +394,19 @@ async def calculate_country_tension(
         except Exception as e:
             logger.warning("긴장도 알림 Redis 저장 실패: %s", e)
 
+    # ── 24h 델타 계산 ──
+    prev_24h_result = await db.execute(
+        select(TensionIndex.raw_score)
+        .where(
+            TensionIndex.country_code == country_code,
+            TensionIndex.time <= now - timedelta(hours=24),
+        )
+        .order_by(TensionIndex.time.desc())
+        .limit(1)
+    )
+    prev_24h_row = prev_24h_result.first()
+    delta_24h = round(raw_score - prev_24h_row[0], 1) if prev_24h_row else None
+
     # TOP5 원인 이슈
     top5 = sorted(current_clusters, key=lambda c: c.severity * c.confidence, reverse=True)[:5]
 
@@ -417,13 +430,17 @@ async def calculate_country_tension(
         "event_score": round(event_score, 2),
         "accel_score": round(accel_score, 2),
         "spillover_score": round(spillover, 2),
+        "delta_24h": delta_24h,
         "top5_clusters": [
             {
                 "id": str(c.id),
                 "title": c.title,
+                "title_ko": c.title_ko,
                 "severity": c.severity,
                 "confidence": c.confidence,
                 "topic": c.topic,
+                "kscore": round(c.kscore, 2),
+                "event_count": c.event_count,
             }
             for c in top5
         ],

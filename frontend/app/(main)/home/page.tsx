@@ -7,7 +7,7 @@ import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes, useTensionAll } from "@/lib/api";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -532,6 +532,55 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
   );
 });
 
+// ── 브리핑 카드 ──────────────────────────────────────────────────────────
+function BriefingCard({ items, lang }: { items: TrendingItem[]; lang: Lang }) {
+  const extremeCount = items.filter((i) => roundKScore(i.kscore) >= 8).length;
+  const severeCount = items.filter((i) => { const k = roundKScore(i.kscore); return k >= 6 && k < 8; }).length;
+  const spikeCount = items.filter((i) => i.is_spike).length;
+  const topItem = items[0];
+
+  if (!topItem) return null;
+
+  const topTitle = (() => {
+    const raw = lang === "en" ? topItem.keyword : (topItem.keyword_ko ?? topItem.keyword);
+    return isJunkTitle(raw)
+      ? buildSmartTitle(topItem.keyword, topItem.topic ?? "unknown", lang, getCountryName, topItem.country_codes?.[0])
+      : (stripTitlePrefix(raw) || topItem.keyword);
+  })();
+
+  const briefing = lang === "ko"
+    ? extremeCount > 0
+      ? `극심 ${extremeCount}건 발생 중 — 1위: ${topTitle}`
+      : severeCount > 0
+      ? `심각 ${severeCount}건 · 스파이크 ${spikeCount}건 — 주목: ${topTitle}`
+      : spikeCount > 0
+      ? `스파이크 ${spikeCount}건 감지됨 — 주목: ${topTitle}`
+      : `현재 ${items.length}건 모니터링 중 — 1위: ${topTitle}`
+    : extremeCount > 0
+      ? `${extremeCount} extreme issue(s) — #1: ${topTitle}`
+      : severeCount > 0
+      ? `${severeCount} severe · ${spikeCount} spike(s) — Top: ${topTitle}`
+      : spikeCount > 0
+      ? `${spikeCount} spike(s) detected — Top: ${topTitle}`
+      : `Monitoring ${items.length} issues — #1: ${topTitle}`;
+
+  const accentColor = extremeCount > 0 ? "border-l-red-900" : severeCount > 0 ? "border-l-red-500" : spikeCount > 0 ? "border-l-amber-500" : "border-l-blue-500";
+
+  return (
+    <div className={cn("rounded-lg border-l-4 border border-border bg-card/50 px-3 py-2.5 mb-3", accentColor)}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <BarChart3 className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          {lang === "ko" ? "오늘의 브리핑" : "Today's Briefing"}
+        </span>
+      </div>
+      <p className="text-[11px] leading-relaxed line-clamp-2" style={{ wordBreak: "keep-all" }}>
+        {briefing}
+      </p>
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-3">
@@ -823,6 +872,11 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            {/* 브리핑 카드 */}
+            {!isLoading && !isError && items && items.length > 0 && (
+              <BriefingCard items={items} lang={lang} />
+            )}
+
             {isLoading && <LoadingSkeleton />}
 
             {isError && (

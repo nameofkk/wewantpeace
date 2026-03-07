@@ -33,6 +33,7 @@ class ClusterSummary(BaseModel):
     confidence: float
     topic: str
     kscore: float = 0.0
+    event_count: int = 0
     image_url: Optional[str] = None
     country_code: Optional[str] = None
 
@@ -46,6 +47,7 @@ class TensionOut(BaseModel):
     event_score: float
     accel_score: float
     spillover_score: float
+    delta_24h: Optional[float] = None
     updated_at: str
     top5_clusters: list[ClusterSummary]
 
@@ -101,6 +103,7 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
             confidence=round(c.confidence, 3),
             topic=c.topic,
             kscore=round(c.kscore, 2),
+            event_count=c.event_count,
             image_url=c.image_url,
             country_code=c.country_code,
         )
@@ -132,6 +135,7 @@ async def _get_top5_batch(
             IssueCluster.confidence,
             IssueCluster.topic,
             IssueCluster.kscore,
+            IssueCluster.event_count,
             IssueCluster.image_url,
             rn_col,
         )
@@ -161,6 +165,7 @@ async def _get_top5_batch(
             confidence=round(row.confidence, 3),
             topic=row.topic,
             kscore=round(row.kscore, 2),
+            event_count=row.event_count,
             image_url=row.image_url,
             country_code=row.country_code,
         )
@@ -168,7 +173,9 @@ async def _get_top5_batch(
     return top5_map
 
 
-def _tension_to_out(t: TensionIndex, top5: list[ClusterSummary]) -> TensionOut:
+def _tension_to_out(
+    t: TensionIndex, top5: list[ClusterSummary], delta_24h: Optional[float] = None,
+) -> TensionOut:
     return TensionOut(
         country_code=t.country_code,
         raw_score=round(t.raw_score, 1),
@@ -178,6 +185,7 @@ def _tension_to_out(t: TensionIndex, top5: list[ClusterSummary]) -> TensionOut:
         event_score=round(t.event_score or 0.0, 1),
         accel_score=round(t.accel_score or 0.0, 1),
         spillover_score=round(t.spillover_score or 0.0, 1),
+        delta_24h=delta_24h,
         updated_at=t.time.isoformat(),
         top5_clusters=top5,
     )
@@ -355,12 +363,37 @@ async def tension_mine(
     active_codes = [c for c in codes if c in tension_map]
     top5_map = await _get_top5_batch(active_codes, db, min_severity=user_min_severity)
 
+    # ── 24h 전 긴장도 배치 조회 (delta_24h 계산용) ──
+    delta_map: dict[str, float] = {}
+    if active_codes:
+        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+        # 각 국가별 24시간 전 가장 가까운 raw_score 조회
+        rn_24h = sa_func.row_number().over(
+            partition_by=TensionIndex.country_code,
+            order_by=TensionIndex.time.desc(),
+        ).label("rn")
+        subq_24h = (
+            select(TensionIndex.country_code, TensionIndex.raw_score, rn_24h)
+            .where(
+                TensionIndex.country_code.in_(active_codes),
+                TensionIndex.time <= cutoff_24h,
+            )
+            .subquery()
+        )
+        prev_result = await db.execute(
+            select(subq_24h).where(subq_24h.c.rn == 1)
+        )
+        for row in prev_result.all():
+            delta_map[row.country_code] = row.raw_score
+
     results = []
     for code in codes:
         t = tension_map.get(code)
         if t is None:
             continue
-        results.append(_tension_to_out(t, top5_map.get(code, [])))
+        prev_score = delta_map.get(code)
+        d24h = round(t.raw_score - prev_score, 1) if prev_score is not None else None
+        results.append(_tension_to_out(t, top5_map.get(code, []), delta_24h=d24h))
 
     return results
 
@@ -427,6 +460,64 @@ async def tension_history(
         )
         for r in rows
     ]
+
+
+class TensionAllItem(BaseModel):
+    country_code: str
+    raw_score: float
+    tension_level: int
+
+
+@router.get("/all", response_model=list[TensionAllItem])
+async def tension_all(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    전체 국가 최신 긴장도 (히트맵 choropleth용).
+    Redis 5분 캐시 적용.
+    """
+    import json as _json
+    response.headers["Cache-Control"] = "public, max-age=300"
+
+    # Redis 캐시 확인
+    try:
+        from backend.app.core.redis import get_redis
+        redis = get_redis()
+        cached = await redis.get("tension:all:cache")
+        if cached:
+            return _json.loads(cached)
+    except Exception:
+        pass
+
+    # DB에서 국가별 최신 1건만 조회
+    raw_result = await db.execute(
+        select(TensionIndex)
+        .where(TensionIndex.country_code.in_(DEFAULT_COUNTRIES))
+        .distinct(TensionIndex.country_code)
+        .order_by(TensionIndex.country_code, TensionIndex.time.desc())
+    )
+    rows = raw_result.scalars().all()
+    items = [
+        TensionAllItem(
+            country_code=r.country_code,
+            raw_score=round(r.raw_score, 1),
+            tension_level=r.tension_level,
+        )
+        for r in rows
+    ]
+
+    # Redis 캐시 저장 (5분)
+    try:
+        await redis.set(
+            "tension:all:cache",
+            _json.dumps([i.model_dump() for i in items]),
+            ex=300,
+        )
+    except Exception:
+        pass
+
+    return items
 
 
 @router.post("/recalculate")
