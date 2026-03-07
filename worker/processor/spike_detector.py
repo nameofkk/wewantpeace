@@ -25,8 +25,8 @@ SEVERITY_MIN = 40
 SOURCES_MIN = 2
 MAX_AGE_HOURS = 48
 
-COOLDOWN_SECONDS = 3600  # 1시간 (기본)
-COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
+COOLDOWN_SECONDS = 21600  # 6시간 (기본) — 같은 이슈 반복 방지
+COOLDOWN_SECONDS_CRITICAL = 10800  # 3시간 (severity >= 90)
 
 
 def _key_cooldown(cluster_id: str) -> str:

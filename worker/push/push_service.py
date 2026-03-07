@@ -25,7 +25,7 @@ Delivery Integrity (Sprint 2):
 import logging
 import uuid as _uuid
 from collections import defaultdict
-from datetime import datetime, timezone, time as dt_time
+from datetime import datetime, timedelta, timezone, time as dt_time
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -692,7 +692,8 @@ async def send_spike_alert(
         logger.info("쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
         return {"status": "cooldown", "sent": 0}
 
-    collapse_key = str(spike_event_id) if spike_event_id else cluster_id
+    # cluster_id 기반 collapse — 같은 이슈 중복 푸시 방지
+    collapse_key = cluster_id
     sent_verified = 0
     sent_fast = 0
     all_invalid: list[str] = []
@@ -807,7 +808,8 @@ async def send_verified_alert(
         logger.info("Verified 쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
         return {"status": "cooldown", "sent": 0}
 
-    collapse_key = str(spike_event_id) if spike_event_id else cluster_id
+    # cluster_id 기반 collapse — 같은 이슈 중복 푸시 방지
+    collapse_key = cluster_id
 
     target_v = await _get_target_tokens_by_platform(
         country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
@@ -865,6 +867,22 @@ async def save_in_app_notifications(
     if not country_code:
         return 0
 
+    # 같은 cluster_id로 6시간 내 인앱 알림이 이미 있으면 스킵
+    cluster_uuid = _uuid.UUID(cluster_id)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+    dup_check = await db.execute(
+        select(Notification.id)
+        .where(
+            Notification.cluster_id == cluster_uuid,
+            Notification.type == notif_type,
+            Notification.created_at >= cutoff,
+        )
+        .limit(1)
+    )
+    if dup_check.scalar_one_or_none():
+        logger.info("인앱 알림 중복 스킵: cluster=%s type=%s (6시간 내 기존 존재)", cluster_id, notif_type)
+        return 0
+
     if notif_type == "verified":
         area_filter = (
             UserArea.country_code == country_code,
@@ -892,8 +910,6 @@ async def save_in_app_notifications(
 
     if not user_ids:
         return 0
-
-    cluster_uuid = _uuid.UUID(cluster_id)
 
     notifications = [
         Notification(

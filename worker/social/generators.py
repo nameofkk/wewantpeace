@@ -236,7 +236,9 @@ async def generate_spike_alert(
     db: AsyncSession,
 ) -> SocialPost | None:
     """스파이크 이벤트 기반 긴급 포스트 생성 (bilingual)."""
-    dedup_key = f"spike_alert:{spike.id}"
+    # cluster_id + 날짜 기반 dedup — 같은 클러스터는 하루 1회만 포스트
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    dedup_key = f"spike_alert:{cluster.id}:{today}"
 
     existing = await db.execute(
         select(SocialPost).where(SocialPost.dedup_key == dedup_key)
