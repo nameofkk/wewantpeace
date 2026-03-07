@@ -69,13 +69,13 @@ export function SplashScreen({ visible }: SplashScreenProps) {
       {/* 로고 + 레이더 영역 */}
       <div className="relative flex items-center justify-center w-[184px] h-20">
         {/* 레이더 파동 3겹 */}
-        <div className="absolute top-1/2 left-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/25 splash-radar" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/25 splash-radar" />
         <div
-          className="absolute top-1/2 left-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/20 splash-radar"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/20 opacity-0 splash-radar"
           style={{ animationDelay: "1s" }}
         />
         <div
-          className="absolute top-1/2 left-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/15 splash-radar"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/15 opacity-0 splash-radar"
           style={{ animationDelay: "2s" }}
         />
         <Image
