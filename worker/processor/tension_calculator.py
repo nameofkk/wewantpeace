@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.tension_index import TensionIndex
 from worker.processor.calibration import (
+    CONFLICT_FLOOR,
     EVENT_SCORE_MULTIPLIER,
     VOLUME_SATURATION,
     ACCEL_BASELINE,
@@ -116,15 +117,61 @@ NEIGHBOR_MAP: dict[str, list[str]] = {
     "TN": ["LY", "DZ"],
     "MA": ["DZ"],
     # 아메리카
-    "VE": ["CO"],
-    "HT": ["CU"],
-    "CO": ["VE", "EC"],
-    "EC": ["CO"],
-    "MX": ["GT"],
-    "NI": ["HN", "GT"],
+    "VE": ["CO", "BR", "GY"],
+    "HT": ["CU", "DO"],
+    "CO": ["VE", "EC", "BR", "PE"],
+    "EC": ["CO", "PE"],
+    "MX": ["GT", "US", "BZ"],
+    "NI": ["HN", "GT", "CR"],
     "CU": ["HT"],
-    "GT": ["MX", "HN"],
-    "HN": ["GT", "NI"],
+    "GT": ["MX", "HN", "BZ", "SV"],
+    "HN": ["GT", "NI", "SV"],
+    # 유럽 (신규 추가)
+    "IT": ["FR", "CH", "AT", "SI"],
+    "ES": ["FR", "PT", "MA"],
+    "PT": ["ES"],
+    "PL": ["DE", "CZ", "SK", "UA", "BY", "LT"],
+    "CZ": ["DE", "PL", "SK", "AT"],
+    "AT": ["DE", "IT", "CH", "CZ", "SK", "HU", "SI"],
+    "CH": ["FR", "DE", "IT", "AT"],
+    "HU": ["AT", "SK", "UA", "RO", "RS", "HR", "SI"],
+    "RO": ["HU", "UA", "MD", "BG", "RS"],
+    "BG": ["RO", "RS", "MK", "GR", "TR"],
+    "GR": ["BG", "TR", "MK", "AL"],
+    "HR": ["SI", "HU", "RS", "BA"],
+    "SI": ["IT", "AT", "HU", "HR"],
+    "SK": ["PL", "CZ", "AT", "HU", "UA"],
+    "LT": ["PL", "BY", "LV"],
+    "LV": ["LT", "EE", "BY"],
+    "EE": ["LV", "RU"],
+    "FI": ["NO", "SE", "RU"],
+    "NO": ["SE", "FI"],
+    "SE": ["NO", "FI", "DK"],
+    "DK": ["DE", "SE"],
+    "AL": ["GR", "MK", "ME", "XK"],
+    "ME": ["AL", "BA", "RS", "HR", "XK"],
+    "MK": ["GR", "BG", "RS", "AL", "XK"],
+    # 아프리카 (신규 추가)
+    "ZA": ["MZ", "BW", "ZW", "NA", "LS", "SZ"],
+    "KE": ["ET", "SO", "TZ", "UG", "SS"],
+    "TZ": ["KE", "UG", "RW", "BI", "CD", "MZ", "ZM", "MW"],
+    "UG": ["KE", "TZ", "SS", "CD", "RW"],
+    "RW": ["UG", "TZ", "BI", "CD"],
+    "BI": ["TZ", "RW", "CD"],
+    "ZW": ["ZA", "MZ", "ZM", "BW"],
+    "ZM": ["TZ", "CD", "ZW", "MZ", "MW", "BW", "NA"],
+    "AO": ["CD", "CG", "ZM", "NA"],
+    "CG": ["CD", "CM", "CF", "GA", "AO"],
+    # 남미 (신규 추가)
+    "BR": ["VE", "CO", "GY", "SR", "PE", "BO", "PY", "AR", "UY"],
+    "AR": ["CL", "BO", "PY", "BR", "UY"],
+    "PE": ["EC", "CO", "BR", "BO", "CL"],
+    "CL": ["AR", "PE", "BO"],
+    "BO": ["BR", "PE", "CL", "AR", "PY"],
+    "PY": ["BR", "AR", "BO"],
+    "UY": ["BR", "AR"],
+    # 오세아니아
+    "NZ": ["AU"],
 }
 
 
@@ -364,7 +411,18 @@ async def calculate_country_tension(
         2,
     )
 
+    # percentile은 clean raw_score로 계산 (floor 적용 전!)
     percentile = await _get_percentile_30d(country_code, raw_score, db)
+
+    # Conflict-Zone Floor: 분쟁지역 최소 긴장도 보장 (percentile 이후!)
+    floor = CONFLICT_FLOOR.get(country_code, 0.0)
+    if raw_score < floor:
+        logger.debug(
+            "conflict-floor: %s raw=%.1f → floor=%.1f",
+            country_code, raw_score, floor,
+        )
+        raw_score = floor
+
     level = _tension_level(percentile, raw_score)
 
     # ── 레벨 변화 감지 → Redis 알림 기록 ──
@@ -449,23 +507,40 @@ async def calculate_country_tension(
 
 # 모니터링 대상 국가 목록 (프론트엔드 ALL_MONITORED_COUNTRIES와 동기화)
 MONITORED_COUNTRIES = [
-    # 주요국
-    "US", "GB", "FR", "DE", "JP", "AU",
-    # 유럽·코카서스
-    "UA", "RU", "BY", "MD", "RS", "XK", "BA", "GE", "AM", "AZ",
-    # 중동
-    "PS", "IL", "IR", "IQ", "SY", "LB", "YE", "SA", "TR", "EG",
-    # 동아시아
-    "KP", "TW", "CN", "KR",
-    # 동남아
-    "MM", "PH", "VN", "ID", "TH",
-    # 남아시아·중앙아시아
-    "PK", "AF", "IN", "BD", "KZ", "TJ", "KG",
-    # 아프리카
-    "SD", "SS", "ET", "SO", "LY", "ML", "BF", "NE", "NG", "CM",
-    "CF", "CD", "MZ", "TD", "GN", "ER", "DZ", "TN", "MA",
-    # 아메리카
-    "VE", "HT", "CO", "EC", "MX", "NI", "CU", "GT", "HN",
+    # 유럽 (44개국)
+    "AL", "AD", "AM", "AT", "AZ", "BY", "BE", "BA", "BG", "HR",
+    "CY", "CZ", "DK", "EE", "FI", "FR", "GE", "DE", "GR", "HU",
+    "IS", "IE", "IT", "XK", "LV", "LI", "LT", "LU", "MT", "MD",
+    "MC", "ME", "NL", "MK", "NO", "PL", "PT", "RO", "RU", "SM",
+    "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB", "VA",
+    # 중동 (16개국)
+    "BH", "EG", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "PS",
+    "QA", "SA", "SY", "TR", "AE", "YE",
+    # 동아시아 (7개국)
+    "CN", "JP", "KP", "KR", "MN", "TW", "HK",
+    # 동남아 (11개국)
+    "BN", "KH", "ID", "LA", "MY", "MM", "PH", "SG", "TH", "TL", "VN",
+    # 남아시아 (8개국)
+    "AF", "BD", "BT", "IN", "MV", "NP", "PK", "LK",
+    # 중앙아시아 (5개국)
+    "KZ", "KG", "TJ", "TM", "UZ",
+    # 아프리카 (54개국)
+    "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM", "CF", "TD",
+    "KM", "CG", "CD", "CI", "DJ", "GQ", "ER", "SZ", "ET", "GA",
+    "GM", "GH", "GN", "GW", "KE", "LS", "LR", "LY", "MG", "MW",
+    "ML", "MR", "MU", "MA", "MZ", "NA", "NE", "NG", "RW", "ST",
+    "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TZ", "TG", "TN",
+    "UG", "ZM", "ZW",
+    # 북미 (3개국)
+    "CA", "MX", "US",
+    # 중미/카리브 (20개국)
+    "AG", "BS", "BB", "BZ", "CR", "CU", "DM", "DO", "SV", "GD",
+    "GT", "HT", "HN", "JM", "NI", "PA", "KN", "LC", "VC", "TT",
+    # 남미 (12개국)
+    "AR", "BO", "BR", "CL", "CO", "EC", "GY", "PY", "PE", "SR", "UY", "VE",
+    # 오세아니아 (14개국)
+    "AU", "FJ", "KI", "MH", "FM", "NR", "NZ", "PW", "PG", "WS",
+    "SB", "TO", "TV", "VU",
 ]
 
 
@@ -542,18 +617,39 @@ async def _get_rolling_baseline(db: AsyncSession) -> float:
 
 
 async def calculate_all_tensions(db: AsyncSession) -> list[dict]:
-    """전체 모니터링 국가의 긴장도 계산 (롤링 베이스라인 정규화 적용)."""
+    """전체 모니터링 국가의 긴장도 계산 (롤링 베이스라인 정규화 적용).
+
+    동적 필터링: 최근 7일 이벤트가 있는 국가 + CONFLICT_FLOOR 국가만 계산.
+    200개국 전체를 매번 쿼리하면 커넥션 풀 부하 → 실제 활성 국가만 계산.
+    """
+    from sqlalchemy import text as sa_text
+
+    # 0단계: 최근 7일 이벤트가 있는 국가 목록 조회 (1개 쿼리)
+    active_result = await db.execute(
+        sa_text("""
+            SELECT DISTINCT country_code
+            FROM issue_clusters
+            WHERE last_event_at > NOW() - INTERVAL '7 days'
+              AND severity >= 30
+              AND country_code IS NOT NULL
+        """)
+    )
+    active_countries = {row[0] for row in active_result.fetchall()}
+
+    # CONFLICT_FLOOR 국가는 이벤트 없어도 항상 계산 (바닥 보장)
+    targets = (active_countries | set(CONFLICT_FLOOR.keys())) & set(MONITORED_COUNTRIES)
+
     # 1단계: 글로벌 베이스라인 산출
     baseline = await _get_rolling_baseline(db)
 
-    # 2단계: 각 국가별 긴장도 계산 (베이스라인 전달)
+    # 2단계: 타겟 국가별 긴장도 계산
     results = []
-    for code in MONITORED_COUNTRIES:
+    for code in targets:
         result = await calculate_country_tension(code, db, baseline)
         if result:
             results.append(result)
     logger.info(
-        "긴장도 계산 완료: %d개국 (baseline=%.1f)",
-        len(results), baseline,
+        "긴장도 계산 완료: %d/%d개국 활성 (baseline=%.1f)",
+        len(results), len(targets), baseline,
     )
     return results

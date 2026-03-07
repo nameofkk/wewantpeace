@@ -292,7 +292,7 @@ async def recluster():
                     # kscore 계산
                     now = datetime.now(timezone.utc)
                     age_hours = (now - last_ev["event_time"]).total_seconds() / 3600
-                    new_kscore = _calc_kscore(
+                    new_kscore, _ = _calc_kscore(
                         event_count=len(group),
                         is_spike=False,
                         confidence=round(avg_conf, 3),
@@ -364,7 +364,7 @@ async def recluster():
 
                     now = datetime.now(timezone.utc)
                     age_hours = (now - last_ev["event_time"]).total_seconds() / 3600
-                    new_kscore = _calc_kscore(
+                    new_kscore, _ = _calc_kscore(
                         event_count=len(group),
                         is_spike=False,
                         confidence=round(avg_conf, 3),

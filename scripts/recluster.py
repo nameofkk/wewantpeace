@@ -220,7 +220,7 @@ async def _process_batch(events: list[dict], start: int, end: int, stats: dict):
 
                     # KScore 재계산
                     age_hours = (now - ev["event_time"]).total_seconds() / 3600
-                    kscore = _calc_kscore(
+                    kscore, _ = _calc_kscore(
                         event_count=new_count,
                         is_spike=best_cluster["is_spike"],
                         confidence=new_conf,
@@ -286,7 +286,7 @@ async def _process_batch(events: list[dict], start: int, end: int, stats: dict):
                             title_ko = fb_ko
 
                     tiers = [ev["source_tier"]] if ev.get("source_tier") else []
-                    kscore = _calc_kscore(
+                    kscore, _ = _calc_kscore(
                         event_count=1, is_spike=False,
                         confidence=ev["confidence"], severity=ev["severity"],
                         independent_sources=1, source_tiers=tiers,
@@ -395,7 +395,7 @@ async def _post_process():
     for cl in clusters:
         age_hours = (now_utc - cl[7]).total_seconds() / 3600 if cl[7] else 0.0
         tiers = cl[6] if cl[6] else []
-        ks = _calc_kscore(
+        ks, _ = _calc_kscore(
             event_count=cl[1], is_spike=cl[2], confidence=cl[3],
             severity=cl[4], independent_sources=cl[5],
             source_tiers=tiers, age_hours=age_hours,

@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from worker.processor.calibration import INFORMATION_ACCESSIBILITY
+
 logger = logging.getLogger(__name__)
 
 # ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
@@ -1809,6 +1811,15 @@ def normalize(
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
     country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
     geohash5 = _make_geohash(lat, lon)
+
+    # 정보 접근성 보정: 언론 자유도 낮은 국가의 severity 상향
+    if country_code:
+        _ia_mod = INFORMATION_ACCESSIBILITY.get(country_code, 1.0)
+        if _ia_mod != 1.0:
+            _orig_sev = severity
+            severity = min(100, int(severity * _ia_mod))
+            logger.debug("IA보정: %s sev %d→%d (×%.2f)", country_code, _orig_sev, severity, _ia_mod)
+
     confidence = _calculate_confidence(source_tier, severity)
     dedup_key = _make_dedup_key(raw_text)  # 원문 기반으로 중복 검사
 

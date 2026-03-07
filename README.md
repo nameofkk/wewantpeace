@@ -7,7 +7,7 @@
 
 - **실시간 이슈 지도** — MapLibre GL 기반, 클러스터 마커 + 펄스 애니메이션 + 스파이크 감지
 - **긴장도 지수** — 국가별 위기 수준 계산·시계열 추적
-- **트렌딩 키워드** — 글로벌/개인화 트렌딩, K-score 기반 급상승 감지
+- **트렌딩 키워드** — 글로벌/개인화 트렌딩, KScore(Key Impact Score) 기반 급상승 감지
 - **커뮤니티** — 토론·분석·질문 게시판 (게시글·댓글·리액션)
 - **푸시 알림** — FCM 기반, 관심국가·토픽·심각도 필터링
 - **구독 결제** — Google Play Billing + Apple StoreKit + 토스 앱인토스
@@ -20,7 +20,7 @@
 |--------|------|
 | **Frontend** | Next.js 14 · React 18 · Tailwind CSS · MapLibre GL · Zustand · TanStack Query · Firebase Auth |
 | **Backend** | FastAPI · SQLAlchemy 2.0 (async) · Celery · Redis |
-| **Database** | PostgreSQL 15 + TimescaleDB · Supabase (프로덕션) |
+| **Database** | PostgreSQL 15 · Supabase (프로덕션) |
 | **Worker** | Celery Beat + Worker (collect/process 큐 분리) |
 | **Mobile** | Expo 55 · React Native 0.83 · react-native-iap · FCM + Notifee |
 | **수집** | RSS/feedparser · Telegram (Telethon) · OpenAI API (분류/번역) |
@@ -33,10 +33,10 @@ wewantpeace/
 ├── backend/
 │   ├── app/
 │   │   ├── routers/      # API (issues, trending, tension, community, auth, admin, me, subscriptions)
-│   │   ├── models/       # SQLAlchemy 모델 (11개)
+│   │   ├── models/       # SQLAlchemy 모델 (22개)
 │   │   ├── services/     # Google Play / Apple StoreKit 결제 처리
 │   │   └── core/         # config, database, auth, redis, firebase
-│   ├── alembic/          # DB 마이그레이션 (23개)
+│   ├── alembic/          # DB 마이그레이션 (37개)
 │   └── tests/            # pytest 테스트 (173+ 통과)
 ├── worker/
 │   ├── collector/        # RSS·Telegram 수집기
@@ -125,6 +125,17 @@ RSS/Telegram 수집 → 정규화(topic/severity/geo) → 중복제거 → 클�
 | `ALLOWED_ORIGINS` | CORS 허용 도메인 (JSON 배열) |
 | `NEXT_PUBLIC_API_URL` | 프론트→백엔드 API URL |
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | MapLibre 지도 토큰 |
+
+## 방법론
+
+알고리즘 설명: [METHODOLOGY.md](./METHODOLOGY.md)
+
+| 항목 | 현재 |
+|------|------|
+| 데이터 소스 | 58개 (RSS 37+ / Telegram 12 / API 3) |
+| 모니터링 국가 | 69개국 (120+ 확대 예정) |
+| 갱신 주기 | 5분 (긴장도/트렌딩/RSS/Telegram) |
+| KScore | Key Impact Score (0-10, 사용자 기준 국가 영향도) |
 
 ## 라이선스
 

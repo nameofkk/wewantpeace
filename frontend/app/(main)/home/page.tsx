@@ -7,6 +7,7 @@ import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
+import { calcImpactFactor } from "@/lib/impact-factors";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes, useTensionAll } from "@/lib/api";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -34,6 +35,13 @@ const TOPIC_COLORS: Record<string, string> = {
 // KScore 반올림: 표시값과 색상 판별에 동일한 값 사용
 function roundKScore(kscore: number): number {
   return Math.round(kscore * 100) / 100;
+}
+
+// 개인화 KScore: kscore(decay 포함) × impact_factor
+function personalizedKScore(item: TrendingItem, homeCountry: string): number {
+  const country = item.country_codes?.[0] || "";
+  const factor = calcImpactFactor(country, item.topic || "unknown", homeCountry);
+  return Math.round(item.kscore * factor * 100) / 100;
 }
 
 // KScore에 따른 카드 좌측 강조선 색 (0-10 스케일, 5단계)
@@ -82,6 +90,7 @@ interface TrendingItem {
   keyword: string;
   keyword_ko?: string | null;
   kscore: number;
+  raw_score?: number;
   topic: string | null;
   country_codes: string[];
   cluster_ids?: string[];
@@ -317,16 +326,18 @@ function KScoreHistorySection({
 const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = false }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string; isAdmin?: boolean }) {
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
+  const homeCountry = useAppStore((s) => s.homeCountry);
   const [showHistory, setShowHistory] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const patchCluster = usePatchCluster();
   const topic = item.topic ?? "unknown";
-  const k = roundKScore(item.kscore);
+  const pKScore = personalizedKScore(item, homeCountry);
+  const k = roundKScore(pKScore);
   const isExtreme = k >= 8;
   const isSevere = k >= 6;
   const isAlert = k >= 4;
-  const badge = getKScoreBadge(item.kscore, lang);
+  const badge = getKScoreBadge(pKScore, lang);
   const clusterId = item.cluster_ids?.[0];
   // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
   const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
@@ -365,7 +376,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
         "card-enter rounded-xl border-l-4 border border-border bg-card p-4 relative",
         "transition-all hover:bg-card/80",
         clusterId && !editing && "cursor-pointer",
-        kscoreAccent(item.kscore),
+        kscoreAccent(pKScore),
         badge.glow,
         isExtreme && "card-pulse-extreme",
         isSevere && !isExtreme && "card-pulse-severe",
@@ -413,7 +424,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
                 <InfoTooltip direction="down" text={t(lang, "signal_new_tooltip")} />
               </span>
             )}
-            {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
+            {isRising(item.first_event_at, pKScore) && !isNew(item.first_event_at) && (
               <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none animate-pulse">
                 RISING
                 <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
@@ -534,8 +545,9 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
 
 // ── 브리핑 카드 ──────────────────────────────────────────────────────────
 function BriefingCard({ items, lang }: { items: TrendingItem[]; lang: Lang }) {
-  const extremeCount = items.filter((i) => roundKScore(i.kscore) >= 8).length;
-  const severeCount = items.filter((i) => { const k = roundKScore(i.kscore); return k >= 6 && k < 8; }).length;
+  const homeCountry = useAppStore((s) => s.homeCountry);
+  const extremeCount = items.filter((i) => roundKScore(personalizedKScore(i, homeCountry)) >= 8).length;
+  const severeCount = items.filter((i) => { const k = roundKScore(personalizedKScore(i, homeCountry)); return k >= 6 && k < 8; }).length;
   const spikeCount = items.filter((i) => i.is_spike).length;
   const topItem = items[0];
 
@@ -608,7 +620,7 @@ function LoadingSkeleton() {
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const router = useRouter();
-  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan } = useAppStore();
+  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry } = useAppStore();
   const { data: me } = useMe();
   const meObj = me as { plan?: string; role?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
@@ -690,9 +702,9 @@ export default function HomePage() {
   }, [items]);
   const elapsed = useElapsed(lastFetchedAt, lang);
 
-  // 레벨별 카운트 (KScore 기준)
-  const extremeCount = (items ?? []).filter((i) => roundKScore(i.kscore) >= 8).length;
-  const crisisCount = (items ?? []).filter((i) => { const k = roundKScore(i.kscore); return k >= 6 && k < 8; }).length;
+  // 레벨별 카운트 (개인화 KScore 기준)
+  const extremeCount = (items ?? []).filter((i) => roundKScore(personalizedKScore(i, homeCountry)) >= 8).length;
+  const crisisCount = (items ?? []).filter((i) => { const k = roundKScore(personalizedKScore(i, homeCountry)); return k >= 6 && k < 8; }).length;
 
   const handleRefresh = useCallback(async () => {
     setSpinning(true);
@@ -920,20 +932,21 @@ export default function HomePage() {
                     const displayTitle = isJunkTitle(rawTitle)
                       ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName, item.country_codes?.[0])
                       : (stripTitlePrefix(rawTitle) || item.keyword);
-                    const badge = getKScoreBadge(item.kscore, lang);
+                    const risingPK = personalizedKScore(item, homeCountry);
+                    const badge = getKScoreBadge(risingPK, lang);
                     return (
                       <div
                         key={item.id}
                         onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
                         className={cn(
                           "shrink-0 w-48 rounded-lg border border-border bg-card p-3 cursor-pointer hover:bg-card/80 transition-colors",
-                          kscoreAccent(item.kscore),
+                          kscoreAccent(risingPK),
                           "border-l-4",
                         )}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className={cn("text-[10px] font-bold", badge.text)}>
-                            {roundKScore(item.kscore).toFixed(1)}
+                            {roundKScore(risingPK).toFixed(1)}
                           </span>
                           {item.country_codes.length > 0 && (
                             <span className="text-[11px]">

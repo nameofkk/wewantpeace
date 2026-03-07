@@ -88,7 +88,7 @@ async def main():
                 merged_total += 1
 
             # winner KScore 재계산
-            winner.kscore = _calc_kscore(
+            winner.kscore, _ = _calc_kscore(
                 event_count=winner.event_count,
                 is_spike=winner.is_spike,
                 confidence=winner.confidence,

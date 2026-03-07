@@ -15,6 +15,7 @@ class TrendingKeyword(Base):
     keyword_ko: Mapped[str | None] = mapped_column(String(256), nullable=True)
     normalized_kw: Mapped[str] = mapped_column(String(256), nullable=False)
     kscore: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    raw_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     topic: Mapped[str | None] = mapped_column(String(32), nullable=True)
     country_codes: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
     cluster_ids: Mapped[list] = mapped_column(UUIDArray, nullable=False, default=list)

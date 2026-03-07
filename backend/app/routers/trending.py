@@ -71,6 +71,7 @@ class TrendingItem(BaseModel):
     keyword: str
     keyword_ko: Optional[str] = None
     kscore: float
+    raw_score: float = 0.0
     topic: Optional[str]
     country_codes: list[str]
     cluster_ids: list
@@ -121,7 +122,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
     distinct_result = await db.execute(
         sa_text("""
             SELECT DISTINCT ON (kw.normalized_kw)
-                kw.id, kw.keyword, kw.keyword_ko, kw.kscore, kw.topic, kw.country_codes,
+                kw.id, kw.keyword, kw.keyword_ko, kw.kscore, COALESCE(kw.raw_score, 0.0) AS raw_score, kw.topic, kw.country_codes,
                 kw.cluster_ids, kw.scope, kw.calculated_at, kw.event_count, kw.severity,
                 kw.is_spike, kw.normalized_kw,
                 COALESCE(ic.independent_sources, 1) AS independent_sources
@@ -167,6 +168,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
                 keyword=r["keyword"],
                 keyword_ko=r["keyword_ko"],
                 kscore=round(float(r["kscore"]), 2),
+                raw_score=round(float(r.get("raw_score") or 0.0), 2),
                 topic=r["topic"],
                 country_codes=r["country_codes"] or [],
                 cluster_ids=[str(u) for u in (r["cluster_ids"] or [])],
@@ -209,7 +211,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
 
     scored = []
     for c in clusters:
-        kscore = _calc_kscore(
+        kscore, _ = _calc_kscore(
             event_count=c.event_count,
             is_spike=c.is_spike,
             confidence=c.confidence,
@@ -289,7 +291,7 @@ async def mine_trending(
         if c.severity < user_min_severity:
             continue
         age_hours = (now - c.last_event_at).total_seconds() / 3600 if c.last_event_at else 0.0
-        kscore = _calc_kscore(
+        kscore, _ = _calc_kscore(
             event_count=c.event_count,
             is_spike=c.is_spike,
             confidence=c.confidence,

@@ -54,7 +54,7 @@ def _calc_kscore(
     independent_sources: int,
     source_tiers: list[str],
     age_hours: float = 0.0,
-) -> float:
+) -> tuple[float, float]:
     """
     KScore 계산 (v6) — 0~10 스케일.
 
@@ -70,6 +70,9 @@ def _calc_kscore(
     - 48시간 후에도 30% 유지 (v5: 15%)
 
     UI 임계값: 안정(<2) / 주의(2-4) / 경계(4-6) / 심각(6-8) / 극심(8+)
+
+    Returns:
+        (kscore, raw_score): kscore=decay 적용 후, raw_score=decay 전 (0-10)
     """
     k10 = max(1, event_count)
 
@@ -96,8 +99,9 @@ def _calc_kscore(
         + 0.30 * severity_norm
         + 0.30 * spread
     )
+    raw_score = round(raw * KSCORE_SCALE, 2)          # decay 전 (0-10)
     decay = max(DECAY_FLOOR, math.exp(-DECAY_LAMBDA * age_hours))
-    return round(raw * KSCORE_SCALE * decay, 2)
+    return round(raw_score * decay, 2), raw_score      # (kscore, raw_score)
 
 
 async def calculate_global_trending(db: AsyncSession) -> list[dict]:
@@ -133,7 +137,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
     scored = []
     for c in clusters:
         age_hours = (now - c.last_event_at).total_seconds() / 3600 if c.last_event_at else 0.0
-        kscore = _calc_kscore(
+        kscore, raw_score = _calc_kscore(
             event_count=c.event_count,
             is_spike=c.is_spike,
             confidence=c.confidence,
@@ -151,6 +155,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             "keyword": c.title,
             "keyword_ko": c.title_ko,
             "kscore": kscore,
+            "raw_score": raw_score,
             "topic": c.topic,
             "country_codes": [c.country_code] if c.country_code else [],
             "is_spike": c.is_spike,
@@ -173,6 +178,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             keyword_ko=item.get("keyword_ko"),
             normalized_kw=item["keyword"].lower(),
             kscore=item["kscore"],
+            raw_score=item.get("raw_score", 0.0),
             topic=item["topic"],
             country_codes=item["country_codes"],
             cluster_ids=[uuid_lib.UUID(item["cluster_id"])],

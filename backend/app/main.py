@@ -89,7 +89,7 @@ async def _cleanup_stale_data():
                 )
                 zero_clusters = result.scalars().all()
                 for c in zero_clusters:
-                    c.kscore = _calc_kscore(
+                    c.kscore, _ = _calc_kscore(
                         event_count=c.event_count,
                         is_spike=c.is_spike,
                         confidence=c.confidence,

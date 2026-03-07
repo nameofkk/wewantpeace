@@ -59,6 +59,7 @@ class PreferencesOut(BaseModel):
     quiet_hours_start: Optional[str]
     quiet_hours_end: Optional[str]
     timezone: str
+    home_country: str = "KR"
 
 
 class PreferencesPatch(BaseModel):
@@ -69,6 +70,7 @@ class PreferencesPatch(BaseModel):
     quiet_hours_start: Optional[str] = None
     quiet_hours_end: Optional[str] = None
     timezone: Optional[str] = None
+    home_country: Optional[str] = None
 
 
 class PushTokenCreate(BaseModel):
@@ -127,6 +129,7 @@ def _pref_to_out(p: UserPreference) -> PreferencesOut:
         quiet_hours_start=p.quiet_hours_start.isoformat() if p.quiet_hours_start else None,
         quiet_hours_end=p.quiet_hours_end.isoformat() if p.quiet_hours_end else None,
         timezone=p.timezone,
+        home_country=getattr(p, "home_country", "KR"),
     )
 
 
@@ -387,6 +390,18 @@ async def update_preferences(
                 pref.quiet_hours_end = dt_time(h, m)
             except (ValueError, TypeError):
                 raise HTTPException(status_code=422, detail="quiet_hours_end 형식 오류: HH:MM")
+
+    if body.home_country is not None:
+        # Free 플랜은 기준 국가 변경 불가 (기본값 고정)
+        if current_user.plan.lower() == "free":
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "PLAN_REQUIRED", "required": "pro",
+                        "message": "기준 국가 변경은 Pro 플랜 전용입니다."},
+            )
+        if len(body.home_country) != 2 or not body.home_country.isalpha():
+            raise HTTPException(400, detail="유효하지 않은 국가 코드")
+        pref.home_country = body.home_country.upper()
 
     await db.flush()
     return _pref_to_out(pref)

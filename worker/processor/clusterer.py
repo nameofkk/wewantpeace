@@ -601,7 +601,7 @@ async def assign_cluster(
             cluster.geohash5 = event.geohash5
         # KScore 즉시 계산 (calculate_trending 의존 제거)
         age_hours = (now - cluster.last_event_at).total_seconds() / 3600 if cluster.last_event_at else 0.0
-        cluster.kscore = _calc_kscore(
+        cluster.kscore, _ = _calc_kscore(
             event_count=cluster.event_count,
             is_spike=cluster.is_spike,
             confidence=cluster.confidence,
@@ -624,7 +624,7 @@ async def assign_cluster(
             if _is_junk_title(event.title):
                 ai_title_en, _ = _make_fallback_titles(event.topic, event.country_code)
         # KScore 즉시 계산
-        initial_kscore = _calc_kscore(
+        initial_kscore, _ = _calc_kscore(
             event_count=1,
             is_spike=False,
             confidence=event.confidence,

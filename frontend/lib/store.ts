@@ -40,6 +40,9 @@ interface AppStore {
   // 테마
   theme: Theme;
 
+  // 기준 국가 (KScore 개인화)
+  homeCountry: string;
+
   // 액션
   setMapViewport: (v: Partial<Viewport>) => void;
   setSelectedCluster: (id: string | null) => void;
@@ -51,6 +54,7 @@ interface AppStore {
   removeMyCountry: (code: string) => void;
   setLang: (lang: Lang) => void;
   setTheme: (theme: Theme) => void;
+  setHomeCountry: (code: string) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -72,6 +76,7 @@ export const useAppStore = create<AppStore>()(
       myCountries: [],
       lang: "ko",
       theme: "dark",
+      homeCountry: "KR",
 
       setMapViewport: (v) =>
         set((state) => ({ mapViewport: { ...state.mapViewport, ...v } })),
@@ -96,6 +101,7 @@ export const useAppStore = create<AppStore>()(
       removeMyCountry: (code) =>
         set((state) => ({ myCountries: state.myCountries.filter((c) => c !== code) })),
       setLang: (lang) => set({ lang }),
+      setHomeCountry: (code) => set({ homeCountry: code }),
       setTheme: (theme) => {
         set({ theme });
         if (typeof document !== "undefined") {
@@ -106,7 +112,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: "wwp-store",
-      version: 4, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme
+      version: 5, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry
       migrate: (old: unknown, version: number) => {
         const s = old as Record<string, unknown>;
         if (version < 2) {
@@ -118,6 +124,9 @@ export const useAppStore = create<AppStore>()(
         if (version < 4) {
           return { ...s, theme: "dark" };
         }
+        if (version < 5) {
+          return { ...s, homeCountry: "KR" };
+        }
         return s;
       },
       partialize: (state) => ({
@@ -126,6 +135,7 @@ export const useAppStore = create<AppStore>()(
         userPlan: state.userPlan,
         lang: state.lang,
         theme: state.theme,
+        homeCountry: state.homeCountry,
       }),
     }
   )

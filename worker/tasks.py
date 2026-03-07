@@ -602,7 +602,7 @@ def calculate_trending(self):
                 merged_total += 1
 
             age_hours = (datetime.now(timezone.utc) - winner.last_event_at).total_seconds() / 3600 if winner.last_event_at else 0.0
-            winner.kscore = _calc_kscore(
+            winner.kscore, _ = _calc_kscore(
                 event_count=winner.event_count,
                 is_spike=winner.is_spike,
                 confidence=winner.confidence,

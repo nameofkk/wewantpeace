@@ -7,7 +7,8 @@ import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "
 import { t, type Lang } from "@/lib/i18n";
 import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
 import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
-import { ALL_COUNTRIES, getCountryName, getRegionName } from "@/lib/countries";
+import { ALL_COUNTRIES, getCountryName, getRegionName, getFlag } from "@/lib/countries";
+import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
 import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
@@ -111,7 +112,7 @@ function CountryPickerPanel({
 export default function SettingsPage() {
   const router = useRouter();
   const { user: firebaseUser, loading: authLoading } = useAuth();
-  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme } = useAppStore();
+  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme, homeCountry, setHomeCountry } = useAppStore();
   const { data: me } = useMe();
 
   // 서버 plan → store 동기화 (Pro/Pro+ 관심국가 제한 반영)
@@ -825,6 +826,39 @@ export default function SettingsPage() {
                   )} />
                 </button>
               </div>
+            </div>
+
+            {/* 1.5. 기준 국가 (KScore 개인화) */}
+            <div className="p-4 border-b border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "settings_home_country")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "settings_home_country_desc")}</p>
+                </div>
+                {plan === "free" ? (
+                  <div className="flex items-center gap-1.5 opacity-60">
+                    <span className="text-sm">{getFlag(homeCountry)} {getCountryName(homeCountry, lang)}</span>
+                    <Lock className="h-3 w-3 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <select
+                    value={homeCountry}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setHomeCountry(code);
+                      saveNotifPatch({ home_country: code });
+                    }}
+                    className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
+                  >
+                    {SUPPORTED_HOME_COUNTRIES.map((cc) => (
+                      <option key={cc} value={cc}>{getFlag(cc)} {getCountryName(cc, lang)}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {plan === "free" && (
+                <p className="text-[9px] text-muted-foreground mt-1">{t(lang, "settings_home_country_pro_hint")}</p>
+              )}
             </div>
 
             {/* 2. KScore 슬라이더 */}

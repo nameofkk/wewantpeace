@@ -412,4 +412,5 @@ export interface UserPreferences {
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   timezone: string;
+  home_country: string;
 }
