@@ -117,7 +117,7 @@ export default function AdminSourcesPage() {
   const [tierFilter, setTierFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("");
 
-  const { data, isLoading } = useQuery<{ total: number; items: SourceItem[] }>({
+  const { data, isLoading } = useQuery<{ total: number; active_count: number; inactive_count: number; items: SourceItem[] }>({
     queryKey: ["admin-sources", page, typeFilter, tierFilter, activeFilter],
     queryFn: async () => {
       if (!user) throw new Error("Unauthorized");
@@ -156,9 +156,9 @@ export default function AdminSourcesPage() {
   const totalPages = Math.ceil((data?.total ?? 0) / 20);
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
-  // 요약 통계 (현재 필터 결과 기준)
-  const activeCount = data?.items.filter(i => i.is_active).length ?? 0;
-  const inactiveCount = data?.items.filter(i => !i.is_active).length ?? 0;
+  // 요약 통계 (전체 기준, 백엔드에서 계산)
+  const activeCount = data?.active_count ?? 0;
+  const inactiveCount = data?.inactive_count ?? 0;
 
   return (
     <div>
@@ -170,7 +170,7 @@ export default function AdminSourcesPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-2xl font-bold">{data?.total ?? 0}</p>
+          <p className="text-2xl font-bold">{activeCount + inactiveCount}</p>
           <p className="text-xs text-muted-foreground">{lang === "ko" ? "전체 소스" : "Total"}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-3 text-center">

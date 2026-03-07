@@ -1127,6 +1127,15 @@ async def list_sources(
     result = await db.execute(q)
     channels = result.scalars().all()
 
+    # 전체 활성/비활성 카운트 (필터 무관)
+    _counts = await db.execute(
+        select(SourceChannel.is_active, func.count())
+        .group_by(SourceChannel.is_active)
+    )
+    _count_map = {row[0]: row[1] for row in _counts.fetchall()}
+    active_count = _count_map.get(True, 0)
+    inactive_count = _count_map.get(False, 0)
+
     # Redis에서 채널별 수집 상태 일괄 조회
     collect_statuses: dict[int, dict] = {}
     try:
@@ -1142,6 +1151,8 @@ async def list_sources(
 
     return {
         "total": total,
+        "active_count": active_count,
+        "inactive_count": inactive_count,
         "items": [
             {
                 "id": ch.id,
