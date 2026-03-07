@@ -147,6 +147,22 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="3,8,13,18,23,28,33,38,43,48,53,58"),  # 5분마다 (+3분 오프셋)
         "options": {"queue": "process"},
     },
+    # ── P1 파이프라인 품질 ──
+    "evaluate-source-reliability": {
+        "task": "worker.tasks.evaluate_source_reliability",
+        "schedule": crontab(minute=30, hour=15, day_of_week=0),  # Sun 15:30 UTC = Mon 00:30 KST
+        "options": {"queue": "process"},
+    },
+    "detect-severity-outliers": {
+        "task": "worker.tasks.detect_severity_outliers",
+        "schedule": crontab(minute=0, hour=5),  # 매일 05:00 UTC = KST 14:00
+        "options": {"queue": "process"},
+    },
+    "deactivate-stale-clusters": {
+        "task": "worker.tasks.deactivate_stale_clusters",
+        "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC = KST 15:00
+        "options": {"queue": "process"},
+    },
 }
 
 

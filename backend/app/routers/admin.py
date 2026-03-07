@@ -615,10 +615,16 @@ async def list_clusters(
     severity: Optional[int] = Query(None),
     topic: Optional[str] = Query(None),
     country: Optional[str] = Query(None),
+    flagged: Optional[bool] = Query(None),
+    active: Optional[bool] = Query(None),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     q = select(IssueCluster)
+    if flagged is not None:
+        q = q.where(IssueCluster.is_flagged == flagged)
+    if active is not None:
+        q = q.where(IssueCluster.is_active == active)
     if search:
         q = q.where(
             (IssueCluster.title.ilike(f"%{search}%"))
@@ -650,6 +656,8 @@ async def list_clusters(
                 "event_count": c.event_count,
                 "confidence": round(c.confidence, 3),
                 "is_spike": c.is_spike,
+                "is_active": c.is_active,
+                "is_flagged": c.is_flagged,
                 "first_event_at": c.first_event_at.isoformat(),
                 "last_event_at": c.last_event_at.isoformat(),
                 "created_at": c.created_at.isoformat(),

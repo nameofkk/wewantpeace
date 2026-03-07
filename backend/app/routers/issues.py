@@ -169,6 +169,7 @@ async def list_clusters(
     elif sort_by == "severity":
         order = IssueCluster.severity.desc()
     stmt = select(IssueCluster).where(
+        IssueCluster.is_active == True,  # noqa: E712
         IssueCluster.severity >= severity_min,
         IssueCluster.last_event_at >= cutoff,
     ).order_by(order).limit(limit)

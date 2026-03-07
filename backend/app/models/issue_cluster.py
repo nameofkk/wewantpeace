@@ -41,6 +41,8 @@ class IssueCluster(Base):
     window_end: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,

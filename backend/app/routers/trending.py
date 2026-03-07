@@ -198,7 +198,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
 
     result2 = await db.execute(
         select(IssueCluster)
-        .where(IssueCluster.last_event_at >= cutoff24)
+        .where(IssueCluster.is_active == True, IssueCluster.last_event_at >= cutoff24)  # noqa: E712
         .order_by(IssueCluster.event_count.desc())
         .limit(200)
     )
@@ -273,6 +273,7 @@ async def mine_trending(
     result = await db.execute(
         select(IssueCluster)
         .where(
+            IssueCluster.is_active == True,  # noqa: E712
             IssueCluster.country_code.in_(codes),
             IssueCluster.last_event_at >= cutoff,
         )

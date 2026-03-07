@@ -2069,3 +2069,249 @@ def monitor_service_health(self):
     except Exception as exc:
         logger.error("monitor_service_health 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── P1 파이프라인 품질 ──────────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.evaluate_source_reliability",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def evaluate_source_reliability(self):
+    """소스 신뢰도 자동 평가 (주간 배치). T9
+
+    소스 채널별 join_rate(클러스터 합류율), solo_rate(단독 이벤트율),
+    severity_dev(평균 심각도 편차)를 계산하여 어드민 텔레그램 리포트 전송.
+    """
+
+    async def _run():
+        import os
+        from sqlalchemy import select, func, case, cast, Float as SAFloat
+        from backend.app.models.source_channel import SourceChannel
+        from backend.app.models.raw_event import RawEvent
+        from backend.app.models.normalized_event import NormalizedEvent
+        from backend.app.models.issue_cluster import ClusterEvent
+
+        now = datetime.now(timezone.utc)
+        week_ago = now - timedelta(days=7)
+
+        async with AsyncSessionLocal() as db:
+            # 소스 채널 목록
+            channels_q = await db.execute(
+                select(SourceChannel).where(SourceChannel.is_active == True)  # noqa: E712
+            )
+            channels = {ch.id: ch for ch in channels_q.scalars().all()}
+
+            if not channels:
+                return {"status": "no_channels"}
+
+            # 지난 7일 normalized_events 소스별 통계
+            # join: raw_event → source_channel_id
+            joined_subq = (
+                select(NormalizedEvent.id)
+                .join(ClusterEvent, ClusterEvent.event_id == NormalizedEvent.id)
+                .where(NormalizedEvent.event_time >= week_ago)
+                .correlate(NormalizedEvent)
+            ).exists()
+
+            stats_q = await db.execute(
+                select(
+                    RawEvent.source_channel_id,
+                    func.count(NormalizedEvent.id).label("total"),
+                    func.sum(
+                        case((joined_subq, 1), else_=0)
+                    ).label("joined"),
+                    func.avg(cast(NormalizedEvent.severity, SAFloat)).label("avg_severity"),
+                    func.stddev(cast(NormalizedEvent.severity, SAFloat)).label("severity_dev"),
+                )
+                .join(NormalizedEvent, NormalizedEvent.raw_event_id == RawEvent.id)
+                .where(NormalizedEvent.event_time >= week_ago)
+                .where(RawEvent.source_channel_id.isnot(None))
+                .group_by(RawEvent.source_channel_id)
+            )
+            rows = stats_q.all()
+
+            if not rows:
+                return {"status": "no_events_this_week"}
+
+            # 리포트 생성
+            lines = [f"📊 <b>소스 신뢰도 주간 리포트</b>", f"기간: {week_ago.date()} ~ {now.date()}", ""]
+
+            for row in sorted(rows, key=lambda r: r.total, reverse=True):
+                ch = channels.get(row.source_channel_id)
+                if not ch:
+                    continue
+                total = row.total or 0
+                joined = row.joined or 0
+                join_rate = (joined / total * 100) if total > 0 else 0
+                solo_rate = 100 - join_rate
+                sev_dev = round(row.severity_dev or 0, 1)
+                avg_sev = round(row.avg_severity or 0, 1)
+
+                # 경고 표시
+                warn = ""
+                if join_rate < 30:
+                    warn += " ⚠️낮은합류"
+                if sev_dev > 20:
+                    warn += " ⚠️편차큼"
+
+                lines.append(
+                    f"<b>{ch.display_name}</b> [{ch.tier}] — {total}건\n"
+                    f"  합류 {join_rate:.0f}% · 단독 {solo_rate:.0f}% · "
+                    f"심각도 평균 {avg_sev} (σ {sev_dev}){warn}"
+                )
+
+            report_text = "\n".join(lines)
+
+            # Telegram 전송
+            tg_token = os.getenv("SOCIAL_TG_BOT_TOKEN", "")
+            tg_chat = os.getenv("SOCIAL_TG_CHAT_ID", "")
+            if tg_token and tg_chat:
+                try:
+                    import httpx
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        await client.post(
+                            f"https://api.telegram.org/bot{tg_token}/sendMessage",
+                            json={"chat_id": tg_chat, "text": report_text, "parse_mode": "HTML"},
+                        )
+                except Exception as e:
+                    logger.warning("소스 신뢰도 텔레그램 전송 실패: %s", e)
+
+            logger.info("evaluate_source_reliability: %d개 소스 분석 완료", len(rows))
+            return {"status": "ok", "sources_analyzed": len(rows)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("evaluate_source_reliability 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.detect_severity_outliers",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def detect_severity_outliers(self):
+    """Severity 이상치 감지 + 플래그 (매일). T10
+
+    활성 클러스터 내 이벤트의 severity 표준편차 > 20이면 is_flagged=True.
+    """
+
+    async def _run():
+        from sqlalchemy import select, func, cast, Float as SAFloat
+        from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
+        from backend.app.models.normalized_event import NormalizedEvent
+
+        async with AsyncSessionLocal() as db:
+            # 활성 클러스터별 severity stddev 계산
+            stddev_q = await db.execute(
+                select(
+                    ClusterEvent.cluster_id,
+                    func.stddev(cast(NormalizedEvent.severity, SAFloat)).label("sev_std"),
+                    func.count(NormalizedEvent.id).label("ev_count"),
+                )
+                .join(NormalizedEvent, NormalizedEvent.id == ClusterEvent.event_id)
+                .join(IssueCluster, IssueCluster.id == ClusterEvent.cluster_id)
+                .where(IssueCluster.is_active == True)  # noqa: E712
+                .group_by(ClusterEvent.cluster_id)
+                .having(func.count(NormalizedEvent.id) >= 3)  # 이벤트 3개 이상만
+            )
+            rows = stddev_q.all()
+
+            flagged_ids = []
+            unflagged_ids = []
+            for row in rows:
+                if row.sev_std and row.sev_std > 20:
+                    flagged_ids.append(row.cluster_id)
+                else:
+                    unflagged_ids.append(row.cluster_id)
+
+            # 플래그 설정
+            if flagged_ids:
+                from sqlalchemy import update
+                await db.execute(
+                    update(IssueCluster)
+                    .where(IssueCluster.id.in_(flagged_ids))
+                    .values(is_flagged=True)
+                )
+
+            # 기존 플래그 해제 (이상치가 아닌 것)
+            if unflagged_ids:
+                from sqlalchemy import update
+                await db.execute(
+                    update(IssueCluster)
+                    .where(IssueCluster.id.in_(unflagged_ids))
+                    .where(IssueCluster.is_flagged == True)  # noqa: E712
+                    .values(is_flagged=False)
+                )
+
+            await db.commit()
+
+            logger.info(
+                "detect_severity_outliers: %d개 클러스터 분석, %d개 플래그",
+                len(rows), len(flagged_ids),
+            )
+            return {"status": "ok", "analyzed": len(rows), "flagged": len(flagged_ids)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("detect_severity_outliers 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.deactivate_stale_clusters",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def deactivate_stale_clusters(self):
+    """Stale 클러스터 자동 비활성화 (매일). T11
+
+    72시간 이상 이벤트 미추가 + severity < 50 → is_active=False.
+    """
+
+    async def _run():
+        from sqlalchemy import select, update, func
+        from backend.app.models.issue_cluster import IssueCluster
+
+        now = datetime.now(timezone.utc)
+        stale_cutoff = now - timedelta(hours=72)
+
+        async with AsyncSessionLocal() as db:
+            # 대상 클러스터 수 먼저 확인
+            count_q = await db.execute(
+                select(func.count(IssueCluster.id)).where(
+                    IssueCluster.is_active == True,  # noqa: E712
+                    IssueCluster.last_event_at < stale_cutoff,
+                    IssueCluster.severity < 50,
+                )
+            )
+            target_count = count_q.scalar() or 0
+
+            if target_count > 0:
+                await db.execute(
+                    update(IssueCluster)
+                    .where(
+                        IssueCluster.is_active == True,  # noqa: E712
+                        IssueCluster.last_event_at < stale_cutoff,
+                        IssueCluster.severity < 50,
+                    )
+                    .values(is_active=False)
+                )
+                await db.commit()
+
+            logger.info("deactivate_stale_clusters: %d개 비활성화", target_count)
+            return {"status": "ok", "deactivated": target_count}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("deactivate_stale_clusters 오류: %s", exc)
+        raise self.retry(exc=exc)
