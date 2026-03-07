@@ -28,15 +28,29 @@ def is_configured() -> bool:
     return bool(THREADS_USER_ID and THREADS_ACCESS_TOKEN)
 
 
+_ENGAGE_KO = [
+    "여러분은 어떻게 생각하시나요?",
+    "이 상황, 어떻게 보시나요?",
+    "여러분의 생각을 들려주세요.",
+]
+_ENGAGE_EN = [
+    "What are your thoughts?",
+    "How do you see this situation?",
+    "Share your perspective below.",
+]
+
+
 def _build_text(post: SocialPost) -> str:
     """Threads 최적화 본문 (500자 한도).
 
     Threads 전용 톤:
-    - 대화형, 맥락 있는 설명
+    - 대화형, 맥락 있는 설명 (원문 전체 유지)
+    - 대화 유도 질문으로 마무리
     - URL 포함 (프로필 유입)
     - 해시태그 2~3개 (검색 발견용)
-    - 마무리에 대화 유도 문구
     """
+    import hashlib
+
     body = post.body_text
 
     # 기존 CTA/URL 라인 정리 (Threads 전용으로 교체)
@@ -45,18 +59,22 @@ def _build_text(post: SocialPost) -> str:
     body = re.sub(r'www\.\S+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
-    # Threads CTA: 링크 + 대화 유도
-    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
-    cta = "\n\n🔗 www.wewantpeace.live"
+    # 대화 유도 문구 추가 (post ID 기반 고정 선택)
+    idx = int(hashlib.md5(str(post.id).encode()).hexdigest(), 16) % len(_ENGAGE_KO)
+    engage = f"\n\n💬 {_ENGAGE_EN[idx]}\n{_ENGAGE_KO[idx]}"
 
-    full_text = body + cta
+    # Threads CTA: 링크 + 해시태그
+    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
+    link = "\n\n🔗 www.wewantpeace.live"
+
+    full_text = body + engage + link
     if hashtag_str and len(full_text) + len(hashtag_str) + 1 <= 500:
         full_text = f"{full_text}\n{hashtag_str}"
 
     # 500자 초과 시 잘라내기
     if len(full_text) > 500:
-        max_body = 500 - len(cta) - 3
-        full_text = f"{body[:max_body]}...{cta}"
+        max_body = 500 - len(engage) - len(link) - 3
+        full_text = f"{body[:max_body]}...{engage}{link}"
 
     return full_text
 

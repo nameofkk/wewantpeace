@@ -36,10 +36,10 @@ def _build_text(post: SocialPost) -> str:
 
     X 전용 톤:
     - 뉴스 속보 스타일, 짧고 강렬
+    - bilingual → 각 언어 첫 문장만 (간결)
     - URL 완전 제거 (비프리미엄 페널티)
     - 해시태그 사용 안 함 (Grok이 직접 분류, 과다 시 페널티)
     - 브랜드명 CTA만 (프로필 링크로 유도)
-    - 영어 + 한국어 bilingual 유지
     """
     body = post.body_text
 
@@ -49,6 +49,31 @@ def _build_text(post: SocialPost) -> str:
     body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
     body = re.sub(r'#\w+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
+
+    # X 톤: 헤드라인 스타일 — 각 언어 첫 문장만 추출
+    lines = [l.strip() for l in body.split('\n') if l.strip()]
+    en_lines = []
+    ko_lines = []
+    for line in lines:
+        cleaned = re.sub(r'^[🚨⚡🔴🟡🟢⚪📊📈]+\s*', '', line).strip()
+        if not cleaned:
+            continue
+        # 한국어 포함 여부로 분류
+        if re.search(r'[\uac00-\ud7a3]', cleaned):
+            ko_lines.append(cleaned)
+        else:
+            en_lines.append(cleaned)
+
+    # 첫 문장씩만 사용 (헤드라인 스타일)
+    en_head = en_lines[0] if en_lines else ""
+    ko_head = ko_lines[0] if ko_lines else ""
+
+    if en_head and ko_head:
+        body = f"🚨 {en_head}\n{ko_head}"
+    elif en_head:
+        body = f"🚨 {en_head}"
+    elif ko_head:
+        body = f"🚨 {ko_head}"
 
     footer = f"\n\n{_CTA}"
 
