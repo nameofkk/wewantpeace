@@ -10,14 +10,33 @@ interface Props {
   params: { id: string };
 }
 
+const SITE_URL = "https://www.wewantpeace.live";
+const SITE_DESC = "110개국+ 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
   if (!issue) {
-    return { title: "Issue Not Found" };
+    return {
+      title: "WeWantPeace",
+      description: SITE_DESC,
+      openGraph: {
+        title: "WeWantPeace | 실시간 글로벌 분쟁 모니터링",
+        description: SITE_DESC,
+        type: "website",
+        url: SITE_URL,
+        siteName: "WeWantPeace",
+        images: [{ url: `${SITE_URL}/og-image.png?v=2` }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: "WeWantPeace | 실시간 글로벌 분쟁 모니터링",
+        description: SITE_DESC,
+        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=2` }],
+      },
+    };
   }
 
   const title = issue.title_ko || issue.title;
-  const siteDesc = "110개국+ 긴장도 지수 · 실시간 스파이크 알림 · 글로벌 분쟁 모니터링";
   // 카카오톡: og:title이 길면 description 영역을 밀어내서 숨김
   // 띄어쓰기 기준으로 자연스럽게 자름
   let ogTitle = title;
@@ -26,23 +45,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ogTitle = (cut > 10 ? title.slice(0, cut) : title.slice(0, 40)) + "…";
   }
 
-  const ogImage = `https://www.wewantpeace.live/issues/${issue.id}/og`;
+  const ogImage = `${SITE_URL}/issues/${issue.id}/og`;
 
   return {
     title,
-    description: siteDesc,
+    description: SITE_DESC,
     openGraph: {
       title: ogTitle,
-      description: siteDesc,
+      description: SITE_DESC,
       type: "website",
-      url: `https://www.wewantpeace.live/issues/${issue.id}`,
+      url: `${SITE_URL}/issues/${issue.id}`,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: ogTitle,
-      description: siteDesc,
+      description: SITE_DESC,
       images: [{ url: ogImage }],
     },
   };

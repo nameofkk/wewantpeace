@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [{ url: ogImage }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${title} | WeWantPeace`,
       description: siteDesc,
       images: [{ url: ogImage }],

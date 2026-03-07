@@ -41,9 +41,13 @@ export interface IssueServer {
 
 export async function fetchIssueServer(id: string): Promise<IssueServer | null> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`${API_BASE}/issues/${id}`, {
       next: { revalidate: 120 },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -61,9 +65,13 @@ export interface TensionCountry {
 
 export async function fetchCountryTension(code: string): Promise<TensionCountry | null> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`${API_BASE}/tension/country/${code}`, {
       next: { revalidate: 120 },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     return res.json();
   } catch {
