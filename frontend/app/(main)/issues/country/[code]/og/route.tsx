@@ -276,12 +276,12 @@ export async function GET(
                   style={{ width: "140px", height: "60px" }}
                 />
               ) : null}
-              <span style={{ color: "#94A3B8", fontSize: 26, fontWeight: 600, letterSpacing: "-0.3px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 800, letterSpacing: "-0.3px" }}>
                 WeWantPeace
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ color: "#64748B", fontSize: 18, fontWeight: 600, fontFamily: displayFont }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700, fontFamily: displayFont }}>
                 {lang === "en" ? "Real-time Global Conflict Monitor" : "실시간 글로벌 분쟁 모니터링"}
               </span>
               <div
@@ -334,7 +334,7 @@ export async function GET(
                 >
                   {lang === "en" ? countryEn : countryKo}
                 </span>
-                <span style={{ color: "#94A3B8", fontSize: 24, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 700 }}>
                   {lang === "en" ? countryKo : countryEn}
                 </span>
               </div>
@@ -360,11 +360,11 @@ export async function GET(
                 >
                   {score.toFixed(1)}
                 </span>
-                <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 24, fontWeight: 800 }}>
                   / 100
                 </span>
               </div>
-              <span style={{ color: "#64748B", fontSize: 18, fontWeight: 600, marginTop: "2px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 22, fontWeight: 700, marginTop: "2px" }}>
                 Tension Index
               </span>
 
@@ -404,7 +404,7 @@ export async function GET(
                   gap: "8px",
                 }}
               >
-                <span style={{ color: "#64748B", fontSize: 16, fontWeight: 600 }}>
+                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
                   {lang === "en" ? "7-Day Trend" : "7일 추이"}
                 </span>
                 <div
@@ -467,19 +467,19 @@ export async function GET(
           >
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {topIssues.length > 0 && (
-                <span style={{ color: "#64748B", fontSize: 14, fontWeight: 600, marginBottom: "2px" }}>
+                <span style={{ color: "#64748B", fontSize: 16, fontWeight: 700, marginBottom: "2px" }}>
                   {lang === "en" ? "Top Issues" : "주요 이슈"}
                 </span>
               )}
               {topIssues.map((t, i) => (
-                <span key={i} style={{ color: "#CBD5E1", fontSize: 18, fontWeight: 600 }}>
+                <span key={i} style={{ color: "#CBD5E1", fontSize: 20, fontWeight: 600 }}>
                   {i + 1}. {t}
                 </span>
               ))}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ color: "#334155", fontSize: 18 }}>|</span>
-              <span style={{ color: "#64748B", fontSize: 18, fontWeight: 600 }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
                 wewantpeace.live
               </span>
             </div>

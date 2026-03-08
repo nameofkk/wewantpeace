@@ -393,6 +393,14 @@ export function usePatchCluster() {
   });
 }
 
+// --- LemonSqueezy 웹 결제 ---
+export async function createLemonSqueezyCheckout(plan: string): Promise<{ checkout_url: string }> {
+  return apiFetch("/payments/ls/create-checkout", undefined, {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
 // --- 타입 ---
 export interface UserArea {
   id: number;

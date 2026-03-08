@@ -865,6 +865,11 @@ export const translations = {
     store_cancel_in_store: "구독 취소는 스토어에서 직접 해주세요",
     store_subscribe_in_app_desc: "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요",
 
+    // LemonSqueezy 웹 결제
+    web_subscribe_button: "구독하기",
+    web_subscribe_loading: "결제 페이지 준비 중...",
+    web_payment_provider: "LemonSqueezy를 통해 안전하게 결제됩니다",
+
     // 피드백
     feedback_title: "의견 보내기",
     feedback_desc: "서비스 개선을 위한 의견이나 건의사항을 보내주세요.",
@@ -2105,6 +2110,11 @@ export const translations = {
     store_login_to_sync: "Log in to the app to sync",
     store_cancel_in_store: "Please cancel your subscription in the store",
     store_subscribe_in_app_desc: "Install the WeWantPeace app and subscribe to Pro/Pro+",
+
+    // LemonSqueezy web payment
+    web_subscribe_button: "Subscribe",
+    web_subscribe_loading: "Preparing checkout...",
+    web_payment_provider: "Secure payment via LemonSqueezy",
 
     // feedback
     feedback_title: "Send Feedback",

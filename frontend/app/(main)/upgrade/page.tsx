@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles, ExternalLink, Tag } from "lucide-react";
+import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Sparkles, ExternalLink, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
-import { detectPlatform, isMobileBrowser, isAndroidBrowser, isIOSBrowser, type AppPlatform } from "@/lib/platform-detect";
+import { detectPlatform, type AppPlatform } from "@/lib/platform-detect";
 import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { API_BASE, useMe } from "@/lib/api";
+import { API_BASE, useMe, createLemonSqueezyCheckout } from "@/lib/api";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
@@ -85,10 +85,6 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
   pro_plus: "com.wewantpeace.proplus.monthly",
 };
 
-// 스토어 링크 (등록 후 실제 URL로 교체)
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
-const APP_STORE_URL = ""; // App Store 미출시 — 실제 ID 확보 시 업데이트
-
 function FeatureValue({
   val, planId, lang,
 }: { val: boolean | string; planId: string; lang: Lang }) {
@@ -107,58 +103,17 @@ function FeatureValue({
   );
 }
 
-/** 웹에서 "앱에서 구독하세요" 안내 UI */
-function AppInstallPrompt({ lang }: { lang: Lang }) {
-  const isAndroid = isAndroidBrowser();
-  const isIOS = isIOSBrowser();
-
+/** 웹에서 LemonSqueezy 결제 안내 + 앱 다운로드 보조 UI */
+function WebCheckoutBanner({ lang }: { lang: Lang }) {
   return (
-    <div className="rounded-2xl border-2 border-primary/30 bg-card p-6 text-center space-y-4">
-      <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mx-auto">
-        <Smartphone className="h-7 w-7 text-primary" />
-      </div>
-
-      <div>
-        <h3 className="text-lg font-bold">
-          {t(lang, "store_subscribe_in_app")}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {lang === "ko"
-            ? "WeWantPeace 앱을 설치하고 Pro/Pro+ 플랜을 구독하세요"
-            : "Install the WeWantPeace app and subscribe to Pro/Pro+"}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3">
-        {(!isIOS) && (
-          <a
-            href={PLAY_STORE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-green-600 to-green-500 py-3 text-sm font-bold text-white hover:opacity-90 transition-opacity"
-          >
-            <Download className="h-4 w-4" />
-            {t(lang, "store_download_android")}
-          </a>
-        )}
-        {(!isAndroid) && APP_STORE_URL && (
-          <a
-            href={APP_STORE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 py-3 text-sm font-bold text-white hover:opacity-90 transition-opacity"
-          >
-            <Download className="h-4 w-4" />
-            {t(lang, "store_download_ios")}
-          </a>
-        )}
-      </div>
-
+    <div className="rounded-2xl border border-primary/20 bg-card/60 p-4 text-center space-y-2">
+      <p className="text-xs text-muted-foreground">
+        {t(lang, "web_payment_provider")}
+      </p>
       <div className="pt-2 border-t border-border">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           {t(lang, "store_already_subscribed")}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
+          {" "}
           {t(lang, "store_login_to_sync")}
         </p>
       </div>
@@ -251,7 +206,9 @@ function UpgradeContent() {
     setError(null);
 
     try {
-      if (platform === "android-native" || platform === "android-twa") {
+      if (isWeb) {
+        await handleLemonSqueezyCheckout(planId);
+      } else if (platform === "android-native" || platform === "android-twa") {
         await handleAndroidPurchase(planId);
       } else if (platform === "ios-native" || platform === "ios-app") {
         await handleIOSPurchase(planId);
@@ -428,6 +385,13 @@ function UpgradeContent() {
     router.push(`/upgrade/success?plan=${planId}`);
   }
 
+  async function handleLemonSqueezyCheckout(planId: string) {
+    const { checkout_url } = await createLemonSqueezyCheckout(planId);
+    if (checkout_url) {
+      window.location.href = checkout_url;
+    }
+  }
+
   const isWeb = platform === "web" && !isTossMiniApp();
 
   return (
@@ -572,10 +536,10 @@ function UpgradeContent() {
           </div>
         )}
 
-        {/* 웹 브라우저: 앱 설치 유도 (Toss 미니앱에서는 숨김) */}
+        {/* 웹 브라우저: LemonSqueezy 결제 안내 (Toss 미니앱에서는 숨김) */}
         {isWeb && !isTossMiniApp() && (
           <div className="mb-8" style={{ animation: "fadeSlideUp 0.35s ease both" }}>
-            <AppInstallPrompt lang={lang} />
+            <WebCheckoutBanner lang={lang} />
           </div>
         )}
 
@@ -725,9 +689,24 @@ function UpgradeContent() {
                 </div>
               ) : (
                 <div className="mt-5 space-y-2">
-                  <div className="w-full rounded-xl py-3 text-sm font-semibold text-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    {t(lang, "store_subscribe_in_app")}
-                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
+                    disabled={loading === "pro"}
+                    className={cn(
+                      "btn-shine w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                      "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+                      "hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5",
+                      "active:scale-[0.98] active:shadow-none",
+                      "disabled:opacity-50"
+                    )}
+                  >
+                    {loading === "pro" ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        {t(lang, "web_subscribe_loading")}
+                      </span>
+                    ) : t(lang, "web_subscribe_button")}
+                  </button>
                   {currentPlan === "free" && !trialUsed && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleStartTrial(); }}
@@ -833,9 +812,26 @@ function UpgradeContent() {
                     : t(lang, "upgrade_subscribe")}
                 </button>
               ) : (
-                <div className="mt-5 w-full rounded-xl py-3 text-sm font-semibold text-center bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                  {t(lang, "store_subscribe_in_app")}
-                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSubscribe("pro_plus"); }}
+                  disabled={loading === "pro_plus"}
+                  className={cn(
+                    "btn-shine mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                    "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+                    "hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5",
+                    "active:scale-[0.98] active:shadow-none",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {loading === "pro_plus" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      {t(lang, "web_subscribe_loading")}
+                    </span>
+                  ) : currentPlan === "pro"
+                    ? (lang === "ko" ? "Pro+로 업그레이드" : "Upgrade to Pro+")
+                    : t(lang, "web_subscribe_button")}
+                </button>
               )}
             </div>
           </div>
