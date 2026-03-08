@@ -109,7 +109,7 @@ async def cancel_subscription(
     )
     sub = result.scalar_one_or_none()
     if not sub:
-        raise HTTPException(404, detail="활성 구독이 없습니다.")
+        raise HTTPException(404, detail={"code": "NO_ACTIVE_SUBSCRIPTION"})
 
     # 스토어 구독은 스토어에서 직접 취소해야 함
     if sub.platform in ("android", "ios"):
@@ -121,7 +121,8 @@ async def cancel_subscription(
         )
         return {
             "status": "store_cancel_required",
-            "message": f"구독은 {store_name}에서 직접 취소해주세요.",
+            "code": "STORE_CANCEL_REQUIRED",
+            "store": store_name,
             "manage_url": manage_url,
             "platform": sub.platform,
         }
@@ -138,8 +139,8 @@ async def cancel_subscription(
 
     return {
         "status": "cancelled",
+        "code": "SUBSCRIPTION_CANCELLED",
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
-        "message": f"구독이 취소되었습니다. {sub.expires_at.strftime('%Y년 %m월 %d일') if sub.expires_at else '기간 종료'} 까지 서비스를 이용할 수 있습니다.",
     }
 
 
@@ -150,7 +151,7 @@ async def start_trial(
 ):
     """Pro 7일 무료 체험. Pro만 가능, Pro+ 제외. 1회만."""
     if current_user.plan != "free":
-        raise HTTPException(409, detail="이미 유료 플랜을 사용 중입니다.")
+        raise HTTPException(409, detail={"code": "ALREADY_PAID_PLAN"})
 
     # 이전 trial 이력 확인 (trial_end IS NOT NULL)
     existing = await db.execute(
@@ -160,7 +161,7 @@ async def start_trial(
         ).limit(1)
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(409, detail="무료 체험은 1회만 가능합니다.")
+        raise HTTPException(409, detail={"code": "TRIAL_ALREADY_USED"})
 
     from datetime import timedelta
 

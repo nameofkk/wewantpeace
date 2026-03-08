@@ -16,3 +16,5 @@ class TensionIndex(Base):
     accel_score: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     spillover_score: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     percentile_30d: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+    convergence_bonus: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+    anomaly_z: Mapped[float | None] = mapped_column(Float, nullable=True)

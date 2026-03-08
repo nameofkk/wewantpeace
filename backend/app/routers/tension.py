@@ -47,6 +47,8 @@ class TensionOut(BaseModel):
     event_score: float
     accel_score: float
     spillover_score: float
+    convergence_bonus: float = 0.0
+    anomaly_z: Optional[float] = None
     delta_24h: Optional[float] = None
     updated_at: str
     top5_clusters: list[ClusterSummary]
@@ -185,6 +187,8 @@ def _tension_to_out(
         event_score=round(t.event_score or 0.0, 1),
         accel_score=round(t.accel_score or 0.0, 1),
         spillover_score=round(t.spillover_score or 0.0, 1),
+        convergence_bonus=round(t.convergence_bonus or 0.0, 2),
+        anomaly_z=round(t.anomaly_z, 2) if t.anomaly_z is not None else None,
         delta_24h=delta_24h,
         updated_at=t.time.isoformat(),
         top5_clusters=top5,

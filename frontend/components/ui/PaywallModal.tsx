@@ -107,19 +107,12 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
     onClose();
   };
 
-  const proFeatures = lang === "ko"
-    ? [
-        "실시간 글로벌 이슈 지도",
-        "관심 국가 5개 + 속보 알림",
-        "KScore 필터 + 30일 히스토리",
-        "방해금지 시간 설정",
-      ]
-    : [
-        "Real-time global issue map",
-        "5 countries + Fast alerts",
-        "KScore filter + 30-day history",
-        "Quiet hours setting",
-      ];
+  const proFeatures = [
+    t(lang, "paywall_pro_feature_map"),
+    t(lang, "paywall_pro_feature_countries"),
+    t(lang, "paywall_pro_feature_kscore"),
+    t(lang, "paywall_pro_feature_quiet"),
+  ];
 
   return (
     <div

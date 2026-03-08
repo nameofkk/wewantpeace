@@ -497,6 +497,8 @@ async def calculate_country_tension(
         accel_score=round(accel_score, 2),
         spillover_score=round(spillover, 2),
         percentile_30d=percentile,
+        convergence_bonus=round(convergence_bonus, 2),
+        anomaly_z=round(anomaly_z, 2) if anomaly_z is not None else None,
     )
     db.add(entry)
 
