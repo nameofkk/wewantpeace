@@ -103,23 +103,6 @@ function FeatureValue({
   );
 }
 
-/** 웹에서 LemonSqueezy 결제 안내 + 앱 다운로드 보조 UI */
-function WebCheckoutBanner({ lang }: { lang: Lang }) {
-  return (
-    <div className="rounded-2xl border border-primary/20 bg-card/60 p-4 text-center space-y-2">
-      <p className="text-xs text-muted-foreground">
-        {t(lang, "web_payment_provider")}
-      </p>
-      <div className="pt-2 border-t border-border">
-        <p className="text-[11px] text-muted-foreground">
-          {t(lang, "store_already_subscribed")}
-          {" "}
-          {t(lang, "store_login_to_sync")}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function UpgradePage() {
   return (
@@ -533,13 +516,6 @@ function UpgradeContent() {
         {trialSuccess && (
           <div className="mb-6 rounded-lg bg-blue-500/10 border border-blue-500/20 px-4 py-3 text-sm text-blue-400 text-center">
             {t(lang, "trial_success")}
-          </div>
-        )}
-
-        {/* 웹 브라우저: LemonSqueezy 결제 안내 (Toss 미니앱에서는 숨김) */}
-        {isWeb && !isTossMiniApp() && (
-          <div className="mb-8" style={{ animation: "fadeSlideUp 0.35s ease both" }}>
-            <WebCheckoutBanner lang={lang} />
           </div>
         )}
 
