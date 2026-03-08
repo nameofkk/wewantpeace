@@ -75,9 +75,9 @@ export async function GET(
 
   // 폰트 로드
   const [playfairData, notoSansKrData] = await Promise.all([playfairFont, notoSansKrFont]);
-  const ogFonts: { name: string; data: ArrayBuffer; weight: number; style: "normal" }[] = [];
-  if (playfairData) ogFonts.push({ name: "Playfair Display", data: playfairData, weight: 900, style: "normal" });
-  if (notoSansKrData) ogFonts.push({ name: "Noto Sans KR", data: notoSansKrData, weight: 700, style: "normal" });
+  const ogFonts: { name: string; data: ArrayBuffer; weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900; style: "normal" }[] = [];
+  if (playfairData) ogFonts.push({ name: "Playfair Display", data: playfairData, weight: 900 as const, style: "normal" });
+  if (notoSansKrData) ogFonts.push({ name: "Noto Sans KR", data: notoSansKrData, weight: 700 as const, style: "normal" });
 
   let logoSrc: string | null = null;
   try {
