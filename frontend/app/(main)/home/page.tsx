@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3 } from "lucide-react";
 import Link from "next/link";
@@ -641,6 +641,14 @@ function LoadingSkeleton() {
 
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
+  return (
+    <Suspense>
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry, completedTours } = useAppStore();
