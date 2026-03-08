@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { API_BASE, useMe } from "@/lib/api";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 interface Feature {
   labelKo: string;
@@ -204,6 +207,21 @@ function UpgradeContent() {
       } catch { /* ignore */ }
     })();
   }, []);
+  // ── 가이드 투어 ──────────────────────────────────────────
+  const [tourRun, setTourRun] = useState(false);
+  const tourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='upgrade-page']",
+      content: t(lang, "tour_upgrade_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='upgrade-comparison']",
+      content: t(lang, "tour_upgrade_comparison"),
+    },
+  ], [lang]);
+
   const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
   const [platform, setPlatform] = useState<AppPlatform>("web");
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
@@ -370,7 +388,9 @@ function UpgradeContent() {
   const isWeb = platform === "web" && !isTossMiniApp();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-tour="upgrade-page">
+      <AppTour tourId="upgrade" steps={tourSteps} run={tourRun} />
+      <TourHelpButton tourId="upgrade" onStartTour={() => setTourRun(true)} />
       <style>{`
         @keyframes fadeSlideUp {
           from { opacity: 0; transform: translateY(24px); }
@@ -778,7 +798,7 @@ function UpgradeContent() {
         </div>
 
         {/* ── 상세 비교 표 ── */}
-        <div className="mt-12" style={{ animation: "fadeSlideUp 0.5s ease 0.4s both" }}>
+        <div className="mt-12" data-tour="upgrade-comparison" style={{ animation: "fadeSlideUp 0.5s ease 0.4s both" }}>
           <h3 className="text-xs font-bold mb-4 text-center text-muted-foreground uppercase tracking-widest">
             {lang === "ko" ? "플랜 상세 비교" : "Detailed Comparison"}
           </h3>

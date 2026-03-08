@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -404,7 +407,9 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
         </span>
       </div>
 
-      <TensionGauge score={data.raw_score} level={displayLevel} lang={lang} />
+      <div data-tour="tension-gauge">
+        <TensionGauge score={data.raw_score} level={displayLevel} lang={lang} />
+      </div>
 
       {/* 최근 30일 대비 */}
       {(() => {
@@ -539,6 +544,24 @@ function LoadingSkeleton() {
 
 export default function TensionPage() {
   const { myCountries, lang } = useAppStore();
+  const [tourRun, setTourRun] = useState(false);
+
+  const tensionTourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='tension-page']",
+      content: t(lang, "tour_tension_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='tension-gauge']",
+      content: t(lang, "tour_tension_gauge"),
+    },
+    {
+      target: "[data-tour='tension-list']",
+      content: t(lang, "tour_tension_list"),
+    },
+  ], [lang]);
 
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
@@ -606,7 +629,9 @@ export default function TensionPage() {
   }, [refetch]);
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
+    <div className="flex flex-col" data-tour="tension-page" style={{ height: "calc(100dvh - 60px)" }}>
+      <AppTour tourId="tension" steps={tensionTourSteps} run={tourRun} />
+      <TourHelpButton tourId="tension" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
         <div className="grid grid-cols-3 items-center mb-3">
@@ -808,7 +833,7 @@ export default function TensionPage() {
           )}
 
           {!isLoading && !isError && tensions && tensions.length > 0 && (
-            <>
+            <div data-tour="tension-list">
               {tensions.slice(0, visibleCount).map((item, i) => (
                 <TensionCard key={item.country_code} data={item} userPlan={userPlan} index={i} lang={lang} />
               ))}
@@ -839,7 +864,7 @@ export default function TensionPage() {
                   )}
                 </button>
               )}
-            </>
+            </div>
           )}
         </div>
       )}

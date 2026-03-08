@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, ArrowLeft, CheckCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,9 @@ import { useNotifications, useMarkRead, useMarkAllRead, useSubmitFeedback, Notif
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { t, Lang } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 function timeAgo(iso: string, lang: Lang): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -28,6 +32,21 @@ export default function NotificationsPage() {
   const markAllRead = useMarkAllRead();
   const submitFeedback = useSubmitFeedback();
 
+  // ── 가이드 투어 ──────────────────────────────────────────
+  const [tourRun, setTourRun] = useState(false);
+  const tourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='notifications-page']",
+      content: t(lang, "tour_notifications_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='notifications-card']",
+      content: t(lang, "tour_notifications_card"),
+    },
+  ], [lang]);
+
   const hasUnread = notifications?.some((n) => !n.is_read);
 
   const handleClick = (notif: NotificationItem) => {
@@ -40,7 +59,9 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-tour="notifications-page">
+      <AppTour tourId="notifications" steps={tourSteps} run={tourRun} />
+      <TourHelpButton tourId="notifications" onStartTour={() => setTourRun(true)} />
       {/* 헤더 */}
       <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-md border-b border-border/50">
         <div className="flex items-center justify-between h-[52px] px-4">
@@ -77,10 +98,11 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <ul className="divide-y divide-border/40">
-            {notifications.map((notif) => (
+            {notifications.map((notif, idx) => (
               <li
                 key={notif.id}
                 onClick={() => handleClick(notif)}
+                {...(idx === 0 ? { "data-tour": "notifications-card" } : {})}
                 className={cn(
                   "flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors",
                   !notif.is_read && "bg-primary/5"

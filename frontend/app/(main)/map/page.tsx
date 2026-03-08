@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -11,6 +11,9 @@ import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { ShareButton } from "@/components/issue/ShareButton";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 // ── 실시간 경과 시간 훅 ───────────────────────────────────────────────────
 function useElapsed(isoString?: string, lang: Lang = "ko") {
@@ -346,7 +349,42 @@ export default function MapPage() {
   const [showPreview, setShowPreview] = useState(false);
   const showPreviewRef = useRef(false);  // 클릭 핸들러에서 최신 값 참조
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [heatmapPulse, setHeatmapPulse] = useState(false);
   const { data: tensionAll } = useTensionAll();
+
+  // ── 가이드 투어 ──────────────────────────────────────────
+  const [tourRun, setTourRun] = useState(false);
+  const tourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='map-page']",
+      content: t(lang, "tour_map_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='map-heatmap']",
+      content: t(lang, "tour_map_heatmap"),
+    },
+    {
+      target: "[data-tour='map-filters']",
+      content: t(lang, "tour_map_filters"),
+    },
+  ], [lang]);
+
+  // 히트맵 버튼 펄스 애니메이션 (첫 방문 시 1회)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const discovered = localStorage.getItem("heatmap_discovered");
+    if (!discovered) {
+      setHeatmapPulse(true);
+      // 2초 후 펄스 중단 + localStorage 저장
+      const timer = setTimeout(() => {
+        setHeatmapPulse(false);
+        localStorage.setItem("heatmap_discovered", "1");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // showPreview → ref 동기화
   useEffect(() => { showPreviewRef.current = showPreview; }, [showPreview]);
@@ -354,15 +392,28 @@ export default function MapPage() {
   // ── PaywallModal: 5초 프리뷰 후 blur + 모달 ────────────────────────────
   const mapPaywall = usePaywall("map_locked");
   const [previewExpired, setPreviewExpired] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   useEffect(() => {
     if (!isLocked || !showPreview) return;
+    // 3초 전부터 카운트다운 표시 (2초 후 시작 = 남은 3초)
+    const countdownTimer = setTimeout(() => {
+      setCountdown(3);
+    }, 2000);
     const timer = setTimeout(() => {
       setPreviewExpired(true);
+      setCountdown(null);
       mapPaywall.show();
     }, 5000);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); clearTimeout(countdownTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocked, showPreview]);
+
+  // 카운트다운 틱 (3 -> 2 -> 1)
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const tick = setTimeout(() => setCountdown((c) => (c !== null && c > 1 ? c - 1 : null)), 1000);
+    return () => clearTimeout(tick);
+  }, [countdown]);
 
   const { data: apiClusters, isError, isLoading, refetch, isFetching } = useClusters({ limit: "2000" });
   const [clusters, setClusters] = useState<Cluster[]>([]);
@@ -616,7 +667,9 @@ export default function MapPage() {
   ] as const;
 
   return (
-    <div className="relative h-[100dvh] w-full">
+    <div className="relative h-[100dvh] w-full" data-tour="map-page">
+      <AppTour tourId="map" steps={tourSteps} run={tourRun} />
+      <TourHelpButton tourId="map" onStartTour={() => setTourRun(true)} />
       <div ref={mapContainerRef} className="h-full w-full" />
 
       {/* ── 상단 헤더 바 ─────────────────────────────────────────── */}
@@ -654,7 +707,7 @@ export default function MapPage() {
             </div>
           </div>
           {/* Row 2: 범례 */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" data-tour="map-filters">
             {LEGEND.map(([label, col]) => (
               <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
@@ -663,15 +716,23 @@ export default function MapPage() {
             ))}
             <InfoTooltip direction="down" text={t(lang, "map_kscore_legend")} />
             <button
-              onClick={() => setShowHeatmap((v) => !v)}
+              data-tour="map-heatmap"
+              onClick={() => {
+                setShowHeatmap((v) => !v);
+                if (heatmapPulse) {
+                  setHeatmapPulse(false);
+                  localStorage.setItem("heatmap_discovered", "1");
+                }
+              }}
               className={cn(
-                "ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors border",
+                "ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors border",
                 showHeatmap
                   ? "bg-primary/15 text-primary border-primary/30"
-                  : "text-muted-foreground border-border hover:text-foreground"
+                  : "text-muted-foreground border-border hover:text-foreground",
+                heatmapPulse && "animate-pulse"
               )}
             >
-              <MapIcon className="h-2.5 w-2.5" />
+              <MapIcon className="h-3.5 w-3.5" />
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
           </div>
@@ -912,12 +973,64 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* ── 카운트다운 경고 배너 ───────────────────────────────────── */}
+      {isLocked && showPreview && !previewExpired && countdown !== null && countdown > 0 && (
+        <div
+          className="absolute z-20 animate-in fade-in slide-in-from-top-2 duration-300"
+          style={{ bottom: "80px", left: "12px", right: "12px" }}
+        >
+          <div
+            style={{
+              borderRadius: "12px",
+              border: "1px solid rgba(239,68,68,0.5)",
+              backgroundColor: "rgba(20,0,0,0.88)",
+              backdropFilter: "blur(8px)",
+              padding: "10px 14px",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "13px",
+                color: "rgba(252,165,165,0.95)",
+                fontWeight: 700,
+              }}
+            >
+              {t(lang, "map_preview_countdown", { n: countdown })}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── 5초 프리뷰 만료 후 blur overlay ────────────────────────── */}
       {isLocked && showPreview && previewExpired && (
         <div
-          className="absolute inset-0 z-25 pointer-events-none"
-          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.35)" }}
-        />
+          className="absolute inset-0 z-25 flex items-center justify-center"
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(0,0,0,0.50)" }}
+        >
+          <div className="text-center px-6" style={{ maxWidth: "320px" }}>
+            <Lock style={{ width: "32px", height: "32px", color: "rgba(255,255,255,0.5)", margin: "0 auto 16px" }} />
+            <p style={{ fontSize: "14px", fontWeight: 700, color: "#fff", marginBottom: "8px" }}>
+              {t(lang, "map_preview_expired_text")}
+            </p>
+            <a
+              href="/upgrade"
+              style={{
+                display: "inline-block",
+                borderRadius: "12px",
+                background: "linear-gradient(to right, #2563eb, #6366f1)",
+                padding: "12px 28px",
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#fff",
+                textDecoration: "none",
+                marginTop: "8px",
+              }}
+            >
+              {lang === "ko" ? "Pro 업그레이드" : "Upgrade to Pro"}
+            </a>
+          </div>
+        </div>
       )}
 
       {/* ── PaywallModal ──────────────────────────────────────────── */}

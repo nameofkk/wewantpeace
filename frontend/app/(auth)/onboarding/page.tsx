@@ -175,7 +175,7 @@ export default function OnboardingPage() {
 
   function finishOnboarding() {
     localStorage.setItem("onboarding_done", "true");
-    router.push("/home");
+    router.push("/home?tour=1");
   }
 
   // --- 국가 선택/해제 ---

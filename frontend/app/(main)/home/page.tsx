@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
@@ -16,6 +16,9 @@ import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
 import { ShareButton } from "@/components/issue/ShareButton";
 import WelcomeModal from "@/components/ui/WelcomeModal";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 const TOPIC_COLORS: Record<string, string> = {
   conflict:  "bg-red-500/20 text-red-600 dark:text-red-400",
@@ -259,7 +262,7 @@ function KScoreHistorySection({
   ];
 
   return (
-    <div className="mt-4 pt-4 border-t border-border">
+    <div className="mt-4 pt-4 border-t border-border" data-tour="home-kscore-history">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-muted-foreground">
           KScore {lang === "ko" ? "히스토리" : "History"}
@@ -272,10 +275,14 @@ function KScoreHistorySection({
               return (
                 <span
                   key={value}
-                  className="flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] text-muted-foreground/40 border border-border/40 cursor-not-allowed select-none"
+                  className="relative group flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] text-muted-foreground/40 border border-border/40 cursor-not-allowed select-none"
+                  title={t(lang, "kscore_history_lock_tooltip")}
                 >
                   <Lock className="h-2.5 w-2.5" />
                   {lang === "ko" ? labelKo : labelEn}
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap rounded-md bg-card border border-border px-2.5 py-1.5 text-[10px] text-foreground shadow-lg z-50">
+                    {t(lang, "kscore_history_lock_tooltip")}
+                  </span>
                 </span>
               );
             }
@@ -635,7 +642,38 @@ function LoadingSkeleton() {
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const router = useRouter();
-  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry } = useAppStore();
+  const searchParams = useSearchParams();
+  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry, completedTours } = useAppStore();
+  const [tourRun, setTourRun] = useState(false);
+
+  // 온보딩 완료 후 tour=1 파라미터로 자동 시작
+  useEffect(() => {
+    if (searchParams.get("tour") === "1" && !completedTours.includes("home")) {
+      setTourRun(true);
+      window.history.replaceState({}, "", "/home");
+    }
+  }, [searchParams, completedTours]);
+
+  const homeTourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='home-page']",
+      content: t(lang, "tour_home_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='home-tabs']",
+      content: t(lang, "tour_home_tabs"),
+    },
+    {
+      target: "[data-tour='home-rising']",
+      content: t(lang, "tour_home_rising"),
+    },
+    {
+      target: "[data-tour='home-kscore-history']",
+      content: t(lang, "tour_home_kscore_history"),
+    },
+  ], [lang]);
   const { data: me } = useMe();
   const meObj = me as { plan?: string; role?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
@@ -743,7 +781,9 @@ export default function HomePage() {
   }, [refetch]);
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
+    <div className="flex flex-col" data-tour="home-page" style={{ height: "calc(100dvh - 60px)" }}>
+      <AppTour tourId="home" steps={homeTourSteps} run={tourRun} />
+      <TourHelpButton tourId="home" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
         <div className="grid grid-cols-3 items-center mb-3">
@@ -797,7 +837,7 @@ export default function HomePage() {
         </p>
 
         {/* 탭 */}
-        <div className="flex gap-0">
+        <div className="flex gap-0" data-tour="home-tabs">
           {(["global", "mine"] as const).map((tab) => (
             <button
               key={tab}
@@ -942,7 +982,7 @@ export default function HomePage() {
 
             {/* ── 급상승 섹션 (글로벌 탭, 데이터 있을 때만) ──── */}
             {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
-              <div className="mb-2">
+              <div className="mb-2" data-tour="home-rising">
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="text-xs font-bold">{t(lang, "home_rising_title")}</span>
                   <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 animate-pulse leading-none">

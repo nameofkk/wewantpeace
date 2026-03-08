@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
@@ -15,6 +15,9 @@ import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 // ── 국가 선택 패널 ─────────────────────────────────────────────────────────
 function CountryPickerPanel({
@@ -175,6 +178,29 @@ export default function SettingsPage() {
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  // ── 가이드 투어 ──────────────────────────────────────────
+  const [tourRun, setTourRun] = useState(false);
+  const tourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='settings-page']",
+      content: t(lang, "tour_settings_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='settings-home-country']",
+      content: t(lang, "tour_settings_home_country"),
+    },
+    {
+      target: "[data-tour='settings-watched']",
+      content: t(lang, "tour_settings_watched"),
+    },
+    {
+      target: "[data-tour='settings-notifications']",
+      content: t(lang, "tour_settings_notifications"),
+    },
+  ], [lang]);
 
   async function handleSubmitFeedback() {
     if (!firebaseUser || !feedbackMsg.trim()) return;
@@ -438,7 +464,9 @@ export default function SettingsPage() {
     (typeof window !== "undefined" && !!getStoredFCMToken());
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" data-tour="settings-page">
+      <AppTour tourId="settings" steps={tourSteps} run={tourRun} />
+      <TourHelpButton tourId="settings" onStartTour={() => setTourRun(true)} />
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
         <div className="grid grid-cols-3 items-center mb-1">
@@ -515,7 +543,7 @@ export default function SettingsPage() {
         </section>
 
         {/* ── 관심지역 ─────────────────────────────────────────────── */}
-        <section>
+        <section data-tour="settings-watched">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t(lang, "settings_monitored")}
@@ -786,7 +814,7 @@ export default function SettingsPage() {
         </section>
 
         {/* ── 알림 설정 ─────────────────────────────────────────────── */}
-        <section>
+        <section data-tour="settings-notifications">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             {t(lang, "settings_notifications")}
           </h2>
@@ -830,7 +858,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 1.5. 기준 국가 (KScore 개인화) */}
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border" data-tour="settings-home-country">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "settings_home_country")}</p>

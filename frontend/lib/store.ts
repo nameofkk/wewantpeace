@@ -31,7 +31,7 @@ interface AppStore {
   // 트렌딩 탭
   trendingTab: "global" | "mine";
 
-  // 관심지역 (localStorage 저장)
+  // 관심 국가 (localStorage 저장)
   myCountries: string[];
 
   // 언어
@@ -40,8 +40,13 @@ interface AppStore {
   // 테마
   theme: Theme;
 
-  // 기준 국가 (KScore 개인화)
+  // 내 국가 (KScore 개인화)
   homeCountry: string;
+
+  // 가이드 투어
+  completedTours: string[];
+  markTourComplete: (tour: string) => void;
+  resetTour: (tour: string) => void;
 
   // 액션
   setMapViewport: (v: Partial<Viewport>) => void;
@@ -77,6 +82,17 @@ export const useAppStore = create<AppStore>()(
       lang: "ko",
       theme: "dark",
       homeCountry: "KR",
+      completedTours: [],
+      markTourComplete: (tour) =>
+        set((state) => ({
+          completedTours: state.completedTours.includes(tour)
+            ? state.completedTours
+            : [...state.completedTours, tour],
+        })),
+      resetTour: (tour) =>
+        set((state) => ({
+          completedTours: state.completedTours.filter((t) => t !== tour),
+        })),
 
       setMapViewport: (v) =>
         set((state) => ({ mapViewport: { ...state.mapViewport, ...v } })),
@@ -112,7 +128,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: "wwp-store",
-      version: 5, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry
+      version: 6, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry, v6: completedTours
       migrate: (old: unknown, version: number) => {
         const s = old as Record<string, unknown>;
         if (version < 2) {
@@ -127,6 +143,9 @@ export const useAppStore = create<AppStore>()(
         if (version < 5) {
           return { ...s, homeCountry: "KR" };
         }
+        if (version < 6) {
+          return { ...s, completedTours: [] };
+        }
         return s;
       },
       partialize: (state) => ({
@@ -136,6 +155,7 @@ export const useAppStore = create<AppStore>()(
         lang: state.lang,
         theme: state.theme,
         homeCountry: state.homeCountry,
+        completedTours: state.completedTours,
       }),
     }
   )
