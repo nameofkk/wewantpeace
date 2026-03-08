@@ -571,16 +571,11 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
   const homeCountry = useAppStore((s) => s.homeCountry);
   if (risingItems.length === 0) return null;
 
-  // ticker용: KScore delta 우선, 없으면 KScore 기반 폴백
-  const deltaItems = allItems
-    .filter((item) => item.kscore_delta_24h != null && item.kscore_delta_24h !== 0)
-    .sort((a, b) => Math.abs(b.kscore_delta_24h ?? 0) - Math.abs(a.kscore_delta_24h ?? 0))
-    .slice(0, 15);
-  const hasDelta = deltaItems.length > 0;
-  // delta 없으면 KScore 상위 이슈로 폴백
-  const tickerItems = hasDelta
-    ? deltaItems
-    : [...allItems].sort((a, b) => b.kscore - a.kscore).slice(0, 15);
+  // ticker용: 이슈 제목 + KScore (delta 있으면 delta, 없으면 현재 KScore)
+  const tickerItems = [...allItems]
+    .sort((a, b) => b.kscore - a.kscore)
+    .slice(0, 12);
+  const hasDelta = tickerItems.some((item) => item.kscore_delta_24h != null && item.kscore_delta_24h !== 0);
 
   return (
     <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3" data-tour="home-rising">
@@ -630,46 +625,45 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
         })}
       </div>
 
-      {/* 하단 ticker — KScore 전일 대비 변동 (폴백: KScore 현재값) */}
+      {/* 하단 ticker — 이슈 제목 + KScore delta */}
       {tickerItems.length > 0 && (() => {
-        const reps = tickerItems.length <= 5 ? 6 : tickerItems.length <= 10 ? 4 : 2;
+        const reps = tickerItems.length <= 4 ? 4 : 2;
         return (
           <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5 flex items-center">
             <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
-              {hasDelta ? "KScore 24h" : "KScore"}
+              {hasDelta ? (lang === "ko" ? "📈 KScore 변동" : "📈 KScore Δ") : "📊 KScore"}
             </span>
             <div className="overflow-hidden flex-1">
               <div className="ticker-track-fast">
                 {Array.from({ length: reps }, (_, rep) => (
-                  <span key={rep} className="inline-flex items-center gap-4 px-3">
+                  <span key={rep} className="inline-flex items-center gap-5 px-3">
                     {tickerItems.map((item) => {
                       const flag = item.country_codes[0] ? getFlag(item.country_codes[0]) : "🌐";
-                      if (hasDelta) {
-                        const delta = item.kscore_delta_24h ?? 0;
-                        const isUp = delta > 0;
-                        return (
-                          <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                            <span>{flag}</span>
-                            <span className="font-medium text-muted-foreground">{item.country_codes[0] || "?"}</span>
-                            <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
-                              {isUp ? "+" : ""}{delta.toFixed(1)}
-                            </span>
-                            <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
-                              {isUp ? "▲" : "▼"}
-                            </span>
-                          </span>
-                        );
-                      }
+                      const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
+                      const title = (stripTitlePrefix(rawTitle) || item.keyword).slice(0, 20);
+                      const delta = item.kscore_delta_24h;
+                      const showDelta = hasDelta && delta != null && delta !== 0;
                       return (
-                        <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                        <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] whitespace-nowrap">
                           <span>{flag}</span>
-                          <span className="font-medium text-muted-foreground">{item.country_codes[0] || "?"}</span>
-                          <span className={cn(
-                            "font-bold",
-                            item.kscore >= 7 ? "text-red-400" : item.kscore >= 4 ? "text-orange-400" : "text-muted-foreground"
-                          )}>
-                            {item.kscore.toFixed(1)}
-                          </span>
+                          <span className="font-medium text-foreground/80 max-w-[140px] truncate">{title}</span>
+                          {showDelta ? (
+                            <>
+                              <span className={cn("font-bold tabular-nums", delta > 0 ? "text-red-400" : "text-emerald-400")}>
+                                {delta > 0 ? "+" : ""}{delta.toFixed(1)}
+                              </span>
+                              <span className={cn("text-[9px]", delta > 0 ? "text-red-400" : "text-emerald-400")}>
+                                {delta > 0 ? "▲" : "▼"}
+                              </span>
+                            </>
+                          ) : (
+                            <span className={cn(
+                              "font-bold tabular-nums",
+                              item.kscore >= 7 ? "text-red-400" : item.kscore >= 4 ? "text-orange-400" : "text-muted-foreground"
+                            )}>
+                              K{item.kscore.toFixed(1)}
+                            </span>
+                          )}
                         </span>
                       );
                     })}

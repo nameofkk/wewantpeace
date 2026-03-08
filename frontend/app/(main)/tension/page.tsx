@@ -722,7 +722,7 @@ export default function TensionPage() {
         return (
           <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5 flex items-center">
             <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
-              {lang === "ko" ? "긴장도 24h" : "Tension 24h"}
+              {lang === "ko" ? "🌡️ 긴장도 변동" : "🌡️ Tension Δ"}
             </span>
             <div className="overflow-hidden flex-1">
               <div className="ticker-track-fast">
