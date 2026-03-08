@@ -142,6 +142,8 @@ export function calcImpactFactor(
   topic: string,
   homeCountry = "KR",
 ): number {
+  // BASIC 모드: homeCountry가 빈 문자열이면 raw KScore (factor=1.0)
+  if (!homeCountry) return 1.0;
   const countryFactors = IMPACT[homeCountry];
   if (!countryFactors) return DEFAULT_FACTOR;
   const f = countryFactors[eventCountry];

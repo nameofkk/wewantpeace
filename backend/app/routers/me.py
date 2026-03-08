@@ -392,15 +392,21 @@ async def update_preferences(
                 raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_end", "expected": "HH:MM"})
 
     if body.home_country is not None:
-        # Free 플랜은 기준 국가 변경 불가 (기본값 고정)
-        if current_user.plan.lower() == "free":
-            raise HTTPException(
-                status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},
-            )
-        if len(body.home_country) != 2 or not body.home_country.isalpha():
-            raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
-        pref.home_country = body.home_country.upper()
+        new_hc = body.home_country.strip()
+        if new_hc == "":
+            # BASIC 모드: 빈 문자열 허용 (raw KScore, 모든 플랜)
+            pref.home_country = ""
+        else:
+            if len(new_hc) != 2 or not new_hc.isalpha():
+                raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
+            new_hc = new_hc.upper()
+            # Free 플랜은 기본 고정 국가(KR)만 허용, 다른 국가 변경 불가
+            if current_user.plan.lower() == "free" and new_hc != "KR":
+                raise HTTPException(
+                    status_code=403,
+                    detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},
+                )
+            pref.home_country = new_hc
 
     await db.flush()
     return _pref_to_out(pref)

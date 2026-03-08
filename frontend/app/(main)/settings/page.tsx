@@ -836,26 +836,24 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">{t(lang, "settings_home_country")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_home_country_desc")}</p>
                 </div>
-                {plan === "free" ? (
-                  <div className="flex items-center gap-1.5 opacity-60">
-                    <span className="text-sm">{getFlag(homeCountry)} {getCountryName(homeCountry, lang)}</span>
-                    <Lock className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                ) : (
-                  <select
-                    value={homeCountry}
-                    onChange={(e) => {
-                      const code = e.target.value;
-                      setHomeCountry(code);
-                      saveNotifPatch({ home_country: code });
-                    }}
-                    className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
-                  >
-                    {SUPPORTED_HOME_COUNTRIES.map((cc) => (
+                <select
+                  value={homeCountry}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    setHomeCountry(code);
+                    saveNotifPatch({ home_country: code });
+                  }}
+                  className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
+                >
+                  <option value="">{t(lang, "home_country_basic_label")}</option>
+                  {plan === "free" ? (
+                    <option value="KR">{getFlag("KR")} {getCountryName("KR", lang)}</option>
+                  ) : (
+                    SUPPORTED_HOME_COUNTRIES.map((cc) => (
                       <option key={cc} value={cc}>{getFlag(cc)} {getCountryName(cc, lang)}</option>
-                    ))}
-                  </select>
-                )}
+                    ))
+                  )}
+                </select>
               </div>
               {plan === "free" && (
                 <p className="text-[9px] text-muted-foreground mt-1">{t(lang, "settings_home_country_pro_hint")}</p>
