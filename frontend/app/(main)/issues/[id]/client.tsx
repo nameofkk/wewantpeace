@@ -308,7 +308,7 @@ export default function IssueDetailClient({ initialData }: Props) {
             <ShareButton issueId={issue.id} title={displayTitle} />
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1 ml-auto"
             >
               {showHistory ? (
                 <><ChevronUp className="h-3 w-3" /> {t(lang, "issue_kscore_history_collapse")}</>
