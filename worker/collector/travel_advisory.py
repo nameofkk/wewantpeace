@@ -225,11 +225,8 @@ class TravelAdvisoryCollector:
 
             # external_id: 국가코드+레벨로 중복 방지
             # 같은 국가의 같은 레벨이면 중복으로 처리
-            # Updated 날짜가 바뀌면 새 이벤트로 인식 (경보 내용 변경)
-            updated = advisory.get("Updated", "")
-            # 날짜만 추출 (시간 부분 제외)하여 하루 단위로 중복 방지
-            updated_date = updated[:10] if updated else ""
-            external_id = f"us-travel-advisory:{country_code or country_name}:{level}:{updated_date}"
+            # 레벨이 변경되면 새 이벤트로 인식 (날짜 제거하여 같은 날 중복 방지)
+            external_id = f"us-travel-advisory:{country_code or country_name}:{level}"
 
             # 중복 확인
             existing = await db.execute(
@@ -430,11 +427,10 @@ class KoreaTravelAdvisoryCollector:
 
             country_name = country_en or country_ko
 
-            # external_id
-            date_part = written_dt[:10] if written_dt else ""
+            # external_id: 국가코드+레벨로 중복 방지 (날짜 제거)
             external_id = (
                 f"kr-travel-advisory:"
-                f"{country_code or country_name}:{alarm_lvl}:{date_part}"
+                f"{country_code or country_name}:{alarm_lvl}"
             )
 
             # 중복 확인
@@ -606,9 +602,10 @@ class UKTravelAdvisoryCollector:
 
                 # updated_at 추출
                 updated_at = data.get("updated_at") or data.get("public_updated_at") or ""
-                updated_date = updated_at[:10] if updated_at else ""
 
-                external_id = f"uk-travel-advisory:{country_code}:{updated_date}"
+                # severity를 external_id에 포함 → 경보 수준 변경 시 새 이벤트로 인식
+                severity = self._parse_fcdo_severity(data)
+                external_id = f"uk-travel-advisory:{country_code}:{severity}"
 
                 # 중복 확인
                 existing = await db.execute(
@@ -620,8 +617,6 @@ class UKTravelAdvisoryCollector:
                 if existing.scalar_one_or_none():
                     result.skipped += 1
                     continue
-
-                severity = self._parse_fcdo_severity(data)
 
                 # 발행 시간 파싱
                 published_at = None

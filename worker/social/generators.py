@@ -70,12 +70,16 @@ async def _generate_card_for_post(
     post: SocialPost,
     clusters=None,
 ):
-    """포스트에 카드 이미지 생성 (실패해도 무시)."""
+    """포스트에 카드 이미지 생성 (실패 시 기본 OG 이미지 폴백)."""
     try:
         from worker.social.card_generator import generate_card_for_post
         await generate_card_for_post(post, clusters)
     except Exception:
         logger.warning("카드 이미지 생성 실패 (무시): post=%s", post.id)
+
+    # 카드 이미지 생성 실패 시 기본 OG 이미지를 폴백으로 설정
+    if not post.image_url:
+        post.image_url = "https://www.wewantpeace.live/og-default.png"
 
 
 # ── 공통 bilingual 시스템 프롬프트 ──────────────────────────────────────────

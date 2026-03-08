@@ -311,8 +311,8 @@ async def _poll_updates():
     import httpx
 
     offset = 0
-    # 수정 대기 중인 post_id 추적 {chat_id: post_id}
-    edit_pending: dict[int, uuid.UUID] = {}
+    # 수정 대기 중인 post_id 추적 {chat_id: (post_id, created_at)}
+    edit_pending: dict[int, tuple[uuid.UUID, datetime]] = {}
 
     while True:
         try:
@@ -345,7 +345,7 @@ async def _poll_updates():
                             try:
                                 pid = uuid.UUID(cb_data.split(":", 1)[1])
                                 if chat_id:
-                                    edit_pending[chat_id] = pid
+                                    edit_pending[chat_id] = (pid, datetime.now(timezone.utc))
                             except ValueError:
                                 pass
 
@@ -368,7 +368,7 @@ async def _poll_updates():
                         text = msg.get("text", "")
 
                         if chat_id and chat_id in edit_pending and text:
-                            pid = edit_pending.pop(chat_id)
+                            pid, _ = edit_pending.pop(chat_id)
                             reply = await handle_edit_text(pid, text)
                             await client.post(
                                 f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
@@ -377,6 +377,12 @@ async def _poll_updates():
                         # 관리자 채팅의 일반 텍스트 → AI 에이전트
                         elif chat_id and str(chat_id) == SOCIAL_TG_CHAT_ID and text:
                             await _handle_agent_message(client, chat_id, text)
+
+            # edit_pending TTL 정리: 10분 이상 된 엔트리 제거
+            now = datetime.now(timezone.utc)
+            expired = [cid for cid, (_, created) in edit_pending.items() if (now - created).total_seconds() > 600]
+            for cid in expired:
+                edit_pending.pop(cid, None)
 
         except Exception:
             logger.exception("Telegram polling 오류")
