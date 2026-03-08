@@ -15,10 +15,10 @@ export const translations = {
     home_title: "오늘의 이슈",
     home_subtitle: "전 세계 분쟁·갈등 이슈를 실시간으로 추적합니다",
     home_tab_global: "글로벌",
-    home_tab_mine: "관심지역",
+    home_tab_mine: "관심 국가",
     home_loading: "이슈를 불러오는 중...",
     home_no_issues: "현재 표시할 이슈가 없습니다.",
-    home_login_required: "로그인하면 관심지역 이슈를 볼 수 있어요",
+    home_login_required: "로그인하면 관심 국가 이슈를 볼 수 있어요",
     home_updated: "갱신",
     home_refresh_interval: "15분마다 갱신",
 
@@ -96,8 +96,8 @@ export const translations = {
 
     // 설정
     settings_title: "설정",
-    settings_subtitle: "알림, 관심지역, 계정 정보를 관리합니다",
-    settings_monitored: "관심지역",
+    settings_subtitle: "알림, 관심 국가, 계정 정보를 관리합니다",
+    settings_monitored: "관심 국가",
     settings_notifications: "알림",
     settings_plan: "플랜",
     settings_support: "고객센터",
@@ -109,12 +109,12 @@ export const translations = {
     settings_theme_dark: "다크",
     settings_theme_light: "라이트",
     settings_login_required_title: "로그인이 필요합니다",
-    settings_login_required_desc: "로그인하면 관심지역을 설정할 수 있어요",
+    settings_login_required_desc: "로그인하면 관심 국가를 설정할 수 있어요",
     settings_login_btn: "로그인",
     settings_logout: "로그아웃",
     settings_login_prompt: "로그인하지 않음",
     settings_login_prompt_sub: "로그인하면 더 많은 기능을 사용할 수 있어요",
-    settings_add_country: "관심지역 추가",
+    settings_add_country: "관심 국가 추가",
     settings_collapse_picker: "국가 선택 접기",
     settings_upgrade_for_unlimited: "Pro 5개 · Pro+ 무제한 — 업그레이드하면 더 추가 가능",
     plan_country_limit_hint: "📍 Pro 5개 · Pro+ 무제한",
@@ -137,8 +137,8 @@ export const translations = {
     settings_notif_push_denied: "브라우저 설정에서 알림 허용 필요",
     settings_plan_pro: "Pro 플랜",
     settings_plan_free: "Free 플랜",
-    settings_plan_pro_desc: "관심지역 5개 · 실시간 지도 · Fast 알림 가능",
-    settings_plan_free_desc: "관심지역 {n}개 · 지도 잠금 · Fast 알림 불가",
+    settings_plan_pro_desc: "관심 국가 5개 · 실시간 지도 · Fast 알림 가능",
+    settings_plan_free_desc: "관심 국가 {n}개 · 지도 잠금 · Fast 알림 불가",
     settings_upgrade_btn: "Pro로 업그레이드",
     settings_plan_change: "플랜 변경하기",
     settings_profile_edit: "계정 정보 수정",
@@ -193,7 +193,7 @@ export const translations = {
     glossary_topic_health: "감염병·보건 (Health)",
     glossary_topic_health_desc: "전염병, 팬데믹, 보건 비상사태.",
     glossary_kscore: "KScore (Key Impact Score)",
-    glossary_kscore_desc: "내 기준 국가에 미치는 영향도 (0~10).\n트렌딩 점수 × 국가별 영향 팩터(지리·안보·경제).",
+    glossary_kscore_desc: "내 국가에 미치는 영향도 (0~10).\n트렌딩 점수 × 국가별 영향 팩터(지리·안보·경제).",
     glossary_severity: "Severity (심각도)",
     glossary_severity_desc: "이벤트의 위험 수준 (0~100). 무력 충돌·사망자·핵 위협 등 키워드 기반으로 자동 산정.",
     glossary_confidence: "Confidence (신뢰도)",
@@ -220,15 +220,15 @@ export const translations = {
     settings_unlimited: "∞",
 
     // 홈 카드 / 빈 상태
-    home_no_monitored: "관심지역이 없습니다",
+    home_no_monitored: "관심 국가가 없습니다",
     home_no_monitored_sub: "설정에서 국가를 추가하세요 (최대 2개)",
-    home_go_settings: "관심지역 설정하기",
+    home_go_settings: "관심 국가 설정하기",
     home_no_trending: "아직 트렌딩 이슈가 없습니다.",
     home_no_trending_sub: "이벤트가 수집되면 표시됩니다.",
     home_change: "변경",
     home_view_detail: "이벤트 상세 보기",
     home_global_count: "글로벌 {n}개 — 15분마다 갱신",
-    home_mine_count: "관심지역 {n}개 — 실시간",
+    home_mine_count: "관심 국가 {n}개 — 실시간",
     home_just_now: "방금 전",
     home_minutes_ago: "{n}분 전",
     home_hours_ago: "{n}시간 전",
@@ -244,7 +244,7 @@ export const translations = {
     signal_severity_tooltip: "이슈 위험도 (0~100). 무력충돌·사망자·쿠데타 등 위협 요소 기반.",
     signal_spread: "확산도",
     signal_spread_tooltip: "독립 출처(언론사·기관) 수. 많을수록 여러 곳에서 동시 보도된 이슈.",
-    signal_kscore_tooltip: "Key Impact Score (0~10).\n기준 국가 관점에서의 이슈 영향도.\n\n기본 점수(속도·심각도·확산도) × 영향 팩터(지리·안보·경제)\n\n8↑ 극심 / 6~8 심각 / 4~6 경계 / 2~4 주의 / 2↓ 안정",
+    signal_kscore_tooltip: "Key Impact Score (0~10).\n내 국가 관점에서의 이슈 영향도.\n\n기본 점수(속도·심각도·확산도) × 영향 팩터(지리·안보·경제)\n\n8↑ 극심 / 6~8 심각 / 4~6 경계 / 2~4 주의 / 2↓ 안정",
     signal_new_tooltip: "2시간 이내에 처음 보고된 이슈입니다. 초기 보고라 아직 확인이 덜 됐을 수 있습니다.",
     signal_rising_tooltip: "최근 6시간 이내 생성되고\nKScore 3.0 이상인 이슈입니다.\n최대 5건까지 표시됩니다.",
     signal_updated_tooltip: "이 이슈에 새로운 보도가 편입되어\n순위가 변동되었습니다.",
@@ -265,7 +265,7 @@ export const translations = {
     tension_breakdown_spillover: "파급",
     tension_breakdown_spillover_tip: "이슈가 인접 국가·지역으로 확산되는 정도. 긴장도의 10% 반영.",
     tension_percentile_label: "최근 30일 대비",
-    tension_percentile_tooltip: "오늘 긴장점수가 이 나라의 최근 30일 기록과 비교해 얼마나 높은지 보여줍니다. '상위 10%'는 30일 중 오늘이 가장 긴장된 날에 해당한다는 의미입니다.",
+    tension_percentile_tooltip: "이 수치는 최근 30일 대비 현재 긴장도의 상대적 위치입니다. 오늘 긴장점수가 이 나라의 최근 30일 기록과 비교해 얼마나 높은지 보여줍니다. '상위 10%'는 30일 중 오늘이 가장 긴장된 날에 해당한다는 의미입니다.",
     tension_percentile_low: "낮음",
     tension_percentile_avg: "← 30일 평균 →",
     tension_percentile_high: "높음",
@@ -294,11 +294,11 @@ export const translations = {
     tension_rank_below: "평소보다 낮음",
 
     // 긴장도 페이지 추가
-    tension_tab_mine: "관심지역",
+    tension_tab_mine: "관심 국가",
     tension_tab_all: "글로벌",
-    tension_no_monitored: "관심지역이 없습니다",
+    tension_no_monitored: "관심 국가가 없습니다",
     tension_no_monitored_sub: "설정에서 국가를 추가하면 해당 국가의 긴장도를 표시합니다",
-    tension_go_settings: "관심지역 설정하기",
+    tension_go_settings: "관심 국가 설정하기",
     tension_no_data_empty: "아직 긴장도 데이터가 없습니다.",
     tension_no_data_sub: "이벤트가 수집되면 자동으로 계산됩니다.",
     tension_recalc: "수동 계산",
@@ -444,7 +444,7 @@ export const translations = {
     map_popup_verified: "✓ 검증",
     map_popup_grouped: "총 {n}개 이슈",
     map_popup_rep_note: "KScore가 가장 높은 이슈가 대표로 표시됩니다",
-    map_popup_kscore_tooltip: "Key Impact Score (0~10). 기준 국가 관점에서의 실시간 이슈 영향도.",
+    map_popup_kscore_tooltip: "Key Impact Score (0~10). 내 국가 관점에서의 실시간 이슈 영향도.",
     map_popup_severity: "심각도",
     map_popup_severity_tooltip: "이슈 위험도 (0~100). 사상자·충돌·위협 수준 기반.",
     map_popup_events: "이벤트",
@@ -456,13 +456,13 @@ export const translations = {
 
     // 온보딩
     onboarding_select_title: "어디가 궁금하세요?",
-    onboarding_select_desc: "관심 지역을 선택하면 중요한 이슈만 알려드립니다.",
+    onboarding_select_desc: "관심 국가를 선택하면 중요한 이슈만 알려드립니다.",
     onboarding_select_limit: "(최대 {n}개, Free)",
     onboarding_notify_title: "알림을 받으시겠어요?",
     onboarding_notify_desc: "스파이크 이슈 발생 시 즉시 알려드립니다. 알림은 설정에서 언제든 변경 가능합니다.",
     onboarding_done_title: "준비 완료!",
-    onboarding_done_desc: "관심지역 알림 설정이 완료되었습니다.",
-    onboarding_selected_label: "선택한 관심지역",
+    onboarding_done_desc: "관심 국가 알림 설정이 완료되었습니다.",
+    onboarding_selected_label: "선택한 관심 국가",
     onboarding_verified_label: "Verified 알림",
     onboarding_verified_desc: "공식 매체·정부 발표로 확인된 이슈만 알림. 오보 걱정 없음.",
     onboarding_fast_label: "Fast 알림 (Pro)",
@@ -550,7 +550,7 @@ export const translations = {
     notif_kscore_free_hint: "Free 플랜 고정값 (3.0)",
     notif_kscore_low: "낮음",
     notif_kscore_high: "높음",
-    notif_area_hint: "Verified / Fast 알림은 관심지역별로 설정할 수 있어요 ↑",
+    notif_area_hint: "Verified / Fast 알림은 관심 국가별로 설정할 수 있어요 ↑",
 
     // settings - notification inline strings
     settings_push_title: "푸시 알림",
@@ -561,8 +561,8 @@ export const translations = {
     settings_push_off_hint: "푸시 알림을 켜면 설정할 수 있습니다",
     settings_push_enable: "알림 활성화",
     settings_push_disable: "알림 비활성화",
-    settings_home_country: "기준 국가",
-    settings_home_country_desc: "KScore가 이 국가 관점에서 계산됩니다",
+    settings_home_country: "내 국가",
+    settings_home_country_desc: "KScore가 내 국가 관점에서 계산됩니다",
     settings_home_country_pro_hint: "다른 국가로 변경하려면 Pro 플랜이 필요합니다",
     home_country_basic_label: "BASIC (글로벌 — 개인화 없음)",
     settings_verified_on: "공식 확인 이슈 알림 켜짐",
@@ -579,7 +579,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ 플랜",
-    settings_plan_proplus_desc: "무제한 지역 · 실시간 지도 · API 접근 · 모든 기능",
+    settings_plan_proplus_desc: "무제한 국가 · 실시간 지도 · API 접근 · 모든 기능",
     settings_plan_upgrade_proplus: "Pro+로 업그레이드",
     settings_plan_active: "현재 플랜",
     settings_plan_started: "결제 시작일",
@@ -841,7 +841,7 @@ export const translations = {
     source_kscore_filter: "KScore 필터",
     source_topic_filter: "토픽 필터",
     source_quiet_hours: "방해금지 시간",
-    source_area_limit: "관심지역 제한",
+    source_area_limit: "관심 국가 제한",
     source_history: "히스토리",
     upgrade_success_title: "구독 완료!",
     upgrade_success_subtitle_pro: "Pro 플랜이 활성화되었습니다",
@@ -986,7 +986,7 @@ export const translations = {
     ob_hero_title: "전 세계 분쟁·위기를\nAI가 실시간으로 감지합니다",
     ob_hero_signal_1: "100+ RSS 출처 실시간 수집",
     ob_hero_signal_2: "AI 자동 분류 · 심각도 분석",
-    ob_hero_signal_3: "관심 지역 맞춤 알림",
+    ob_hero_signal_3: "관심 국가 맞춤 알림",
     ob_hero_monitoring: "현재 50+개국 모니터링 중",
     ob_hero_cta: "시작하기",
     ob_step_countries: "관심 국가 선택",
@@ -1011,8 +1011,8 @@ export const translations = {
     ob_back: "이전",
 
     // Sprint 3: 놓친 스파이크 배너
-    missed_spike_banner: "놓친 알림 {n}건 — Pro에서 실시간으로 받기",
-    missed_spike_cta: "Pro 시작",
+    missed_spike_banner: "부재 중 {n}건의 주요 변동이 있었습니다",
+    missed_spike_cta: "자세히 보기",
 
     // Sprint 3: Trial
     trial_start_button: "7일 무료 체험 시작",
@@ -1085,6 +1085,7 @@ export const translations = {
     admin_social_save: "저장",
     admin_social_platform_filter: "플랫폼 필터",
     admin_social_skipped: "스킵됨",
+    admin_content_moderation: "콘텐츠 관리",
     admin_kpi_weekly: "주간 KPI 추이",
     admin_kpi_wow: "전주 대비",
     admin_kpi_alert: "경고",
@@ -1158,6 +1159,48 @@ export const translations = {
     banner_close: "닫기",
     banner_score_suffix: "점",
 
+    // Phase 2: KScore 히스토리 잠금 툴팁
+    kscore_history_lock_tooltip: "Pro에서 30일 / Pro+에서 90일 히스토리 확인",
+
+    // Phase 2: 지도 프리뷰
+    map_preview_countdown: "{n}초 후 프리뷰가 종료됩니다",
+    map_preview_expired_text: "지도를 계속 사용하려면 Pro 업그레이드",
+
+    // Phase 2: 긴장도 퍼센타일 상세 툴팁
+    tension_percentile_detail: "이 수치는 최근 30일 대비 현재 긴장도의 상대적 위치입니다",
+
+    // 가이드 투어 — Home
+    tour_home_page_role: "이 화면은 전 세계 주요 위기를 실시간으로 추적하는 메인 대시보드입니다.",
+    tour_home_tabs: "Global은 전체 이슈, 관심 국가는 내가 설정한 국가의 이슈만 보여줍니다.",
+    tour_home_rising: "최근 6시간 내 새로 등장하여 빠르게 확산 중인 이슈입니다.",
+    tour_home_kscore_history: "시간대별 KScore 변화를 추적합니다. Pro에서 30일/90일 히스토리를 확인할 수 있습니다.",
+
+    // 가이드 투어 — Tension
+    tour_tension_page_role: "국가별 긴장도를 수치화하여 위험 수준을 모니터링하는 페이지입니다.",
+    tour_tension_gauge: "실시간 긴장도 게이지입니다. 수치가 높을수록 위험합니다.",
+    tour_tension_percentile: "최근 30일 대비 현재 긴장도의 상대적 위치를 보여줍니다.",
+    tour_tension_list: "긴장도 상위 국가를 확인할 수 있습니다.",
+
+    // 가이드 투어 — Map
+    tour_map_page_role: "세계 지도 위에 실시간 위기 이벤트를 시각화하는 페이지입니다.",
+    tour_map_markers: "마커를 탭하면 해당 이슈의 상세 정보를 볼 수 있습니다.",
+    tour_map_heatmap: "히트맵 모드로 전환하면 지역별 이슈 밀집도를 확인할 수 있습니다.",
+    tour_map_filters: "토픽·심각도로 이슈를 필터링할 수 있습니다.",
+
+    // 가이드 투어 — Settings
+    tour_settings_page_role: "알림, 내 국가, 관심 국가 등 개인 설정을 관리하는 페이지입니다.",
+    tour_settings_home_country: "KScore가 이 국가 관점에서 계산됩니다.",
+    tour_settings_watched: "관심 국가의 이슈를 우선적으로 확인할 수 있습니다.",
+    tour_settings_notifications: "스파이크 알림, 일일 요약 등 알림을 설정합니다.",
+
+    // 가이드 투어 — Notifications
+    tour_notifications_page_role: "지금까지 수신한 알림을 확인하는 페이지입니다.",
+    tour_notifications_card: "각 알림을 탭하면 해당 이슈로 이동합니다.",
+
+    // 가이드 투어 — Upgrade
+    tour_upgrade_page_role: "Free / Pro / Pro+ 플랜을 비교하고 업그레이드할 수 있는 페이지입니다.",
+    tour_upgrade_comparison: "각 플랜별 제공 기능을 비교해보세요.",
+
     // 에러 페이지
     error_title: "문제가 발생했습니다",
     error_message: "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
@@ -1181,10 +1224,10 @@ export const translations = {
     home_title: "Today's Issues",
     home_subtitle: "Track global conflict and tension events in real-time",
     home_tab_global: "Global",
-    home_tab_mine: "My Regions",
+    home_tab_mine: "My Countries",
     home_loading: "Loading issues...",
     home_no_issues: "No issues to display right now.",
-    home_login_required: "Log in to see issues from your monitored regions",
+    home_login_required: "Log in to see issues from your watched countries",
     home_updated: "updated",
     home_refresh_interval: "Refreshes every 15 min",
 
@@ -1262,8 +1305,8 @@ export const translations = {
 
     // settings
     settings_title: "Settings",
-    settings_subtitle: "Manage notifications, monitored regions, and account",
-    settings_monitored: "Monitored Regions",
+    settings_subtitle: "Manage notifications, watched countries, and account",
+    settings_monitored: "Watched Countries",
     settings_notifications: "Notifications",
     settings_plan: "Plan",
     settings_support: "Support",
@@ -1275,15 +1318,15 @@ export const translations = {
     settings_theme_dark: "Dark",
     settings_theme_light: "Light",
     settings_login_required_title: "Login Required",
-    settings_login_required_desc: "Log in to configure your monitored regions",
+    settings_login_required_desc: "Log in to configure your watched countries",
     settings_login_btn: "Log In",
     settings_logout: "Log Out",
     settings_login_prompt: "Not logged in",
     settings_login_prompt_sub: "Log in to access more features",
-    settings_add_country: "Add Region",
+    settings_add_country: "Add Country",
     settings_collapse_picker: "Collapse",
-    settings_upgrade_for_unlimited: "Pro: 5 regions · Pro+: Unlimited — upgrade for more",
-    plan_country_limit_hint: "📍 Pro: 5 regions · Pro+: Unlimited",
+    settings_upgrade_for_unlimited: "Pro: 5 countries · Pro+: Unlimited — upgrade for more",
+    plan_country_limit_hint: "📍 Pro: 5 countries · Pro+: Unlimited",
     paywall_pro_feature_map: "Real-time global issue map",
     paywall_pro_feature_countries: "5 countries + Fast alerts",
     paywall_pro_feature_kscore: "KScore filter + 30-day history",
@@ -1303,8 +1346,8 @@ export const translations = {
     settings_notif_push_denied: "Allow notifications in browser settings",
     settings_plan_pro: "Pro Plan",
     settings_plan_free: "Free Plan",
-    settings_plan_pro_desc: "5 regions · Real-time map · Fast alerts enabled",
-    settings_plan_free_desc: "{n} regions · Map locked · No Fast alerts",
+    settings_plan_pro_desc: "5 countries · Real-time map · Fast alerts enabled",
+    settings_plan_free_desc: "{n} countries · Map locked · No Fast alerts",
     settings_upgrade_btn: "Upgrade to Pro",
     settings_plan_change: "Change Plan",
     settings_profile_edit: "Edit Profile",
@@ -1382,19 +1425,19 @@ export const translations = {
     settings_lang_en: "English",
     settings_search_country: "Search country...",
     settings_close: "Close",
-    settings_free_limit: "Free plan allows up to {n} regions.",
+    settings_free_limit: "Free plan allows up to {n} countries.",
     settings_unlimited: "∞",
 
     // home cards / empty states
-    home_no_monitored: "No monitored regions",
+    home_no_monitored: "No watched countries",
     home_no_monitored_sub: "Add countries in Settings (up to 2)",
-    home_go_settings: "Set Up Regions",
+    home_go_settings: "Set Up Countries",
     home_no_trending: "No trending issues yet.",
     home_no_trending_sub: "Issues will appear as events are collected.",
     home_change: "Edit",
     home_view_detail: "View Details",
     home_global_count: "Global · {n} issues — refreshes every 15 min",
-    home_mine_count: "My Regions · {n} issues — live",
+    home_mine_count: "My Countries · {n} issues — live",
     home_just_now: "just now",
     home_minutes_ago: "{n}m ago",
     home_hours_ago: "{n}h ago",
@@ -1420,11 +1463,11 @@ export const translations = {
     signal_count_spike: "{n} reports ⚡",
 
     // tension page extra
-    tension_tab_mine: "My Regions",
+    tension_tab_mine: "My Countries",
     tension_tab_all: "Global",
-    tension_no_monitored: "No monitored regions",
+    tension_no_monitored: "No watched countries",
     tension_no_monitored_sub: "Add countries in Settings to track their tension levels",
-    tension_go_settings: "Set Up Regions",
+    tension_go_settings: "Set Up Countries",
     tension_no_data_empty: "No tension data yet.",
     tension_no_data_sub: "Data will appear as events are collected.",
     tension_recalc: "Calculate Now",
@@ -1445,7 +1488,7 @@ export const translations = {
     tension_breakdown_spillover: "Spillover",
     tension_breakdown_spillover_tip: "Degree to which the issue is spreading to neighboring countries. Accounts for 10% of tension.",
     tension_percentile_label: "vs. Last 30 Days",
-    tension_percentile_tooltip: "Shows how today's tension compares to the past 30 days for this country. 'Top 10%' means today ranks among the most tense in 30 days.",
+    tension_percentile_tooltip: "This value shows the relative position of current tension compared to the past 30 days. Shows how today's tension compares to the past 30 days for this country. 'Top 10%' means today ranks among the most tense in 30 days.",
     tension_percentile_low: "Low",
     tension_percentile_avg: "← 30-day avg →",
     tension_percentile_high: "High",
@@ -1622,13 +1665,13 @@ export const translations = {
 
     // onboarding
     onboarding_select_title: "Where would you like to follow?",
-    onboarding_select_desc: "Select regions to get alerts on important issues.",
+    onboarding_select_desc: "Select countries to get alerts on important issues.",
     onboarding_select_limit: "(up to {n}, Free)",
     onboarding_notify_title: "Enable notifications?",
     onboarding_notify_desc: "Get instant alerts when a spike event occurs. You can change this anytime in Settings.",
     onboarding_done_title: "You're all set!",
-    onboarding_done_desc: "Your monitored regions are ready.",
-    onboarding_selected_label: "Selected Regions",
+    onboarding_done_desc: "Your watched countries are ready.",
+    onboarding_selected_label: "Selected Countries",
     onboarding_verified_label: "Verified Alerts",
     onboarding_verified_desc: "Only issues confirmed by official sources. No false alarms.",
     onboarding_fast_label: "Fast Alerts (Pro)",
@@ -1716,7 +1759,7 @@ export const translations = {
     notif_kscore_free_hint: "Fixed at 3.0 on Free plan",
     notif_kscore_low: "Low",
     notif_kscore_high: "High",
-    notif_area_hint: "Verified / Fast alerts can be configured per region above ↑",
+    notif_area_hint: "Verified / Fast alerts can be configured per country above ↑",
 
     // settings - notification inline strings
     settings_push_title: "Push Notifications",
@@ -1726,8 +1769,8 @@ export const translations = {
     settings_push_desc_default: "Get instant alerts for critical events",
     settings_push_off_hint: "Enable push to configure these settings",
     settings_push_enable: "Enable",
-    settings_home_country: "Home Country",
-    settings_home_country_desc: "KScore is calculated from this country's perspective",
+    settings_home_country: "My Country",
+    settings_home_country_desc: "KScore is calculated from your country's perspective",
     settings_home_country_pro_hint: "Pro plan required to change to other countries",
     home_country_basic_label: "BASIC (Global — no personalization)",
     settings_push_disable: "Disable",
@@ -1745,7 +1788,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ Plan",
-    settings_plan_proplus_desc: "Unlimited regions · Real-time map · API access · All features",
+    settings_plan_proplus_desc: "Unlimited countries · Real-time map · API access · All features",
     settings_plan_upgrade_proplus: "Upgrade to Pro+",
     settings_plan_active: "Current Plan",
     settings_plan_started: "Billing started",
@@ -2007,7 +2050,7 @@ export const translations = {
     source_kscore_filter: "KScore Filter",
     source_topic_filter: "Topic Filter",
     source_quiet_hours: "Quiet Hours",
-    source_area_limit: "Country Limit",
+    source_area_limit: "Watched Country Limit",
     source_history: "History",
     upgrade_success_title: "You're all set!",
     upgrade_success_subtitle_pro: "Pro plan is now active",
@@ -2152,7 +2195,7 @@ export const translations = {
     ob_hero_title: "AI-powered real-time\nconflict & crisis monitoring",
     ob_hero_signal_1: "100+ RSS sources, real-time",
     ob_hero_signal_2: "AI classification & severity",
-    ob_hero_signal_3: "Custom alerts for your regions",
+    ob_hero_signal_3: "Custom alerts for your countries",
     ob_hero_monitoring: "Monitoring 50+ countries",
     ob_hero_cta: "Get started",
     ob_step_countries: "Select countries",
@@ -2177,8 +2220,8 @@ export const translations = {
     ob_back: "Back",
 
     // Sprint 3: Missed spike banner
-    missed_spike_banner: "You missed {n} alerts — Get real-time with Pro",
-    missed_spike_cta: "Start Pro",
+    missed_spike_banner: "{n} notable changes occurred while you were away",
+    missed_spike_cta: "View details",
 
     // Sprint 3: Trial
     trial_start_button: "Start 7-day Free Trial",
@@ -2251,6 +2294,7 @@ export const translations = {
     admin_social_save: "Save",
     admin_social_platform_filter: "Platform Filter",
     admin_social_skipped: "Skipped",
+    admin_content_moderation: "Content Moderation",
     admin_kpi_weekly: "Weekly KPI Trend",
     admin_kpi_wow: "vs. Last Week",
     admin_kpi_alert: "Alert",
@@ -2324,11 +2368,53 @@ export const translations = {
     banner_close: "Close",
     banner_score_suffix: "pts",
 
+    // Phase 2: KScore history lock tooltip
+    kscore_history_lock_tooltip: "View 30-day history with Pro / 90-day with Pro+",
+
+    // Phase 2: Map preview
+    map_preview_countdown: "Preview ends in {n} seconds",
+    map_preview_expired_text: "Upgrade to Pro to continue using the map",
+
+    // Phase 2: Tension percentile detail tooltip
+    tension_percentile_detail: "This value shows the relative position of current tension compared to the past 30 days",
+
     // Error page
     error_title: "Something went wrong",
     error_message: "A temporary error occurred. Please try again later.",
     error_code: "Error code",
     error_retry: "Try again",
+
+    // Guide Tour — Home
+    tour_home_page_role: "This is the main dashboard that tracks major crises worldwide in real time.",
+    tour_home_tabs: "Global shows all issues, My Countries shows issues from your watched countries only.",
+    tour_home_rising: "Issues that have emerged within the last 6 hours and are spreading rapidly.",
+    tour_home_kscore_history: "Track KScore changes over time. Pro unlocks 30-day and 90-day history.",
+
+    // Guide Tour — Tension
+    tour_tension_page_role: "This page quantifies country-level tension to monitor risk levels.",
+    tour_tension_gauge: "Real-time tension gauge. Higher values indicate greater risk.",
+    tour_tension_percentile: "Shows current tension position relative to the past 30 days.",
+    tour_tension_list: "View countries with the highest tension levels.",
+
+    // Guide Tour — Map
+    tour_map_page_role: "This page visualizes real-time crisis events on a world map.",
+    tour_map_markers: "Tap a marker to view detailed information about the issue.",
+    tour_map_heatmap: "Switch to heatmap mode to see regional issue density.",
+    tour_map_filters: "Filter issues by topic and severity.",
+
+    // Guide Tour — Settings
+    tour_settings_page_role: "Manage notifications, your country, watched countries, and other settings.",
+    tour_settings_home_country: "KScore is calculated from this country's perspective.",
+    tour_settings_watched: "Prioritize issues from your watched countries.",
+    tour_settings_notifications: "Configure spike alerts, daily summaries, and more.",
+
+    // Guide Tour — Notifications
+    tour_notifications_page_role: "View all notifications you have received.",
+    tour_notifications_card: "Tap any notification to navigate to the related issue.",
+
+    // Guide Tour — Upgrade
+    tour_upgrade_page_role: "Compare Free, Pro, and Pro+ plans and upgrade your subscription.",
+    tour_upgrade_comparison: "Compare features available in each plan.",
 
     // 404 page
     not_found_title: "Page not found",

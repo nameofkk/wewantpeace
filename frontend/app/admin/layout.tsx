@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Layers, Activity, FileText,
-  Flag, Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
-  CreditCard, MessageSquare, TrendingUp, MessageCircleQuestion,
+  Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
+  MessageSquare, TrendingUp, MessageCircleQuestion,
   Mail, ScrollText, Workflow, BarChart3,
-  Handshake, Link2, FileBarChart, BookOpen, Share2,
+  Handshake, Link2, FileBarChart, BookOpen, Share2, ShieldCheck,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
@@ -40,16 +40,14 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "admin_group_users",
     items: [
       { href: "/admin/users", icon: Users, labelKey: "admin_users" },
-      { href: "/admin/subscriptions", icon: CreditCard, labelKey: "admin_subscriptions" },
       { href: "/admin/marketing", icon: Mail, labelKey: "admin_marketing" },
     ],
   },
   {
     labelKey: "admin_group_content",
     items: [
-      { href: "/admin/posts", icon: MessageSquare, labelKey: "admin_posts" },
+      { href: "/admin/content", icon: ShieldCheck, labelKey: "admin_content_moderation" },
       { href: "/admin/comments", icon: ScrollText, labelKey: "admin_comments" },
-      { href: "/admin/reports", icon: Flag, labelKey: "admin_reports" },
       { href: "/admin/feedbacks", icon: MessageCircleQuestion, labelKey: "admin_feedbacks" },
     ],
   },
@@ -76,7 +74,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/partners", icon: Handshake, labelKey: "admin_partners" },
       { href: "/admin/links", icon: Link2, labelKey: "admin_links" },
       { href: "/admin/weekly-report", icon: FileBarChart, labelKey: "admin_weekly_report" },
-      { href: "/admin/reports-perf", icon: FileBarChart, labelKey: "admin_reports_perf" },
       { href: "/admin/guide", icon: BookOpen, labelKey: "admin_guide" },
       { href: "/admin/social", icon: Share2, labelKey: "admin_social" },
     ],

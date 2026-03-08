@@ -576,6 +576,89 @@ function DetailModal({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Auto-Approve Rules                                                 */
+/* ------------------------------------------------------------------ */
+interface AutoApproveRules {
+  daily_movers: boolean;
+  weekly_report: boolean;
+  spike_alert: boolean;
+}
+
+function AutoApproveSection({
+  lang,
+  fetchWithToken,
+}: {
+  lang: "ko" | "en";
+  fetchWithToken: <T>(path: string, opts?: { method?: string; body?: unknown }) => Promise<T>;
+}) {
+  const qc = useQueryClient();
+  const { data: rules } = useQuery<AutoApproveRules>({
+    queryKey: ["social-auto-approve"],
+    queryFn: () => fetchWithToken("/admin/social/auto-approve-rules"),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (newRules: AutoApproveRules) =>
+      fetchWithToken("/admin/social/auto-approve-rules", {
+        method: "PUT",
+        body: newRules,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["social-auto-approve"] }),
+  });
+
+  if (!rules) return null;
+
+  const items: { key: keyof AutoApproveRules; label: { ko: string; en: string }; locked?: boolean }[] = [
+    { key: "daily_movers", label: { ko: "Daily Movers", en: "Daily Movers" } },
+    { key: "weekly_report", label: { ko: "Weekly Report", en: "Weekly Report" } },
+    { key: "spike_alert", label: { ko: "Spike Alert (수동)", en: "Spike Alert (Manual)" }, locked: true },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 mb-4">
+      <h3 className="text-xs font-semibold text-muted-foreground mb-3">
+        {lang === "ko" ? "자동 승인 규칙" : "Auto-Approve Rules"}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className={cn(
+              "flex items-center justify-between rounded-lg border px-3 py-2.5",
+              item.locked ? "border-border/50 opacity-60" : "border-border"
+            )}
+          >
+            <span className="text-sm">{item.label[lang]}</span>
+            <button
+              disabled={item.locked || updateMut.isPending}
+              onClick={() => {
+                if (item.locked) return;
+                updateMut.mutate({ ...rules, [item.key]: !rules[item.key] });
+              }}
+              className={cn(
+                "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                item.locked
+                  ? "bg-secondary cursor-not-allowed"
+                  : rules[item.key]
+                    ? "bg-green-500 cursor-pointer"
+                    : "bg-secondary cursor-pointer"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+                  rules[item.key] ? "translate-x-4" : "translate-x-1"
+                )}
+              />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Page                                                          */
 /* ------------------------------------------------------------------ */
 export default function AdminSocialPage() {
@@ -682,6 +765,9 @@ export default function AdminSocialPage() {
       </div>
 
       <InlineGuide lang={lang} />
+
+      {/* Auto-Approve Rules */}
+      <AutoApproveSection lang={lang} fetchWithToken={fetchWithToken} />
 
       {/* Stats Cards */}
       {stats && (

@@ -2808,6 +2808,52 @@ async def social_stats(
     }
 
 
+# ── 소셜 자동 승인 규칙 ───────────────────────────────────────────────
+
+SOCIAL_AUTO_APPROVE_KEY = "admin:social:auto_approve_rules"
+DEFAULT_AUTO_APPROVE_RULES = {"daily_movers": True, "weekly_report": True, "spike_alert": False}
+
+
+class AutoApproveRulesBody(BaseModel):
+    daily_movers: bool = True
+    weekly_report: bool = True
+    spike_alert: bool = False
+
+
+@router.get("/social/auto-approve-rules")
+async def get_auto_approve_rules(
+    admin: User = Depends(require_admin),
+):
+    import json
+    try:
+        redis = get_redis()
+        cached = await redis.get(SOCIAL_AUTO_APPROVE_KEY)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+    return DEFAULT_AUTO_APPROVE_RULES
+
+
+@router.put("/social/auto-approve-rules")
+async def update_auto_approve_rules(
+    body: AutoApproveRulesBody,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    import json
+    rules = body.dict()
+    # spike_alert은 항상 수동 (False 강제)
+    rules["spike_alert"] = False
+    try:
+        redis = get_redis()
+        await redis.set(SOCIAL_AUTO_APPROVE_KEY, json.dumps(rules))
+    except Exception:
+        pass
+    await _log_action(db, admin, "update_auto_approve_rules", detail=rules)
+    return rules
+
+
 @router.get("/social/{post_id}")
 async def get_social_post(
     post_id: str,

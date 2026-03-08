@@ -6,7 +6,10 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/admin-utils";
 import { useAuth } from "@/lib/auth";
-import { Download, Send, ChevronLeft, ChevronRight, Users, Mail } from "lucide-react";
+import {
+  Download, Send, ChevronLeft, ChevronRight, Users, Mail,
+  Award, ArrowUpRight, AlertTriangle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MarketingUser {
@@ -26,13 +29,47 @@ interface EmailLog {
   created_at: string;
 }
 
+interface ReferralKPI {
+  total_codes: number;
+  total_used: number;
+  pro_converted: number;
+  top_referrers: { user_id: string; email: string | null; nickname: string | null; referral_count: number }[];
+}
+
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  subValue,
+  color,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+  subValue?: string;
+  color: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className={cn("rounded-lg p-2", color)}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <p className="text-2xl font-bold">{typeof value === "number" ? value.toLocaleString() : value}</p>
+      {subValue && <p className="text-xs text-muted-foreground mt-1">{subValue}</p>}
+    </div>
+  );
+}
+
 export default function AdminMarketingPage() {
   const lang = useAppStore((s) => s.lang);
   const { user } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [planFilter, setPlanFilter] = useState<string>("");
-  const [tab, setTab] = useState<"users" | "send" | "logs">("users");
+  const [tab, setTab] = useState<"users" | "send" | "logs" | "referral">("users");
 
   // 이메일 폼
   const [subject, setSubject] = useState("");
@@ -65,6 +102,19 @@ export default function AdminMarketingPage() {
       return res.json() as Promise<{ total: number; items: EmailLog[] }>;
     },
     enabled: !!user && tab === "logs",
+  });
+
+  const { data: referralData, isLoading: referralLoading } = useQuery<ReferralKPI>({
+    queryKey: ["admin-reports-referral-kpi"],
+    queryFn: async () => {
+      const token = await user?.getIdToken();
+      const res = await fetch(`${API_BASE}/admin/reports/referral-kpi`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!user && tab === "referral",
   });
 
   const sendEmail = useMutation({
@@ -129,19 +179,20 @@ export default function AdminMarketingPage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 mb-5 border-b border-border">
-        {(["users", "send", "logs"] as const).map((t_) => (
+      <div className="flex gap-1 mb-5 border-b border-border overflow-x-auto">
+        {(["users", "send", "logs", "referral"] as const).map((t_) => (
           <button
             key={t_}
             onClick={() => setTab(t_)}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+              "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
               tab === t_ ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t_ === "users" && <><Users className="h-3.5 w-3.5" />{lang === "ko" ? "유저 목록" : "Users"}</>}
             {t_ === "send" && <><Send className="h-3.5 w-3.5" />{lang === "ko" ? "이메일 발송" : "Send Email"}</>}
             {t_ === "logs" && <><Mail className="h-3.5 w-3.5" />{lang === "ko" ? "발송 이력" : "Email Logs"}</>}
+            {t_ === "referral" && <><Award className="h-3.5 w-3.5" />{lang === "ko" ? "레퍼럴 KPI" : "Referral KPI"}</>}
           </button>
         ))}
       </div>
@@ -322,6 +373,115 @@ export default function AdminMarketingPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* 레퍼럴 KPI 탭 */}
+      {tab === "referral" && (
+        <div>
+          {referralLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-border bg-card p-4">
+                  <div className="h-4 bg-secondary/50 rounded animate-pulse w-1/2 mb-3" />
+                  <div className="h-8 bg-secondary/50 rounded animate-pulse w-2/3" />
+                </div>
+              ))}
+            </div>
+          ) : referralData ? (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <KpiCard
+                  icon={Award}
+                  label={lang === "ko" ? "총 레퍼럴 코드" : "Total Referral Codes"}
+                  value={referralData.total_codes}
+                  color="bg-blue-500/10 text-blue-400"
+                />
+                <KpiCard
+                  icon={ArrowUpRight}
+                  label={lang === "ko" ? "사용된 코드" : "Codes Used"}
+                  value={referralData.total_used}
+                  subValue={referralData.total_codes > 0
+                    ? `${((referralData.total_used / referralData.total_codes) * 100).toFixed(1)}% ${lang === "ko" ? "사용률" : "usage rate"}`
+                    : undefined}
+                  color="bg-green-500/10 text-green-400"
+                />
+                <KpiCard
+                  icon={AlertTriangle}
+                  label={lang === "ko" ? "Pro 전환" : "Pro Converted"}
+                  value={referralData.pro_converted}
+                  subValue={referralData.total_used > 0
+                    ? `${((referralData.pro_converted / referralData.total_used) * 100).toFixed(1)}% ${lang === "ko" ? "전환률" : "conversion rate"}`
+                    : undefined}
+                  color="bg-purple-500/10 text-purple-400"
+                />
+              </div>
+
+              {/* Top 10 Referrers */}
+              <h3 className="text-sm font-semibold mb-3">
+                {lang === "ko" ? "Top 10 레퍼러" : "Top 10 Referrers"}
+              </h3>
+
+              {referralData.top_referrers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {lang === "ko" ? "레퍼럴 데이터 없음" : "No referral data"}
+                </div>
+              ) : (
+                <>
+                  {/* Desktop */}
+                  <div className="hidden md:block rounded-xl border border-border overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-secondary/50">
+                        <tr>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">#</th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "닉네임" : "Nickname"}</th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "이메일" : "Email"}</th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{lang === "ko" ? "레퍼럴 수" : "Referrals"}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {referralData.top_referrers.map((r, i) => (
+                          <tr key={r.user_id} className="hover:bg-secondary/20">
+                            <td className="px-4 py-3 text-xs font-medium text-muted-foreground">{i + 1}</td>
+                            <td className="px-4 py-3 text-xs">{r.nickname ?? "\u2014"}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{r.email ?? "\u2014"}</td>
+                            <td className="px-4 py-3">
+                              <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium">
+                                {r.referral_count}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile */}
+                  <div className="md:hidden space-y-2">
+                    {referralData.top_referrers.map((r, i) => (
+                      <div key={r.user_id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                        <span className="text-xs font-bold text-muted-foreground w-5 text-center">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{r.nickname ?? r.email ?? "\u2014"}</p>
+                          {r.nickname && r.email && (
+                            <p className="text-[10px] text-muted-foreground truncate">{r.email}</p>
+                          )}
+                        </div>
+                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-medium shrink-0">
+                          {r.referral_count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              {lang === "ko" ? "데이터를 불러올 수 없습니다" : "Failed to load data"}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
