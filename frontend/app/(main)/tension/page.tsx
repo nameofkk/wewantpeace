@@ -718,7 +718,7 @@ export default function TensionPage() {
         if (deltaItems.length < 3) return null;
         return (
           <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5">
-            <div className="ticker-track">
+            <div className="ticker-track-fast">
               {[0, 1].map((rep) => (
                 <span key={rep} className="inline-flex items-center gap-4 px-3">
                   <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">

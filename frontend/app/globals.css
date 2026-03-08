@@ -127,10 +127,16 @@
   display: inline-flex;
   flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 25s linear infinite;
+  animation: ticker-scroll 120s linear infinite;
 }
 .ticker-track:hover {
   animation-play-state: paused;
+}
+.ticker-track-fast {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  animation: ticker-scroll 25s linear infinite;
 }
 
 /* ── 카드 stagger slide-up ─────────────────────────── */

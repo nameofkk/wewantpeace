@@ -646,7 +646,7 @@ function BriefingCard({ items, lang }: { items: TrendingItem[]; lang: Lang }) {
       {/* 하단 ticker */}
       {tickerCountries.length > 0 && (
         <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
-          <div className="ticker-track">
+          <div className="ticker-track-fast">
             {[0, 1].map((rep) => (
               <span key={rep} className="inline-flex items-center gap-4 px-3">
                 {tickerCountries.map((c) => (
