@@ -668,7 +668,7 @@ export default function MapPage() {
 
   return (
     <div className="relative h-[100dvh] w-full" data-tour="map-page">
-      <AppTour tourId="map" steps={tourSteps} run={tourRun} />
+      <AppTour tourId="map" steps={tourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="map" onStartTour={() => setTourRun(true)} />
       <div ref={mapContainerRef} className="h-full w-full" />
 

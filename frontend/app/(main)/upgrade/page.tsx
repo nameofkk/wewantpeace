@@ -389,7 +389,7 @@ function UpgradeContent() {
 
   return (
     <div className="min-h-screen bg-background" data-tour="upgrade-page">
-      <AppTour tourId="upgrade" steps={tourSteps} run={tourRun} />
+      <AppTour tourId="upgrade" steps={tourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="upgrade" onStartTour={() => setTourRun(true)} />
       <style>{`
         @keyframes fadeSlideUp {

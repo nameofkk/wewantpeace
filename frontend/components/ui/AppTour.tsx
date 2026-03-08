@@ -4,18 +4,17 @@ import dynamic from "next/dynamic";
 import { useCallback } from "react";
 import type { CallBackProps, Step, Styles } from "react-joyride";
 import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
 
 const Joyride = dynamic(() => import("react-joyride"), { ssr: false });
 
 const tourStyles: Partial<Styles> = {
   options: {
-    primaryColor: "hsl(var(--primary))",
+    primaryColor: "#3B82F6",
     zIndex: 10000,
-    arrowColor: "hsl(var(--popover))",
-    backgroundColor: "hsl(var(--popover))",
-    textColor: "hsl(var(--popover-foreground))",
-    overlayColor: "rgba(0, 0, 0, 0.5)",
+    arrowColor: "#1E293B",
+    backgroundColor: "#1E293B",
+    textColor: "#F1F5F9",
+    overlayColor: "rgba(0, 0, 0, 0.6)",
   },
   tooltip: {
     borderRadius: "12px",
@@ -23,6 +22,8 @@ const tourStyles: Partial<Styles> = {
     fontSize: "14px",
     maxWidth: "min(420px, 90vw)",
     wordBreak: "keep-all" as const,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+    border: "1px solid rgba(255,255,255,0.1)",
   },
   tooltipContainer: {
     textAlign: "left" as const,
@@ -31,13 +32,15 @@ const tourStyles: Partial<Styles> = {
     borderRadius: "8px",
     padding: "8px 16px",
     fontSize: "13px",
+    backgroundColor: "#3B82F6",
+    color: "#FFFFFF",
   },
   buttonBack: {
-    color: "hsl(var(--muted-foreground))",
+    color: "#94A3B8",
     fontSize: "13px",
   },
   buttonSkip: {
-    color: "hsl(var(--muted-foreground))",
+    color: "#94A3B8",
     fontSize: "13px",
   },
   spotlight: {
@@ -49,9 +52,10 @@ interface AppTourProps {
   tourId: string;
   steps: Step[];
   run?: boolean;
+  onComplete?: () => void;
 }
 
-export default function AppTour({ tourId, steps, run }: AppTourProps) {
+export default function AppTour({ tourId, steps, run, onComplete }: AppTourProps) {
   const { completedTours, markTourComplete, lang } = useAppStore();
   const isCompleted = completedTours.includes(tourId);
   const shouldRun = run !== undefined ? run : !isCompleted;
@@ -61,9 +65,10 @@ export default function AppTour({ tourId, steps, run }: AppTourProps) {
       const { status } = data;
       if (status === "finished" || status === "skipped") {
         markTourComplete(tourId);
+        onComplete?.();
       }
     },
-    [tourId, markTourComplete]
+    [tourId, markTourComplete, onComplete]
   );
 
   if (!shouldRun || steps.length === 0) return null;

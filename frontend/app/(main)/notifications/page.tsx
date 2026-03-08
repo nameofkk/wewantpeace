@@ -60,7 +60,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-background" data-tour="notifications-page">
-      <AppTour tourId="notifications" steps={tourSteps} run={tourRun} />
+      <AppTour tourId="notifications" steps={tourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="notifications" onStartTour={() => setTourRun(true)} />
       {/* 헤더 */}
       <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-md border-b border-border/50">

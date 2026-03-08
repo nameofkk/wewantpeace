@@ -22,6 +22,8 @@
     --radius: 0.75rem;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+    --popover: 222 47% 14%;
+    --popover-foreground: 210 40% 98%;
   }
 
   html.light {
@@ -42,6 +44,8 @@
     --ring: 221 83% 53%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     /* 맵 잠금 버튼 라이트모드 */
     --lock-btn-bg: rgba(0,0,0,0.05);
     --lock-btn-border: rgba(0,0,0,0.1);

@@ -465,7 +465,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col" data-tour="settings-page">
-      <AppTour tourId="settings" steps={tourSteps} run={tourRun} />
+      <AppTour tourId="settings" steps={tourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="settings" onStartTour={() => setTourRun(true)} />
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">

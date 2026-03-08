@@ -630,7 +630,7 @@ export default function TensionPage() {
 
   return (
     <div className="flex flex-col" data-tour="tension-page" style={{ height: "calc(100dvh - 60px)" }}>
-      <AppTour tourId="tension" steps={tensionTourSteps} run={tourRun} />
+      <AppTour tourId="tension" steps={tensionTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="tension" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">

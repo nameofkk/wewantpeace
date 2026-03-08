@@ -430,7 +430,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
             <span className={cn(
               "inline-flex items-center h-5 rounded-full px-2 text-[10px] font-bold leading-none",
               badge.bg, badge.text,
-              isSevere && "animate-pulse",
+              k >= 8 && "animate-pulse",
             )}>
               {badge.label}
             </span>
@@ -441,7 +441,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
               </span>
             )}
             {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
-              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none animate-pulse">
+              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none">
                 RISING
                 <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
               </span>
@@ -790,7 +790,7 @@ function HomePageContent() {
 
   return (
     <div className="flex flex-col" data-tour="home-page" style={{ height: "calc(100dvh - 60px)" }}>
-      <AppTour tourId="home" steps={homeTourSteps} run={tourRun} />
+      <AppTour tourId="home" steps={homeTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="home" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
@@ -993,7 +993,7 @@ function HomePageContent() {
               <div className="mb-2" data-tour="home-rising">
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="text-xs font-bold">{t(lang, "home_rising_title")}</span>
-                  <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 animate-pulse leading-none">
+                  <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none">
                     RISING
                   </span>
                   <InfoTooltip text={t(lang, "signal_rising_tooltip")} direction="down" />
