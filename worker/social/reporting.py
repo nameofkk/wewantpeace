@@ -2,6 +2,7 @@
 import logging
 import os
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,7 +44,8 @@ async def _send_telegram(text: str) -> bool:
 
 async def send_daily_ops_report(db: AsyncSession) -> dict:
     """일일 SNS 운영 리포트 생성 + Telegram 전송."""
-    now = datetime.now(timezone.utc)
+    KST = ZoneInfo("Asia/Seoul")
+    now = datetime.now(KST)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # 오늘 생성된 포스트 통계
@@ -115,7 +117,7 @@ async def send_daily_ops_report(db: AsyncSession) -> dict:
     if plat_lines:
         text += f"\n<b>플랫폼별 발행:</b>\n" + "\n".join(plat_lines) + "\n"
 
-    text += f"\n⏰ {now.strftime('%H:%M UTC')}"
+    text += f"\n⏰ {now.strftime('%H:%M KST')}"
 
     sent = await _send_telegram(text)
     logger.info("일일 SNS 리포트: created=%d, published=%d, sent=%s", created, published, sent)

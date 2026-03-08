@@ -11,7 +11,7 @@ SpikeDetector: 누적 기반 스파이크 감지.
   independent_sources >= 3  — 복수 독립 출처 (v5: 2→3)
   cluster age <= 48h        — 최근 클러스터만 (오래된 건 제외)
 
-쿨다운: severity >= 90 → 30분, 그 외 → 1시간 (Redis 유지)
+쿨다운: severity >= 90 → 3시간, 그 외 → 6시간 (Redis 유지)
 """
 import logging
 import uuid as _uuid
@@ -41,7 +41,7 @@ async def is_in_cooldown(cluster_id: str, redis) -> bool:
 
 
 async def set_cooldown(cluster_id: str, redis, severity: int = 0):
-    """쿨다운 설정. severity >= 90이면 30분, 그 외 1시간."""
+    """쿨다운 설정. severity >= 90이면 3시간, 그 외 6시간."""
     ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
     await redis.setex(_key_cooldown(cluster_id), ttl, "1")
 

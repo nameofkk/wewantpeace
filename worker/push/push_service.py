@@ -913,6 +913,7 @@ async def send_spike_alert(
     sent_verified = 0
     sent_fast = 0
     all_invalid: list[str] = []
+    target_v_for_count = _TargetResult([], [])
 
     # Verified 레인
     if is_verified:
@@ -949,6 +950,7 @@ async def send_spike_alert(
 
         # 5. 일일 카운터 증가
         await _increment_daily_push_for_tokens(target_v.tokens, redis)
+        target_v_for_count = target_v
 
     # Fast 레인 (항상)
     target_f = await _get_target_tokens_by_platform(
@@ -996,7 +998,6 @@ async def send_spike_alert(
 
     # ── FREE 유저 spike push 카운트 추적 (Pro 전환 프롬프트용) ──
     try:
-        target_v_for_count = target_v if is_verified else _TargetResult([], [])
         await _increment_spike_push_counts(target_v_for_count, target_f, db, redis)
     except Exception:
         logger.debug("spike_push_count 추적 실패 (무시)")
