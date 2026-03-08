@@ -579,7 +579,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ 플랜",
-    settings_plan_proplus_desc: "무제한 국가 · 실시간 지도 · API 접근 · 모든 기능",
+    settings_plan_proplus_desc: "무제한 국가 · 일일 알림 50건 · KScore 1.5~ · 90일 히스토리",
     settings_plan_upgrade_proplus: "Pro+로 업그레이드",
     settings_plan_active: "현재 플랜",
     settings_plan_started: "결제 시작일",
@@ -1788,7 +1788,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ Plan",
-    settings_plan_proplus_desc: "Unlimited countries · Real-time map · API access · All features",
+    settings_plan_proplus_desc: "Unlimited countries · 50 daily alerts · KScore 1.5~ · 90-day history",
     settings_plan_upgrade_proplus: "Upgrade to Pro+",
     settings_plan_active: "Current Plan",
     settings_plan_started: "Billing started",

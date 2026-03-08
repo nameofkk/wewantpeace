@@ -21,19 +21,22 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 PLANS = {
     "pro": {"name": "Pro", "amount": 4900, "features": [
-        {"ko": "관심국가 5개", "en": "5 monitored countries"},
+        {"ko": "관심 국가 5개", "en": "5 monitored countries"},
+        {"ko": "내 국가 변경", "en": "Change home country"},
         {"ko": "실시간 이슈 지도", "en": "Real-time issue map"},
         {"ko": "속보 알림 (미확인 포함)", "en": "Fast alerts (breaking news)"},
-        {"ko": "긴장도 히스토리 30일", "en": "30-day tension history"},
+        {"ko": "일일 알림 10건", "en": "10 daily alerts"},
         {"ko": "KScore 필터 조정 (3.0~10.0)", "en": "KScore filter (3.0–10.0)"},
         {"ko": "토픽 필터", "en": "Topic filter"},
         {"ko": "방해금지 시간", "en": "Quiet hours"},
+        {"ko": "30일 히스토리", "en": "30-day history"},
     ]},
     "pro_plus": {"name": "Pro+", "amount": 9900, "features": [
         {"ko": "Pro 기능 전체", "en": "All Pro features"},
-        {"ko": "관심국가 무제한", "en": "Unlimited monitored countries"},
-        {"ko": "긴장도 히스토리 90일", "en": "90-day tension history"},
+        {"ko": "관심 국가 무제한", "en": "Unlimited monitored countries"},
+        {"ko": "일일 알림 50건", "en": "50 daily alerts"},
         {"ko": "KScore 필터 조정 (1.5~10.0)", "en": "KScore filter (1.5–10.0)"},
+        {"ko": "90일 히스토리", "en": "90-day history"},
     ]},
 }
 

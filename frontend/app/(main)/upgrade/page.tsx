@@ -26,48 +26,52 @@ interface Feature {
 
 const FEATURES: Feature[] = [
   {
-    labelKo: "관심 국가",         labelEn: "Monitored countries",
-    free: "2개",                  pro: "5개",                     proplus: "무제한",
+    labelKo: "관심 국가",              labelEn: "Monitored countries",
+    free: "2개",                       pro: "5개",                      proplus: "무제한",
   },
   {
-    labelKo: "글로벌 트렌딩",      labelEn: "Global trending",
-    free: true,                   pro: true,                      proplus: true,
+    labelKo: "내 국가 변경",           labelEn: "Home country",
+    free: "KR 고정",                   pro: true,                       proplus: true,
   },
   {
-    labelKo: "실시간 이슈 지도",    labelEn: "Real-time issue map",
-    free: false,                  pro: true,                      proplus: true,
+    labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
+    free: false,                       pro: true,                       proplus: true,
   },
   {
-    labelKo: "공식 확인 이슈 알림", labelEn: "Verified issue alerts",
-    free: true,                   pro: true,                      proplus: true,
+    labelKo: "글로벌 트렌딩",          labelEn: "Global trending",
+    free: true,                        pro: true,                       proplus: true,
   },
   {
-    labelKo: "속보 알림 (미확인 포함)", labelEn: "Fast alerts (breaking news)",
-    free: false,                  pro: true,                      proplus: true,
+    labelKo: "확인 이슈 알림",          labelEn: "Verified alerts",
+    free: true,                        pro: true,                       proplus: true,
   },
   {
-    labelKo: "KScore 필터 조정",   labelEn: "KScore threshold filter",
-    free: "고정 (3.0)",           pro: "3.0 ~ 10.0",              proplus: "1.5 ~ 10.0",
+    labelKo: "속보 알림",               labelEn: "Fast alerts",
+    free: false,                       pro: true,                       proplus: true,
   },
   {
-    labelKo: "토픽 필터",          labelEn: "Topic filter",
-    free: false,                  pro: true,                      proplus: true,
+    labelKo: "일일 알림 상한",         labelEn: "Daily alert limit",
+    free: "3건",                       pro: "10건",                     proplus: "50건",
   },
   {
-    labelKo: "방해금지 시간",       labelEn: "Quiet hours",
-    free: false,                  pro: true,                      proplus: true,
+    labelKo: "KScore 필터",             labelEn: "KScore filter",
+    free: "3.0 고정",                  pro: "3.0~10.0",                proplus: "1.5~10.0",
   },
   {
-    labelKo: "긴장도 히스토리",     labelEn: "Tension history",
-    free: "7일",                  pro: "30일",                    proplus: "90일",
+    labelKo: "토픽 필터",              labelEn: "Topic filter",
+    free: false,                       pro: true,                       proplus: true,
   },
   {
-    labelKo: "KScore 히스토리",    labelEn: "KScore history",
-    free: "7일",                  pro: "30일",                    proplus: "90일",
+    labelKo: "방해금지 시간",          labelEn: "Quiet hours",
+    free: false,                       pro: true,                       proplus: true,
   },
   {
-    labelKo: "커뮤니티",           labelEn: "Community",
-    free: "읽기/쓰기",             pro: "읽기/쓰기",               proplus: "읽기/쓰기",
+    labelKo: "긴장도 히스토리",        labelEn: "Tension history",
+    free: "7일",                       pro: "30일",                     proplus: "90일",
+  },
+  {
+    labelKo: "KScore 히스토리",        labelEn: "KScore history",
+    free: "7일",                       pro: "30일",                     proplus: "90일",
   },
 ];
 
@@ -95,7 +99,7 @@ function FeatureValue({
   if (val === false) return <X className="h-4 w-4 mx-auto text-muted-foreground/30" />;
   return (
     <span className={cn(
-      "text-[11px] font-medium",
+      "text-[10px] font-medium whitespace-nowrap",
       planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-muted-foreground"
     )}>
       {val}
@@ -624,8 +628,9 @@ function UpgradeContent() {
               <div className="mt-4 space-y-2.5">
                 {[
                   lang === "ko" ? "실시간 글로벌 이슈 지도" : "Real-time global issue map",
-                  lang === "ko" ? "관심 국가 5개 + 속보 알림" : "5 countries + Breaking alerts",
-                  lang === "ko" ? "KScore 필터 + 30일 히스토리" : "KScore filter + 30-day history",
+                  lang === "ko" ? "관심 국가 5개 · 속보 알림" : "5 countries · Breaking alerts",
+                  lang === "ko" ? "내 국가 변경 · 토픽 필터" : "Home country · Topic filter",
+                  lang === "ko" ? "KScore 필터 · 30일 히스토리" : "KScore filter · 30-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
@@ -750,8 +755,8 @@ function UpgradeContent() {
               <div className="mt-4 space-y-2.5">
                 {[
                   lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
-                  lang === "ko" ? "무제한 국가 + KScore 1.5~10.0" : "Unlimited countries + KScore 1.5~10.0",
-                  lang === "ko" ? "90일 전체 히스토리" : "Full 90-day history",
+                  lang === "ko" ? "무제한 국가 · 일일 알림 50건" : "Unlimited countries · 50 daily alerts",
+                  lang === "ko" ? "KScore 1.5~10.0 · 90일 히스토리" : "KScore 1.5~10.0 · 90-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-purple-500/15 flex items-center justify-center shrink-0">
@@ -804,7 +809,7 @@ function UpgradeContent() {
           </h3>
           <div className="rounded-2xl border border-border overflow-hidden">
             {/* 헤더 */}
-            <div className="grid grid-cols-4 bg-muted/30 text-[11px] font-bold">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] bg-muted/30 text-[11px] font-bold">
               <div className="p-3 text-muted-foreground">{lang === "ko" ? "기능" : "Feature"}</div>
               <div className="p-3 text-center text-muted-foreground">Free</div>
               <div className="p-3 text-center text-blue-400">Pro</div>
@@ -813,19 +818,19 @@ function UpgradeContent() {
             {/* 행 */}
             {FEATURES.map((f, i) => (
               <div key={f.labelKo} className={cn(
-                "grid grid-cols-4 items-center text-[11px] border-t border-border/50",
+                "grid grid-cols-[2fr_1fr_1fr_1fr] items-center text-[11px] border-t border-border/50",
                 i % 2 === 0 ? "bg-background" : "bg-muted/10"
               )}>
-                <div className="p-3 text-muted-foreground font-medium">
+                <div className="p-3 text-muted-foreground font-medium" style={{ wordBreak: "keep-all" }}>
                   {lang === "ko" ? f.labelKo : f.labelEn}
                 </div>
-                <div className="p-3 text-center">
+                <div className="p-3 text-center" style={{ wordBreak: "keep-all" }}>
                   <FeatureValue val={f.free} planId="free" lang={lang} />
                 </div>
-                <div className="p-3 text-center">
+                <div className="p-3 text-center" style={{ wordBreak: "keep-all" }}>
                   <FeatureValue val={f.pro} planId="pro" lang={lang} />
                 </div>
-                <div className="p-3 text-center">
+                <div className="p-3 text-center" style={{ wordBreak: "keep-all" }}>
                   <FeatureValue val={f.proplus} planId="pro_plus" lang={lang} />
                 </div>
               </div>
