@@ -107,6 +107,13 @@ class Settings(BaseSettings):
     toss_decryption_key: str = ""      # 유저 정보 복호화 키 (AES-256-GCM)
     toss_decryption_aad: str = ""      # 복호화 AAD
 
+    # LemonSqueezy
+    lemonsqueezy_api_key: str = ""
+    lemonsqueezy_webhook_secret: str = ""
+    lemonsqueezy_store_id: str = ""
+    lemonsqueezy_variant_pro: str = ""
+    lemonsqueezy_variant_proplus: str = ""
+
     # SMTP (마케팅 메일링)
     smtp_host: str = "smtp.naver.com"
     smtp_port: int = 587
