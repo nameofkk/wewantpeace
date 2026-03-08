@@ -148,9 +148,9 @@ const SECTIONS: GuideSection[] = [
     bodyEn: "Create marketing short links and track clicks. Auto-attach UTM parameters and set expiration dates.",
   },
   {
-    id: "reports-perf",
-    titleKo: "성과 리포트",
-    titleEn: "Performance Reports",
+    id: "marketing",
+    titleKo: "마케팅 (레퍼럴 포함)",
+    titleEn: "Marketing (incl. Referral)",
     bodyKo: "마케팅 캠페인, 링크 클릭, 레퍼럴 성과를 종합적으로 분석합니다. 기간별 비교, 채널별 성과를 확인합니다.",
     bodyEn: "Analyze marketing campaigns, link clicks, and referral performance. Compare periods and view per-channel metrics.",
   },

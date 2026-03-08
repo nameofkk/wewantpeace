@@ -125,7 +125,7 @@ export default function AdminDashboard() {
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
-      href: "/admin/subscriptions",
+      href: "/admin/users",
     },
     {
       label: t(lang, "admin_active_clusters"),
@@ -157,7 +157,7 @@ export default function AdminDashboard() {
       icon: Flag,
       color: (stats?.pending_reports ?? 0) > 0 ? "text-orange-400" : "text-muted-foreground",
       bg: (stats?.pending_reports ?? 0) > 0 ? "bg-orange-500/10" : "bg-secondary",
-      href: "/admin/reports",
+      href: "/admin/content",
     },
     {
       label: t(lang, "admin_push_tokens"),
