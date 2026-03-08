@@ -715,7 +715,7 @@ export default function TensionPage() {
         const deltaItems = tensions
           .filter((t) => t.delta_24h != null && t.delta_24h !== 0)
           .sort((a, b) => Math.abs(b.delta_24h ?? 0) - Math.abs(a.delta_24h ?? 0));
-        if (deltaItems.length < 3) return null;
+        if (deltaItems.length < 1) return null;
         return (
           <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5">
             <div className="ticker-track-fast">

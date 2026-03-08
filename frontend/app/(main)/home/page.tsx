@@ -565,111 +565,78 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
   );
 });
 
-// ── 브리핑 카드 ──────────────────────────────────────────────────────────
-function BriefingCard({ items, lang }: { items: TrendingItem[]; lang: Lang }) {
+// ── 최근 급부상 카드 ──────────────────────────────────────────────────────
+function RisingCard({ risingItems, lang, onNavigate }: { risingItems: TrendingItem[]; lang: Lang; onNavigate: (id: string) => void }) {
   const homeCountry = useAppStore((s) => s.homeCountry);
-  const extremeCount = items.filter((i) => roundKScore(personalizedKScore(i, homeCountry)) >= 8).length;
-  const severeCount = items.filter((i) => { const k = roundKScore(personalizedKScore(i, homeCountry)); return k >= 6 && k < 8; }).length;
-  const spikeCount = items.filter((i) => i.is_spike).length;
-  if (items.length === 0) return null;
-
-  // 날짜 M.DD 형식
-  const today = new Date();
-  const dateStr = `${today.getMonth() + 1}.${String(today.getDate()).padStart(2, "0")}`;
-
-  // ticker 데이터: 국가별 최고 severity 집계
-  const countryMap = new Map<string, { code: string; maxSeverity: number; count: number }>();
-  for (const item of items) {
-    for (const code of item.country_codes) {
-      const existing = countryMap.get(code);
-      if (existing) {
-        existing.maxSeverity = Math.max(existing.maxSeverity, item.severity ?? 0);
-        existing.count++;
-      } else {
-        countryMap.set(code, { code, maxSeverity: item.severity ?? 0, count: 1 });
-      }
-    }
-  }
-  const tickerCountries = [...countryMap.values()]
-    .sort((a, b) => b.count - a.count || b.maxSeverity - a.maxSeverity)
-    .slice(0, 10);
+  if (risingItems.length === 0) return null;
 
   return (
-    <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3">
-      {/* 상단 헤더 */}
-      <div className="flex items-center justify-between px-3.5 pt-3">
-        <div className="flex items-center gap-1.5">
-          <BarChart3 className="h-3 w-3 text-muted-foreground" />
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-            {lang === "ko" ? "오늘의 브리핑" : "Today's Briefing"}
-          </span>
-        </div>
-        <span className="text-[11px] font-medium text-muted-foreground tabular-nums">{dateStr}</span>
+    <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3" data-tour="home-rising">
+      {/* 헤더 */}
+      <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          {lang === "ko" ? "최근 급부상" : "Rising Now"}
+        </span>
+        <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none">
+          RISING
+        </span>
+        <InfoTooltip text={t(lang, "signal_rising_tooltip")} direction="down" />
       </div>
 
-      {/* 위기 현황 숫자 */}
-      <div className="flex items-center gap-3 px-3.5 mt-2.5 pb-2.5">
-        {extremeCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xl font-black tabular-nums text-red-700 dark:text-red-300">{extremeCount}</span>
-            <span className="text-[10px] font-bold text-red-600/80 dark:text-red-400/80">
-              {lang === "ko" ? "극심" : "Extreme"}
-            </span>
-          </div>
-        )}
-        {severeCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xl font-black tabular-nums text-red-500 dark:text-red-400">{severeCount}</span>
-            <span className="text-[10px] font-bold text-red-500/70 dark:text-red-400/70">
-              {lang === "ko" ? "심각" : "Severe"}
-            </span>
-          </div>
-        )}
-        {spikeCount > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xl font-black tabular-nums text-amber-500">{spikeCount}</span>
-            <span className="text-[10px] font-bold text-amber-500/70">
-              {lang === "ko" ? "스파이크" : "Spike"}
-            </span>
-          </div>
-        )}
-        {extremeCount === 0 && severeCount === 0 && spikeCount === 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xl font-black tabular-nums text-emerald-500">{items.length}</span>
-            <span className="text-[10px] font-bold text-emerald-500/70">
-              {lang === "ko" ? "모니터링" : "Monitoring"}
-            </span>
-          </div>
-        )}
+      {/* 급부상 이슈 가로 스크롤 */}
+      <div className="flex gap-2 overflow-x-auto px-3.5 pb-3 scrollbar-hide">
+        {risingItems.map((item) => {
+          const clusterId = item.cluster_ids?.[0];
+          const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
+          const displayTitle = isJunkTitle(rawTitle)
+            ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName, item.country_codes?.[0])
+            : (stripTitlePrefix(rawTitle) || item.keyword);
+          const pk = personalizedKScore(item, homeCountry);
+          const badge = getKScoreBadge(pk, lang);
+          return (
+            <div
+              key={item.id}
+              onClick={clusterId ? () => onNavigate(clusterId) : undefined}
+              className={cn(
+                "shrink-0 w-44 rounded-lg border border-border bg-card p-2.5 cursor-pointer hover:bg-card/80 transition-colors",
+                kscoreAccent(pk), "border-l-4",
+              )}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={cn("text-[10px] font-bold tabular-nums", badge.text)}>
+                  {roundKScore(pk).toFixed(1)}
+                </span>
+                {item.country_codes.length > 0 && (
+                  <span className="text-[11px]">
+                    {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] font-medium leading-snug line-clamp-2">{displayTitle}</p>
+            </div>
+          );
+        })}
       </div>
 
       {/* 하단 ticker */}
-      {tickerCountries.length > 0 && (
+      {risingItems.length > 0 && (
         <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
           <div className="ticker-track-fast">
             {[0, 1].map((rep) => (
               <span key={rep} className="inline-flex items-center gap-4 px-3">
-                {tickerCountries.map((c) => (
-                  <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                    <span>{getFlag(c.code)}</span>
-                    <span className="font-medium text-muted-foreground">{c.code}</span>
-                    <span className={cn(
-                      "font-bold",
-                      c.maxSeverity >= 80 ? "text-red-700 dark:text-red-300" :
-                      c.maxSeverity >= 60 ? "text-red-500 dark:text-red-400" :
-                      c.maxSeverity >= 40 ? "text-orange-500" :
-                      "text-muted-foreground"
-                    )}>
-                      {c.maxSeverity}
+                {risingItems.map((item) => {
+                  const pk = personalizedKScore(item, homeCountry);
+                  return (
+                    <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                      {item.country_codes.length > 0 && <span>{getFlag(item.country_codes[0])}</span>}
+                      <span className="font-medium text-muted-foreground">{item.country_codes[0] ?? ""}</span>
+                      <span className={cn("font-bold", pk >= 8 ? "text-red-300" : pk >= 6 ? "text-red-400" : "text-emerald-400")}>
+                        K{roundKScore(pk).toFixed(1)}
+                      </span>
+                      <span className="text-[9px] text-emerald-400">▲</span>
                     </span>
-                    <span className={cn(
-                      "text-[9px]",
-                      c.maxSeverity >= 60 ? "text-red-400" : "text-muted-foreground/50"
-                    )}>
-                      {c.maxSeverity >= 60 ? "▲" : "▼"}
-                    </span>
-                  </span>
-                ))}
+                  );
+                })}
               </span>
             ))}
           </div>
@@ -1021,9 +988,9 @@ function HomePageContent() {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {/* 브리핑 카드 */}
-            {!isLoading && !isError && items && items.length > 0 && (
-              <BriefingCard items={items} lang={lang} />
+            {/* 최근 급부상 카드 */}
+            {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
+              <RisingCard risingItems={risingData} lang={lang} onNavigate={(id) => router.push(`/issues/${id}`)} />
             )}
 
             {isLoading && <LoadingSkeleton />}
@@ -1049,53 +1016,6 @@ function HomePageContent() {
                 <MapPin className="h-10 w-10 text-muted-foreground mb-3" />
                 <p className="text-sm font-medium">{t(lang, "home_no_trending")}</p>
                 <p className="text-sm text-muted-foreground">{t(lang, "home_no_trending_sub")}</p>
-              </div>
-            )}
-
-            {/* ── 급상승 섹션 (글로벌 탭, 데이터 있을 때만) ──── */}
-            {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
-              <div className="mb-2" data-tour="home-rising">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-xs font-bold">{t(lang, "home_rising_title")}</span>
-                  <span className="inline-flex h-4 items-center rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none">
-                    RISING
-                  </span>
-                  <InfoTooltip text={t(lang, "signal_rising_tooltip")} direction="down" />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {risingData.map((item) => {
-                    const clusterId = item.cluster_ids?.[0];
-                    const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
-                    const displayTitle = isJunkTitle(rawTitle)
-                      ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName, item.country_codes?.[0])
-                      : (stripTitlePrefix(rawTitle) || item.keyword);
-                    const risingPK = personalizedKScore(item, homeCountry);
-                    const badge = getKScoreBadge(risingPK, lang);
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
-                        className={cn(
-                          "shrink-0 w-48 rounded-lg border border-border bg-card p-3 cursor-pointer hover:bg-card/80 transition-colors",
-                          kscoreAccent(risingPK),
-                          "border-l-4",
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={cn("text-[10px] font-bold", badge.text)}>
-                            {roundKScore(risingPK).toFixed(1)}
-                          </span>
-                          {item.country_codes.length > 0 && (
-                            <span className="text-[11px]">
-                              {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] font-medium leading-snug line-clamp-2">{displayTitle}</p>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
 
