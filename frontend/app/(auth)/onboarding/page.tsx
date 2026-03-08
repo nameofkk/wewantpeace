@@ -105,11 +105,13 @@ export default function OnboardingPage() {
 
   const scanCount = useScanCounter();
 
-  // 이미 온보딩 완료면 /home
+  // 이미 온보딩 완료면 원래 페이지로 복원 (deep link 지원)
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
     if (done === "true") {
-      router.replace("/home");
+      const returnUrl = sessionStorage.getItem("wwp_return_url");
+      sessionStorage.removeItem("wwp_return_url");
+      router.replace(returnUrl || "/home");
     }
   }, [router]);
 
@@ -170,12 +172,18 @@ export default function OnboardingPage() {
   function handleSkip() {
     trackSkip("later");
     localStorage.setItem("onboarding_done", "true");
-    router.push("/home");
+    localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+    const returnUrl = sessionStorage.getItem("wwp_return_url");
+    sessionStorage.removeItem("wwp_return_url");
+    router.push(returnUrl || "/home");
   }
 
   function finishOnboarding() {
     localStorage.setItem("onboarding_done", "true");
-    router.push("/home?tour=1");
+    localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+    const returnUrl = sessionStorage.getItem("wwp_return_url");
+    sessionStorage.removeItem("wwp_return_url");
+    router.push(returnUrl || "/home?tour=1");
   }
 
   // --- 국가 선택/해제 ---

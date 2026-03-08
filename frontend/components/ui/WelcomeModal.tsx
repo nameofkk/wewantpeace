@@ -15,6 +15,11 @@ export default function WelcomeModal() {
   const [closing, setClosing] = useState(false);
 
   useEffect(() => {
+    // 온보딩 완료 유저에게는 WelcomeModal을 표시하지 않음
+    if (localStorage.getItem("onboarding_done") === "true") {
+      localStorage.setItem(STORAGE_KEY, String(Date.now()));
+      return;
+    }
     if (!localStorage.getItem(STORAGE_KEY)) {
       setOpen(true);
     }

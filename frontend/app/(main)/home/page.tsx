@@ -15,7 +15,6 @@ import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
 import { ShareButton } from "@/components/issue/ShareButton";
-import WelcomeModal from "@/components/ui/WelcomeModal";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
@@ -948,7 +947,6 @@ function HomePageContent() {
       )}
       <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
       <UpgradeNudgeBanner />
-      <WelcomeModal />
 
       {/* ── 내 관심지역 국가 표시 바 ──────────────────────────────── */}
       {trendingTab === "mine" && hydrated && myCountries.length > 0 && (

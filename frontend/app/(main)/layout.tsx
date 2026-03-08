@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { NewEventBanner } from "@/components/ui/new-event-banner";
 import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
 import { SmartAppBanner } from "@/components/ui/smart-app-banner";
+import WelcomeModal from "@/components/ui/WelcomeModal";
 import { useMe, useMyAreas } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +30,7 @@ function CountrySync() {
 /** 로그인됐는데 등록 미완료(닉네임/약관동의 없음)인 유저를 등록 페이지로 리다이렉트 */
 function RegistrationGuard() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
   const { data: me, isLoading: meLoading } = useMe();
 
@@ -38,9 +40,13 @@ function RegistrationGuard() {
     if (!me) return;
     // 닉네임 또는 약관동의가 없으면 등록 폼으로 리다이렉트
     if (!me.nickname || !me.agreed_terms_at) {
+      // 현재 페이지를 returnUrl로 보존
+      if (pathname && pathname !== "/home") {
+        sessionStorage.setItem("wwp_return_url", pathname);
+      }
       router.replace("/login?tab=google-register");
     }
-  }, [authLoading, meLoading, user, me, router]);
+  }, [authLoading, meLoading, user, me, router, pathname]);
 
   return null;
 }
@@ -82,6 +88,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <RegistrationGuard />
       <SessionTracker />
       <NewEventBanner />
+      <WelcomeModal />
       <main className="pb-[60px]">{children}</main>
       <BottomNav />
       <PWAInstallPrompt />

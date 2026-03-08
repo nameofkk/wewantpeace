@@ -34,7 +34,9 @@ export function BottomNav() {
     <nav className="tab-bar fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm" role="tablist" aria-label="Main navigation">
       <div className="flex h-[60px] items-center justify-around px-2">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname.startsWith(href);
+          // /issues/*, /notifications/* 등은 /home의 하위 플로우로 간주
+          const isActive = pathname.startsWith(href) ||
+            (href === "/home" && (pathname.startsWith("/issues") || pathname.startsWith("/notifications") || pathname.startsWith("/upgrade")));
           return (
             <Link
               key={href}

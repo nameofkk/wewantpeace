@@ -200,7 +200,7 @@ function UpgradeContent() {
 
   async function handleSubscribe(planId: string) {
     if (planId === "free") return;
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { window.location.href = "/login?returnUrl=/upgrade"; return; }
 
     setLoading(planId);
     setError(null);
@@ -252,7 +252,7 @@ function UpgradeContent() {
   }
 
   async function handleStartTrial() {
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { window.location.href = "/login?returnUrl=/upgrade"; return; }
     setLoading("trial");
     setError(null);
     try {
@@ -276,7 +276,7 @@ function UpgradeContent() {
   }
 
   async function handleRedeemPromo() {
-    if (!user) { window.location.href = "/login"; return; }
+    if (!user) { window.location.href = "/login?returnUrl=/upgrade"; return; }
     if (!promoCode.trim()) return;
     setPromoLoading(true);
     setError(null);
@@ -921,9 +921,9 @@ function UpgradeContent() {
               : "Cancel anytime · Service continues until current billing period ends"}
           </p>
           <p>
-            <a href="/terms" className="hover:underline">{t(lang, "terms_title")}</a>
+            <Link href="/terms" className="hover:underline">{t(lang, "terms_title")}</Link>
             {" · "}
-            <a href="/privacy" className="hover:underline">{t(lang, "privacy_title")}</a>
+            <Link href="/privacy" className="hover:underline">{t(lang, "privacy_title")}</Link>
           </p>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { CONTACT_EMAIL } from "@/lib/legal-data";
 import { useAuth, signOut } from "@/lib/auth";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import AppTour from "@/components/ui/AppTour";
@@ -447,6 +448,11 @@ export default function SettingsPage() {
   }
 
   async function handleTogglePush() {
+    // 비로그인 유저가 토글 시 로그인 유도
+    if (!firebaseUser) {
+      router.push("/login?returnUrl=/settings");
+      return;
+    }
     if (hasFCMToken) {
       // 즉시 UI 반영 → 비동기 처리
       setNotifStatus("idle");
@@ -619,9 +625,9 @@ export default function SettingsPage() {
                             {inactive && (
                               <div className="mt-1 space-y-0.5">
                                 <p className="text-[10px] text-amber-400">{t(lang, "settings_area_inactive")}</p>
-                                <a href="/upgrade" className="text-[10px] text-primary hover:underline">
+                                <Link href="/upgrade" className="text-[10px] text-primary hover:underline">
                                   {t(lang, "settings_area_upgrade_hint")}
-                                </a>
+                                </Link>
                               </div>
                             )}
                             {area && !inactive ? (
@@ -971,18 +977,18 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground">{t(lang, "notif_topics_desc")}</p>
                 </div>
                 {plan === "free" && (
-                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
+                  <Link href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
                     Pro →
-                  </a>
+                  </Link>
                 )}
               </div>
               {!hasFCMToken ? (
                 <p className="mt-1 text-[10px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
               ) : plan === "free" ? (
-                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
+                <Link href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
                   <span>🔓</span>
                   <span>{t(lang, "settings_unlock_topics")}</span>
-                </a>
+                </Link>
               ) : null}
               {plan !== "free" ? (
                 <>
@@ -1037,9 +1043,9 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_desc")}</p>
                 </div>
                 {!hasFCMToken ? null : plan === "free" ? (
-                  <a href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
+                  <Link href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
                     Pro →
-                  </a>
+                  </Link>
                 ) : (
                   <button
                     onClick={() => {
@@ -1066,10 +1072,10 @@ export default function SettingsPage() {
               {!hasFCMToken ? (
                 <p className="mt-2 text-[10px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
               ) : plan === "free" ? (
-                <a href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
+                <Link href="/upgrade" className="mt-2 flex items-center gap-1.5 text-[11px] text-primary/80 hover:text-primary pointer-events-auto">
                   <span>🔓</span>
                   <span>{t(lang, "settings_unlock_quiet")}</span>
-                </a>
+                </Link>
               ) : null}
               {plan !== "free" && hasFCMToken && quietEnabled && (
                 <div className="flex items-center gap-2 mt-3">
@@ -1186,14 +1192,14 @@ export default function SettingsPage() {
 
             {/* 플랜 변경/업그레이드 버튼 */}
             {plan === "free" && (
-              <a href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-center text-sm font-bold text-white">
+              <Link href="/upgrade" className="mt-3 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-center text-sm font-bold text-white">
                 {t(lang, "settings_upgrade_btn")}
-              </a>
+              </Link>
             )}
             {plan !== "free" && (
-              <a href="/upgrade" className="mt-3 block w-full rounded-lg border border-border py-2.5 text-center text-sm font-medium text-foreground hover:bg-muted/30 transition-colors">
+              <Link href="/upgrade" className="mt-3 block w-full rounded-lg border border-border py-2.5 text-center text-sm font-medium text-foreground hover:bg-muted/30 transition-colors">
                 {t(lang, "settings_plan_change")}
-              </a>
+              </Link>
             )}
 
             {/* 스토어 구독 관리 링크 */}
@@ -1353,18 +1359,18 @@ export default function SettingsPage() {
                 <span className="text-muted-foreground text-xs">→</span>
               </button>
             )}
-            <a href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
+            <Link href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_my_posts")}</span>
               <span className="text-muted-foreground text-xs">→</span>
-            </a>
-            <a href="/terms" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
+            </Link>
+            <Link href="/terms" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_terms")}</span>
               <span className="text-muted-foreground text-xs">→</span>
-            </a>
-            <a href="/privacy" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
+            </Link>
+            <Link href="/privacy" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_privacy")}</span>
               <span className="text-muted-foreground text-xs">→</span>
-            </a>
+            </Link>
           </div>
         </section>
 

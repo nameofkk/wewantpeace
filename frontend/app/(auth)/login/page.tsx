@@ -31,6 +31,12 @@ const CURRENT_YEAR = new Date().getFullYear();
 const MIN_BIRTH_YEAR = CURRENT_YEAR - 100;
 const MAX_BIRTH_YEAR = CURRENT_YEAR - 14;
 
+function getReturnUrl(): string {
+  if (typeof window === "undefined") return "/home";
+  const params = new URLSearchParams(window.location.search);
+  return params.get("returnUrl") || sessionStorage.getItem("wwp_return_url") || "/home";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -109,9 +115,10 @@ export default function LoginPage() {
             return;
           }
           localStorage.setItem("onboarding_done", "true");
+          localStorage.setItem("wwp_welcome_seen", String(Date.now()));
           clearTimeout(safetyTimeout);
-          router.push("/home");
-          return; // 홈으로 이동 중 — 로딩 유지
+          router.push(getReturnUrl());
+          return; // 이동 중 — 로딩 유지
         } else {
           setGoogleUser(user);
           setTab("google-register");
@@ -247,7 +254,8 @@ export default function LoginPage() {
           }
         }
         localStorage.setItem("onboarding_done", "true");
-        router.push("/home");
+        localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+        router.push(getReturnUrl());
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -276,7 +284,8 @@ export default function LoginPage() {
           return;
         }
         localStorage.setItem("onboarding_done", "true");
-        router.push("/home");
+        localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+        router.push(getReturnUrl());
       } else {
         setGoogleUser(user);
         setTab("google-register");
@@ -330,7 +339,8 @@ export default function LoginPage() {
           return;
         }
         localStorage.setItem("onboarding_done", "true");
-        router.push("/home");
+        localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+        router.push(getReturnUrl());
       } else {
         setGoogleUser(user);
         setTab("google-register");
@@ -414,7 +424,8 @@ export default function LoginPage() {
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
-      router.push("/home");
+      localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+      router.push(getReturnUrl());
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
@@ -483,7 +494,8 @@ export default function LoginPage() {
           return;
         }
         localStorage.setItem("onboarding_done", "true");
-        router.push("/home");
+        localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+        router.push(getReturnUrl());
       } else {
         setError(lang === "en"
           ? "Could not verify account. Please sign up."
@@ -559,7 +571,8 @@ export default function LoginPage() {
 
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
-      router.push("/home");
+      localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+      router.push(getReturnUrl());
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
       if (err.code === "auth/operation-not-allowed") {
