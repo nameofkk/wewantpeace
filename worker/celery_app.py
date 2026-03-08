@@ -195,6 +195,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=12, day_of_week=3),  # 매주 수요일 12:00 UTC = KST 21:00
         "options": {"queue": "process"},
     },
+    # ── Phase 1 마케팅 체크리스트 ──
+    "send-daily-checklist": {
+        "task": "worker.tasks.send_daily_checklist",
+        "schedule": crontab(minute=0, hour=0),  # UTC 00:00 = KST 09:00
+        "options": {"queue": "process"},
+    },
 }
 
 
