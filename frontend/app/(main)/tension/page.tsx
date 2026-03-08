@@ -725,7 +725,7 @@ export default function TensionPage() {
               {lang === "ko" ? "🌡️ 긴장도 변동" : "🌡️ Tension Δ"}
             </span>
             <div className="overflow-hidden flex-1">
-              <div className="ticker-track-fast">
+              <div className="ticker-track-medium">
                 {Array.from({ length: reps }, (_, rep) => (
                   <span key={rep} className="inline-flex items-center gap-4 px-3">
                     {deltaItems.map((item) => {

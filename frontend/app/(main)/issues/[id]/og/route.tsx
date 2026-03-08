@@ -79,18 +79,32 @@ function cleanTitle(raw: string): string {
     )
     .replace(/[⚡️🔴🟠🟡🟢⚠️🚨📰💥🔥❗️‼️]/g, "")
     .trim();
+  // 접두사 제거
   t = t
     .replace(/^(중동 라이브|MIDDLE EAST LIVE|요약|Recap|속보|BREAKING|URGENT)\s*[:：\-–—]\s*/i, "")
     .replace(/^(좋은 아침입니다|Good morning).*$/i, "")
     .trim();
   const colonIdx = t.indexOf(": ");
   if (colonIdx > 0 && colonIdx < 15) t = t.slice(colonIdx + 2).trim();
+  // 한국어 서술형 어미 → 명사형 종결 (뉴스 스타일)
   t = t
     .replace(/했다고\s+.{1,10}(밝혔|전했|보도했|발표했|알렸)습니다\.?$/, "")
     .replace(/[이가을를은는]\s*(것으로\s+)?(밝혀졌|전해졌|알려졌|보도됐|확인됐)습니다\.?$/, "")
     .replace(/고\s+(밝혔|전했)습니다\.?$/, "")
-    .replace(/\.$/, "")
+    .replace(/(하고\s+있|하려고\s+노력하|하려\s+하|시도하|노력하)(고 있다|다)\.?$/, "")
+    .replace(/(에\s+나서|을\s+촉구하|를\s+요구하|에\s+돌입하)(고 있다|다|였다)\.?$/, "")
+    .replace(/(습니다|합니다|됩니다|입니다|했다|됐다|였다|이다)\.?$/, "")
+    .replace(/[.…]+$/, "")
     .trim();
+  // 40자 초과 시 자연스러운 지점에서 자르기 (쉼표, 말줄임표, 접속조사)
+  if (t.length > 40) {
+    const cutPoints = [",", "…", "·", " - ", "–"];
+    for (const sep of cutPoints) {
+      const idx = t.lastIndexOf(sep, 40);
+      if (idx >= 15) { t = t.slice(0, idx).trim(); break; }
+    }
+    if (t.length > 45) t = t.slice(0, 42) + "…";
+  }
   return t || raw;
 }
 
@@ -176,7 +190,7 @@ export async function GET(
 
   const rawTitle = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
   const headline = cleanTitle(rawTitle);
-  const titleSize = headline.length <= 14 ? 56 : headline.length <= 22 ? 44 : headline.length <= 35 ? 36 : 30;
+  const titleSize = headline.length <= 10 ? 72 : headline.length <= 18 ? 60 : headline.length <= 28 ? 48 : headline.length <= 40 ? 40 : 34;
   const config = getConfig(issue.severity);
   const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
   const cn = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;
@@ -336,7 +350,7 @@ export async function GET(
               display: "flex",
               flex: 1,
               gap: "40px",
-              marginTop: "24px",
+              marginTop: "36px",
               alignItems: "center",
             }}
           >
@@ -346,7 +360,7 @@ export async function GET(
                 display: "flex",
                 flexDirection: "column",
                 flex: 1,
-                gap: "12px",
+                gap: "20px",
               }}
             >
               {/* 메타 뱃지 */}
@@ -401,7 +415,7 @@ export async function GET(
               </div>
 
               {/* 지표 행 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "24px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                   <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.severity}

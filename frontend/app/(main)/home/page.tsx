@@ -634,13 +634,15 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
               {hasDelta ? (lang === "ko" ? "📈 KScore 변동" : "📈 KScore Δ") : "📊 KScore"}
             </span>
             <div className="overflow-hidden flex-1">
-              <div className="ticker-track-fast">
+              <div className="ticker-track-medium">
                 {Array.from({ length: reps }, (_, rep) => (
                   <span key={rep} className="inline-flex items-center gap-5 px-3">
                     {tickerItems.map((item) => {
                       const flag = item.country_codes[0] ? getFlag(item.country_codes[0]) : "🌐";
                       const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
-                      const title = (stripTitlePrefix(rawTitle) || item.keyword).slice(0, 20);
+                      const title = (isJunkTitle(rawTitle)
+                        ? buildSmartTitle(item.keyword, item.topic ?? "unknown", lang, getCountryName, item.country_codes?.[0])
+                        : (stripTitlePrefix(rawTitle) || item.keyword)).slice(0, 20);
                       const delta = item.kscore_delta_24h;
                       const showDelta = hasDelta && delta != null && delta !== 0;
                       return (
