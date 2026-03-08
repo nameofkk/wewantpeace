@@ -10,6 +10,7 @@ import { t, Lang } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
+import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
 import type { Step } from "react-joyride";
 
 const NOTIF_TYPE_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
@@ -60,11 +61,17 @@ export default function NotificationsPage() {
     },
   ], [lang]);
 
+  const incrementSpikeAlertCount = useAppStore((s) => s.incrementSpikeAlertCount);
+
   const hasUnread = notifications?.some((n) => !n.is_read);
 
   const handleClick = (notif: NotificationItem) => {
     if (!notif.is_read) {
       markRead.mutate(notif.id);
+      // 스파이크 알림 확인 시 카운트 증가 (구독 전환 유도용)
+      if (notif.type === "spike") {
+        incrementSpikeAlertCount();
+      }
     }
     if (notif.cluster_id) {
       router.push(`/issues/${notif.cluster_id}`);
@@ -95,6 +102,8 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
+
+      <UpgradeNudgeBanner />
 
       {/* 알림 목록 */}
       <div className="pb-[80px]">

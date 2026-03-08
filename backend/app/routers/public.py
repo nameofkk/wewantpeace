@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, Response
-from sqlalchemy import select, func
+from sqlalchemy import select, func, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 
@@ -321,4 +321,90 @@ async def trending_top(
             }
             for r in rows
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 4) GET /public/countries — 데이터가 존재하는 국가 목록
+# ---------------------------------------------------------------------------
+@router.get("/countries")
+@limiter.limit("60/minute")
+async def countries_list(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """데이터가 존재하는 국가 코드 목록 — 인증 불필요."""
+    response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=7200"
+
+    # tension_index와 issue_clusters에서 고유 국가 코드 수집
+    tension_cc = (await db.execute(
+        select(distinct(TensionIndex.country_code))
+    )).scalars().all()
+
+    cluster_cc = (await db.execute(
+        select(distinct(IssueCluster.country_code))
+        .where(IssueCluster.is_active.is_(True))
+    )).scalars().all()
+
+    all_codes = sorted(set(tension_cc) | set(cluster_cc))
+
+    return {
+        "count": len(all_codes),
+        "data": all_codes,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 5) GET /public/stats — 플랫폼 통계
+# ---------------------------------------------------------------------------
+@router.get("/stats")
+@limiter.limit("60/minute")
+async def platform_stats(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """플랫폼 전체 통계 — 인증 불필요."""
+    response.headers["Cache-Control"] = "public, max-age=600, stale-while-revalidate=1200"
+
+    now = datetime.now(timezone.utc)
+    cutoff_24h = now - timedelta(hours=24)
+    cutoff_7d = now - timedelta(days=7)
+
+    # 전체 이벤트 수
+    total_events = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+    )).scalar() or 0
+
+    # 최근 24시간 이벤트 수
+    events_24h = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent)
+        .where(NormalizedEvent.created_at >= cutoff_24h)
+    )).scalar() or 0
+
+    # 활성 클러스터 수
+    active_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster)
+        .where(IssueCluster.is_active.is_(True), IssueCluster.severity > 0)
+    )).scalar() or 0
+
+    # 모니터링 국가 수
+    monitored_countries = (await db.execute(
+        select(func.count(distinct(TensionIndex.country_code)))
+    )).scalar() or 0
+
+    # 최근 7일 새 클러스터 수
+    new_clusters_7d = (await db.execute(
+        select(func.count()).select_from(IssueCluster)
+        .where(IssueCluster.first_event_at >= cutoff_7d)
+    )).scalar() or 0
+
+    return {
+        "total_events": total_events,
+        "events_24h": events_24h,
+        "active_clusters": active_clusters,
+        "monitored_countries": monitored_countries,
+        "new_clusters_7d": new_clusters_7d,
+        "updated_at": now.isoformat(),
     }

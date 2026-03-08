@@ -1014,6 +1014,10 @@ export const translations = {
     missed_spike_banner: "부재 중 {n}건의 주요 변동이 있었습니다",
     missed_spike_cta: "자세히 보기",
 
+    // 구독 전환 유도 배너
+    upgrade_nudge_message: "지금까지 {count}건의 위기 알림을 받았습니다. Pro에서는 더 많은 알림과 상세 분석을 받을 수 있습니다.",
+    upgrade_nudge_cta: "Pro 알아보기",
+
     // Sprint 3: Trial
     trial_start_button: "7일 무료 체험 시작",
     trial_already_used: "무료 체험은 1회만 가능합니다",
@@ -1220,6 +1224,25 @@ export const translations = {
     not_found_title: "페이지를 찾을 수 없습니다",
     not_found_message: "요청하신 페이지가 존재하지 않거나 이동되었습니다.",
     not_found_go_home: "홈으로 돌아가기",
+
+    // API 문서 페이지
+    api_docs_title: "WeWantPeace 공개 API",
+    api_docs_subtitle: "실시간 글로벌 분쟁 데이터에 프로그래밍 방식으로 접근하세요",
+    api_docs_base_url: "Base URL",
+    api_docs_auth_title: "인증",
+    api_docs_auth_desc: "현재 공개 API는 인증 없이 접근 가능합니다. 향후 API 키 기반 인증이 도입될 예정입니다.",
+    api_docs_rate_limit_title: "Rate Limit",
+    api_docs_rate_limit_desc: "모든 엔드포인트에 IP당 분당 60회 요청 제한이 적용됩니다.",
+    api_docs_endpoints_title: "엔드포인트",
+    api_docs_params: "파라미터",
+    api_docs_response: "응답 예시",
+    api_docs_curl: "curl 예시",
+    api_docs_no_params: "없음",
+    api_docs_try_it: "직접 시도해보기",
+    api_docs_copy: "복사",
+    api_docs_copied: "복사됨",
+    api_docs_developers: "개발자",
+    api_docs_developers_desc: "공개 API 문서",
   },
   en: {
     // bottom nav
@@ -2232,6 +2255,10 @@ export const translations = {
     missed_spike_banner: "{n} notable changes occurred while you were away",
     missed_spike_cta: "View details",
 
+    // Upgrade nudge banner
+    upgrade_nudge_message: "You've received {count} crisis alerts so far. Upgrade to Pro for more alerts and detailed analysis.",
+    upgrade_nudge_cta: "Learn about Pro",
+
     // Sprint 3: Trial
     trial_start_button: "Start 7-day Free Trial",
     trial_already_used: "Free trial is available once",
@@ -2438,6 +2465,25 @@ export const translations = {
     not_found_title: "Page not found",
     not_found_message: "The requested page does not exist or has been moved.",
     not_found_go_home: "Go to Home",
+
+    // API Docs page
+    api_docs_title: "WeWantPeace Public API",
+    api_docs_subtitle: "Programmatically access real-time global conflict data",
+    api_docs_base_url: "Base URL",
+    api_docs_auth_title: "Authentication",
+    api_docs_auth_desc: "The public API currently requires no authentication. API key-based authentication will be introduced in the future.",
+    api_docs_rate_limit_title: "Rate Limit",
+    api_docs_rate_limit_desc: "All endpoints are limited to 60 requests per minute per IP address.",
+    api_docs_endpoints_title: "Endpoints",
+    api_docs_params: "Parameters",
+    api_docs_response: "Example Response",
+    api_docs_curl: "curl Example",
+    api_docs_no_params: "None",
+    api_docs_try_it: "Try it out",
+    api_docs_copy: "Copy",
+    api_docs_copied: "Copied",
+    api_docs_developers: "Developers",
+    api_docs_developers_desc: "Public API documentation",
   },
 } as const;
 

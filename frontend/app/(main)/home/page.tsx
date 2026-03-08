@@ -18,6 +18,7 @@ import { ShareButton } from "@/components/issue/ShareButton";
 import WelcomeModal from "@/components/ui/WelcomeModal";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
+import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
 import type { Step } from "react-joyride";
 
 const TOPIC_COLORS: Record<string, string> = {
@@ -946,6 +947,7 @@ function HomePageContent() {
         </button>
       )}
       <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
+      <UpgradeNudgeBanner />
       <WelcomeModal />
 
       {/* ── 내 관심지역 국가 표시 바 ──────────────────────────────── */}
