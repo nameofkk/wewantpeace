@@ -141,7 +141,20 @@ export async function GET(
   const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
   const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
   const kscore = issue.kscore ?? 0;
-  const hasBackground = !!issue.image_url;
+
+  // Satori는 외부 URL을 직접 fetch할 수 없으므로 Base64로 변환
+  let bgImageSrc: string | null = null;
+  if (issue.image_url) {
+    try {
+      const imgRes = await fetch(issue.image_url, { signal: AbortSignal.timeout(3000) });
+      if (imgRes.ok) {
+        const ct = imgRes.headers.get("content-type") || "image/jpeg";
+        const buf = await imgRes.arrayBuffer();
+        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+      }
+    } catch {}
+  }
+  const hasBackground = !!bgImageSrc;
 
   // KScore 그래프
   const graphWidth = 420;
@@ -172,10 +185,10 @@ export async function GET(
           position: "relative",
         }}
       >
-        {/* 배경 이미지 (RSS) */}
+        {/* 배경 이미지 (Base64) */}
         {hasBackground ? (
           <img
-            src={issue.image_url!}
+            src={bgImageSrc!}
             width={1200}
             height={630}
             alt=""

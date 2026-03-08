@@ -96,6 +96,9 @@ def generate_ai_title(
         if not title_en or not title_ko:
             logger.warning("AI 제목 응답 불완전: %s", raw[:200])
             return None
+        if len(title_en) < 5 or len(title_ko) < 2:
+            logger.warning("AI 제목 너무 짧음 (en=%d, ko=%d): %s", len(title_en), len(title_ko), raw[:200])
+            return None
         # 길이 제한 적용
         if len(title_en) > 160:
             title_en = title_en[:158] + "…"

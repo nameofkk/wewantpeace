@@ -116,6 +116,15 @@ function isRising(firstEventAt?: string | null, kscore?: number): boolean {
   return ageMs < 6 * 60 * 60 * 1000 && kscore >= 3;
 }
 
+// UPDATED 태그 기준: 생성은 2시간 이전이지만, 최근 2시간 내 이벤트 편입
+function isUpdated(firstEventAt?: string | null, calculatedAt?: string): boolean {
+  if (!firstEventAt || !calculatedAt) return false;
+  const now = Date.now();
+  const firstAge = now - new Date(firstEventAt).getTime();
+  const lastAge = now - new Date(calculatedAt).getTime();
+  return firstAge > 2 * 60 * 60 * 1000 && lastAge < 2 * 60 * 60 * 1000;
+}
+
 // 날짜+시분 포맷
 import { type Lang } from "@/lib/i18n";
 
@@ -430,6 +439,12 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
                 <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
               </span>
             )}
+            {isUpdated(item.first_event_at, item.calculated_at) && !isNew(item.first_event_at) && !isRising(item.first_event_at, item.kscore) && (
+              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-amber-500/20 px-1.5 text-[9px] font-bold text-amber-400 leading-none">
+                UPDATED
+                <InfoTooltip direction="down" text={t(lang, "signal_updated_tooltip")} />
+              </span>
+            )}
             <span className={cn("inline-flex items-center h-5 gap-0.5 rounded-full px-2 text-[10px] font-medium leading-none", TOPIC_COLORS[topic])}>
               {topicLabel}
               <InfoTooltip direction="down" text={t(lang, (`topic_${topic}_tooltip`) as Parameters<typeof t>[1]) || topicLabel} />
@@ -667,7 +682,14 @@ export default function HomePage() {
       .sort((a, b) => {
         const aK = personalizedKScore(a, homeCountry);
         const bK = personalizedKScore(b, homeCountry);
-        return bK - aK || (b.severity ?? 0) - (a.severity ?? 0);
+        const kDiff = bK - aK;
+        // KScore 차이가 0.5 미만이면 최근 업데이트된 클러스터 우선
+        if (Math.abs(kDiff) < 0.5) {
+          const aTime = a.calculated_at ? new Date(a.calculated_at).getTime() : 0;
+          const bTime = b.calculated_at ? new Date(b.calculated_at).getTime() : 0;
+          if (bTime !== aTime) return bTime - aTime;
+        }
+        return kDiff || (b.severity ?? 0) - (a.severity ?? 0);
       }) as TrendingItem[];
   }, [clusterData, homeCountry]);
   // 급상승 데이터: 6시간 이내 생성 + raw KScore >= 3 (글로벌 탭 전용)

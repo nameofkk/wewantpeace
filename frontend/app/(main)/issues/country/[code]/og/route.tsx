@@ -140,9 +140,20 @@ export async function GET(
     svgAreaPath = `${svgPath} L${pts[pts.length - 1].x},${graphHeight} L${pts[0].x},${graphHeight} Z`;
   }
 
-  // 상위 이슈 이미지를 배경으로 (전체 클러스터에서 첫 번째 이미지 탐색)
+  // 상위 이슈 이미지를 배경으로 (Satori는 외부 URL 불가 → Base64 변환)
   const topImageUrl = tension.top5_clusters?.find((c) => c.image_url)?.image_url ?? null;
-  const hasBackground = !!topImageUrl;
+  let bgImageSrc: string | null = null;
+  if (topImageUrl) {
+    try {
+      const imgRes = await fetch(topImageUrl, { signal: AbortSignal.timeout(3000) });
+      if (imgRes.ok) {
+        const ct = imgRes.headers.get("content-type") || "image/jpeg";
+        const buf = await imgRes.arrayBuffer();
+        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+      }
+    } catch {}
+  }
+  const hasBackground = !!bgImageSrc;
 
   // 상위 이슈 2개 표시
   const topIssues = tension.top5_clusters.slice(0, 2).map((c) => {
@@ -162,10 +173,10 @@ export async function GET(
           position: "relative",
         }}
       >
-        {/* 배경 이미지 (RSS) */}
+        {/* 배경 이미지 (Base64) */}
         {hasBackground ? (
           <img
-            src={topImageUrl!}
+            src={bgImageSrc!}
             width={1200}
             height={630}
             alt=""
