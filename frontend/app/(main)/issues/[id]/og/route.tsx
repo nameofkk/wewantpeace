@@ -7,12 +7,19 @@ const size = { width: 1200, height: 630 };
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ── 커스텀 폰트 (모듈 레벨, 첫 요청 시 1회 fetch) ──
-const playfairFont = fetch(
-  "https://fonts.gstatic.com/s/playfairdisplay/v37/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_qiTbtbK-F2rA0s.ttf"
+// 영문 헤드라인: Noto Serif KR Black (900)
+const notoSerifKrFont = fetch(
+  "https://fonts.gstatic.com/s/notoserifkr/v31/3JnoSDn90Gmq2mr3blnHaTZXbOtLJDvui3JOnchPf852.ttf"
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-const notoSansKrFont = fetch(
-  "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hfeE.ttf"
+// 한국어 헤드라인: Gothic A1 Black (900)
+const gothicA1Font = fetch(
+  "https://fonts.gstatic.com/s/gothica1/v18/CSR44z5ZnPydRjlCCwlC6OAKSA.ttf"
+).then((r) => r.arrayBuffer()).catch((): null => null);
+
+// 본문: Inter Semi-Bold (600)
+const interFont = fetch(
+  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf"
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
 const TOPIC: Record<string, { ko: string; en: string }> = {
@@ -97,10 +104,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   // 폰트 로드
-  const [playfairData, notoSansKrData] = await Promise.all([playfairFont, notoSansKrFont]);
+  const [notoSerifKrData, gothicA1Data, interData] = await Promise.all([notoSerifKrFont, gothicA1Font, interFont]);
   const ogFonts: { name: string; data: ArrayBuffer; weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900; style: "normal" }[] = [];
-  if (playfairData) ogFonts.push({ name: "Playfair Display", data: playfairData, weight: 900 as const, style: "normal" });
-  if (notoSansKrData) ogFonts.push({ name: "Noto Sans KR", data: notoSansKrData, weight: 700 as const, style: "normal" });
+  if (notoSerifKrData) ogFonts.push({ name: "Noto Serif KR", data: notoSerifKrData, weight: 900 as const, style: "normal" });
+  if (gothicA1Data) ogFonts.push({ name: "Gothic A1", data: gothicA1Data, weight: 900 as const, style: "normal" });
+  if (interData) ogFonts.push({ name: "Inter", data: interData, weight: 600 as const, style: "normal" });
 
   const lang = req.nextUrl.searchParams.get("lang") === "en" ? "en" : "ko";
 
@@ -168,12 +176,13 @@ export async function GET(
 
   const rawTitle = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
   const headline = cleanTitle(rawTitle);
-  const titleSize = headline.length <= 18 ? 56 : headline.length <= 30 ? 46 : headline.length <= 50 ? 38 : 32;
+  const titleSize = headline.length <= 14 ? 56 : headline.length <= 22 ? 44 : headline.length <= 35 ? 36 : 30;
   const config = getConfig(issue.severity);
   const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
   const cn = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;
   const countryName = cn ? cn[lang] : (issue.country_code || "");
   const kscore = issue.kscore ?? 0;
+  const displayFont = lang === "en" ? "'Noto Serif KR', serif" : "'Gothic A1', sans-serif";
 
   // Satori는 외부 URL을 직접 fetch할 수 없으므로 Base64로 변환
   let bgImageSrc: string | null = null;
@@ -213,7 +222,7 @@ export async function GET(
           display: "flex",
           width: "100%",
           height: "100%",
-          fontFamily: "'Noto Sans KR', sans-serif",
+          fontFamily: "'Inter', sans-serif",
           background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)",
           position: "relative",
         }}
@@ -379,7 +388,7 @@ export async function GET(
                   color: "#FFFFFF",
                   fontSize: titleSize,
                   fontWeight: 900,
-                  fontFamily: "'Playfair Display', 'Noto Sans KR', serif",
+                  fontFamily: displayFont,
                   lineHeight: 1.35,
                   letterSpacing: "-0.5px",
                   wordBreak: "keep-all",
@@ -394,7 +403,7 @@ export async function GET(
               {/* 지표 행 */}
               <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "12px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.severity}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
@@ -403,7 +412,7 @@ export async function GET(
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     K{kscore.toFixed(1)}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
@@ -412,7 +421,7 @@ export async function GET(
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, lineHeight: 1 }}>
+                  <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.event_count}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>

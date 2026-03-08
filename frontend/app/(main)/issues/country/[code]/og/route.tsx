@@ -8,12 +8,19 @@ const size = { width: 1200, height: 630 };
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ── 커스텀 폰트 ──
-const playfairFont = fetch(
-  "https://fonts.gstatic.com/s/playfairdisplay/v37/nuFRD-vYSZviVYUb_rj3ij__anPXDTnCjmHKM4nYO7KN_qiTbtbK-F2rA0s.ttf"
+// 영문 헤드라인: Noto Serif KR Black (900)
+const notoSerifKrFont = fetch(
+  "https://fonts.gstatic.com/s/notoserifkr/v31/3JnoSDn90Gmq2mr3blnHaTZXbOtLJDvui3JOnchPf852.ttf"
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-const notoSansKrFont = fetch(
-  "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hfeE.ttf"
+// 한국어 헤드라인: Gothic A1 Black (900)
+const gothicA1Font = fetch(
+  "https://fonts.gstatic.com/s/gothica1/v18/CSR44z5ZnPydRjlCCwlC6OAKSA.ttf"
+).then((r) => r.arrayBuffer()).catch((): null => null);
+
+// 본문: Inter Semi-Bold (600)
+const interFont = fetch(
+  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf"
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
 const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
@@ -75,10 +82,11 @@ export async function GET(
   const lang = req.nextUrl.searchParams.get("lang") === "en" ? "en" : "ko";
 
   // 폰트 로드
-  const [playfairData, notoSansKrData] = await Promise.all([playfairFont, notoSansKrFont]);
+  const [notoSerifKrData, gothicA1Data, interData] = await Promise.all([notoSerifKrFont, gothicA1Font, interFont]);
   const ogFonts: { name: string; data: ArrayBuffer; weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900; style: "normal" }[] = [];
-  if (playfairData) ogFonts.push({ name: "Playfair Display", data: playfairData, weight: 900 as const, style: "normal" });
-  if (notoSansKrData) ogFonts.push({ name: "Noto Sans KR", data: notoSansKrData, weight: 700 as const, style: "normal" });
+  if (notoSerifKrData) ogFonts.push({ name: "Noto Serif KR", data: notoSerifKrData, weight: 900 as const, style: "normal" });
+  if (gothicA1Data) ogFonts.push({ name: "Gothic A1", data: gothicA1Data, weight: 900 as const, style: "normal" });
+  if (interData) ogFonts.push({ name: "Inter", data: interData, weight: 600 as const, style: "normal" });
 
   let logoSrc: string | null = null;
   try {
@@ -138,6 +146,7 @@ export async function GET(
   const config = getLevelConfig(tension.tension_level);
   const score = tension.raw_score;
   const scorePercent = Math.min(score, 100);
+  const displayFont = lang === "en" ? "'Noto Serif KR', serif" : "'Gothic A1', sans-serif";
 
   // 7일 히스토리 → SVG path for sparkline
   const graphPoints = history.length >= 2 ? history : [];
@@ -184,7 +193,7 @@ export async function GET(
           display: "flex",
           width: "100%",
           height: "100%",
-          fontFamily: "'Noto Sans KR', sans-serif",
+          fontFamily: "'Inter', sans-serif",
           background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)",
           position: "relative",
         }}
@@ -318,7 +327,7 @@ export async function GET(
                     color: "#FFFFFF",
                     fontSize: 68,
                     fontWeight: 900,
-                    fontFamily: "'Playfair Display', 'Noto Sans KR', serif",
+                    fontFamily: displayFont,
                     lineHeight: 1.1,
                     letterSpacing: "-1.5px",
                   }}
@@ -344,6 +353,7 @@ export async function GET(
                     color: config.barColor,
                     fontSize: 88,
                     fontWeight: 900,
+                    fontFamily: displayFont,
                     letterSpacing: "-3px",
                     lineHeight: 1,
                   }}
