@@ -83,6 +83,7 @@ class TrendingItem(BaseModel):
     severity: int = 0
     reason: str = ""
     independent_sources: int = 1
+    kscore_delta_24h: Optional[float] = None
 
 
 # ── Pydantic 스키마 (추가) ─────────────────────────────────────────────────────
@@ -90,6 +91,38 @@ class TrendingItem(BaseModel):
 class KScoreHistoryPoint(BaseModel):
     time: str
     kscore: float
+
+
+async def _get_kscore_delta_24h(
+    cluster_ids: list[str], db: AsyncSession
+) -> dict[str, float]:
+    """클러스터별 24시간 전 KScore를 조회해서 delta를 반환."""
+    if not cluster_ids:
+        return {}
+    from sqlalchemy import text as sa_text
+    import uuid as uuid_mod
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    # trending_keywords에서 24h 전 시점의 각 클러스터 최신 kscore 조회
+    result = await db.execute(
+        sa_text("""
+            WITH ranked AS (
+                SELECT
+                    (cluster_ids)[1] AS cid,
+                    kscore,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY (cluster_ids)[1]
+                        ORDER BY calculated_at DESC
+                    ) AS rn
+                FROM trending_keywords
+                WHERE (cluster_ids)[1] = ANY(CAST(:cids AS uuid[]))
+                  AND calculated_at <= :cutoff
+            )
+            SELECT cid, kscore FROM ranked WHERE rn = 1
+        """),
+        {"cids": cluster_ids, "cutoff": cutoff},
+    )
+    return {str(row[0]): float(row[1]) for row in result.fetchall()}
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
@@ -158,16 +191,23 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
             for row in cr.fetchall():
                 cid_to_first[str(row[0])] = row[1].isoformat() if row[1] else None
 
+        # 24h 전 KScore delta 배치 조회
+        delta_cids = [str(r["cluster_ids"][0]) for r in sorted_rows if r["cluster_ids"]]
+        prev_kscore_map = await _get_kscore_delta_24h(delta_cids, db)
+
         # raw row → TrendingItem 직접 변환
         out = []
         for r in sorted_rows:
             cid = str(r["cluster_ids"][0]) if r["cluster_ids"] else None
             first_event_at = cid_to_first.get(cid) if cid else None
+            cur_ks = round(float(r["kscore"]), 2)
+            prev_ks = prev_kscore_map.get(cid) if cid else None
+            delta = round(cur_ks - prev_ks, 2) if prev_ks is not None else None
             out.append(TrendingItem(
                 id=r["id"],
                 keyword=r["keyword"],
                 keyword_ko=r["keyword_ko"],
-                kscore=round(float(r["kscore"]), 2),
+                kscore=cur_ks,
                 raw_score=round(float(r.get("raw_score") or 0.0), 2),
                 topic=r["topic"],
                 country_codes=r["country_codes"] or [],
@@ -180,6 +220,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
                 is_spike=bool(r["is_spike"]),
                 reason=f"KScore {float(r['kscore']):.1f}",
                 independent_sources=int(r["independent_sources"] or 1),
+                kscore_delta_24h=delta,
             ))
 
         # Redis 캐시 갱신
@@ -209,7 +250,7 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
     if not clusters:
         return []
 
-    scored = []
+    scored_raw = []
     for c in clusters:
         kscore, _ = _calc_kscore(
             event_count=c.event_count,
@@ -219,22 +260,33 @@ async def global_trending(response: Response, db: AsyncSession = Depends(get_db)
             independent_sources=c.independent_sources,
             source_tiers=c.source_tiers or [],
         )
+        scored_raw.append((c, round(kscore, 2)))
+
+    fb_cids = [str(c.id) for c, _ in scored_raw]
+    fb_prev_map = await _get_kscore_delta_24h(fb_cids, db)
+
+    scored = []
+    for c, ks in scored_raw:
+        cid = str(c.id)
+        prev_ks = fb_prev_map.get(cid)
+        delta = round(ks - prev_ks, 2) if prev_ks is not None else None
         scored.append(TrendingItem(
-            id=abs(hash(str(c.id))) % (2 ** 31),
+            id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,
             keyword_ko=c.title_ko,
-            kscore=round(kscore, 2),
+            kscore=ks,
             topic=c.topic,
             country_codes=[c.country_code] if c.country_code else [],
-            cluster_ids=[str(c.id)],
+            cluster_ids=[cid],
             scope="global",
             calculated_at=c.last_event_at.isoformat(),
             first_event_at=c.first_event_at.isoformat() if c.first_event_at else None,
             is_spike=c.is_spike,
             event_count=c.event_count,
             severity=c.severity,
-            reason=_make_global_reason(c, kscore),
+            reason=_make_global_reason(c, ks),
             independent_sources=c.independent_sources,
+            kscore_delta_24h=delta,
         ))
 
     scored.sort(key=lambda x: x.kscore, reverse=True)
@@ -303,26 +355,38 @@ async def mine_trending(
         # 스파이크 클러스터는 KSCORE_MIN 미달이어도 항상 포함
         if kscore < KSCORE_MIN and not c.is_spike:
             continue
-        scored.append(TrendingItem(
-            id=abs(hash(str(c.id))) % (2 ** 31),
+        scored.append((c, round(kscore, 2)))
+
+    # 24h 전 KScore delta 배치 조회
+    mine_cids = [str(c.id) for c, _ in scored]
+    prev_kscore_map = await _get_kscore_delta_24h(mine_cids, db)
+
+    items = []
+    for c, ks in scored:
+        cid = str(c.id)
+        prev_ks = prev_kscore_map.get(cid)
+        delta = round(ks - prev_ks, 2) if prev_ks is not None else None
+        items.append(TrendingItem(
+            id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,
             keyword_ko=c.title_ko,
-            kscore=round(kscore, 2),
+            kscore=ks,
             topic=c.topic,
             country_codes=[c.country_code] if c.country_code else [],
-            cluster_ids=[str(c.id)],
+            cluster_ids=[cid],
             scope="mine",
             calculated_at=c.last_event_at.isoformat(),
             first_event_at=c.first_event_at.isoformat() if c.first_event_at else None,
             is_spike=c.is_spike,
             event_count=c.event_count,
             severity=c.severity,
-            reason=_make_mine_reason(c, kscore),
+            reason=_make_mine_reason(c, ks),
             independent_sources=c.independent_sources,
+            kscore_delta_24h=delta,
         ))
 
-    scored.sort(key=lambda x: x.kscore, reverse=True)
-    return _dedup_by_title(scored, limit=20)
+    items.sort(key=lambda x: x.kscore, reverse=True)
+    return _dedup_by_title(items, limit=20)
 
 
 def _make_global_reason(cluster: IssueCluster, kscore: float) -> str:

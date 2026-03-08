@@ -720,31 +720,33 @@ export default function TensionPage() {
         // 국가 수가 적을 때 무한 롤링을 위해 최소 4회 반복
         const reps = deltaItems.length <= 5 ? 6 : deltaItems.length <= 10 ? 4 : 2;
         return (
-          <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5">
-            <div className="ticker-track-fast">
-              {Array.from({ length: reps }, (_, rep) => (
-                <span key={rep} className="inline-flex items-center gap-4 px-3">
-                  <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                    {lang === "ko" ? "📊 일간 변동" : "📊 Daily Changes"}
+          <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5 flex items-center">
+            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
+              {lang === "ko" ? "긴장도 24h" : "Tension 24h"}
+            </span>
+            <div className="overflow-hidden flex-1">
+              <div className="ticker-track-fast">
+                {Array.from({ length: reps }, (_, rep) => (
+                  <span key={rep} className="inline-flex items-center gap-4 px-3">
+                    {deltaItems.map((item) => {
+                      const delta = item.delta_24h ?? 0;
+                      const isUp = delta > 0;
+                      return (
+                        <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                          <span>{getFlag(item.country_code)}</span>
+                          <span className="font-medium text-muted-foreground">{item.country_code}</span>
+                          <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "+" : ""}{delta.toFixed(1)}
+                          </span>
+                          <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "▲" : "▼"}
+                          </span>
+                        </span>
+                      );
+                    })}
                   </span>
-                  {deltaItems.map((item) => {
-                    const delta = item.delta_24h ?? 0;
-                    const isUp = delta > 0;
-                    return (
-                      <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                        <span>{getFlag(item.country_code)}</span>
-                        <span className="font-medium text-muted-foreground">{item.country_code}</span>
-                        <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
-                          {isUp ? "+" : ""}{delta.toFixed(1)}
-                        </span>
-                        <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
-                          {isUp ? "▲" : "▼"}
-                        </span>
-                      </span>
-                    );
-                  })}
-                </span>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         );

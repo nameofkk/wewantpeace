@@ -104,6 +104,7 @@ interface TrendingItem {
   calculated_at?: string;
   first_event_at?: string | null;
   independent_sources?: number;
+  kscore_delta_24h?: number | null;
 }
 
 // NEW 태그 기준: 2시간 이내
@@ -570,21 +571,10 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
   const homeCountry = useAppStore((s) => s.homeCountry);
   if (risingItems.length === 0) return null;
 
-  // ticker용: 전체 이슈에서 국가별 최고 severity 집계
-  const countryMap = new Map<string, { code: string; maxSeverity: number; count: number }>();
-  for (const item of allItems) {
-    for (const code of item.country_codes) {
-      const existing = countryMap.get(code);
-      if (existing) {
-        existing.maxSeverity = Math.max(existing.maxSeverity, item.severity ?? 0);
-        existing.count++;
-      } else {
-        countryMap.set(code, { code, maxSeverity: item.severity ?? 0, count: 1 });
-      }
-    }
-  }
-  const tickerCountries = [...countryMap.values()]
-    .sort((a, b) => b.maxSeverity - a.maxSeverity || b.count - a.count)
+  // ticker용: KScore delta가 있는 이슈만 국가별 집계
+  const deltaItems = allItems
+    .filter((item) => item.kscore_delta_24h != null && item.kscore_delta_24h !== 0)
+    .sort((a, b) => Math.abs(b.kscore_delta_24h ?? 0) - Math.abs(a.kscore_delta_24h ?? 0))
     .slice(0, 15);
 
   return (
@@ -635,36 +625,38 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
         })}
       </div>
 
-      {/* 하단 ticker — 전체 이슈 국가별 severity */}
-      {tickerCountries.length > 0 && (() => {
-        const reps = tickerCountries.length <= 5 ? 6 : tickerCountries.length <= 10 ? 4 : 2;
+      {/* 하단 ticker — KScore 전일 대비 변동 */}
+      {deltaItems.length > 0 && (() => {
+        const reps = deltaItems.length <= 5 ? 6 : deltaItems.length <= 10 ? 4 : 2;
         return (
-          <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
-            <div className="ticker-track-fast">
-              {Array.from({ length: reps }, (_, rep) => (
-                <span key={rep} className="inline-flex items-center gap-4 px-3">
-                  {tickerCountries.map((c) => (
-                    <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                      <span>{getFlag(c.code)}</span>
-                      <span className="font-medium text-muted-foreground">{c.code}</span>
-                      <span className={cn(
-                        "font-bold",
-                        c.maxSeverity >= 60 ? "text-red-400" :
-                        c.maxSeverity >= 40 ? "text-red-400" :
-                        "text-emerald-400"
-                      )}>
-                        {c.maxSeverity}
-                      </span>
-                      <span className={cn(
-                        "text-[9px]",
-                        c.maxSeverity >= 40 ? "text-red-400" : "text-emerald-400"
-                      )}>
-                        {c.maxSeverity >= 40 ? "▲" : "▼"}
-                      </span>
-                    </span>
-                  ))}
-                </span>
-              ))}
+          <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5 flex items-center">
+            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
+              {lang === "ko" ? "KScore 24h" : "KScore 24h"}
+            </span>
+            <div className="overflow-hidden flex-1">
+              <div className="ticker-track-fast">
+                {Array.from({ length: reps }, (_, rep) => (
+                  <span key={rep} className="inline-flex items-center gap-4 px-3">
+                    {deltaItems.map((item) => {
+                      const delta = item.kscore_delta_24h ?? 0;
+                      const isUp = delta > 0;
+                      const flag = item.country_codes[0] ? getFlag(item.country_codes[0]) : "🌐";
+                      return (
+                        <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                          <span>{flag}</span>
+                          <span className="font-medium text-muted-foreground">{item.country_codes[0] || "?"}</span>
+                          <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "+" : ""}{delta.toFixed(1)}
+                          </span>
+                          <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "▲" : "▼"}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         );
