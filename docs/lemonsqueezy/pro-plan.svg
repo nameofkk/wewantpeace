@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#161b22"/>
+      <stop offset="50%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#1a1e2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2563eb"/>
+      <stop offset="100%" style="stop-color:#6366f1"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="85%" cy="10%" r="35%">
+      <stop offset="0%" style="stop-color:rgba(37,99,235,0.15)"/>
+      <stop offset="100%" style="stop-color:rgba(37,99,235,0)"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="10%" cy="90%" r="30%">
+      <stop offset="0%" style="stop-color:rgba(99,102,241,0.1)"/>
+      <stop offset="100%" style="stop-color:rgba(99,102,241,0)"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1600" height="1200" fill="#0d1117"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#bg)" stroke="#30363d" stroke-width="1"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#glow1)"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#glow2)"/>
+
+  <!-- Badge -->
+  <rect x="180" y="140" width="195" height="38" rx="19" fill="url(#accent)"/>
+  <text x="277" y="165" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="16" font-weight="700" fill="#fff" text-anchor="middle" letter-spacing="1">SUBSCRIPTION</text>
+
+  <!-- Logo -->
+  <text x="180" y="235" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="44" font-weight="800" fill="#e6edf3" letter-spacing="-1">&#9760; WeWantPeace</text>
+  <text x="652" y="235" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="44" font-weight="800" fill="#58a6ff"> Pro</text>
+
+  <!-- Subtitle -->
+  <text x="180" y="275" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="20" fill="#8b949e">Real-time global conflict &amp; security monitoring</text>
+
+  <!-- Plan Name -->
+  <text x="180" y="380" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="68" font-weight="800" fill="url(#accent)" letter-spacing="-2">Pro Plan</text>
+
+  <!-- Price -->
+  <text x="180" y="450" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="52" font-weight="800" fill="#e6edf3">&#8361;4,900</text>
+  <text x="440" y="450" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="22" fill="#8b949e"> / month</text>
+
+  <!-- Features - Left Column -->
+  <g font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="19" fill="#c9d1d9">
+    <!-- Feature 1 -->
+    <circle cx="200" cy="530" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="200" y="535" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="224" y="536">5 monitored countries</text>
+    <line x1="180" y1="555" x2="730" y2="555" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Feature 2 -->
+    <circle cx="200" cy="585" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="200" y="590" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="224" y="591">Real-time issue map</text>
+    <line x1="180" y1="610" x2="730" y2="610" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Feature 3 -->
+    <circle cx="200" cy="640" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="200" y="645" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="224" y="646">Fast alerts (breaking news)</text>
+    <line x1="180" y1="665" x2="730" y2="665" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Feature 4 -->
+    <circle cx="200" cy="695" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="200" y="700" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="224" y="701">10 daily alerts</text>
+    <line x1="180" y1="720" x2="730" y2="720" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Feature 5 -->
+    <circle cx="200" cy="750" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="200" y="755" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="224" y="756">KScore filter (3.0 &#8211; 10.0)</text>
+  </g>
+
+  <!-- Features - Right Column -->
+  <g font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="19" fill="#c9d1d9">
+    <circle cx="830" cy="530" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="830" y="535" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="854" y="536">Topic filter</text>
+    <line x1="810" y1="555" x2="1360" y2="555" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="585" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="830" y="590" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="854" y="591">Quiet hours</text>
+    <line x1="810" y1="610" x2="1360" y2="610" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="640" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="830" y="645" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="854" y="646">30-day history</text>
+    <line x1="810" y1="665" x2="1360" y2="665" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="695" r="14" fill="rgba(37,99,235,0.2)"/>
+    <text x="830" y="700" font-size="13" font-weight="700" fill="#58a6ff" text-anchor="middle">&#10003;</text>
+    <text x="854" y="701">Change home country</text>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text x="800" y="900" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="16" fill="#484f58" text-anchor="middle">Monitor 195 countries &middot; AI-powered KScore &middot; Real-time alerts</text>
+
+  <!-- Powered by -->
+  <text x="800" y="1060" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" fill="#30363d" text-anchor="middle">www.wewantpeace.live</text>
+</svg>

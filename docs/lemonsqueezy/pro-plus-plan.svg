@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1528"/>
+      <stop offset="50%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#1e1a2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#ec4899"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="85%" cy="10%" r="35%">
+      <stop offset="0%" style="stop-color:rgba(168,85,247,0.15)"/>
+      <stop offset="100%" style="stop-color:rgba(168,85,247,0)"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="10%" cy="90%" r="30%">
+      <stop offset="0%" style="stop-color:rgba(236,72,153,0.1)"/>
+      <stop offset="100%" style="stop-color:rgba(236,72,153,0)"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1600" height="1200" fill="#0d1117"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#bg)" stroke="#30363d" stroke-width="1"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#glow1)"/>
+  <rect x="100" y="60" width="1400" height="1080" rx="32" fill="url(#glow2)"/>
+
+  <!-- Badge -->
+  <rect x="180" y="140" width="280" height="38" rx="19" fill="url(#accent)"/>
+  <text x="320" y="165" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="16" font-weight="700" fill="#fff" text-anchor="middle" letter-spacing="1">PREMIUM SUBSCRIPTION</text>
+
+  <!-- Logo -->
+  <text x="180" y="235" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="44" font-weight="800" fill="#e6edf3" letter-spacing="-1">&#9760; WeWantPeace</text>
+  <text x="652" y="235" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="44" font-weight="800" fill="url(#accent)"> Pro+</text>
+
+  <!-- Subtitle -->
+  <text x="180" y="275" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="20" fill="#8b949e">Maximum coverage &middot; Unlimited monitoring</text>
+
+  <!-- Plan Name -->
+  <text x="180" y="380" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="68" font-weight="800" fill="url(#accent)" letter-spacing="-2">Pro+ Plan</text>
+
+  <!-- Price -->
+  <text x="180" y="450" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="52" font-weight="800" fill="#e6edf3">&#8361;9,900</text>
+  <text x="440" y="450" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="22" fill="#8b949e"> / month</text>
+
+  <!-- Includes tag -->
+  <rect x="180" y="480" width="320" height="30" rx="4" fill="#21262d"/>
+  <text x="340" y="500" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="13" fill="#8b949e" text-anchor="middle">Includes all Pro features, plus:</text>
+
+  <!-- Features - Left Column (Highlighted Pro+ exclusives) -->
+  <g font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="19">
+    <!-- Exclusive 1 -->
+    <circle cx="200" cy="555" r="14" fill="rgba(236,72,153,0.2)"/>
+    <text x="200" y="560" font-size="13" font-weight="700" fill="#ec4899" text-anchor="middle">&#10003;</text>
+    <text x="224" y="561" fill="#e6edf3" font-weight="600">Unlimited monitored countries</text>
+    <line x1="180" y1="580" x2="730" y2="580" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Exclusive 2 -->
+    <circle cx="200" cy="610" r="14" fill="rgba(236,72,153,0.2)"/>
+    <text x="200" y="615" font-size="13" font-weight="700" fill="#ec4899" text-anchor="middle">&#10003;</text>
+    <text x="224" y="616" fill="#e6edf3" font-weight="600">50 daily alerts</text>
+    <line x1="180" y1="635" x2="730" y2="635" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Exclusive 3 -->
+    <circle cx="200" cy="665" r="14" fill="rgba(236,72,153,0.2)"/>
+    <text x="200" y="670" font-size="13" font-weight="700" fill="#ec4899" text-anchor="middle">&#10003;</text>
+    <text x="224" y="671" fill="#e6edf3" font-weight="600">KScore filter (1.5 &#8211; 10.0)</text>
+    <line x1="180" y1="690" x2="730" y2="690" stroke="#21262d" stroke-width="1"/>
+
+    <!-- Exclusive 4 -->
+    <circle cx="200" cy="720" r="14" fill="rgba(236,72,153,0.2)"/>
+    <text x="200" y="725" font-size="13" font-weight="700" fill="#ec4899" text-anchor="middle">&#10003;</text>
+    <text x="224" y="726" fill="#e6edf3" font-weight="600">90-day history</text>
+  </g>
+
+  <!-- Features - Right Column (Included Pro features) -->
+  <g font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="19" fill="#c9d1d9">
+    <circle cx="830" cy="555" r="14" fill="rgba(168,85,247,0.2)"/>
+    <text x="830" y="560" font-size="13" font-weight="700" fill="#a855f7" text-anchor="middle">&#10003;</text>
+    <text x="854" y="561">Real-time issue map</text>
+    <line x1="810" y1="580" x2="1360" y2="580" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="610" r="14" fill="rgba(168,85,247,0.2)"/>
+    <text x="830" y="615" font-size="13" font-weight="700" fill="#a855f7" text-anchor="middle">&#10003;</text>
+    <text x="854" y="616">Fast alerts (breaking news)</text>
+    <line x1="810" y1="635" x2="1360" y2="635" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="665" r="14" fill="rgba(168,85,247,0.2)"/>
+    <text x="830" y="670" font-size="13" font-weight="700" fill="#a855f7" text-anchor="middle">&#10003;</text>
+    <text x="854" y="671">Topic &amp; KScore filters</text>
+    <line x1="810" y1="690" x2="1360" y2="690" stroke="#21262d" stroke-width="1"/>
+
+    <circle cx="830" cy="720" r="14" fill="rgba(168,85,247,0.2)"/>
+    <text x="830" y="725" font-size="13" font-weight="700" fill="#a855f7" text-anchor="middle">&#10003;</text>
+    <text x="854" y="726">Quiet hours</text>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text x="800" y="880" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="16" fill="#484f58" text-anchor="middle">Monitor 195 countries &middot; AI-powered KScore &middot; Unlimited alerts</text>
+
+  <!-- Powered by -->
+  <text x="800" y="1060" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" fill="#30363d" text-anchor="middle">www.wewantpeace.live</text>
+</svg>
