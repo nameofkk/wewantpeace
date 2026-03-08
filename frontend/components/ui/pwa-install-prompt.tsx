@@ -81,7 +81,7 @@ export function PWAInstallPrompt() {
       <button
         onClick={handleDismiss}
         className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-        aria-label="닫기"
+        aria-label={lang === "ko" ? "닫기" : "Close"}
       >
         <X className="h-4 w-4" />
       </button>

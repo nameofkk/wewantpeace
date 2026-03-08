@@ -19,19 +19,19 @@ import type { Step } from "react-joyride";
 interface Feature {
   labelKo: string;
   labelEn: string;
-  free: boolean | string;
-  pro: boolean | string;
-  proplus: boolean | string;
+  free: boolean | { ko: string; en: string };
+  pro: boolean | { ko: string; en: string };
+  proplus: boolean | { ko: string; en: string };
 }
 
 const FEATURES: Feature[] = [
   {
     labelKo: "관심 국가",              labelEn: "Monitored countries",
-    free: "2개",                       pro: "5개",                      proplus: "무제한",
+    free: { ko: "2개", en: "2" },      pro: { ko: "5개", en: "5" },      proplus: { ko: "무제한", en: "Unlimited" },
   },
   {
     labelKo: "내 국가 변경",           labelEn: "Home country",
-    free: "KR 고정",                   pro: true,                       proplus: true,
+    free: { ko: "KR 고정", en: "KR only" }, pro: true,                   proplus: true,
   },
   {
     labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
@@ -51,11 +51,11 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "일일 알림 상한",         labelEn: "Daily alert limit",
-    free: "3건",                       pro: "10건",                     proplus: "50건",
+    free: { ko: "3건", en: "3" },      pro: { ko: "10건", en: "10" },    proplus: { ko: "50건", en: "50" },
   },
   {
     labelKo: "KScore 필터",             labelEn: "KScore filter",
-    free: "3.0 고정",                  pro: "3.0~10.0",                proplus: "1.5~10.0",
+    free: { ko: "3.0 고정", en: "3.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
   },
   {
     labelKo: "토픽 필터",              labelEn: "Topic filter",
@@ -67,11 +67,11 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "긴장도 히스토리",        labelEn: "Tension history",
-    free: "7일",                       pro: "30일",                     proplus: "90일",
+    free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
   {
     labelKo: "KScore 히스토리",        labelEn: "KScore history",
-    free: "7일",                       pro: "30일",                     proplus: "90일",
+    free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
 ];
 
@@ -87,18 +87,19 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
 
 function FeatureValue({
   val, planId, lang,
-}: { val: boolean | string; planId: string; lang: Lang }) {
+}: { val: boolean | string | { ko: string; en: string }; planId: string; lang: Lang }) {
   if (val === true) {
     const color = planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-green-500";
     return <Check className={cn("h-4 w-4 mx-auto", color)} />;
   }
   if (val === false) return <X className="h-4 w-4 mx-auto text-muted-foreground/30" />;
+  const text = typeof val === "object" ? (lang === "ko" ? val.ko : val.en) : val;
   return (
     <span className={cn(
       "text-[10px] font-medium whitespace-nowrap",
       planId === "pro_plus" ? "text-purple-400" : planId === "pro" ? "text-blue-400" : "text-muted-foreground"
     )}>
-      {val}
+      {text}
     </span>
   );
 }

@@ -71,28 +71,32 @@ async def create_checkout(
     if not settings.lemonsqueezy_store_id:
         raise HTTPException(500, detail="LemonSqueezy Store ID가 설정되지 않았습니다.")
 
-    # 이미 활성 유료 구독이 있는지 확인 (trial은 업그레이드 허용)
-    existing = await db.execute(
+    # 기존 활성 구독 처리 (업그레이드/중복 방지)
+    existing_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "grace_period"]),
-        ).limit(1)
+            Subscription.status.in_(["active", "trial", "grace_period"]),
+        )
     )
-    if existing.scalar_one_or_none():
-        raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 활성 구독이 있습니다."})
-
-    # trial 구독이 있으면 만료 처리 (유료 전환 준비)
-    trial_result = await db.execute(
-        select(Subscription).where(
-            Subscription.user_id == current_user.id,
-            Subscription.status == "trial",
-        ).limit(1)
-    )
-    trial_sub = trial_result.scalar_one_or_none()
-    if trial_sub:
-        trial_sub.status = "expired"
-        trial_sub.updated_at = datetime.now(timezone.utc)
-        logger.info("Trial 구독 만료 처리: user=%s → 유료 전환 진행", current_user.id)
+    now = datetime.now(timezone.utc)
+    for existing_sub in existing_result.scalars().all():
+        if existing_sub.status == "trial":
+            # trial → 만료 처리
+            existing_sub.status = "expired"
+            existing_sub.updated_at = now
+            logger.info("Trial 구독 만료 처리: user=%s → 유료 전환 진행", current_user.id)
+        elif existing_sub.plan == body.plan:
+            # 같은 플랜 중복 구독 차단
+            raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 같은 플랜의 활성 구독이 있습니다."})
+        else:
+            # 다른 플랜 업그레이드/다운그레이드 → 기존 구독 취소 처리
+            existing_sub.status = "cancelled"
+            existing_sub.cancelled_at = now
+            existing_sub.updated_at = now
+            logger.info(
+                "기존 구독 취소: user=%s plan=%s → 새 플랜 %s 전환",
+                current_user.id, existing_sub.plan, body.plan,
+            )
 
     # LemonSqueezy Checkout API 호출
     checkout_payload = {

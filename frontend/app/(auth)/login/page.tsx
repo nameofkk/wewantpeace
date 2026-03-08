@@ -234,7 +234,7 @@ export default function LoginPage() {
     setError(null);
     try {
       const { user, isNewUser } = await signInWithToss();
-      if (!user) throw new Error("토스 로그인 실패");
+      if (!user) throw new Error(lang === "ko" ? "토스 로그인 실패" : "Toss login failed");
 
       if (isNewUser) {
         setGoogleUser(user);
@@ -259,7 +259,7 @@ export default function LoginPage() {
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setError(err.message || "토스 로그인에 실패했습니다.");
+      setError(err.message || (lang === "ko" ? "토스 로그인에 실패했습니다." : "Toss login failed."));
     } finally {
       setLoading(false);
     }

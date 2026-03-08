@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 import { useUnreadCount } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
 import { getFirebaseAuth } from "@/lib/auth";
+import { useAppStore } from "@/lib/store";
 
 function AppHeaderInner() {
   const [hidden, setHidden] = useState(false);
   const [tapped, setTapped] = useState(false);
   const lastY = useRef(0);
+  const lang = useAppStore((s) => s.lang);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   useEffect(() => {
@@ -89,7 +91,7 @@ function AppHeaderInner() {
             </span>
           </Link>
           {isLoggedIn ? (
-            <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center" aria-label={unread > 0 ? `알림 ${unread}개 읽지 않음` : "알림"}>
+            <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center" aria-label={lang === "ko" ? (unread > 0 ? `알림 ${unread}개 읽지 않음` : "알림") : (unread > 0 ? `${unread} unread notifications` : "Notifications")}>
               <Bell className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
               {unread > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">

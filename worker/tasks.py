@@ -1132,6 +1132,13 @@ def expire_subscriptions(self):
                         )
                         valid_trial = trial_result.scalar_one_or_none()
                         if valid_trial is None:
+                            # referral Pro가 아직 유효하면 skip
+                            if (
+                                hasattr(user, "referral_pro_expires_at")
+                                and user.referral_pro_expires_at
+                                and user.referral_pro_expires_at > now
+                            ):
+                                continue
                             user.plan = "free"
                             from backend.app.services.area_activation import sync_area_activation
                             await sync_area_activation(user.id, "free", db)
@@ -1158,8 +1165,35 @@ def expire_subscriptions(self):
                         await sync_area_activation(trial_user.id, "free", db)
                         trial_expired += 1
 
-                logger.info("expire_subscriptions: %d명 → free 다운그레이드, trial 만료 %d명", downgraded, trial_expired)
-                return {"status": "ok", "downgraded": downgraded, "trial_expired": trial_expired}
+                # Referral Pro 만료 처리: referral_pro_expires_at <= now
+                referral_expired = 0
+                referral_result = await db.execute(
+                    select(User).where(
+                        User.referral_pro_expires_at.isnot(None),
+                        User.referral_pro_expires_at <= now,
+                        User.plan != "free",
+                    )
+                )
+                for ruser in referral_result.scalars().all():
+                    # 유효한 유료 구독이 있으면 건드리지 않음
+                    valid_sub_result = await db.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == ruser.id,
+                            Subscription.status.in_(["active", "trial"]),
+                            Subscription.expires_at > now,
+                        ).limit(1)
+                    )
+                    if valid_sub_result.scalar_one_or_none() is None:
+                        ruser.plan = "free"
+                        from backend.app.services.area_activation import sync_area_activation
+                        await sync_area_activation(ruser.id, "free", db)
+                        referral_expired += 1
+
+                logger.info(
+                    "expire_subscriptions: %d명 → free 다운그레이드, trial 만료 %d명, referral 만료 %d명",
+                    downgraded, trial_expired, referral_expired,
+                )
+                return {"status": "ok", "downgraded": downgraded, "trial_expired": trial_expired, "referral_expired": referral_expired}
 
     try:
         return run_async(_run())

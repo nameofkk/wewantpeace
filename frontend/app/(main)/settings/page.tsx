@@ -329,14 +329,14 @@ export default function SettingsPage() {
         const detail = err.detail;
         throw new Error(
           Array.isArray(detail) ? detail.map((d: { msg: string }) => d.msg).join(", ")
-          : typeof detail === "string" ? detail : "저장에 실패했습니다."
+          : typeof detail === "string" ? detail : (lang === "ko" ? "저장에 실패했습니다." : "Failed to save.")
         );
       }
       setProfileSuccess(true);
       setShowProfileEdit(false);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setProfileError(err.message || "저장에 실패했습니다.");
+      setProfileError(err.message || (lang === "ko" ? "저장에 실패했습니다." : "Failed to save."));
     } finally {
       setProfileSaving(false);
     }
@@ -538,7 +538,7 @@ export default function SettingsPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">
-                    {(me as { nickname?: string })?.nickname || firebaseUser.displayName || "사용자"}
+                    {(me as { nickname?: string })?.nickname || firebaseUser.displayName || (lang === "ko" ? "사용자" : "User")}
                   </p>
                   <p className="text-[11px] text-muted-foreground truncate">{firebaseUser.email}</p>
                   <span className="inline-block mt-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">

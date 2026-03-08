@@ -3,12 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useAppStore } from "@/lib/store";
 
 // logo-eye.png: 585×255px (눈만 크롭, 투명 배경)
 const RATIO = 585 / 255; // ≈ 2.294
 
 export function LogoIcon({ height = 32, hideText = false }: { height?: number; hideText?: boolean }) {
   const [tapped, setTapped] = useState(false);
+  const lang = useAppStore((s) => s.lang);
   const width = Math.round(height * RATIO);
 
   const handleTap = () => {
@@ -21,7 +23,7 @@ export function LogoIcon({ height = 32, hideText = false }: { height?: number; h
     <Link
       href="/home"
       onClick={handleTap}
-      aria-label="홈으로"
+      aria-label={lang === "ko" ? "홈으로" : "Go to Home"}
       style={{
         display: "flex",
         alignItems: "center",
