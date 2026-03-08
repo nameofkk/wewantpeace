@@ -12,6 +12,19 @@ import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
 
+const NOTIF_TYPE_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
+  verified: { bg: "bg-green-500/20", text: "text-green-400", labelKo: "확인", labelEn: "Verified" },
+  spike: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "스파이크", labelEn: "Spike" },
+  daily_summary: { bg: "bg-blue-500/20", text: "text-blue-400", labelKo: "일일 요약", labelEn: "Daily" },
+  weekly_report: { bg: "bg-purple-500/20", text: "text-purple-400", labelKo: "주간", labelEn: "Weekly" },
+};
+
+const NOTIF_TYPE_FALLBACK = NOTIF_TYPE_STYLES.spike;
+
+function getNotifStyle(type: string) {
+  return NOTIF_TYPE_STYLES[type] ?? NOTIF_TYPE_FALLBACK;
+}
+
 function timeAgo(iso: string, lang: Lang): string {
   const diff = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diff / 1000);
@@ -121,18 +134,20 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     {/* 타입 뱃지 */}
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                        notif.type === "verified"
-                          ? "bg-green-500/20 text-green-400"
-                          : "bg-red-500/20 text-red-400"
-                      )}
-                    >
-                      {notif.type === "verified"
-                        ? t(lang, "notif_type_verified")
-                        : t(lang, "notif_type_spike")}
-                    </span>
+                    {(() => {
+                      const style = getNotifStyle(notif.type);
+                      return (
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                            style.bg,
+                            style.text
+                          )}
+                        >
+                          {lang === "ko" ? style.labelKo : style.labelEn}
+                        </span>
+                      );
+                    })()}
                     <span className="text-[10px] text-muted-foreground">
                       {timeAgo(notif.created_at, lang)}
                     </span>

@@ -736,6 +736,14 @@ export default function MapPage() {
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
           </div>
+          {/* 히트맵 ON 시 메트릭 안내 배너 */}
+          {showHeatmap && (
+            <div className="mt-1 rounded-lg bg-background/80 px-2.5 py-1 text-[10px] text-muted-foreground backdrop-blur-sm text-center">
+              {lang === "ko"
+                ? "히트맵: 국가별 긴장도 | 마커: 개별 이슈 KScore"
+                : "Heatmap: Country tension | Markers: Issue KScore"}
+            </div>
+          )}
         </div>
       </div>
 
