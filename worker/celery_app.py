@@ -189,6 +189,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC = KST 15:00
         "options": {"queue": "process"},
     },
+    # ── SNS 토큰 자동 갱신 ──
+    "refresh-social-tokens": {
+        "task": "worker.tasks.refresh_social_tokens",
+        "schedule": crontab(minute=0, hour=12, day_of_week=3),  # 매주 수요일 12:00 UTC = KST 21:00
+        "options": {"queue": "process"},
+    },
 }
 
 

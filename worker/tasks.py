@@ -2683,3 +2683,47 @@ def deactivate_stale_clusters(self):
     except Exception as exc:
         logger.error("deactivate_stale_clusters 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── SNS 토큰 자동 갱신 ─────────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.refresh_social_tokens",
+    queue="process",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=300,  # 5분 후 재시도
+)
+def refresh_social_tokens(self):
+    """SNS 플랫폼 토큰 자동 갱신 (주 1회).
+
+    현재 지원: Threads (60일 만료 토큰 갱신).
+    향후 확장: Instagram, LinkedIn 등.
+    """
+
+    async def _run():
+        from worker.social.token_refresh import refresh_threads_token
+
+        results = {}
+
+        # Threads 토큰 갱신
+        threads_result = await refresh_threads_token()
+        results["threads"] = threads_result
+        logger.info(
+            "Threads 토큰 갱신 결과: status=%s, detail=%s",
+            threads_result["status"],
+            threads_result["detail"],
+        )
+
+        # 향후 다른 플랫폼 토큰 갱신 추가 가능:
+        # results["instagram"] = await refresh_instagram_token()
+        # results["linkedin"] = await refresh_linkedin_token()
+
+        return results
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("refresh_social_tokens 오류: %s", exc)
+        raise self.retry(exc=exc)
