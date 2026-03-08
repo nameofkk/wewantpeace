@@ -108,6 +108,44 @@ function cleanTitle(raw: string): string {
   return t || raw;
 }
 
+/**
+ * 헤드라인을 자연스러운 지점에서 2줄로 분할.
+ * 규칙:
+ *   1. 18자 이하면 1줄 유지
+ *   2. 구분자(, · … – — ;) 중 중앙에 가장 가까운 지점에서 줄바꿈
+ *   3. 첫 줄 최소 8자, 둘째 줄 최소 4자
+ *   4. 구분자가 없으면 1줄 유지 (CSS 자동 줄바꿈에 맡김)
+ */
+function splitHeadline(text: string): string[] {
+  if (text.length <= 18) return [text];
+
+  const seps = [", ", "…", "· ", " - ", "– ", "— ", "; "];
+  const target = Math.floor(text.length * 0.55); // 첫 줄을 약간 길게
+  let bestAt = -1;
+  let bestDist = Infinity;
+
+  for (const sep of seps) {
+    let from = 0;
+    while (true) {
+      const idx = text.indexOf(sep, from);
+      if (idx === -1) break;
+      const after = idx + sep.length;
+      if (after >= 8 && after <= text.length - 4) {
+        const d = Math.abs(after - target);
+        if (d < bestDist) { bestDist = d; bestAt = after; }
+      }
+      from = idx + 1;
+    }
+  }
+
+  if (bestAt > 0) {
+    const line1 = text.slice(0, bestAt).trim().replace(/[,;·]$/, "").trim();
+    const line2 = text.slice(bestAt).trim();
+    return [line1, line2];
+  }
+  return [text];
+}
+
 interface KScorePoint {
   time: string;
   kscore: number;
@@ -190,6 +228,7 @@ export async function GET(
 
   const rawTitle = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
   const headline = cleanTitle(rawTitle);
+  const headlineLines = splitHeadline(headline);
   const titleSize = headline.length <= 10 ? 72 : headline.length <= 18 ? 60 : headline.length <= 28 ? 48 : headline.length <= 40 ? 40 : 34;
   const config = getConfig(issue.severity);
   const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
@@ -399,6 +438,7 @@ export async function GET(
               <div
                 style={{
                   display: "flex",
+                  flexDirection: "column",
                   color: "#FFFFFF",
                   fontSize: titleSize,
                   fontWeight: 900,
@@ -411,7 +451,9 @@ export async function GET(
                   overflow: "hidden",
                 }}
               >
-                {headline}
+                {headlineLines.map((line, i) => (
+                  <span key={i} style={{ display: "block" }}>{line}</span>
+                ))}
               </div>
 
               {/* 지표 행 */}
