@@ -582,35 +582,147 @@ function BriefingCard({ items, lang }: { items: TrendingItem[]; lang: Lang }) {
       : (stripTitlePrefix(raw) || topItem.keyword);
   })();
 
-  const briefing = lang === "ko"
-    ? extremeCount > 0
-      ? `극심 ${extremeCount}건 발생 중 — 1위: ${topTitle}`
-      : severeCount > 0
-      ? `심각 ${severeCount}건 · 스파이크 ${spikeCount}건 — 주목: ${topTitle}`
-      : spikeCount > 0
-      ? `스파이크 ${spikeCount}건 감지됨 — 주목: ${topTitle}`
-      : `현재 ${items.length}건 모니터링 중 — 1위: ${topTitle}`
-    : extremeCount > 0
-      ? `${extremeCount} extreme issue(s) — #1: ${topTitle}`
-      : severeCount > 0
-      ? `${severeCount} severe · ${spikeCount} spike(s) — Top: ${topTitle}`
-      : spikeCount > 0
-      ? `${spikeCount} spike(s) detected — Top: ${topTitle}`
-      : `Monitoring ${items.length} issues — #1: ${topTitle}`;
+  const topBadge = getKScoreBadge(personalizedKScore(topItem, homeCountry), lang);
 
-  const accentColor = extremeCount > 0 ? "border-l-red-900" : severeCount > 0 ? "border-l-red-500" : spikeCount > 0 ? "border-l-amber-500" : "border-l-blue-500";
+  // 날짜 M.DD 형식
+  const today = new Date();
+  const dateStr = `${today.getMonth() + 1}.${String(today.getDate()).padStart(2, "0")}`;
+
+  // 배경 그라데이션
+  const bgGradient = extremeCount > 0
+    ? "linear-gradient(135deg, rgba(127,29,29,0.20) 0%, transparent 60%)"
+    : severeCount > 0
+    ? "linear-gradient(135deg, rgba(239,68,68,0.10) 0%, transparent 60%)"
+    : "linear-gradient(135deg, rgba(30,58,138,0.10) 0%, transparent 60%)";
+
+  // ticker 데이터: 국가별 최고 severity 집계
+  const countryMap = new Map<string, { code: string; maxSeverity: number; count: number }>();
+  for (const item of items) {
+    for (const code of item.country_codes) {
+      const existing = countryMap.get(code);
+      if (existing) {
+        existing.maxSeverity = Math.max(existing.maxSeverity, item.severity ?? 0);
+        existing.count++;
+      } else {
+        countryMap.set(code, { code, maxSeverity: item.severity ?? 0, count: 1 });
+      }
+    }
+  }
+  const tickerCountries = [...countryMap.values()]
+    .sort((a, b) => b.count - a.count || b.maxSeverity - a.maxSeverity)
+    .slice(0, 10);
 
   return (
-    <div className={cn("rounded-lg border-l-4 border border-border bg-card/50 px-3 py-2.5 mb-3", accentColor)}>
-      <div className="flex items-center gap-1.5 mb-1">
-        <BarChart3 className="h-3 w-3 text-muted-foreground shrink-0" />
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          {lang === "ko" ? "오늘의 브리핑" : "Today's Briefing"}
-        </span>
+    <div
+      className="fade-in-up rounded-xl border border-border overflow-hidden mb-3 relative"
+      style={{ background: bgGradient }}
+    >
+      {/* 상단 헤더 */}
+      <div className="flex items-center justify-between px-3.5 pt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="live-dot h-2 w-2 rounded-full bg-red-500" />
+          <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">LIVE</span>
+          <BarChart3 className="h-3 w-3 text-muted-foreground ml-1" />
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            {lang === "ko" ? "오늘의 브리핑" : "Today's Briefing"}
+          </span>
+        </div>
+        <span className="text-[11px] font-medium text-muted-foreground tabular-nums">{dateStr}</span>
       </div>
-      <p className="text-[11px] leading-relaxed line-clamp-2" style={{ wordBreak: "keep-all" }}>
-        {briefing}
-      </p>
+
+      {/* 위기 현황 숫자 */}
+      <div className="flex items-center gap-3 px-3.5 mt-2.5">
+        {extremeCount > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-black tabular-nums text-red-700 dark:text-red-300">{extremeCount}</span>
+            <span className="text-[10px] font-bold text-red-600/80 dark:text-red-400/80">
+              {lang === "ko" ? "극심" : "Extreme"}
+            </span>
+          </div>
+        )}
+        {severeCount > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-black tabular-nums text-red-500 dark:text-red-400">{severeCount}</span>
+            <span className="text-[10px] font-bold text-red-500/70 dark:text-red-400/70">
+              {lang === "ko" ? "심각" : "Severe"}
+            </span>
+          </div>
+        )}
+        {spikeCount > 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-black tabular-nums text-amber-500">{spikeCount}</span>
+            <span className="text-[10px] font-bold text-amber-500/70">
+              {lang === "ko" ? "스파이크" : "Spike"}
+            </span>
+          </div>
+        )}
+        {extremeCount === 0 && severeCount === 0 && spikeCount === 0 && (
+          <div className="flex items-center gap-1">
+            <span className="text-xl font-black tabular-nums text-emerald-500">{items.length}</span>
+            <span className="text-[10px] font-bold text-emerald-500/70">
+              {lang === "ko" ? "모니터링" : "Monitoring"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* 1위 이슈 */}
+      <div className="px-3.5 mt-2.5 pb-2.5">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className={cn("inline-flex items-center h-4 rounded-full px-1.5 text-[9px] font-bold leading-none", topBadge.bg, topBadge.text)}>
+            #1
+          </span>
+          {topItem.country_codes.length > 0 && (
+            <span className="text-[11px]">
+              {topItem.country_codes.map((code: string) => getFlag(code)).join(" ")}
+            </span>
+          )}
+        </div>
+        <p className="text-[13px] font-semibold leading-snug line-clamp-2" style={{ wordBreak: "keep-all" }}>
+          {topTitle}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className={cn("text-[10px] font-bold tabular-nums", topBadge.text)}>
+            KScore {roundKScore(personalizedKScore(topItem, homeCountry)).toFixed(1)}
+          </span>
+          {topItem.is_spike && (
+            <span className="text-[9px] font-bold text-amber-500">SPIKE</span>
+          )}
+        </div>
+      </div>
+
+      {/* 하단 ticker */}
+      {tickerCountries.length > 0 && (
+        <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
+          <div className="ticker-track">
+            {[0, 1].map((rep) => (
+              <span key={rep} className="inline-flex items-center gap-4 px-3">
+                {tickerCountries.map((c) => (
+                  <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                    <span>{getFlag(c.code)}</span>
+                    <span className="font-medium text-muted-foreground">{c.code}</span>
+                    <span className={cn(
+                      "font-bold",
+                      c.maxSeverity >= 80 ? "text-red-700 dark:text-red-300" :
+                      c.maxSeverity >= 60 ? "text-red-500 dark:text-red-400" :
+                      c.maxSeverity >= 40 ? "text-orange-500" :
+                      "text-muted-foreground"
+                    )}>
+                      {c.maxSeverity}
+                    </span>
+                    <span className={cn(
+                      "text-[9px]",
+                      c.maxSeverity >= 60 ? "text-red-400" : "text-muted-foreground/50"
+                    )}>
+                      {c.maxSeverity >= 60 ? "▲" : "▼"}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
