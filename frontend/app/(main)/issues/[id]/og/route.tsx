@@ -324,7 +324,7 @@ export async function GET(
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700, fontFamily: displayFont }}>
                 {lang === "en" ? "Real-time Global Conflict Monitor" : "실시간 글로벌 분쟁 모니터링"}
               </span>
               <div
@@ -416,7 +416,7 @@ export async function GET(
 
               {/* 지표 행 */}
               <div style={{ display: "flex", alignItems: "center", gap: "28px", marginTop: "24px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                   <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.severity}
                   </span>
@@ -425,7 +425,7 @@ export async function GET(
                   </span>
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                   <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     K{kscore.toFixed(1)}
                   </span>
@@ -434,7 +434,7 @@ export async function GET(
                   </span>
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                   <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.event_count}
                   </span>
