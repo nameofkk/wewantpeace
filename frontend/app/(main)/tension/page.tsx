@@ -709,62 +709,36 @@ export default function TensionPage() {
         </div>
       </div>
 
-      {/* ── 일간 변동 / 긴장도 Ticker ────────────────────────────── */}
+      {/* ── 일간 변동 Ticker (전일 대비만 표시) ─────────────────── */}
       {(() => {
         if (!tensions || tensions.length === 0) return null;
         const deltaItems = tensions
           .filter((t) => t.delta_24h != null && t.delta_24h !== 0)
-          .sort((a, b) => Math.abs(b.delta_24h ?? 0) - Math.abs(a.delta_24h ?? 0));
-        // delta_24h가 있으면 일간 변동 모드, 없으면 raw_score 기반 국가별 긴장도 모드
-        const useDelta = deltaItems.length >= 1;
-        const tickerItems = useDelta
-          ? deltaItems.slice(0, 20)
-          : [...tensions].sort((a, b) => b.raw_score - a.raw_score).slice(0, 20);
-        if (tickerItems.length < 1) return null;
+          .sort((a, b) => Math.abs(b.delta_24h ?? 0) - Math.abs(a.delta_24h ?? 0))
+          .slice(0, 20);
+        if (deltaItems.length < 1) return null;
+        // 국가 수가 적을 때 무한 롤링을 위해 최소 4회 반복
+        const reps = deltaItems.length <= 5 ? 6 : deltaItems.length <= 10 ? 4 : 2;
         return (
           <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5">
             <div className="ticker-track-fast">
-              {[0, 1].map((rep) => (
+              {Array.from({ length: reps }, (_, rep) => (
                 <span key={rep} className="inline-flex items-center gap-4 px-3">
                   <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                    {useDelta
-                      ? (lang === "ko" ? "📊 일간 변동" : "📊 Daily Changes")
-                      : (lang === "ko" ? "📊 긴장도 현황" : "📊 Tension Levels")}
+                    {lang === "ko" ? "📊 일간 변동" : "📊 Daily Changes"}
                   </span>
-                  {tickerItems.map((item) => {
-                    if (useDelta) {
-                      const delta = item.delta_24h ?? 0;
-                      const isUp = delta > 0;
-                      return (
-                        <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                          <span>{getFlag(item.country_code)}</span>
-                          <span className="font-medium text-muted-foreground">{item.country_code}</span>
-                          <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
-                            {isUp ? "+" : ""}{delta.toFixed(1)}
-                          </span>
-                          <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
-                            {isUp ? "▲" : "▼"}
-                          </span>
-                        </span>
-                      );
-                    }
+                  {deltaItems.map((item) => {
+                    const delta = item.delta_24h ?? 0;
+                    const isUp = delta > 0;
                     return (
                       <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
                         <span>{getFlag(item.country_code)}</span>
                         <span className="font-medium text-muted-foreground">{item.country_code}</span>
-                        <span className={cn(
-                          "font-bold",
-                          item.raw_score >= 60 ? "text-red-400" :
-                          item.raw_score >= 40 ? "text-red-400" :
-                          "text-emerald-400"
-                        )}>
-                          {item.raw_score.toFixed(0)}
+                        <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
+                          {isUp ? "+" : ""}{delta.toFixed(1)}
                         </span>
-                        <span className={cn(
-                          "text-[9px]",
-                          item.raw_score >= 40 ? "text-red-400" : "text-emerald-400"
-                        )}>
-                          {item.raw_score >= 40 ? "▲" : "▼"}
+                        <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
+                          {isUp ? "▲" : "▼"}
                         </span>
                       </span>
                     );

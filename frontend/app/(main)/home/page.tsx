@@ -636,36 +636,39 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
       </div>
 
       {/* 하단 ticker — 전체 이슈 국가별 severity */}
-      {tickerCountries.length > 0 && (
-        <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
-          <div className="ticker-track-fast">
-            {[0, 1].map((rep) => (
-              <span key={rep} className="inline-flex items-center gap-4 px-3">
-                {tickerCountries.map((c) => (
-                  <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                    <span>{getFlag(c.code)}</span>
-                    <span className="font-medium text-muted-foreground">{c.code}</span>
-                    <span className={cn(
-                      "font-bold",
-                      c.maxSeverity >= 60 ? "text-red-400" :
-                      c.maxSeverity >= 40 ? "text-red-400" :
-                      "text-emerald-400"
-                    )}>
-                      {c.maxSeverity}
+      {tickerCountries.length > 0 && (() => {
+        const reps = tickerCountries.length <= 5 ? 6 : tickerCountries.length <= 10 ? 4 : 2;
+        return (
+          <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
+            <div className="ticker-track-fast">
+              {Array.from({ length: reps }, (_, rep) => (
+                <span key={rep} className="inline-flex items-center gap-4 px-3">
+                  {tickerCountries.map((c) => (
+                    <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                      <span>{getFlag(c.code)}</span>
+                      <span className="font-medium text-muted-foreground">{c.code}</span>
+                      <span className={cn(
+                        "font-bold",
+                        c.maxSeverity >= 60 ? "text-red-400" :
+                        c.maxSeverity >= 40 ? "text-red-400" :
+                        "text-emerald-400"
+                      )}>
+                        {c.maxSeverity}
+                      </span>
+                      <span className={cn(
+                        "text-[9px]",
+                        c.maxSeverity >= 40 ? "text-red-400" : "text-emerald-400"
+                      )}>
+                        {c.maxSeverity >= 40 ? "▲" : "▼"}
+                      </span>
                     </span>
-                    <span className={cn(
-                      "text-[9px]",
-                      c.maxSeverity >= 40 ? "text-red-400" : "text-emerald-400"
-                    )}>
-                      {c.maxSeverity >= 40 ? "▲" : "▼"}
-                    </span>
-                  </span>
-                ))}
-              </span>
-            ))}
+                  ))}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
