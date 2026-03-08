@@ -280,27 +280,52 @@ def collect_usgs(self):
     default_retry_delay=300,
 )
 def collect_travel_advisory(self):
-    """US State Dept Travel Advisory 수집 (6시간마다, Level 2+)."""
+    """Travel Advisory 수집 (6시간마다) - US → Korea → UK 순차 실행."""
 
     async def _run():
-        from worker.collector.travel_advisory import TravelAdvisoryCollector
+        from worker.collector.travel_advisory import (
+            TravelAdvisoryCollector,
+            KoreaTravelAdvisoryCollector,
+            UKTravelAdvisoryCollector,
+        )
+
+        all_results = []
         async with AsyncSessionLocal() as db:
-            collector = TravelAdvisoryCollector()
-            results = await collector.collect_all(db)
-            total = sum(r.collected for r in results)
+            # 1) US State Dept
+            us_collector = TravelAdvisoryCollector()
+            us_results = await us_collector.collect_all(db)
+            all_results.extend(us_results)
+
+            # 2) Korea MOFA (API 키 없으면 내부에서 skip)
+            kr_collector = KoreaTravelAdvisoryCollector()
+            kr_results = await kr_collector.collect_all(db)
+            all_results.extend(kr_results)
+
+            # 3) UK FCDO (인증 불요)
+            uk_collector = UKTravelAdvisoryCollector()
+            uk_results = await uk_collector.collect_all(db)
+            all_results.extend(uk_results)
+
+            total = sum(r.collected for r in all_results)
             if total > 0:
                 await db.flush()
                 all_ids = []
-                for r in results:
+                for r in all_results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
                 await db.commit()
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
+                # 소스별 통계 로깅
+                for r in all_results:
+                    logger.info(
+                        "%s 수집: collected=%d, skipped=%d, errors=%s",
+                        r.display_name, r.collected, r.skipped, r.errors,
+                    )
                 logger.info("Travel Advisory 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
-                logger.info("Travel Advisory 수집 완료: 새 이벤트 없음")
+                logger.info("Travel Advisory 수집 완료: 새 이벤트 없음 (US/Korea/UK)")
             return {"total_collected": total}
 
     try:
