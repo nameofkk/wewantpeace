@@ -330,6 +330,7 @@ async def calculate_country_tension(
     country_code: str,
     db: AsyncSession,
     baseline: float = 0.0,
+    convergence_bonus: float = 0.0,
 ) -> Optional[dict]:
     """
     단일 국가의 긴장도 계산.
@@ -337,6 +338,7 @@ async def calculate_country_tension(
 
     baseline: 글로벌 롤링 베이스라인 (전체 국가 raw total 중앙값의 7일 이동평균).
               0이면 정규화 미적용 (워밍업 기간).
+    convergence_bonus: 다중 토픽 수렴 보너스 (convergence_detector에서 산출).
 
     윈도우 전략:
     - 1차: 최근 48시간 클러스터 (충분한 데이터 확보, 지속 분쟁국 대응)
@@ -411,6 +413,14 @@ async def calculate_country_tension(
         2,
     )
 
+    # ── Convergence bonus: 다중 토픽 수렴 보너스 적용 ──
+    if convergence_bonus > 0:
+        raw_score = min(100.0, raw_score + convergence_bonus)
+        logger.debug(
+            "convergence bonus: %s +%.1f → raw=%.1f",
+            country_code, convergence_bonus, raw_score,
+        )
+
     # percentile은 clean raw_score로 계산 (floor 적용 전!)
     percentile = await _get_percentile_30d(country_code, raw_score, db)
 
@@ -465,6 +475,16 @@ async def calculate_country_tension(
     prev_24h_row = prev_24h_result.first()
     delta_24h = round(raw_score - prev_24h_row[0], 1) if prev_24h_row else None
 
+    # ── Anomaly detection (Welford baseline) ──
+    anomaly_z = None
+    try:
+        from backend.app.core.redis import get_redis
+        from worker.processor.anomaly_detector import update_baseline_and_detect
+        redis = get_redis()
+        anomaly_z = await update_baseline_and_detect(redis, country_code, raw_score)
+    except Exception as e:
+        logger.warning("Anomaly detection 실패 (%s): %s", country_code, e)
+
     # TOP5 원인 이슈
     top5 = sorted(current_clusters, key=lambda c: c.severity * c.confidence, reverse=True)[:5]
 
@@ -488,6 +508,8 @@ async def calculate_country_tension(
         "event_score": round(event_score, 2),
         "accel_score": round(accel_score, 2),
         "spillover_score": round(spillover, 2),
+        "convergence_bonus": round(convergence_bonus, 2),
+        "anomaly_z": round(anomaly_z, 2) if anomaly_z is not None else None,
         "delta_24h": delta_24h,
         "top5_clusters": [
             {
@@ -642,10 +664,26 @@ async def calculate_all_tensions(db: AsyncSession) -> list[dict]:
     # 1단계: 글로벌 베이스라인 산출
     baseline = await _get_rolling_baseline(db)
 
+    # 1.5단계: 다중 토픽 수렴 탐지 (1회 쿼리 → 전체 국가 보너스 맵)
+    from worker.processor.convergence_detector import detect_convergence
+    try:
+        convergence_bonuses = await detect_convergence(db)
+    except Exception as e:
+        logger.warning("Convergence detection 실패 (무시): %s", e)
+        convergence_bonuses = {}
+
+    if convergence_bonuses:
+        logger.info(
+            "Convergence bonuses: %d개국 %s",
+            len(convergence_bonuses),
+            {k: f"+{v:.1f}" for k, v in convergence_bonuses.items()},
+        )
+
     # 2단계: 타겟 국가별 긴장도 계산
     results = []
     for code in targets:
-        result = await calculate_country_tension(code, db, baseline)
+        bonus = convergence_bonuses.get(code, 0.0)
+        result = await calculate_country_tension(code, db, baseline, bonus)
         if result:
             results.append(result)
     logger.info(

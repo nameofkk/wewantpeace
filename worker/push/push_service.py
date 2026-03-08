@@ -51,6 +51,10 @@ COOLDOWN_SECONDS = 3600  # 1시간 (기본)
 COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
 _COOLDOWN_KEY_PREFIX = "push:cooldown:"
 
+# ── Spike Push Count: FREE 유저 spike 알림 횟수 추적 (Pro 전환 프롬프트) ──
+_SPIKE_PUSH_COUNT_PREFIX = "spike_push_count:"
+_SPIKE_PUSH_COUNT_TTL = 30 * 86400  # 30일
+
 # T12: 일일 푸시 상한
 DAILY_PUSH_LIMITS = {
     "free": 3,
@@ -106,14 +110,23 @@ def _is_in_quiet_hours(current: dt_time, start: dt_time, end: dt_time) -> bool:
         return current >= start or current <= end
 
 
-# ── 토큰 타입 (플랫폼 + user_id 포함) ──
+# ── 토큰 타입 (플랫폼 + user_id + 개인화 정보 포함) ──
 class _TokenInfo:
-    __slots__ = ("fcm_token", "platform", "user_id")
+    __slots__ = ("fcm_token", "platform", "user_id", "home_country", "language")
 
-    def __init__(self, fcm_token: str, platform: str, user_id: _uuid.UUID):
+    def __init__(
+        self,
+        fcm_token: str,
+        platform: str,
+        user_id: _uuid.UUID,
+        home_country: str = "KR",
+        language: str = "ko",
+    ):
         self.fcm_token = fcm_token
         self.platform = platform  # "web" | "android" | "ios"
         self.user_id = user_id
+        self.home_country = home_country
+        self.language = language
 
 
 # ── 억제된 사용자 정보 ──
@@ -178,6 +191,8 @@ async def _get_target_tokens_by_platform(
             UserPreference.quiet_hours_start,
             UserPreference.quiet_hours_end,
             UserPreference.timezone,
+            UserPreference.home_country,
+            UserPreference.language,
         )
         .join(UserArea, UserArea.user_id == UserPushToken.user_id)
         .join(UserPreference, UserPreference.user_id == UserPushToken.user_id)
@@ -188,9 +203,9 @@ async def _get_target_tokens_by_platform(
     now_utc = datetime.now(timezone.utc)
 
     # 1차: 유저별로 모든 토큰 수집 + 필터링 사유 판별
-    # user_id -> list of (fcm_token, platform, last_seen_at, suppression_reason|None)
+    # user_id -> list of (fcm_token, platform, last_seen_at, suppression_reason|None, home_country, language)
     user_rows: dict[_uuid.UUID, list[tuple]] = defaultdict(list)
-    for user_id, fcm_token, platform, last_seen_at, topics, qh_start, qh_end, tz_name in rows:
+    for user_id, fcm_token, platform, last_seen_at, topics, qh_start, qh_end, tz_name, home_country, language in rows:
         suppression_reason = None
 
         # topics 필터: cluster_topic이 사용자가 구독한 topic 목록에 없으면 스킵
@@ -208,7 +223,7 @@ async def _get_target_tokens_by_platform(
             except (ZoneInfoNotFoundError, Exception):
                 pass  # timezone 파싱 실패 시 조용한 시간 무시
 
-        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason))
+        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason, home_country or "KR", language or "ko"))
 
     # 2차: 유저당 last_seen_at 최신 1개 토큰만 선택 (PRD 8.5)
     tokens: list[_TokenInfo] = []
@@ -218,7 +233,7 @@ async def _get_target_tokens_by_platform(
         # 억제 사유가 있는 토큰이 하나라도 있으면 유저 전체 억제
         # (같은 유저의 모든 토큰은 동일한 suppression_reason을 가짐)
         first_suppression = None
-        for _, _, _, reason in token_list:
+        for _, _, _, reason, _, _ in token_list:
             if reason is not None:
                 first_suppression = reason
                 break
@@ -241,7 +256,7 @@ async def _get_target_tokens_by_platform(
             reverse=True,
         )
         best = sorted_by_seen[0]
-        tokens.append(_TokenInfo(best[0], best[1], user_id))
+        tokens.append(_TokenInfo(best[0], best[1], user_id, home_country=best[4], language=best[5]))
 
     return _TargetResult(tokens, suppressed)
 
@@ -312,6 +327,112 @@ async def _get_plan_locked_users(
         _SuppressedInfo(row.id, row.platform or "web", "plan_locked")
         for row in result.fetchall()
     ]
+
+
+# ── "Why this matters" 컨텍스트 생성 ─────────────────────────────────────────
+
+# 국가명 (컨텍스트 표시용, 짧은 이름)
+_HOME_COUNTRY_NAMES_KO: dict[str, str] = {
+    "KR": "한국", "US": "미국", "JP": "일본", "CN": "중국", "TW": "대만",
+    "DE": "독일", "GB": "영국", "AU": "호주", "IN": "인도", "BR": "브라질",
+}
+_HOME_COUNTRY_NAMES_EN: dict[str, str] = {
+    "KR": "Korea", "US": "US", "JP": "Japan", "CN": "China", "TW": "Taiwan",
+    "DE": "Germany", "GB": "UK", "AU": "Australia", "IN": "India", "BR": "Brazil",
+}
+
+# 관계 설명 템플릿 (geo/sec/eco 최대 요인 기반)
+# (factor_key, min_threshold) -> (ko_template, en_template)
+# 50자 이내를 목표로 함
+_RELATION_TEMPLATES_KO: dict[str, list[tuple[float, str]]] = {
+    "geo": [
+        (0.9, "직접 안보 위협 — 최고 경계"),
+        (0.7, "인접국 긴장 — 주시 필요"),
+        (0.4, "주변국 동향 — 영향 가능"),
+    ],
+    "sec": [
+        (0.9, "핵심 안보 이해관계 — 경계"),
+        (0.7, "안보 동맹/관련국 — 주시 필요"),
+        (0.4, "안보 연관 — 동향 주시"),
+    ],
+    "eco": [
+        (0.9, "핵심 경제 파트너 — 직접 영향"),
+        (0.7, "주요 교역국 — 경제 영향 가능"),
+        (0.4, "경제 연관 — 간접 영향 가능"),
+    ],
+}
+
+_RELATION_TEMPLATES_EN: dict[str, list[tuple[float, str]]] = {
+    "geo": [
+        (0.9, "Direct threat — highest alert"),
+        (0.7, "Neighboring tension — monitor"),
+        (0.4, "Regional development — watch"),
+    ],
+    "sec": [
+        (0.9, "Core security interest — alert"),
+        (0.7, "Security ally/partner — monitor"),
+        (0.4, "Security link — watch"),
+    ],
+    "eco": [
+        (0.9, "Key economic partner — direct impact"),
+        (0.7, "Major trade partner — potential impact"),
+        (0.4, "Economic link — indirect impact"),
+    ],
+}
+
+
+def generate_spike_context(
+    home_country: str,
+    event_country: str,
+    topic: str,
+    lang: str = "ko",
+) -> str:
+    """
+    사용자 기준국과 이벤트 발생국의 관계를 1줄로 설명.
+    IMPACT_FACTORS와 TOPIC_IMPACT_WEIGHTS를 기반으로 가장 두드러진 요인을 선택.
+    50자 이내 목표.
+
+    Returns: "한국: 직접 안보 위협 — 최고 경계" 형태의 문자열
+    """
+    from worker.processor.calibration import IMPACT_FACTORS, TOPIC_IMPACT_WEIGHTS
+
+    factors = IMPACT_FACTORS.get(home_country, {}).get(event_country)
+    if not factors:
+        # 등록되지 않은 국가쌍: 글로벌 폴백
+        if lang == "ko":
+            return "글로벌 긴장도 상승 — 주시 필요"
+        return "Global tension rising — monitor"
+
+    # TOPIC_IMPACT_WEIGHTS로 가중 점수 계산, 가장 높은 요인 선택
+    weights = TOPIC_IMPACT_WEIGHTS.get(topic, TOPIC_IMPACT_WEIGHTS["unknown"])
+    weighted = {
+        k: factors[k] * weights[k]
+        for k in ("geo", "sec", "eco")
+    }
+    # 가중 점수가 가장 높은 요인 선택
+    dominant_key = max(weighted, key=weighted.get)  # type: ignore[arg-type]
+    dominant_val = factors[dominant_key]
+
+    templates = _RELATION_TEMPLATES_KO if lang == "ko" else _RELATION_TEMPLATES_EN
+    country_names = _HOME_COUNTRY_NAMES_KO if lang == "ko" else _HOME_COUNTRY_NAMES_EN
+
+    home_label = country_names.get(home_country, home_country)
+
+    # 임계값 내림차순으로 매칭
+    desc = None
+    for threshold, tmpl in templates[dominant_key]:
+        if dominant_val >= threshold:
+            desc = tmpl
+            break
+
+    if not desc:
+        # 모든 요인이 낮은 경우 (< 0.4)
+        if lang == "ko":
+            desc = "글로벌 동향 — 참고"
+        else:
+            desc = "Global development — FYI"
+
+    return f"{home_label}: {desc}"
 
 
 FCM_BATCH_SIZE = 500  # FCM MulticastMessage 최대 토큰 수
@@ -518,6 +639,61 @@ def _split_and_send(
     return sent_web + sent_native, invalid_web + invalid_native, all_failures
 
 
+def _split_and_send_with_context(
+    token_infos: list[_TokenInfo],
+    title: str,
+    base_body: str,
+    data: dict,
+    event_country: Optional[str],
+    topic: Optional[str],
+    severity: int = 0,
+    collapse_key: Optional[str] = None,
+) -> tuple[int, list[str], dict[str, str]]:
+    """
+    토큰을 (home_country, language)별로 그룹화하여 개인화된 컨텍스트를 body에 추가 발송.
+    각 그룹마다 generate_spike_context()로 "why this matters" 1줄 생성.
+    Returns: (성공 수, 무효 토큰 리스트, 토큰별 failure_reason)
+    """
+    if not token_infos:
+        return 0, [], {}
+
+    # (home_country, language)별로 토큰 그룹화
+    groups: dict[tuple[str, str], list[_TokenInfo]] = defaultdict(list)
+    for ti in token_infos:
+        groups[(ti.home_country, ti.language)].append(ti)
+
+    total_sent = 0
+    all_invalid: list[str] = []
+    all_failures: dict[str, str] = {}
+
+    for (home_country, lang), group_tokens in groups.items():
+        # 컨텍스트 생성
+        if event_country:
+            context = generate_spike_context(home_country, event_country, topic or "unknown", lang)
+        else:
+            context = "글로벌 긴장도 상승 — 주시 필요" if lang == "ko" else "Global tension rising — monitor"
+
+        # body에 컨텍스트 추가 (줄바꿈 구분)
+        personalized_body = f"{base_body}\n{context}"
+
+        # data에도 context 추가 (웹 SW에서 활용 가능)
+        personalized_data = {**data, "context": context}
+
+        sent, invalid, failures = _split_and_send(
+            token_infos=group_tokens,
+            title=title,
+            body=personalized_body,
+            data=personalized_data,
+            severity=severity,
+            collapse_key=collapse_key,
+        )
+        total_sent += sent
+        all_invalid.extend(invalid)
+        all_failures.update(failures)
+
+    return total_sent, all_invalid, all_failures
+
+
 async def cleanup_invalid_tokens(invalid_tokens: list[str], db: AsyncSession):
     """무효/만료 FCM 토큰을 status='expired'로 소프트 삭제."""
     if not invalid_tokens:
@@ -664,6 +840,46 @@ async def _process_delivery_results(
     await _update_logs_failed(failed_ids, db)
 
 
+# ── Spike Push Count 추적 (Pro 전환 프롬프트용) ────────────────────────────
+
+
+async def _increment_spike_push_counts(
+    target_verified: _TargetResult,
+    target_fast: _TargetResult,
+    db: AsyncSession,
+    redis,
+):
+    """
+    Spike 알림이 실제 발송된 FREE 유저의 spike_push_count를 Redis에서 증가.
+    Verified + Fast 레인 모두의 발송 대상 유저에서 FREE 유저만 카운트.
+    """
+    # 발송 대상 유저 ID 수집 (중복 제거)
+    sent_user_ids = set()
+    for ti in target_verified.tokens:
+        sent_user_ids.add(ti.user_id)
+    for ti in target_fast.tokens:
+        sent_user_ids.add(ti.user_id)
+
+    if not sent_user_ids:
+        return
+
+    # FREE 유저만 필터
+    user_ids_list = list(sent_user_ids)
+    plan_result = await db.execute(
+        select(User.id, User.plan).where(User.id.in_(user_ids_list))
+    )
+    free_user_ids = [row[0] for row in plan_result.fetchall() if row[1] == "free"]
+
+    for uid in free_user_ids:
+        key = f"{_SPIKE_PUSH_COUNT_PREFIX}{uid}"
+        try:
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, _SPIKE_PUSH_COUNT_TTL)
+        except Exception:
+            logger.debug("spike_push_count incr 실패: user_id=%s", uid)
+
+
 # ── 메인 발송 함수 ──────────────────────────────────────────────────────
 
 
@@ -715,12 +931,14 @@ async def send_spike_alert(
             target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
         )
 
-        # 3. FCM 발송
-        sent_verified, invalid_v, failures_v = _split_and_send(
+        # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
+        sent_verified, invalid_v, failures_v = _split_and_send_with_context(
             token_infos=target_v.tokens,
             title=f"⚠️ {cluster_title}",
-            body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
+            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
             data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+            event_country=country_code,
+            topic=cluster_topic,
             severity=severity,
             collapse_key=collapse_key,
         )
@@ -752,12 +970,14 @@ async def send_spike_alert(
         target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
     )
 
-    # 3. FCM 발송
-    sent_fast, invalid_f, failures_f = _split_and_send(
+    # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
+    sent_fast, invalid_f, failures_f = _split_and_send_with_context(
         token_infos=target_f.tokens,
         title=f"🚨 {cluster_title}",
-        body=f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림",
+        base_body=f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림",
         data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
+        event_country=country_code,
+        topic=cluster_topic,
         severity=severity,
         collapse_key=collapse_key,
     )
@@ -773,6 +993,13 @@ async def send_spike_alert(
     await cleanup_invalid_tokens(all_invalid, db)
 
     await _set_cooldown(cluster_id, redis, severity=severity)
+
+    # ── FREE 유저 spike push 카운트 추적 (Pro 전환 프롬프트용) ──
+    try:
+        target_v_for_count = target_v if is_verified else _TargetResult([], [])
+        await _increment_spike_push_counts(target_v_for_count, target_f, db, redis)
+    except Exception:
+        logger.debug("spike_push_count 추적 실패 (무시)")
 
     return {
         "status": "sent",
@@ -825,12 +1052,14 @@ async def send_verified_alert(
         target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
     )
 
-    # 3. FCM 발송
-    sent_verified, invalid_v, failures_v = _split_and_send(
+    # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
+    sent_verified, invalid_v, failures_v = _split_and_send_with_context(
         token_infos=target_v.tokens,
         title=f"⚠️ {cluster_title}",
-        body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
+        base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
         data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+        event_country=country_code,
+        topic=cluster_topic,
         severity=severity,
         collapse_key=collapse_key,
     )
@@ -858,10 +1087,12 @@ async def save_in_app_notifications(
     country_code: Optional[str],
     notif_type: str,
     db: AsyncSession,
+    cluster_topic: Optional[str] = None,
 ) -> int:
     """
     해당 국가 관심지역 사용자에게 인앱 Notification 레코드 배치 INSERT.
     notif_type: "verified" | "spike"
+    cluster_topic: 이벤트 토픽 (컨텍스트 생성용)
     Returns: 생성된 알림 수
     """
     if not country_code:
@@ -890,7 +1121,7 @@ async def save_in_app_notifications(
             UserArea.notify_verified == True,
         )
         title = f"⚠️ {cluster_title}"
-        body = "공식 확인된 이슈입니다 / Verified issue"
+        base_body = "공식 확인된 이슈입니다 / Verified issue"
     else:
         area_filter = (
             UserArea.country_code == country_code,
@@ -898,29 +1129,45 @@ async def save_in_app_notifications(
             UserArea.notify_fast == True,
         )
         title = f"🚨 {cluster_title}"
-        body = "속보 알림 / Breaking alert"
+        base_body = "속보 알림 / Breaking alert"
 
-    # 대상 사용자 user_id 수집 (중복 제거)
+    # 대상 사용자 user_id + home_country + language 수집 (중복 제거)
     result = await db.execute(
-        select(UserArea.user_id)
+        select(
+            UserArea.user_id,
+            UserPreference.home_country,
+            UserPreference.language,
+        )
+        .join(UserPreference, UserPreference.user_id == UserArea.user_id)
         .where(*area_filter)
-        .distinct()
+        .distinct(UserArea.user_id)
     )
-    user_ids = [row[0] for row in result.fetchall()]
+    rows = result.fetchall()
 
-    if not user_ids:
+    if not rows:
         return 0
 
-    notifications = [
-        Notification(
-            user_id=uid,
-            type=notif_type,
-            cluster_id=cluster_uuid,
-            title=title,
-            body=body,
+    notifications = []
+    for uid, home_country, language in rows:
+        # 유저별 개인화된 컨텍스트 생성
+        context = generate_spike_context(
+            home_country=home_country or "KR",
+            event_country=country_code,
+            topic=cluster_topic or "unknown",
+            lang=language or "ko",
         )
-        for uid in user_ids
-    ]
+        body = f"{base_body}\n{context}"
+
+        notifications.append(
+            Notification(
+                user_id=uid,
+                type=notif_type,
+                cluster_id=cluster_uuid,
+                title=title,
+                body=body,
+            )
+        )
+
     db.add_all(notifications)
     await db.flush()
 

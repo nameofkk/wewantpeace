@@ -750,6 +750,29 @@ async def mark_missed_spike_shown(
     return {"status": "ok"}
 
 
+# ── /me/upgrade-prompt ────────────────────────────────────────────────────────
+
+@router.get("/upgrade-prompt")
+async def check_upgrade_prompt(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Spike 알림 3회 이상 받은 FREE 유저에게 Pro 업그레이드 프롬프트 표시 여부 반환.
+    Redis key: spike_push_count:{user_id} (30일 TTL, worker push_service에서 증가)
+    """
+    if current_user.plan != "free":
+        return {"show": False, "spike_count": 0}
+
+    try:
+        from backend.app.core.redis import get_redis
+        redis = get_redis()
+        count = await redis.get(f"spike_push_count:{current_user.id}")
+        spike_count = int(count or 0)
+        return {"show": spike_count >= 3, "spike_count": spike_count}
+    except Exception:
+        return {"show": False, "spike_count": 0}
+
+
 # ── /me/referral ─────────────────────────────────────────────────────────────
 
 import secrets

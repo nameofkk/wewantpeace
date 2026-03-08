@@ -48,7 +48,7 @@ app.conf.beat_schedule = {
     },
     "collect-acled": {
         "task": "worker.tasks.collect_acled",
-        "schedule": crontab(minute=30, hour=6, day_of_week=1),  # 매주 월요일 06:30 UTC
+        "schedule": crontab(minute=30, hour=6),  # 매일 06:30 UTC
         "options": {"queue": "collect"},
     },
     "collect-reliefweb": {
@@ -59,6 +59,11 @@ app.conf.beat_schedule = {
     "collect-usgs": {
         "task": "worker.tasks.collect_usgs",
         "schedule": crontab(minute="*/5"),  # 5분마다 (M5.0+ 지진)
+        "options": {"queue": "collect"},
+    },
+    "collect-travel-advisory": {
+        "task": "worker.tasks.collect_travel_advisory",
+        "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
         "options": {"queue": "collect"},
     },
     "calc-tension": {

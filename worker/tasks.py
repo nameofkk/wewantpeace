@@ -273,6 +273,44 @@ def collect_usgs(self):
 
 
 @app.task(
+    name="worker.tasks.collect_travel_advisory",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+def collect_travel_advisory(self):
+    """US State Dept Travel Advisory 수집 (6시간마다, Level 2+)."""
+
+    async def _run():
+        from worker.collector.travel_advisory import TravelAdvisoryCollector
+        async with AsyncSessionLocal() as db:
+            collector = TravelAdvisoryCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("Travel Advisory 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("Travel Advisory 수집 완료: 새 이벤트 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("Travel Advisory 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
     bind=True,
@@ -819,6 +857,7 @@ def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
                     country_code=cluster.country_code,
                     notif_type="spike",
                     db=db,
+                    cluster_topic=cluster.topic,
                 )
 
                 logger.info("push_spike_alert 완료: %s", result)
@@ -876,6 +915,7 @@ def push_verified_alert(self, cluster_id: str):
                     country_code=cluster.country_code,
                     notif_type="verified",
                     db=db,
+                    cluster_topic=cluster.topic,
                 )
 
                 logger.info("push_verified_alert 완료: %s", result)
