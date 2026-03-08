@@ -93,7 +93,7 @@ async def create_checkout(
                     },
                 },
                 "product_options": {
-                    "redirect_url": "https://wewantpeace.app/subscription/success",
+                    "redirect_url": "https://www.wewantpeace.live/upgrade/success",
                 },
             },
             "relationships": {
