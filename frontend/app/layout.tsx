@@ -85,6 +85,147 @@ export default function RootLayout({
             document.documentElement.dataset.lang = l;
           } catch(e) {}
         ` }} />
+        {/* SEO: JSON-LD Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": "https://www.wewantpeace.live/#organization",
+                  "name": "WeWantPeace",
+                  "url": "https://www.wewantpeace.live",
+                  "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://www.wewantpeace.live/logo-eye.png",
+                    "width": 184,
+                    "height": 80,
+                  },
+                  "description":
+                    "Real-time global conflict and security monitoring platform covering 195 countries with AI-powered analysis.",
+                  "sameAs": [
+                    "https://x.com/wewantpeace_",
+                    "https://www.threads.net/@wewantpeace.live",
+                    "https://www.instagram.com/wewantpeace.live",
+                  ],
+                  "foundingDate": "2025",
+                  "knowsAbout": [
+                    "Global conflict monitoring",
+                    "Geopolitical risk analysis",
+                    "Security intelligence",
+                    "Real-time news aggregation",
+                  ],
+                },
+                {
+                  "@type": "WebApplication",
+                  "@id": "https://www.wewantpeace.live/#webapp",
+                  "name": "WeWantPeace",
+                  "url": "https://www.wewantpeace.live",
+                  "applicationCategory": "NewsApplication",
+                  "operatingSystem": "Web, Android (TWA)",
+                  "browserRequirements": "Requires JavaScript. Requires HTML5.",
+                  "description":
+                    "Monitor real-time global conflicts, security threats, and geopolitical tensions across 195 countries. Features AI-powered KScore impact scoring, Tension Index per country, spike detection alerts, and interactive crisis maps.",
+                  "offers": [
+                    {
+                      "@type": "Offer",
+                      "name": "Free",
+                      "price": "0",
+                      "priceCurrency": "USD",
+                      "description":
+                        "Real-time trending issues, basic tension index, spike alerts",
+                    },
+                    {
+                      "@type": "Offer",
+                      "name": "Pro",
+                      "price": "4.99",
+                      "priceCurrency": "USD",
+                      "description":
+                        "Interactive issue map, 5 watched countries, KScore filter, 30-day history",
+                    },
+                  ],
+                  "featureList": [
+                    "Real-time conflict monitoring across 195 countries",
+                    "KScore (Key Impact Score) personalized to your country",
+                    "Country-level Tension Index (0-100)",
+                    "AI-powered spike detection with push notifications",
+                    "Interactive global crisis map",
+                    "Multi-source news aggregation (RSS, Telegram)",
+                    "Bilingual interface (Korean/English)",
+                  ],
+                  "screenshot": "https://www.wewantpeace.live/og-image.png?v=4",
+                  "publisher": {
+                    "@id": "https://www.wewantpeace.live/#organization",
+                  },
+                },
+                {
+                  "@type": "FAQPage",
+                  "@id": "https://www.wewantpeace.live/#faq",
+                  "mainEntity": [
+                    {
+                      "@type": "Question",
+                      "name": "What is WeWantPeace?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "WeWantPeace is a real-time global conflict and security monitoring platform that covers 195 countries. It aggregates news from hundreds of RSS feeds and Telegram channels, uses AI to classify and score events, and presents them through trending issue lists, interactive maps, and per-country tension dashboards.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "What is KScore (Key Impact Score)?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "KScore is a 0-10 score that measures how much a global issue impacts your home country. It combines a base score (event velocity, severity, source spread, and credibility) with a country-specific impact factor that accounts for geographic proximity, security alliances, and economic ties. Scores above 8 indicate extreme impact; below 2 is stable.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "How does the Tension Index work?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "The Tension Index is a 0-100 score assigned to each country, updated every 5 minutes. It is calculated from three components: EventScore (55% weight, based on severity and confidence of recent events), ActivityScore (35% weight, combining event volume and acceleration), and Spillover (10% weight, reflecting the highest severity from neighboring countries). Levels range from Stable (0-20) to Extreme (80-100).",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "What data sources does WeWantPeace use?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "WeWantPeace aggregates data from hundreds of international RSS news feeds and Telegram channels. Events are collected every 3-5 minutes, then processed through an AI pipeline using GPT-4o-mini for topic classification, severity scoring, country/coordinate extraction, and deduplication. Sources include major wire services, regional news outlets, and defense/security-focused channels.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "Is WeWantPeace free to use?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes, WeWantPeace offers a free tier that includes real-time trending issues, basic tension index views, and spike alert notifications. Pro and Pro+ plans unlock additional features like the interactive issue map, more watched countries, KScore filtering, quiet hours, and extended history (30 or 90 days).",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "What is spike detection?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Spike detection is an automated system that identifies sudden surges in conflict or security events. When an issue's event count rapidly increases beyond normal patterns, it is flagged as a spike. Users receive real-time push notifications (via Firebase Cloud Messaging) for spikes related to their watched countries, ensuring they are alerted to breaking crises as they unfold.",
+                      },
+                    },
+                    {
+                      "@type": "Question",
+                      "name": "How often is the data updated?",
+                      "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Data is collected continuously: RSS feeds are polled every 5 minutes and Telegram channels every 3 minutes. The KScore trending rankings are recalculated every 15 minutes, and the Tension Index is updated every 5 minutes. Spike detection runs in real-time as new events are processed.",
+                      },
+                    },
+                  ],
+                },
+              ],
+            }),
+          }}
+        />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
