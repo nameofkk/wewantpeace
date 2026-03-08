@@ -177,6 +177,8 @@ export default function IssueDetailClient({ initialData }: Props) {
   const issue = (data as ClusterDetail | undefined) ?? initialData;
   const lang = useAppStore((s) => s.lang);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
+  const [expandedFullBodies, setExpandedFullBodies] = useState<Record<string, boolean>>({});
 
   if (!initialData && isPending) {
     return (
@@ -435,6 +437,39 @@ export default function IssueDetailClient({ initialData }: Props) {
                           </a>
                         )}
                       </div>
+
+                      {/* 본문 보기 토글 */}
+                      {event.body && event.body.trim() !== "" && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => setExpandedBodies((prev) => ({ ...prev, [event.id]: !prev[event.id] }))}
+                            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {expandedBodies[event.id] ? (
+                              <><ChevronUp className="h-2.5 w-2.5" /> {t(lang, "event_hide_body")}</>
+                            ) : (
+                              <><ChevronDown className="h-2.5 w-2.5" /> {t(lang, "event_show_body")}</>
+                            )}
+                          </button>
+                          {expandedBodies[event.id] && (
+                            <div className="mt-2 pt-2 border-t border-border/50">
+                              <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-line">
+                                {event.body.length > 300 && !expandedFullBodies[event.id]
+                                  ? event.body.slice(0, 300) + "..."
+                                  : event.body}
+                              </p>
+                              {event.body.length > 300 && (
+                                <button
+                                  onClick={() => setExpandedFullBodies((prev) => ({ ...prev, [event.id]: !prev[event.id] }))}
+                                  className="mt-1 text-[10px] text-primary hover:text-primary/80 transition-colors font-medium"
+                                >
+                                  {expandedFullBodies[event.id] ? t(lang, "event_show_less") : t(lang, "event_show_more")}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

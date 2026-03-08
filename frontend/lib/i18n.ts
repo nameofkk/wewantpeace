@@ -337,6 +337,10 @@ export const translations = {
     issue_updated_badge: "수정됨",
     issue_correction_history: "수정 이력",
     issue_correction_no_history: "수정 이력이 없습니다",
+    event_show_body: "내용 보기",
+    event_hide_body: "내용 접기",
+    event_show_more: "더 보기",
+    event_show_less: "접기",
     issue_load_error: "이슈를 불러올 수 없습니다.",
 
     // 국가별 이슈
@@ -1583,6 +1587,10 @@ export const translations = {
     issue_updated_badge: "Updated",
     issue_correction_history: "Correction History",
     issue_correction_no_history: "No corrections",
+    event_show_body: "Show content",
+    event_hide_body: "Hide content",
+    event_show_more: "Show more",
+    event_show_less: "Show less",
     issue_load_error: "Failed to load issue.",
 
     // country issues
