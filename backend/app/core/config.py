@@ -113,6 +113,7 @@ class Settings(BaseSettings):
     lemonsqueezy_store_id: str = ""
     lemonsqueezy_variant_pro: str = ""
     lemonsqueezy_variant_proplus: str = ""
+    lemonsqueezy_welcome_discount: str = ""  # e.g. "WELCOME30"
 
     # SMTP (마케팅 메일링)
     smtp_host: str = "smtp.naver.com"

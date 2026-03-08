@@ -161,7 +161,7 @@ async def start_trial(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Pro 7일 무료 체험. Pro만 가능, Pro+ 제외. 1회만."""
+    """Pro 7일 무료 체험. Pro만 가능, Pro+ 제외. 무료 혜택 계정당 1회."""
     if current_user.plan != "free":
         raise HTTPException(409, detail={"code": "ALREADY_PAID_PLAN"})
 
@@ -174,6 +174,16 @@ async def start_trial(
     )
     if existing.scalar_one_or_none():
         raise HTTPException(409, detail={"code": "TRIAL_ALREADY_USED"})
+
+    # 프로모 이력 확인 — 무료 혜택은 계정당 총 1회
+    promo_existing = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.platform.like("promo:%"),
+        ).limit(1)
+    )
+    if promo_existing.scalar_one_or_none():
+        raise HTTPException(409, detail={"code": "FREE_BENEFIT_ALREADY_USED"})
 
     now = datetime.now(timezone.utc)
     trial_end = now + timedelta(days=7)
@@ -208,7 +218,7 @@ async def redeem_promo(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """프로모 코드로 Pro 활성화. trial 사용 여부와 무관하게 사용 가능."""
+    """프로모 코드로 Pro 활성화. 무료 혜택 계정당 1회."""
     code = body.code.strip().upper()
     promo = PROMO_CODES.get(code)
     if not promo:
@@ -228,6 +238,16 @@ async def redeem_promo(
     )
     if existing.scalar_one_or_none():
         raise HTTPException(409, detail={"code": "PROMO_ALREADY_USED"})
+
+    # trial 이력 확인 — 무료 혜택은 계정당 총 1회
+    trial_existing = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.trial_end.isnot(None),
+        ).limit(1)
+    )
+    if trial_existing.scalar_one_or_none():
+        raise HTTPException(409, detail={"code": "FREE_BENEFIT_ALREADY_USED"})
 
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(days=promo["days"])

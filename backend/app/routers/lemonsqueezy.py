@@ -98,17 +98,35 @@ async def create_checkout(
                 current_user.id, existing_sub.plan, body.plan,
             )
 
+    # 최근 만료된 trial/promo 확인 → 할인 코드 자동 적용
+    discount_code = None
+    if settings.lemonsqueezy_welcome_discount:
+        recent_expired = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == current_user.id,
+                Subscription.status == "expired",
+                Subscription.platform.in_(["trial", "promo:PRODUCTHUNT"]),
+                Subscription.expires_at >= now - timedelta(days=7),
+            ).limit(1)
+        )
+        if recent_expired.scalar_one_or_none():
+            discount_code = settings.lemonsqueezy_welcome_discount
+
     # LemonSqueezy Checkout API 호출
+    checkout_data = {
+        "email": current_user.email or "",
+        "custom": {
+            "user_id": str(current_user.id),
+        },
+    }
+    if discount_code:
+        checkout_data["discount_code"] = discount_code
+
     checkout_payload = {
         "data": {
             "type": "checkouts",
             "attributes": {
-                "checkout_data": {
-                    "email": current_user.email or "",
-                    "custom": {
-                        "user_id": str(current_user.id),
-                    },
-                },
+                "checkout_data": checkout_data,
                 "product_options": {
                     "redirect_url": "https://www.wewantpeace.live/upgrade/success",
                 },
@@ -149,13 +167,14 @@ async def create_checkout(
     checkout_url = data["data"]["attributes"]["url"]
 
     logger.info(
-        "LemonSqueezy checkout 생성: user=%s plan=%s variant=%s",
-        current_user.id, body.plan, variant_id,
+        "LemonSqueezy checkout 생성: user=%s plan=%s variant=%s discount=%s",
+        current_user.id, body.plan, variant_id, discount_code,
     )
 
     return {
         "checkout_url": checkout_url,
         "plan": body.plan,
+        **({"discount_applied": True, "discount_code": discount_code} if discount_code else {}),
     }
 
 

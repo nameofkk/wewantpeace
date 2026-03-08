@@ -2037,6 +2037,61 @@ async def get_kpi(
 
     trial_to_paid = round(trial_converted / max(1, trial_started) * 100, 1)
 
+    # ── Promo 전환 ──
+    promo_started = (await db.execute(
+        select(func.count()).select_from(Subscription)
+        .where(Subscription.platform.like("promo:%"), Subscription.started_at >= cutoff)
+    )).scalar() or 0
+
+    promo_converted = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.platform.like("promo:%"),
+            Subscription.started_at >= cutoff,
+        ).where(
+            Subscription.user_id.in_(
+                select(Subscription.user_id).where(
+                    Subscription.platform == "lemonsqueezy",
+                    Subscription.status == "active",
+                )
+            )
+        )
+    )).scalar() or 0
+
+    promo_to_paid = round(promo_converted / max(1, promo_started) * 100, 1)
+
+    # ── Trial 만료 후 7일내 할인 전환 ──
+    discount_eligible = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.status == "expired",
+            Subscription.platform.in_(["trial", "promo:PRODUCTHUNT"]),
+            Subscription.expires_at >= cutoff,
+        )
+    )).scalar() or 0
+
+    discount_converted = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            Subscription.platform == "lemonsqueezy",
+            Subscription.status == "active",
+            Subscription.started_at >= cutoff,
+            Subscription.user_id.in_(
+                select(Subscription.user_id).where(
+                    Subscription.status == "expired",
+                    Subscription.platform.in_(["trial", "promo:PRODUCTHUNT"]),
+                    Subscription.expires_at >= cutoff - timedelta(days=7),
+                )
+            )
+        )
+    )).scalar() or 0
+
+    discount_conversion = round(discount_converted / max(1, discount_eligible) * 100, 1)
+
+    # ── Referral 통계 ──
+    active_referral_users = (await db.execute(
+        select(func.count()).select_from(User).where(
+            User.referral_pro_expires_at > now,
+        )
+    )).scalar() or 0
+
     # ── D7 리텐션 ──
     d7_start = now - timedelta(days=days + 7)
     d7_end = now - timedelta(days=7)
@@ -2064,6 +2119,8 @@ async def get_kpi(
         "a1_onboarding_rate": a1_rate,
         "paywall_conversion_rate": paywall_rate,
         "trial_to_paid_rate": trial_to_paid,
+        "promo_to_paid_rate": promo_to_paid,
+        "discount_conversion_rate": discount_conversion,
         "d7_retention_rate": d7_retention,
         "raw": {
             **ae_counts,
@@ -2071,6 +2128,11 @@ async def get_kpi(
             "paywall_purchase": pw_purchase,
             "trial_started": trial_started,
             "trial_converted": trial_converted,
+            "promo_started": promo_started,
+            "promo_converted": promo_converted,
+            "discount_eligible": discount_eligible,
+            "discount_converted": discount_converted,
+            "active_referral_users": active_referral_users,
             "d7_cohort": d7_cohort,
             "d7_retained": d7_retained,
         },

@@ -1430,6 +1430,87 @@ def reconcile_delivery_logs(self):
         raise self.retry(exc=exc)
 
 
+async def _send_fcm_to_user(user_id, title: str, body: str, data: dict | None = None):
+    """개별 사용자에게 FCM 푸시 발송 (웹+네이티브)."""
+    from sqlalchemy import select
+    from backend.app.models.user import UserPushToken
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(UserPushToken).where(
+                UserPushToken.user_id == user_id,
+                UserPushToken.status == "active",
+            ).order_by(UserPushToken.last_seen_at.desc()).limit(1)
+        )
+        token_row = result.scalar_one_or_none()
+        if not token_row:
+            return
+
+    from worker.push.push_service import _send_fcm_for_web, _send_fcm_for_native
+
+    fcm_data = data or {}
+    if token_row.platform == "web":
+        _send_fcm_for_web([token_row.fcm_token], title, body, fcm_data)
+    else:
+        _send_fcm_for_native([token_row.fcm_token], title, body, fcm_data)
+
+
+async def _get_user_lang(user_id, db) -> str:
+    """사용자 언어 설정 조회. 기본값 ko."""
+    from sqlalchemy import select
+    from backend.app.models.user import UserPreference
+
+    result = await db.execute(
+        select(UserPreference.language).where(UserPreference.user_id == user_id)
+    )
+    lang = result.scalar_one_or_none()
+    return lang if lang in ("ko", "en") else "ko"
+
+
+async def _send_trial_email(user_email: str, user_name: str, subject: str, template_name: str, template_vars: dict):
+    """Trial 관련 이메일 발송 (SMTP)."""
+    import smtplib
+    import os
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    import jinja2
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+    sender = os.getenv("SMTP_FROM", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.warning("SMTP 미설정 — trial 이메일 발송 건너뜀")
+        return
+
+    tpl_dir = os.path.join(os.path.dirname(__file__), "..", "backend", "app", "templates")
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(tpl_dir), autoescape=True)
+    try:
+        template = env.get_template(template_name)
+    except jinja2.TemplateNotFound:
+        logger.warning("이메일 템플릿 없음: %s", template_name)
+        return
+
+    html_body = template.render(**template_vars)
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = sender
+    msg["To"] = user_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    try:
+        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp.starttls()
+        smtp.login(smtp_user, smtp_pass)
+        smtp.sendmail(sender, user_email, msg.as_string())
+        smtp.quit()
+    except Exception as e:
+        logger.error("trial 이메일 발송 실패: %s → %s", user_email, e)
+
+
 @app.task(
     name="worker.tasks.send_trial_nudges",
     queue="process",
@@ -1437,10 +1518,13 @@ def reconcile_delivery_logs(self):
     max_retries=1,
 )
 def send_trial_nudges(self):
-    """Trial D3/D6 넛지 발송. 매일 09:00 UTC (KST 18:00)."""
+    """Trial/Promo D3/D6 넛지 발송. 매일 09:00 UTC (KST 18:00).
+    D3: 인앱 + FCM 푸시
+    D6: 인앱 + FCM 푸시 + 이메일 (마케팅 동의자만)
+    """
 
     async def _run():
-        from sqlalchemy import select
+        from sqlalchemy import select, or_
         from sqlalchemy import func
         from backend.app.models.subscription import Subscription
         from backend.app.models.user import User
@@ -1448,21 +1532,28 @@ def send_trial_nudges(self):
         from backend.app.models.notification import Notification
 
         now = datetime.now(timezone.utc)
-        results = {"d3": 0, "d6": 0}
+        results = {"d3": 0, "d6": 0, "d6_email": 0}
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                # D3 넛지: trial_start + 3일 이내이면서 오늘이 D3 (72시간~96시간)
+                # trial + promo 모두 대상 (promo는 started_at 기준)
+                # D3 넛지: 시작 72~96시간 경과
                 d3_start = now - timedelta(hours=96)
                 d3_end = now - timedelta(hours=72)
                 d3_subs = await db.execute(
                     select(Subscription).where(
-                        Subscription.status == "trial",
-                        Subscription.trial_start >= d3_start,
-                        Subscription.trial_start < d3_end,
+                        or_(
+                            Subscription.status == "trial",
+                            Subscription.platform.like("promo:%"),
+                        ),
+                        Subscription.started_at >= d3_start,
+                        Subscription.started_at < d3_end,
+                        Subscription.status.in_(["trial", "active"]),
                     )
                 )
                 for sub in d3_subs.scalars().all():
+                    lang = await _get_user_lang(sub.user_id, db)
+
                     # missed spikes 카운트
                     missed_result = await db.execute(
                         select(func.count())
@@ -1474,12 +1565,20 @@ def send_trial_nudges(self):
                     )
                     missed_count = missed_result.scalar() or 0
 
-                    if missed_count > 0:
-                        title = f"지난 72시간 스파이크 {missed_count}건 감지"
-                        body = "Pro에서 놓친 알림을 실시간으로 받아보세요"
+                    if lang == "en":
+                        if missed_count > 0:
+                            title = f"Pro Trial · Day 3"
+                            body = f"{missed_count} spikes detected in the last 72 hours"
+                        else:
+                            title = "Pro Trial · Day 3"
+                            body = "Check the tension level in your monitored regions"
                     else:
-                        title = "Pro 체험 중: 상황 요약"
-                        body = "현재 관심 지역의 긴장도를 확인하세요"
+                        if missed_count > 0:
+                            title = f"Pro 체험 중 · 3일 경과"
+                            body = f"지난 72시간 스파이크 {missed_count}건이 감지되었습니다"
+                        else:
+                            title = "Pro 체험 중 · 3일 경과"
+                            body = "현재 관심 지역의 긴장도를 확인하세요"
 
                     notif = Notification(
                         user_id=sub.user_id,
@@ -1488,35 +1587,285 @@ def send_trial_nudges(self):
                         body=body,
                     )
                     db.add(notif)
+
+                    # FCM 푸시 발송
+                    await _send_fcm_to_user(
+                        sub.user_id, title, body,
+                        {"type": "trial_nudge", "day": "3"},
+                    )
                     results["d3"] += 1
 
-                # D6 넛지: trial 만료 1일 전 (144~168시간)
+                # D6 넛지: 시작 144~168시간 경과 (만료 1일 전)
                 d6_start = now - timedelta(hours=168)
                 d6_end = now - timedelta(hours=144)
                 d6_subs = await db.execute(
                     select(Subscription).where(
-                        Subscription.status == "trial",
-                        Subscription.trial_start >= d6_start,
-                        Subscription.trial_start < d6_end,
+                        or_(
+                            Subscription.status == "trial",
+                            Subscription.platform.like("promo:%"),
+                        ),
+                        Subscription.started_at >= d6_start,
+                        Subscription.started_at < d6_end,
+                        Subscription.status.in_(["trial", "active"]),
                     )
                 )
                 for sub in d6_subs.scalars().all():
+                    lang = await _get_user_lang(sub.user_id, db)
+
+                    # 유저 정보 조회 (이메일, 마케팅 동의)
+                    user_result = await db.execute(
+                        select(User).where(User.id == sub.user_id)
+                    )
+                    user = user_result.scalar_one_or_none()
+
+                    # missed spikes 카운트
+                    missed_result = await db.execute(
+                        select(func.count())
+                        .select_from(UserMissedSpikeSummary)
+                        .where(
+                            UserMissedSpikeSummary.user_id == sub.user_id,
+                            UserMissedSpikeSummary.is_shown == False,
+                        )
+                    )
+                    missed_count = missed_result.scalar() or 0
+
+                    if lang == "en":
+                        title = "Trial ends tomorrow"
+                        body = "Subscribe now to keep all Pro features without interruption."
+                        email_subject = "Your WeWantPeace Pro trial ends tomorrow"
+                    else:
+                        title = "체험 종료 D-1"
+                        body = "내일이면 Pro 기능이 비활성화됩니다. 지금 구독하면 끊김 없이 계속 사용할 수 있어요."
+                        email_subject = "WeWantPeace Pro 체험이 내일 종료됩니다"
+
                     notif = Notification(
                         user_id=sub.user_id,
                         type="trial_nudge",
-                        title="내일 체험이 종료됩니다",
-                        body="Pro 구독으로 전환하여 모든 기능을 계속 사용하세요",
+                        title=title,
+                        body=body,
                     )
                     db.add(notif)
+
+                    # FCM 푸시 발송
+                    await _send_fcm_to_user(
+                        sub.user_id, title, body,
+                        {"type": "trial_nudge", "day": "6"},
+                    )
+
+                    # 이메일 발송 (마케팅 동의 사용자만)
+                    if user and user.email and user.marketing_agreed_at:
+                        await _send_trial_email(
+                            user_email=user.email,
+                            user_name=user.display_name or user.nickname or "",
+                            subject=email_subject,
+                            template_name="trial_expiring.html",
+                            template_vars={
+                                "user_name": user.display_name or user.nickname or "",
+                                "missed_count": missed_count,
+                                "lang": lang,
+                                "upgrade_url": "https://www.wewantpeace.live/upgrade",
+                            },
+                        )
+                        results["d6_email"] += 1
+
                     results["d6"] += 1
 
-        logger.info("send_trial_nudges: d3=%d, d6=%d", results["d3"], results["d6"])
+        logger.info("send_trial_nudges: d3=%d, d6=%d, d6_email=%d",
+                     results["d3"], results["d6"], results["d6_email"])
         return results
 
     try:
         return run_async(_run())
     except Exception as exc:
         logger.error("send_trial_nudges 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+# ── 만료 후 전환 오퍼 발송 ────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.send_expired_trial_offers",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_expired_trial_offers(self):
+    """만료 후 D+1 할인 오퍼 + D+3 놓친 이슈 리마인더. 매일 10:00 UTC (KST 19:00)."""
+
+    async def _run():
+        from sqlalchemy import select, or_, and_
+        from sqlalchemy import func
+        from backend.app.models.subscription import Subscription
+        from backend.app.models.user import User
+        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.notification import Notification
+
+        now = datetime.now(timezone.utc)
+        results = {"d1_push": 0, "d1_email": 0, "d3_email": 0}
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # D+1: 어제 만료된 trial/promo
+                yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                yesterday_end = yesterday_start + timedelta(days=1)
+
+                d1_subs = await db.execute(
+                    select(Subscription).where(
+                        Subscription.status == "expired",
+                        or_(
+                            Subscription.platform == "trial",
+                            Subscription.platform.like("promo:%"),
+                        ),
+                        Subscription.expires_at >= yesterday_start,
+                        Subscription.expires_at < yesterday_end,
+                    )
+                )
+
+                for sub in d1_subs.scalars().all():
+                    lang = await _get_user_lang(sub.user_id, db)
+                    user_result = await db.execute(
+                        select(User).where(User.id == sub.user_id)
+                    )
+                    user = user_result.scalar_one_or_none()
+                    if not user:
+                        continue
+
+                    # 이미 재구독한 유저 제외
+                    active_sub = await db.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == sub.user_id,
+                            Subscription.status.in_(["active", "trial"]),
+                        ).limit(1)
+                    )
+                    if active_sub.scalar_one_or_none():
+                        continue
+
+                    # missed spikes
+                    missed_result = await db.execute(
+                        select(func.count())
+                        .select_from(UserMissedSpikeSummary)
+                        .where(UserMissedSpikeSummary.user_id == sub.user_id)
+                    )
+                    missed_count = missed_result.scalar() or 0
+
+                    if lang == "en":
+                        title = "30% off your first month · Get Pro back"
+                        body = "Subscribe now and get back real-time alerts and all Pro features."
+                        email_subject = "Special offer from WeWantPeace"
+                    else:
+                        title = "첫 달 30% 할인 · Pro를 다시 만나보세요"
+                        body = "지금 구독하면 실시간 알림과 모든 Pro 기능을 다시 사용할 수 있어요."
+                        email_subject = "WeWantPeace에서 특별 혜택을 드립니다"
+
+                    # 인앱 알림
+                    notif = Notification(
+                        user_id=sub.user_id,
+                        type="expired_offer",
+                        title=title,
+                        body=body,
+                    )
+                    db.add(notif)
+
+                    # FCM 푸시
+                    await _send_fcm_to_user(
+                        sub.user_id, title, body,
+                        {"type": "expired_offer", "action": "upgrade"},
+                    )
+                    results["d1_push"] += 1
+
+                    # 이메일
+                    if user.email and user.marketing_agreed_at:
+                        await _send_trial_email(
+                            user_email=user.email,
+                            user_name=user.display_name or user.nickname or "",
+                            subject=email_subject,
+                            template_name="trial_expired_offer.html",
+                            template_vars={
+                                "user_name": user.display_name or user.nickname or "",
+                                "missed_count": missed_count,
+                                "days_left": 7,
+                                "top_issues": [],
+                                "lang": lang,
+                                "upgrade_url": "https://www.wewantpeace.live/upgrade",
+                            },
+                        )
+                        results["d1_email"] += 1
+
+                # D+3: 3일 전 만료 + 아직 재구독 안 한 유저 → 이메일만
+                d3_start = (now - timedelta(days=3)).replace(hour=0, minute=0, second=0, microsecond=0)
+                d3_end = d3_start + timedelta(days=1)
+
+                d3_subs = await db.execute(
+                    select(Subscription).where(
+                        Subscription.status == "expired",
+                        or_(
+                            Subscription.platform == "trial",
+                            Subscription.platform.like("promo:%"),
+                        ),
+                        Subscription.expires_at >= d3_start,
+                        Subscription.expires_at < d3_end,
+                    )
+                )
+
+                for sub in d3_subs.scalars().all():
+                    user_result = await db.execute(
+                        select(User).where(User.id == sub.user_id)
+                    )
+                    user = user_result.scalar_one_or_none()
+                    if not user or not user.email or not user.marketing_agreed_at:
+                        continue
+
+                    # 이미 재구독한 유저 제외
+                    active_sub = await db.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == sub.user_id,
+                            Subscription.status.in_(["active", "trial"]),
+                        ).limit(1)
+                    )
+                    if active_sub.scalar_one_or_none():
+                        continue
+
+                    lang = await _get_user_lang(sub.user_id, db)
+
+                    missed_result = await db.execute(
+                        select(func.count())
+                        .select_from(UserMissedSpikeSummary)
+                        .where(UserMissedSpikeSummary.user_id == sub.user_id)
+                    )
+                    missed_count = missed_result.scalar() or 0
+
+                    if lang == "en":
+                        email_subject = f"You've missed {missed_count} crisis alerts since your trial ended"
+                    else:
+                        email_subject = f"체험 이후 {missed_count}건의 위기 알림을 놓치셨습니다"
+
+                    await _send_trial_email(
+                        user_email=user.email,
+                        user_name=user.display_name or user.nickname or "",
+                        subject=email_subject,
+                        template_name="trial_expired_offer.html",
+                        template_vars={
+                            "user_name": user.display_name or user.nickname or "",
+                            "missed_count": missed_count,
+                            "days_left": 4,
+                            "top_issues": [],
+                            "lang": lang,
+                            "upgrade_url": "https://www.wewantpeace.live/upgrade",
+                        },
+                    )
+                    results["d3_email"] += 1
+
+        logger.info(
+            "send_expired_trial_offers: d1_push=%d, d1_email=%d, d3_email=%d",
+            results["d1_push"], results["d1_email"], results["d3_email"],
+        )
+        return results
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_expired_trial_offers 오류: %s", exc)
         raise self.retry(exc=exc)
 
 

@@ -345,11 +345,17 @@ async def register(
                 "code": body.referral_code.strip().upper(),
             })
 
-            # 추천인에게도 즉시 Pro 7일 보상
+            # 추천인에게도 즉시 Pro 7일 보상 (최대 30일 상한)
+            MAX_REFERRAL_PRO_DAYS = 30
             if not referrer.referral_pro_expires_at or referrer.referral_pro_expires_at < now:
                 referrer.referral_pro_expires_at = now + timedelta(days=7)
             else:
-                referrer.referral_pro_expires_at = referrer.referral_pro_expires_at + timedelta(days=7)
+                max_allowed = now + timedelta(days=MAX_REFERRAL_PRO_DAYS)
+                new_expires = min(
+                    referrer.referral_pro_expires_at + timedelta(days=7),
+                    max_allowed,
+                )
+                referrer.referral_pro_expires_at = new_expires
             if referrer.plan == "free":
                 referrer.plan = "pro"
                 from backend.app.services.area_activation import sync_area_activation

@@ -8,7 +8,7 @@ import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { calcImpactFactor } from "@/lib/impact-factors";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes, useTensionAll } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes, useTensionAll, useMySubscription } from "@/lib/api";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -764,6 +764,34 @@ function HomePageContent() {
   const missedCount = Array.isArray(missedSpikes) ? missedSpikes.length : 0;
   const paywall = usePaywall("map_locked");
 
+  // Trial/Promo 배너
+  const { data: mySub } = useMySubscription();
+  const [trialBannerDismissed, setTrialBannerDismissed] = useState(false);
+  const [fomoBannerDismissed, setFomoBannerDismissed] = useState(false);
+
+  // FOMO 배너 — localStorage로 영구 dismiss
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("fomo_banner_dismissed") === "1") {
+      setFomoBannerDismissed(true);
+    }
+  }, []);
+
+  const isTrialOrPromo = mySub?.status === "trial" || mySub?.platform?.startsWith("promo:");
+  const subExpiresAt = mySub?.expires_at || mySub?.trial_end;
+  const daysLeft = subExpiresAt
+    ? Math.max(0, Math.ceil((new Date(subExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
+
+  // 만료 후 FOMO 배너 (7일 이내)
+  const isExpiredTrialPromo = mySub?.status === "expired" &&
+    (mySub?.platform === "trial" || mySub?.platform?.startsWith("promo:"));
+  const daysSinceExpiry = subExpiresAt
+    ? Math.floor((Date.now() - new Date(subExpiresAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showFomoBanner = isExpiredTrialPromo && daysSinceExpiry !== null &&
+    daysSinceExpiry >= 0 && daysSinceExpiry <= 7 && !fomoBannerDismissed;
+  const fomoDiscountDaysLeft = daysSinceExpiry !== null ? Math.max(0, 7 - daysSinceExpiry) : 0;
+
   // Zustand persist 수화 완료 전까지 mine 쿼리 비활성화
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
@@ -947,6 +975,54 @@ function HomePageContent() {
       )}
       <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
       <UpgradeNudgeBanner />
+
+      {/* Trial/Promo 만료 임박 배너 (잔여 3일 이하) */}
+      {isTrialOrPromo && daysLeft !== null && daysLeft <= 3 && daysLeft > 0 && !trialBannerDismissed && (
+        <div className="mx-4 mt-2 rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-amber-400">
+              {t(lang, "trial_expiry_banner", { n: daysLeft })}
+            </p>
+            <Link href="/upgrade" className="text-xs text-primary font-medium hover:underline">
+              {t(lang, "trial_expiry_cta")}
+            </Link>
+          </div>
+          <button
+            onClick={() => setTrialBannerDismissed(true)}
+            className="shrink-0 text-muted-foreground hover:text-foreground p-0.5"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 만료 후 FOMO 배너 (7일 이내) */}
+      {showFomoBanner && (
+        <div className="mx-4 mt-2 rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-3 flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-blue-400">
+              {t(lang, "fomo_banner_title", { n: missedCount })}
+            </p>
+            {fomoDiscountDaysLeft > 0 && (
+              <p className="text-xs text-blue-300/80 mt-0.5">
+                {t(lang, "fomo_banner_discount", { n: fomoDiscountDaysLeft })}
+              </p>
+            )}
+            <Link href="/upgrade" className="text-xs text-primary font-medium hover:underline">
+              {t(lang, "trial_expiry_cta")}
+            </Link>
+          </div>
+          <button
+            onClick={() => {
+              setFomoBannerDismissed(true);
+              localStorage.setItem("fomo_banner_dismissed", "1");
+            }}
+            className="shrink-0 text-muted-foreground hover:text-foreground p-0.5"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── 내 관심지역 국가 표시 바 ──────────────────────────────── */}
       {trendingTab === "mine" && hydrated && myCountries.length > 0 && (

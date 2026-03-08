@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{% if lang == 'ko' %}Pro 체험 종료 안내{% else %}Pro Trial Ending Soon{% endif %}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0d1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#0d1117;padding:32px 16px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;width:100%;background-color:#161b22;border-radius:12px;overflow:hidden;border:1px solid #30363d;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1a2332 0%,#0d1117 100%);padding:36px 40px 28px;border-bottom:1px solid #30363d;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <span style="font-size:24px;font-weight:700;color:#e6edf3;letter-spacing:-0.5px;">
+                      &#9760;&nbsp;WeWantPeace
+                    </span>
+                    <p style="margin:6px 0 0;font-size:13px;color:#8b949e;">
+                      {% if lang == 'ko' %}
+                        {{ user_name }}님, Pro 체험이 내일 종료됩니다
+                      {% else %}
+                        {{ user_name }}, your Pro trial ends tomorrow
+                      {% endif %}
+                    </p>
+                  </td>
+                  <td align="right" style="vertical-align:top;">
+                    <span style="display:inline-block;background-color:#3d2a10;border:1px solid #e3b341;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;color:#e3b341;">
+                      D-1
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main content -->
+          <tr>
+            <td style="padding:32px 40px;">
+              <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#e6edf3;">
+                {% if lang == 'ko' %}내일이면 Pro 기능이 비활성화됩니다{% else %}Pro features will be deactivated tomorrow{% endif %}
+              </h2>
+              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#8b949e;">
+                {% if lang == 'ko' %}
+                  체험 기간이 내일 종료됩니다. 지금 구독하면 끊김 없이 모든 Pro 기능을 계속 사용할 수 있습니다.
+                {% else %}
+                  Your trial period ends tomorrow. Subscribe now to keep all Pro features without interruption.
+                {% endif %}
+              </p>
+
+              {% if missed_count > 0 %}
+              <!-- Missed spikes summary -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px;background-color:#21262d;border-radius:8px;border:1px solid #30363d;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#e6edf3;">
+                      {% if lang == 'ko' %}
+                        체험 기간 중 감지된 스파이크
+                      {% else %}
+                        Spikes detected during your trial
+                      {% endif %}
+                    </p>
+                    <p style="margin:0;font-size:28px;font-weight:700;color:#f85149;">
+                      {{ missed_count }}{% if lang == 'ko' %}건{% endif %}
+                    </p>
+                    <p style="margin:6px 0 0;font-size:12px;color:#8b949e;">
+                      {% if lang == 'ko' %}
+                        Free 전환 시 실시간 알림을 받을 수 없습니다
+                      {% else %}
+                        You won't receive real-time alerts on the Free plan
+                      {% endif %}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+
+              <!-- CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding:8px 0 16px;">
+                    <a href="{{ upgrade_url }}" style="display:inline-block;background:linear-gradient(135deg,#2563eb 0%,#6366f1 100%);color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                      {% if lang == 'ko' %}지금 구독하기{% else %}Subscribe Now{% endif %}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Features reminder -->
+              <p style="margin:16px 0 8px;font-size:13px;font-weight:600;color:#e6edf3;">
+                {% if lang == 'ko' %}구독 시 계속 사용 가능:{% else %}Keep these Pro features:{% endif %}
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                {% if lang == 'ko' %}
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; 관심 국가 5개 모니터링</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; 실시간 이슈 지도</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; 속보 알림 (미확인 포함)</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; 일일 알림 10건</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; KScore 필터 · 토픽 필터</td></tr>
+                {% else %}
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; Monitor 5 countries</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; Real-time issue map</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; Fast alerts (breaking news)</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; 10 daily alerts</td></tr>
+                <tr><td style="padding:4px 0;font-size:13px;color:#8b949e;">&#x2714; KScore filter · Topic filter</td></tr>
+                {% endif %}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px 28px;border-top:1px solid #30363d;">
+              <p style="margin:0;font-size:11px;color:#484f58;text-align:center;">
+                {% if lang == 'ko' %}
+                  이 메일은 WeWantPeace 마케팅 수신에 동의한 분께 발송됩니다.
+                  <br><a href="https://www.wewantpeace.live/settings" style="color:#484f58;">수신 설정 변경</a>
+                {% else %}
+                  This email was sent because you opted in to WeWantPeace marketing.
+                  <br><a href="https://www.wewantpeace.live/settings" style="color:#484f58;">Manage preferences</a>
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

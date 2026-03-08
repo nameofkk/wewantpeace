@@ -1258,6 +1258,13 @@ export const translations = {
     api_docs_copied: "복사됨",
     api_docs_developers: "개발자",
     api_docs_developers_desc: "공개 API 문서",
+
+    // Trial/Promo 전환 유도
+    trial_expiry_banner: "Pro 체험이 {n}일 후 종료됩니다",
+    trial_expiry_cta: "지금 구독하기 →",
+    fomo_banner_title: "체험 기간 동안 {n}건의 알림을 받으셨습니다. Pro에서 계속 받아보세요",
+    fomo_banner_discount: "첫 달 30% 할인 · {n}일 남음",
+    free_benefit_already_used: "무료 혜택은 1회만 사용할 수 있습니다",
   },
   en: {
     // bottom nav
@@ -2514,6 +2521,13 @@ export const translations = {
     api_docs_copied: "Copied",
     api_docs_developers: "Developers",
     api_docs_developers_desc: "Public API documentation",
+
+    // Trial/Promo conversion
+    trial_expiry_banner: "Your Pro trial ends in {n} day(s)",
+    trial_expiry_cta: "Subscribe now →",
+    fomo_banner_title: "You received {n} alert(s) during your trial. Keep them with Pro",
+    fomo_banner_discount: "30% off first month · {n} day(s) left",
+    free_benefit_already_used: "Free benefits can only be used once",
   },
 } as const;
 

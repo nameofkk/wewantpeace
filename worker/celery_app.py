@@ -118,6 +118,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=9),  # 매일 09:00 UTC = KST 18:00
         "options": {"queue": "process"},
     },
+    # ── 만료 후 전환 오퍼 ──
+    "send-expired-trial-offers": {
+        "task": "worker.tasks.send_expired_trial_offers",
+        "schedule": crontab(minute=0, hour=10),  # 매일 10:00 UTC = KST 19:00
+        "options": {"queue": "process"},
+    },
     # ── 주간 리포트 ──
     "send-weekly-report": {
         "task": "worker.tasks.send_weekly_report",

@@ -12,6 +12,8 @@ interface KpiData {
   a1_onboarding_rate: number;
   paywall_conversion_rate: number;
   trial_to_paid_rate: number;
+  promo_to_paid_rate: number;
+  discount_conversion_rate: number;
   d7_retention_rate: number;
   raw: Record<string, number>;
 }
@@ -161,7 +163,7 @@ export default function KpiPage() {
       {/* Inline Guide */}
       <InlineGuide lang={lang} />
 
-      {/* KPI Cards */}
+      {/* KPI Cards — Phase Gate */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label={lang === "ko" ? "온보딩 완료율 (A1)" : "Onboarding Rate (A1)"}
@@ -183,6 +185,41 @@ export default function KpiPage() {
           value={kpi.d7_retention_rate}
           color="text-orange-500"
         />
+      </div>
+
+      {/* 전환 유도 효과 카드 */}
+      <div>
+        <h2 className="text-sm font-semibold mb-3">
+          {lang === "ko" ? "전환 유도 효과" : "Conversion Pipeline"}
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label={lang === "ko" ? "Promo → Paid 전환율" : "Promo → Paid Rate"}
+            value={kpi.promo_to_paid_rate}
+            color="text-cyan-500"
+          />
+          <KpiCard
+            label={lang === "ko" ? "할인 오퍼 전환율" : "Discount Offer Conv."}
+            value={kpi.discount_conversion_rate}
+            color="text-pink-500"
+          />
+          <KpiCard
+            label={lang === "ko" ? "Referral 활성 유저" : "Active Referral Users"}
+            value={kpi.raw.active_referral_users ?? 0}
+            suffix={lang === "ko" ? "명" : ""}
+            color="text-amber-500"
+          />
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs text-muted-foreground mb-1">
+              {lang === "ko" ? "할인 대상 / 전환" : "Discount Eligible / Converted"}
+            </p>
+            <p className="text-2xl font-bold text-muted-foreground">
+              {kpi.raw.discount_eligible ?? 0}
+              <span className="text-base mx-1">/</span>
+              <span className="text-pink-500">{kpi.raw.discount_converted ?? 0}</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Raw Metrics Table */}

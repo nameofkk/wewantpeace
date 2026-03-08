@@ -422,3 +422,26 @@ export interface UserPreferences {
   timezone: string;
   home_country: string;
 }
+
+// --- 구독 정보 ---
+export interface MySubscription {
+  plan: string;
+  status: string;
+  amount?: number;
+  platform?: string;
+  auto_renewing?: boolean;
+  started_at?: string;
+  expires_at?: string | null;
+  next_billing_at?: string | null;
+  cancelled_at?: string | null;
+  trial_end?: string | null;
+}
+
+export function useMySubscription() {
+  return useQuery({
+    queryKey: ["me", "subscription"],
+    queryFn: () => apiFetch<MySubscription>("/subscriptions/my"),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
