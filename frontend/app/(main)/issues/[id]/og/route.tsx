@@ -294,7 +294,7 @@ export async function GET(
               width: 1200,
               height: 630,
               objectFit: "cover",
-              filter: "brightness(0.5) saturate(0.8)",
+              filter: "brightness(0.65) saturate(0.8)",
             }}
           />
         ) : null}
@@ -333,7 +333,7 @@ export async function GET(
             flexDirection: "column",
             width: "100%",
             height: "100%",
-            padding: "44px 56px 40px",
+            padding: "44px 56px 40px 40px",
             position: "relative",
             background: hasBackground
               ? "linear-gradient(180deg, rgba(15,23,42,0.4) 0%, rgba(15,23,42,0.75) 40%, rgba(15,23,42,0.9) 100%)"
@@ -358,12 +358,12 @@ export async function GET(
                   style={{ width: "140px", height: "60px" }}
                 />
               ) : null}
-              <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 800, letterSpacing: "-0.3px" }}>
+              <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 600, letterSpacing: "-0.3px" }}>
                 WeWantPeace
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700, fontFamily: displayFont }}>
+              <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 600 }}>
                 {lang === "en" ? "Real-time Global Conflict Monitor" : "실시간 글로벌 분쟁 모니터링"}
               </span>
               <div
@@ -462,7 +462,7 @@ export async function GET(
                   <span style={{ color: config.barColor, fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.severity}
                   </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 600 }}>
                     {lang === "en" ? "Severity" : "위기지수"}
                   </span>
                 </div>
@@ -471,7 +471,7 @@ export async function GET(
                   <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     K{kscore.toFixed(1)}
                   </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 600 }}>
                     KScore
                   </span>
                 </div>
@@ -480,7 +480,7 @@ export async function GET(
                   <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
                     {issue.event_count}
                   </span>
-                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
+                  <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 600 }}>
                     {lang === "en" ? "Sources" : "보도 건수"}
                   </span>
                 </div>
@@ -497,7 +497,7 @@ export async function GET(
                   gap: "8px",
                 }}
               >
-                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
+                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600 }}>
                   {lang === "en" ? "KScore 7-Day Trend" : "KScore 7일 추이"}
                 </span>
                 <div
@@ -555,7 +555,7 @@ export async function GET(
               marginTop: "auto",
             }}
           >
-            <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
+            <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 600 }}>
               wewantpeace.live
             </span>
           </div>
