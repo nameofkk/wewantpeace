@@ -3,12 +3,14 @@
 import logging
 from datetime import date, datetime, timezone, timedelta
 
+import os
+
 import httpx
 
 logger = logging.getLogger(__name__)
 
-TELEGRAM_BOT_TOKEN = "8707575294:AAG4CJZLIQMO0WvSBYzO2vN1_V4CC-WZWXE"
-TELEGRAM_CHAT_ID = "1784169302"
+TELEGRAM_BOT_TOKEN = os.getenv("SOCIAL_TG_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("SOCIAL_TG_CHAT_ID", "")
 
 # X Thread 시작일: 2026-03-09 = Day 1
 THREAD_START_DATE = date(2026, 3, 9)
