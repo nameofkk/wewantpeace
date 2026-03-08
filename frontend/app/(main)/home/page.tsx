@@ -566,9 +566,26 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
 });
 
 // ── 최근 급부상 카드 ──────────────────────────────────────────────────────
-function RisingCard({ risingItems, lang, onNavigate }: { risingItems: TrendingItem[]; lang: Lang; onNavigate: (id: string) => void }) {
+function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: TrendingItem[]; allItems: TrendingItem[]; lang: Lang; onNavigate: (id: string) => void }) {
   const homeCountry = useAppStore((s) => s.homeCountry);
   if (risingItems.length === 0) return null;
+
+  // ticker용: 전체 이슈에서 국가별 최고 severity 집계
+  const countryMap = new Map<string, { code: string; maxSeverity: number; count: number }>();
+  for (const item of allItems) {
+    for (const code of item.country_codes) {
+      const existing = countryMap.get(code);
+      if (existing) {
+        existing.maxSeverity = Math.max(existing.maxSeverity, item.severity ?? 0);
+        existing.count++;
+      } else {
+        countryMap.set(code, { code, maxSeverity: item.severity ?? 0, count: 1 });
+      }
+    }
+  }
+  const tickerCountries = [...countryMap.values()]
+    .sort((a, b) => b.maxSeverity - a.maxSeverity || b.count - a.count)
+    .slice(0, 15);
 
   return (
     <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3" data-tour="home-rising">
@@ -618,25 +635,32 @@ function RisingCard({ risingItems, lang, onNavigate }: { risingItems: TrendingIt
         })}
       </div>
 
-      {/* 하단 ticker */}
-      {risingItems.length > 0 && (
+      {/* 하단 ticker — 전체 이슈 국가별 severity */}
+      {tickerCountries.length > 0 && (
         <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5">
           <div className="ticker-track-fast">
             {[0, 1].map((rep) => (
               <span key={rep} className="inline-flex items-center gap-4 px-3">
-                {risingItems.map((item) => {
-                  const pk = personalizedKScore(item, homeCountry);
-                  return (
-                    <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                      {item.country_codes.length > 0 && <span>{getFlag(item.country_codes[0])}</span>}
-                      <span className="font-medium text-muted-foreground">{item.country_codes[0] ?? ""}</span>
-                      <span className={cn("font-bold", pk >= 8 ? "text-red-300" : pk >= 6 ? "text-red-400" : "text-emerald-400")}>
-                        K{roundKScore(pk).toFixed(1)}
-                      </span>
-                      <span className="text-[9px] text-emerald-400">▲</span>
+                {tickerCountries.map((c) => (
+                  <span key={`${rep}-${c.code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                    <span>{getFlag(c.code)}</span>
+                    <span className="font-medium text-muted-foreground">{c.code}</span>
+                    <span className={cn(
+                      "font-bold",
+                      c.maxSeverity >= 60 ? "text-red-400" :
+                      c.maxSeverity >= 40 ? "text-red-400" :
+                      "text-emerald-400"
+                    )}>
+                      {c.maxSeverity}
                     </span>
-                  );
-                })}
+                    <span className={cn(
+                      "text-[9px]",
+                      c.maxSeverity >= 40 ? "text-red-400" : "text-emerald-400"
+                    )}>
+                      {c.maxSeverity >= 40 ? "▲" : "▼"}
+                    </span>
+                  </span>
+                ))}
               </span>
             ))}
           </div>
@@ -990,7 +1014,7 @@ function HomePageContent() {
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {/* 최근 급부상 카드 */}
             {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
-              <RisingCard risingItems={risingData} lang={lang} onNavigate={(id) => router.push(`/issues/${id}`)} />
+              <RisingCard risingItems={risingData} allItems={globalData ?? []} lang={lang} onNavigate={(id) => router.push(`/issues/${id}`)} />
             )}
 
             {isLoading && <LoadingSkeleton />}

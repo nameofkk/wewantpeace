@@ -136,7 +136,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   white-space: nowrap;
-  animation: ticker-scroll 25s linear infinite;
+  animation: ticker-scroll 15s linear infinite;
 }
 
 /* ── 카드 stagger slide-up ─────────────────────────── */

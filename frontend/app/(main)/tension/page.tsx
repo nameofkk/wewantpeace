@@ -709,33 +709,62 @@ export default function TensionPage() {
         </div>
       </div>
 
-      {/* ── 일간 변동 Ticker ──────────────────────────────────────── */}
+      {/* ── 일간 변동 / 긴장도 Ticker ────────────────────────────── */}
       {(() => {
         if (!tensions || tensions.length === 0) return null;
         const deltaItems = tensions
           .filter((t) => t.delta_24h != null && t.delta_24h !== 0)
           .sort((a, b) => Math.abs(b.delta_24h ?? 0) - Math.abs(a.delta_24h ?? 0));
-        if (deltaItems.length < 1) return null;
+        // delta_24h가 있으면 일간 변동 모드, 없으면 raw_score 기반 국가별 긴장도 모드
+        const useDelta = deltaItems.length >= 1;
+        const tickerItems = useDelta
+          ? deltaItems.slice(0, 20)
+          : [...tensions].sort((a, b) => b.raw_score - a.raw_score).slice(0, 20);
+        if (tickerItems.length < 1) return null;
         return (
           <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5">
             <div className="ticker-track-fast">
               {[0, 1].map((rep) => (
                 <span key={rep} className="inline-flex items-center gap-4 px-3">
                   <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                    {lang === "ko" ? "📊 일간 변동" : "📊 Daily Changes"}
+                    {useDelta
+                      ? (lang === "ko" ? "📊 일간 변동" : "📊 Daily Changes")
+                      : (lang === "ko" ? "📊 긴장도 현황" : "📊 Tension Levels")}
                   </span>
-                  {deltaItems.map((item) => {
-                    const delta = item.delta_24h ?? 0;
-                    const isUp = delta > 0;
+                  {tickerItems.map((item) => {
+                    if (useDelta) {
+                      const delta = item.delta_24h ?? 0;
+                      const isUp = delta > 0;
+                      return (
+                        <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
+                          <span>{getFlag(item.country_code)}</span>
+                          <span className="font-medium text-muted-foreground">{item.country_code}</span>
+                          <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "+" : ""}{delta.toFixed(1)}
+                          </span>
+                          <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
+                            {isUp ? "▲" : "▼"}
+                          </span>
+                        </span>
+                      );
+                    }
                     return (
                       <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
                         <span>{getFlag(item.country_code)}</span>
                         <span className="font-medium text-muted-foreground">{item.country_code}</span>
-                        <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
-                          {isUp ? "+" : ""}{delta.toFixed(1)}
+                        <span className={cn(
+                          "font-bold",
+                          item.raw_score >= 60 ? "text-red-400" :
+                          item.raw_score >= 40 ? "text-red-400" :
+                          "text-emerald-400"
+                        )}>
+                          {item.raw_score.toFixed(0)}
                         </span>
-                        <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
-                          {isUp ? "▲" : "▼"}
+                        <span className={cn(
+                          "text-[9px]",
+                          item.raw_score >= 40 ? "text-red-400" : "text-emerald-400"
+                        )}>
+                          {item.raw_score >= 40 ? "▲" : "▼"}
                         </span>
                       </span>
                     );
