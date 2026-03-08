@@ -18,8 +18,8 @@ class Subscription(Base):
     customer_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     amount: Mapped[int] = mapped_column(Integer, nullable=False, default=4900)
     currency: Mapped[str] = mapped_column(String(4), nullable=False, default="KRW")
-    # 스토어 IAP 필드
-    platform: Mapped[str] = mapped_column(String(16), nullable=False, default="web")
+    # 스토어 IAP 필드 (promo:XXXX 형식 지원을 위해 32자)
+    platform: Mapped[str] = mapped_column(String(32), nullable=False, default="web")
     store_product_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     store_transaction_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     store_original_transaction_id: Mapped[str | None] = mapped_column(String(256), nullable=True)

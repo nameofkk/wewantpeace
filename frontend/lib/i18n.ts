@@ -1020,6 +1020,15 @@ export const translations = {
     trial_success: "Pro 7일 무료 체험이 시작되었습니다!",
     trial_note: "Pro+ 플랜은 무료 체험이 제공되지 않습니다",
 
+    // Promo code
+    promo_have_code: "프로모 코드가 있으신가요?",
+    promo_input_placeholder: "프로모 코드 입력",
+    promo_redeem: "적용",
+    promo_success: "Pro 플랜이 활성화되었습니다!",
+    promo_invalid: "유효하지 않은 프로모 코드입니다",
+    promo_already_used: "이미 사용한 프로모 코드입니다",
+    promo_already_paid: "이미 유료 플랜을 사용 중입니다",
+
     // Phase 2: Admin KPI
     admin_kpi: "KPI",
 
@@ -2228,6 +2237,15 @@ export const translations = {
     trial_already_used: "Free trial is available once",
     trial_success: "Your 7-day Pro free trial has started!",
     trial_note: "Pro+ plan does not include a free trial",
+
+    // Promo code
+    promo_have_code: "Have a promo code?",
+    promo_input_placeholder: "Enter promo code",
+    promo_redeem: "Redeem",
+    promo_success: "Pro plan activated!",
+    promo_invalid: "Invalid promo code",
+    promo_already_used: "This promo code has already been used",
+    promo_already_paid: "You already have a paid plan",
 
     // Phase 2: Admin KPI
     admin_kpi: "KPI",

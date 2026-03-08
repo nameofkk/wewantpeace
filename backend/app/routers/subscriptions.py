@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,6 +18,10 @@ from backend.app.services.area_activation import sync_area_activation
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+
+PROMO_CODES = {
+    "PRODUCTHUNT": {"plan": "pro", "days": 7, "description": "Product Hunt launch offer"},
+}
 
 PLANS = {
     "pro": {"name": "Pro", "amount": 4900, "features": [
@@ -45,6 +49,10 @@ PLANS = {
 
 class CancelBody(BaseModel):
     reason: str = "사용자 요청"
+
+
+class RedeemPromoBody(BaseModel):
+    code: str
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
@@ -166,8 +174,6 @@ async def start_trial(
     if existing.scalar_one_or_none():
         raise HTTPException(409, detail={"code": "TRIAL_ALREADY_USED"})
 
-    from datetime import timedelta
-
     now = datetime.now(timezone.utc)
     trial_end = now + timedelta(days=7)
 
@@ -192,4 +198,61 @@ async def start_trial(
         "status": "ok",
         "plan": "pro",
         "trial_end": trial_end.isoformat(),
+    }
+
+
+@router.post("/redeem-promo")
+async def redeem_promo(
+    body: RedeemPromoBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로모 코드로 Pro 활성화. trial 사용 여부와 무관하게 사용 가능."""
+    code = body.code.strip().upper()
+    promo = PROMO_CODES.get(code)
+    if not promo:
+        raise HTTPException(400, detail={"code": "INVALID_PROMO_CODE"})
+
+    # 이미 유료 플랜이면 거부
+    if current_user.plan != "free":
+        raise HTTPException(409, detail={"code": "ALREADY_PAID_PLAN"})
+
+    # 이미 같은 프로모 코드를 사용했으면 거부
+    platform_tag = f"promo:{code}"
+    existing = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.platform == platform_tag,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, detail={"code": "PROMO_ALREADY_USED"})
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=promo["days"])
+
+    sub = Subscription(
+        user_id=current_user.id,
+        plan=promo["plan"],
+        status="active",
+        amount=0,
+        platform=platform_tag,
+        started_at=now,
+        expires_at=expires_at,
+        auto_renewing=False,
+    )
+    db.add(sub)
+
+    current_user.plan = promo["plan"]
+    await sync_area_activation(current_user.id, promo["plan"], db)
+    await db.flush()
+
+    logger.info("promo redeemed: user=%s code=%s plan=%s expires=%s",
+                current_user.id, code, promo["plan"], expires_at.isoformat())
+
+    return {
+        "status": "ok",
+        "plan": promo["plan"],
+        "expires_at": expires_at.isoformat(),
+        "promo_code": code,
     }

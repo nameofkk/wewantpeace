@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles, ExternalLink } from "lucide-react";
+import { Check, X, Zap, Shield, Star, Crown, ArrowLeft, Download, Smartphone, Sparkles, ExternalLink, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
@@ -186,6 +186,10 @@ function UpgradeContent() {
   const [error, setError] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
   const [trialSuccess, setTrialSuccess] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoSuccess, setPromoSuccess] = useState(false);
 
   // trial 사용 이력 확인: /subscriptions/my 에서 status가 trial인 이력이 있으면 사용됨
   useEffect(() => {
@@ -311,6 +315,41 @@ function UpgradeContent() {
       setError(t(lang, "upgrade_payment_error"));
     } finally {
       setLoading(null);
+    }
+  }
+
+  async function handleRedeemPromo() {
+    if (!user) { window.location.href = "/login"; return; }
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setError(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${API_BASE}/subscriptions/redeem-promo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const code = data?.detail?.code || data?.detail || "";
+        if (code === "INVALID_PROMO_CODE") {
+          setError(t(lang, "promo_invalid"));
+        } else if (code === "PROMO_ALREADY_USED") {
+          setError(t(lang, "promo_already_used"));
+        } else if (code === "ALREADY_PAID_PLAN") {
+          setError(t(lang, "promo_already_paid"));
+        } else {
+          setError(t(lang, "promo_invalid"));
+        }
+        return;
+      }
+      setPromoSuccess(true);
+      setTimeout(() => { window.location.reload(); }, 1500);
+    } catch {
+      setError(t(lang, "upgrade_payment_error"));
+    } finally {
+      setPromoLoading(false);
     }
   }
 
@@ -837,6 +876,46 @@ function UpgradeContent() {
             ))}
           </div>
         </div>
+
+        {/* ── 프로모 코드 ── */}
+        {currentPlan === "free" && (
+          <div className="mt-8 text-center" style={{ animation: "fadeSlideUp 0.5s ease 0.5s both" }}>
+            {promoSuccess ? (
+              <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 font-semibold">
+                {t(lang, "promo_success")}
+              </div>
+            ) : !promoOpen ? (
+              <button
+                onClick={() => setPromoOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Tag className="h-3 w-3" />
+                {t(lang, "promo_have_code")}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 max-w-xs mx-auto">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && handleRedeemPromo()}
+                  placeholder={t(lang, "promo_input_placeholder")}
+                  className="flex-1 rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  autoFocus
+                />
+                <button
+                  onClick={handleRedeemPromo}
+                  disabled={promoLoading || !promoCode.trim()}
+                  className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {promoLoading ? (
+                    <span className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin inline-block" />
+                  ) : t(lang, "promo_redeem")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 푸터 */}
         <div className="mt-8 text-center text-[11px] text-muted-foreground space-y-1 pb-4">
