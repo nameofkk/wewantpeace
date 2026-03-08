@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
@@ -153,6 +153,12 @@ export default function SettingsPage() {
   const [quietStart, setQuietStart] = useState("23:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
   // notifSaving/notifSaved 제거 — 자동 저장
+
+  // debounce refs — 빠른 연속 토글 시 마지막 값만 서버에 전송
+  const topicDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTopicsRef = useRef<string[]>(selectedTopics);
+  const quietDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestQuietRef = useRef<{ start: string; end: string }>({ start: quietStart, end: quietEnd });
 
   // 프로필 편집
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -389,16 +395,34 @@ export default function SettingsPage() {
       ? selectedTopics.filter((t) => t !== topic)
       : [...selectedTopics, topic];
     setSelectedTopics(next);
-    saveNotifPatch({ topics: next });
+    latestTopicsRef.current = next;
+
+    if (topicDebounceRef.current) clearTimeout(topicDebounceRef.current);
+    topicDebounceRef.current = setTimeout(() => {
+      saveNotifPatch({ topics: latestTopicsRef.current });
+    }, 300);
   }
 
   function handleSetAllTopics(topics: string[]) {
     setSelectedTopics(topics);
-    saveNotifPatch({ topics });
+    latestTopicsRef.current = topics;
+
+    if (topicDebounceRef.current) clearTimeout(topicDebounceRef.current);
+    topicDebounceRef.current = setTimeout(() => {
+      saveNotifPatch({ topics: latestTopicsRef.current });
+    }, 300);
   }
 
   function handleSaveQuietHours(start: string, end: string) {
-    saveNotifPatch({ quiet_hours_start: start, quiet_hours_end: end });
+    latestQuietRef.current = { start, end };
+
+    if (quietDebounceRef.current) clearTimeout(quietDebounceRef.current);
+    quietDebounceRef.current = setTimeout(() => {
+      saveNotifPatch({
+        quiet_hours_start: latestQuietRef.current.start,
+        quiet_hours_end: latestQuietRef.current.end,
+      });
+    }, 300);
   }
 
   // 국가 코드 → 이름+플래그

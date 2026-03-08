@@ -78,22 +78,28 @@ async def _set_cooldown(cluster_id: str, redis, severity: int = 0):
     await redis.setex(_cooldown_key(cluster_id), ttl, "1")
 
 
-def _daily_push_key(user_id: str) -> str:
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+def _daily_push_key(user_id: str, tz_name: str = "") -> str:
+    if tz_name:
+        try:
+            today = datetime.now(ZoneInfo(tz_name)).strftime("%Y-%m-%d")
+        except (ZoneInfoNotFoundError, Exception):
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return f"{_DAILY_PUSH_KEY_PREFIX}{user_id}:{today}"
 
 
-async def _check_daily_limit(user_id: str, plan: str, redis) -> bool:
+async def _check_daily_limit(user_id: str, plan: str, redis, tz_name: str = "") -> bool:
     """일일 푸시 상한 확인. 초과 시 True 반환."""
     limit = DAILY_PUSH_LIMITS.get(plan, DAILY_PUSH_LIMITS["free"])
-    key = _daily_push_key(user_id)
+    key = _daily_push_key(user_id, tz_name=tz_name)
     current = await redis.get(key)
     return int(current or 0) >= limit
 
 
-async def _increment_daily_push(user_id: str, redis):
+async def _increment_daily_push(user_id: str, redis, tz_name: str = ""):
     """일일 푸시 카운터 증가."""
-    key = _daily_push_key(user_id)
+    key = _daily_push_key(user_id, tz_name=tz_name)
     pipe = redis.pipeline()
     pipe.incr(key)
     pipe.expire(key, 86400)  # 24시간 TTL
@@ -112,7 +118,7 @@ def _is_in_quiet_hours(current: dt_time, start: dt_time, end: dt_time) -> bool:
 
 # ── 토큰 타입 (플랫폼 + user_id + 개인화 정보 포함) ──
 class _TokenInfo:
-    __slots__ = ("fcm_token", "platform", "user_id", "home_country", "language")
+    __slots__ = ("fcm_token", "platform", "user_id", "home_country", "language", "tz_name")
 
     def __init__(
         self,
@@ -121,12 +127,14 @@ class _TokenInfo:
         user_id: _uuid.UUID,
         home_country: str = "KR",
         language: str = "ko",
+        tz_name: str = "",
     ):
         self.fcm_token = fcm_token
         self.platform = platform  # "web" | "android" | "ios"
         self.user_id = user_id
         self.home_country = home_country
         self.language = language
+        self.tz_name = tz_name
 
 
 # ── 억제된 사용자 정보 ──
@@ -223,7 +231,7 @@ async def _get_target_tokens_by_platform(
             except (ZoneInfoNotFoundError, Exception):
                 pass  # timezone 파싱 실패 시 조용한 시간 무시
 
-        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason, home_country or "KR", language or "ko"))
+        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason, home_country or "KR", language or "ko", tz_name or ""))
 
     # 2차: 유저당 last_seen_at 최신 1개 토큰만 선택 (PRD 8.5)
     tokens: list[_TokenInfo] = []
@@ -233,7 +241,7 @@ async def _get_target_tokens_by_platform(
         # 억제 사유가 있는 토큰이 하나라도 있으면 유저 전체 억제
         # (같은 유저의 모든 토큰은 동일한 suppression_reason을 가짐)
         first_suppression = None
-        for _, _, _, reason, _, _ in token_list:
+        for _, _, _, reason, _, _, _ in token_list:
             if reason is not None:
                 first_suppression = reason
                 break
@@ -256,7 +264,7 @@ async def _get_target_tokens_by_platform(
             reverse=True,
         )
         best = sorted_by_seen[0]
-        tokens.append(_TokenInfo(best[0], best[1], user_id, home_country=best[4], language=best[5]))
+        tokens.append(_TokenInfo(best[0], best[1], user_id, home_country=best[4], language=best[5], tz_name=best[6]))
 
     return _TargetResult(tokens, suppressed)
 
@@ -282,7 +290,7 @@ async def _apply_daily_limits(
 
     for t in target.tokens:
         plan = user_plans.get(t.user_id, "free")
-        exceeded = await _check_daily_limit(str(t.user_id), plan, redis)
+        exceeded = await _check_daily_limit(str(t.user_id), plan, redis, tz_name=t.tz_name)
         if exceeded:
             extra_suppressed.append(_SuppressedInfo(t.user_id, t.platform, "daily_limit"))
         else:
@@ -298,7 +306,7 @@ async def _increment_daily_push_for_tokens(tokens: list[_TokenInfo], redis):
         uid = str(t.user_id)
         if uid not in seen_users:
             seen_users.add(uid)
-            await _increment_daily_push(uid, redis)
+            await _increment_daily_push(uid, redis, tz_name=t.tz_name)
 
 
 async def _get_plan_locked_users(
