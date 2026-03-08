@@ -1149,7 +1149,7 @@ export default function SettingsPage() {
                     { icon: "⚡", ko: "속보 알림", en: "Fast alerts" },
                     { icon: "📊", ko: "KScore 필터", en: "KScore filter" },
                     { icon: "🔕", ko: "방해금지 시간", en: "Quiet hours" },
-                    { icon: "📍", ko: `관심지역 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} regions` },
+                    { icon: "📍", ko: `관심 국가 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} countries` },
                   ].map((f) => (
                     <span key={f.ko} className="flex items-center gap-1 rounded-full bg-primary/8 border border-primary/20 px-2 py-0.5 text-[10px] text-primary/80">
                       <span>{f.icon}</span>

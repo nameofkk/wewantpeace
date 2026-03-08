@@ -492,7 +492,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
             </div>
           ) : (
             <div className="mt-1.5 flex items-center gap-1">
-              <h3 className="text-sm font-semibold leading-snug">{displayTitle}</h3>
+              <h3 className="text-sm font-semibold leading-snug line-clamp-2">{displayTitle}</h3>
               {isAdmin && clusterId && (
                 <button
                   onClick={handleEditStart}

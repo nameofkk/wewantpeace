@@ -34,7 +34,7 @@ function kscoreLabel(rounded: number, lang: "ko" | "en"): string {
 
 export function KScoreBar({ kscore, showLabel = true, className = "" }: KScoreBarProps) {
   const lang = useAppStore((s) => s.lang);
-  const rounded = Math.round(kscore * 10) / 10;
+  const rounded = Math.round(kscore * 100) / 100;
   const pct = Math.min(100, Math.round((kscore / KSCORE_MAX) * 100));
   const gradient = kscoreColor(rounded);
   const label = kscoreLabel(rounded, lang);

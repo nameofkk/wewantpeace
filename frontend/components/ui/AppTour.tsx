@@ -21,6 +21,8 @@ const tourStyles: Partial<Styles> = {
     borderRadius: "12px",
     padding: "20px",
     fontSize: "14px",
+    maxWidth: "min(420px, 90vw)",
+    wordBreak: "keep-all" as const,
   },
   tooltipContainer: {
     textAlign: "left" as const,
