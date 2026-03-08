@@ -242,6 +242,7 @@ export default function SettingsPage() {
     next_billing_at?: string;
     auto_renewing?: boolean;
     status?: string;
+    trial_end?: string;
   }>({ platform: "web" });
   const subPlatform = subInfo.platform;
   useEffect(() => {
@@ -260,6 +261,7 @@ export default function SettingsPage() {
               next_billing_at: d.next_billing_at,
               auto_renewing: d.auto_renewing,
               status: d.status,
+              trial_end: d.trial_end,
             });
           }
         })
@@ -1129,6 +1131,17 @@ export default function SettingsPage() {
                  plan === "pro" ? t(lang, "settings_plan_pro") :
                  t(lang, "settings_plan_free")}
               </p>
+              {/* 체험판/유료 뱃지 */}
+              {plan !== "free" && subInfo.status === "trial" && (
+                <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                  {t(lang, "trial_badge")}
+                </span>
+              )}
+              {plan !== "free" && subInfo.status === "active" && (
+                <span className="rounded-full bg-green-500/15 border border-green-500/30 px-2 py-0.5 text-[10px] font-semibold text-green-400">
+                  {t(lang, "settings_plan_status_active")}
+                </span>
+              )}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plan === "pro_plus" ? t(lang, "settings_plan_proplus_desc") :
@@ -1136,8 +1149,32 @@ export default function SettingsPage() {
                t(lang, "settings_plan_free_desc", { n: FREE_COUNTRY_LIMIT })}
             </p>
 
-            {/* 결제 정보 (유료 플랜) */}
-            {plan !== "free" && subInfo.started_at && (
+            {/* 체험판 정보 */}
+            {plan !== "free" && subInfo.status === "trial" && subInfo.trial_end && (
+              <div className="mt-3 space-y-1.5 rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">{t(lang, "trial_expires_label")}</span>
+                  <span className="font-medium text-amber-400">
+                    {new Date(subInfo.trial_end).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR")}
+                  </span>
+                </div>
+                {(() => {
+                  const daysLeft = Math.max(0, Math.ceil((new Date(subInfo.trial_end!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                  return (
+                    <p className="text-[10px] font-semibold text-amber-400">
+                      {t(lang, "trial_remaining_days", { n: daysLeft })}
+                    </p>
+                  );
+                })()}
+                <p className="text-[10px] text-muted-foreground">{t(lang, "trial_upgrade_prompt")}</p>
+                <Link href="/upgrade" className="mt-1 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2 text-center text-xs font-bold text-white">
+                  {t(lang, "settings_upgrade_btn")}
+                </Link>
+              </div>
+            )}
+
+            {/* 유료 구독 결제 정보 */}
+            {plan !== "free" && subInfo.status !== "trial" && subInfo.started_at && (
               <div className="mt-3 space-y-1 rounded-lg bg-muted/30 px-3 py-2.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">{t(lang, "settings_plan_started")}</span>

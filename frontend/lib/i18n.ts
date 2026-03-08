@@ -1032,6 +1032,12 @@ export const translations = {
     trial_already_used: "무료 체험은 1회만 가능합니다",
     trial_success: "Pro 7일 무료 체험이 시작되었습니다!",
     trial_note: "Pro+ 플랜은 무료 체험이 제공되지 않습니다",
+    trial_badge: "체험판",
+    trial_remaining_days: "체험판 {n}일 남음",
+    trial_expires_label: "체험 만료일",
+    trial_upgrade_prompt: "체험 종료 전 업그레이드하면 서비스가 끊기지 않습니다",
+    settings_plan_status_trial: "무료 체험 중",
+    settings_plan_status_active: "구독 중",
 
     // Promo code
     promo_have_code: "프로모 코드가 있으신가요?",
@@ -2282,6 +2288,12 @@ export const translations = {
     trial_already_used: "Free trial is available once",
     trial_success: "Your 7-day Pro free trial has started!",
     trial_note: "Pro+ plan does not include a free trial",
+    trial_badge: "Trial",
+    trial_remaining_days: "{n} days left in trial",
+    trial_expires_label: "Trial expires",
+    trial_upgrade_prompt: "Upgrade before trial ends for uninterrupted service",
+    settings_plan_status_trial: "Free Trial",
+    settings_plan_status_active: "Active",
 
     // Promo code
     promo_have_code: "Have a promo code?",

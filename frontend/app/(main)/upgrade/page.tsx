@@ -123,6 +123,8 @@ function UpgradeContent() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
+  const [isCurrentlyTrial, setIsCurrentlyTrial] = useState(false);
+  const [trialEnd, setTrialEnd] = useState<string | null>(null);
   const [trialSuccess, setTrialSuccess] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -146,8 +148,13 @@ function UpgradeContent() {
         if (res.ok) {
           const data = await res.json();
           // trial_end가 있으면 trial 사용 이력 있음
-          if (data.status === "trial" || data.trial_end) {
+          if (data.trial_end) {
             setTrialUsed(true);
+          }
+          if (data.status === "trial") {
+            setIsCurrentlyTrial(true);
+            setTrialUsed(true);
+            if (data.trial_end) setTrialEnd(data.trial_end);
           }
         }
       } catch { /* ignore */ }
@@ -197,8 +204,13 @@ function UpgradeContent() {
         await handleIOSPurchase(planId);
       }
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message || t(lang, "upgrade_payment_error"));
+      const err = e as { message?: string; body?: { detail?: { code?: string; message?: string } | string } };
+      const code = typeof err.body?.detail === "object" ? err.body?.detail?.code : "";
+      if (code === "ALREADY_SUBSCRIBED") {
+        setError(lang === "ko" ? "이미 활성 구독이 있습니다. 설정에서 현재 구독을 확인해주세요." : "You already have an active subscription. Please check your current plan in Settings.");
+      } else {
+        setError(err.message || t(lang, "upgrade_payment_error"));
+      }
     } finally {
       setLoading(null);
     }
@@ -621,7 +633,35 @@ function UpgradeContent() {
               </div>
 
               {/* 구독 버튼 */}
-              {currentPlan === "pro" ? (
+              {currentPlan === "pro" && isCurrentlyTrial ? (
+                <div className="mt-5 space-y-2">
+                  <div className="w-full rounded-xl py-2.5 text-xs font-semibold text-center bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {t(lang, "settings_plan_status_trial")}
+                    {trialEnd && (() => {
+                      const d = Math.max(0, Math.ceil((new Date(trialEnd).getTime() - Date.now()) / 86400000));
+                      return <span className="ml-1.5 text-[10px] opacity-80">({t(lang, "trial_remaining_days", { n: d })})</span>;
+                    })()}
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
+                    disabled={loading === "pro"}
+                    className={cn(
+                      "btn-shine w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                      "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+                      "hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5",
+                      "active:scale-[0.98] active:shadow-none",
+                      "disabled:opacity-50"
+                    )}
+                  >
+                    {loading === "pro" ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        {isWeb ? t(lang, "web_subscribe_loading") : t(lang, "upgrade_processing")}
+                      </span>
+                    ) : isWeb ? t(lang, "web_subscribe_button") : t(lang, "upgrade_subscribe")}
+                  </button>
+                </div>
+              ) : currentPlan === "pro" && !isCurrentlyTrial ? (
                 <div className="mt-5 w-full rounded-xl py-3 text-xs font-semibold text-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {t(lang, "upgrade_current_plan")}
                 </div>

@@ -81,7 +81,7 @@ async def get_my_subscription(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
             or_(
-                Subscription.status.in_(["active", "grace_period"]),
+                Subscription.status.in_(["active", "trial", "grace_period"]),
                 and_(
                     Subscription.status == "cancelled",
                     Subscription.expires_at > now,
@@ -103,6 +103,7 @@ async def get_my_subscription(
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "next_billing_at": sub.next_billing_at.isoformat() if sub.next_billing_at else None,
         "cancelled_at": sub.cancelled_at.isoformat() if sub.cancelled_at else None,
+        "trial_end": sub.trial_end.isoformat() if sub.trial_end else None,
     }
 
 

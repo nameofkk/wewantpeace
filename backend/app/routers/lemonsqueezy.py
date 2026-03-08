@@ -71,15 +71,28 @@ async def create_checkout(
     if not settings.lemonsqueezy_store_id:
         raise HTTPException(500, detail="LemonSqueezy Store ID가 설정되지 않았습니다.")
 
-    # 이미 활성 구독이 있는지 확인
+    # 이미 활성 유료 구독이 있는지 확인 (trial은 업그레이드 허용)
     existing = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "trial", "grace_period"]),
+            Subscription.status.in_(["active", "grace_period"]),
         ).limit(1)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 활성 구독이 있습니다."})
+
+    # trial 구독이 있으면 만료 처리 (유료 전환 준비)
+    trial_result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.status == "trial",
+        ).limit(1)
+    )
+    trial_sub = trial_result.scalar_one_or_none()
+    if trial_sub:
+        trial_sub.status = "expired"
+        trial_sub.updated_at = datetime.now(timezone.utc)
+        logger.info("Trial 구독 만료 처리: user=%s → 유료 전환 진행", current_user.id)
 
     # LemonSqueezy Checkout API 호출
     checkout_payload = {
@@ -296,6 +309,7 @@ async def _handle_subscription_created(
         existing.plan = plan
         existing.ls_variant_id = ls_variant_id
         existing.expires_at = expires_at
+        existing.next_billing_at = expires_at  # renews_at가 다음 결제일
         existing.updated_at = now
     else:
         sub = Subscription(
@@ -311,6 +325,7 @@ async def _handle_subscription_created(
             auto_renewing=attrs.get("cancelled", False) is False,
             started_at=now,
             expires_at=expires_at,
+            next_billing_at=expires_at,  # renews_at가 다음 결제일
         )
         db.add(sub)
 
@@ -342,6 +357,7 @@ async def _handle_payment_success(
 
     if new_expires:
         sub.expires_at = new_expires
+        sub.next_billing_at = new_expires  # renews_at가 다음 결제일
 
     now = datetime.now(timezone.utc)
     sub.status = "active"
