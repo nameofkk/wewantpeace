@@ -1,66 +1,24 @@
 """
-SpikeDetector 단위 테스트.
+SpikeDetector v2 단위 테스트 — 누적 기반 스파이크 감지.
 """
 import pytest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
+
 from worker.processor.spike_detector import (
     evaluate_spike,
-    increment_event_counters,
     is_in_cooldown,
     set_cooldown,
-    update_baseline,
-    get_baseline,
-    track_source,
-    C1_THRESHOLD,
-    C10_THRESHOLD,
-    RATIO_THRESHOLD,
+    EVENT_COUNT_MIN,
     SEVERITY_MIN,
+    SOURCES_MIN,
+    MAX_AGE_HOURS,
+    COOLDOWN_SECONDS,
+    COOLDOWN_SECONDS_CRITICAL,
 )
 
 
 CLUSTER_ID = "test-cluster-001"
-CLUSTER_KEY = "u8c3m:conflict"
-
-
-# ── 카운터 ────────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_counter_increments(redis_mock):
-    c1, c10 = await increment_event_counters(CLUSTER_ID, redis_mock)
-    assert c1 == 1
-    assert c10 == 1
-
-
-@pytest.mark.asyncio
-async def test_counter_accumulates(redis_mock):
-    for _ in range(5):
-        await increment_event_counters(CLUSTER_ID, redis_mock)
-    c1, c10 = await increment_event_counters(CLUSTER_ID, redis_mock)
-    assert c1 == 6
-    assert c10 == 6
-
-
-# ── EWMA 기준선 ───────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_baseline_starts_at_zero(redis_mock):
-    b = await get_baseline("new_key", redis_mock)
-    assert b == 0.0
-
-
-@pytest.mark.asyncio
-async def test_baseline_updates(redis_mock):
-    b = await update_baseline(CLUSTER_KEY, 10, redis_mock)
-    # 첫 관측(obs_count<5) alpha=0.5: 0.5*10 + 0.5*0 = 5.0
-    assert b == pytest.approx(5.0)
-
-
-@pytest.mark.asyncio
-async def test_baseline_ewma_converges(redis_mock):
-    """반복 업데이트 시 c10 값으로 수렴."""
-    for _ in range(50):
-        await update_baseline(CLUSTER_KEY, 8, redis_mock)
-    b = await get_baseline(CLUSTER_KEY, redis_mock)
-    assert b == pytest.approx(8.0, abs=0.5)
 
 
 # ── 쿨다운 ────────────────────────────────────────────────────────────────────
@@ -78,37 +36,57 @@ async def test_cooldown_set_and_detected(redis_mock):
     assert result is True
 
 
+@pytest.mark.asyncio
+async def test_cooldown_severity_critical_uses_shorter_ttl(redis_mock):
+    """severity >= 90 → 3시간 쿨다운."""
+    await set_cooldown(CLUSTER_ID, redis_mock, severity=95)
+    ttl = await redis_mock.ttl(f"spike:cooldown:{CLUSTER_ID}")
+    assert ttl <= COOLDOWN_SECONDS_CRITICAL
+    assert ttl > 0
+
+
+@pytest.mark.asyncio
+async def test_cooldown_normal_uses_longer_ttl(redis_mock):
+    """severity < 90 → 6시간 쿨다운."""
+    await set_cooldown(CLUSTER_ID, redis_mock, severity=50)
+    ttl = await redis_mock.ttl(f"spike:cooldown:{CLUSTER_ID}")
+    assert ttl <= COOLDOWN_SECONDS
+    assert ttl > COOLDOWN_SECONDS_CRITICAL
+
+
 # ── 스파이크 감지: 트리거 ON ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_spike_triggers_on_c1_threshold(redis_mock):
-    """c1 >= 4 이면 (ratio 조건도 기준선 0이면 높음) 스파이크."""
-    cid = "spike-c1-test"
-    ckey = "abc12:conflict"
-    # c1을 4 이상으로 만들기 위해 3번 미리 증가
-    for _ in range(3):
-        await increment_event_counters(cid, redis_mock)
-    # 최소 2개 독립 소스 필요
-    await track_source(cid, "src-a", redis_mock)
-    await track_source(cid, "src-b", redis_mock)
-    # 4번째 호출 (evaluate_spike 내부에서 1회 더 증가)
-    result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
-    is_spike, _ = result
+@patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-id-001")
+async def test_spike_triggers_when_all_conditions_met(mock_save, redis_mock):
+    """event_count >= 8, severity >= 40, sources >= 3, age <= 48h → 스파이크."""
+    result = await evaluate_spike(
+        cluster_id=CLUSTER_ID,
+        severity=60,
+        event_count=10,
+        independent_sources=4,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        kscore=5.5,
+        redis=redis_mock,
+    )
+    is_spike, spike_id = result
     assert is_spike is True
+    assert spike_id == "spike-id-001"
+    mock_save.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_spike_triggers_on_c10_threshold(redis_mock):
-    """c10 >= 12 면 스파이크."""
-    cid = "spike-c10-test"
-    ckey = "def34:conflict"
-    # 11번 미리 증가
-    for _ in range(11):
-        await increment_event_counters(cid, redis_mock)
-    # 최소 2개 독립 소스 필요
-    await track_source(cid, "src-a", redis_mock)
-    await track_source(cid, "src-b", redis_mock)
-    result = await evaluate_spike(cid, ckey, severity=55, redis=redis_mock)
+@patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-id-002")
+async def test_spike_triggers_at_exact_thresholds(mock_save, redis_mock):
+    """정확한 임계치에서도 트리거."""
+    result = await evaluate_spike(
+        cluster_id="exact-threshold",
+        severity=SEVERITY_MIN,
+        event_count=EVENT_COUNT_MIN,
+        independent_sources=SOURCES_MIN,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
     is_spike, _ = result
     assert is_spike is True
 
@@ -117,23 +95,77 @@ async def test_spike_triggers_on_c10_threshold(redis_mock):
 
 @pytest.mark.asyncio
 async def test_spike_not_triggered_low_severity(redis_mock):
-    """severity < 35 면 스파이크 안됨."""
-    cid = "no-spike-sev"
-    ckey = "ghi56:diplomacy"
-    for _ in range(20):
-        await increment_event_counters(cid, redis_mock)
-    result = await evaluate_spike(cid, ckey, severity=20, redis=redis_mock)
+    """severity < 40 → 스파이크 안됨."""
+    result = await evaluate_spike(
+        cluster_id="no-spike-sev",
+        severity=SEVERITY_MIN - 1,
+        event_count=20,
+        independent_sources=5,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
     is_spike, _ = result
     assert is_spike is False
 
 
 @pytest.mark.asyncio
-async def test_spike_not_triggered_low_count(redis_mock):
-    """c1 < 4 AND c10 < 12 면 스파이크 안됨."""
-    cid = "no-spike-count"
-    ckey = "jkl78:protest"
-    # 카운터 없는 상태 → evaluate_spike 1회만 호출 → c1=1, c10=1
-    result = await evaluate_spike(cid, ckey, severity=60, redis=redis_mock)
+async def test_spike_not_triggered_low_event_count(redis_mock):
+    """event_count < 8 → 스파이크 안됨."""
+    result = await evaluate_spike(
+        cluster_id="no-spike-count",
+        severity=60,
+        event_count=EVENT_COUNT_MIN - 1,
+        independent_sources=5,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
+    is_spike, _ = result
+    assert is_spike is False
+
+
+@pytest.mark.asyncio
+async def test_spike_not_triggered_low_sources(redis_mock):
+    """independent_sources < 3 → 스파이크 안됨."""
+    result = await evaluate_spike(
+        cluster_id="no-spike-sources",
+        severity=60,
+        event_count=20,
+        independent_sources=SOURCES_MIN - 1,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
+    is_spike, _ = result
+    assert is_spike is False
+
+
+@pytest.mark.asyncio
+async def test_spike_not_triggered_old_cluster(redis_mock):
+    """cluster age > 48h → 스파이크 안됨."""
+    result = await evaluate_spike(
+        cluster_id="no-spike-old",
+        severity=80,
+        event_count=30,
+        independent_sources=10,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=MAX_AGE_HOURS + 1),
+        redis=redis_mock,
+    )
+    is_spike, _ = result
+    assert is_spike is False
+
+
+@pytest.mark.asyncio
+async def test_spike_not_triggered_no_first_event(redis_mock):
+    """first_event_at=None → age=0 → 조건 충족 시 트리거 가능 (age_hours=0 <= 48)."""
+    # first_event_at=None이면 age_hours=0이므로 age 조건은 통과
+    # 하지만 낮은 severity로 막음
+    result = await evaluate_spike(
+        cluster_id="no-first-event",
+        severity=10,
+        event_count=20,
+        independent_sources=5,
+        first_event_at=None,
+        redis=redis_mock,
+    )
     is_spike, _ = result
     assert is_spike is False
 
@@ -142,28 +174,46 @@ async def test_spike_not_triggered_low_count(redis_mock):
 async def test_spike_cooldown_prevents_retrigger(redis_mock):
     """쿨다운 중이면 스파이크 트리거 안됨."""
     cid = "cooldown-test"
-    ckey = "mno90:conflict"
-    # 먼저 쿨다운 설정
     await set_cooldown(cid, redis_mock)
-    # 카운터 많아도
-    for _ in range(20):
-        await increment_event_counters(cid, redis_mock)
-    result = await evaluate_spike(cid, ckey, severity=80, redis=redis_mock)
+    result = await evaluate_spike(
+        cluster_id=cid,
+        severity=80,
+        event_count=30,
+        independent_sources=10,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
     is_spike, _ = result
     assert is_spike is False
 
+
+# ── 쿨다운 설정 확인 ──────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_spike_ratio_prevents_trigger(redis_mock):
-    """ratio < 4.0 이면 스파이크 안됨 (높은 기준선)."""
-    cid = "ratio-test"
-    ckey = "pqr12:conflict"
-    # 기준선을 높게 설정 (c10=100으로 EWMA)
-    for _ in range(100):
-        await update_baseline(ckey, 100, redis_mock)
-    # c10을 11로 (threshold는 12 미만)
-    for _ in range(10):
-        await increment_event_counters(cid, redis_mock)
-    result = await evaluate_spike(cid, ckey, severity=70, redis=redis_mock)
-    is_spike, _ = result
-    assert is_spike is False
+@patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-cd")
+async def test_spike_sets_cooldown_after_trigger(mock_save, redis_mock):
+    """스파이크 발동 후 쿨다운이 자동 설정됨."""
+    cid = "cooldown-auto-set"
+    assert await is_in_cooldown(cid, redis_mock) is False
+
+    await evaluate_spike(
+        cluster_id=cid,
+        severity=60,
+        event_count=15,
+        independent_sources=5,
+        first_event_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        redis=redis_mock,
+    )
+    assert await is_in_cooldown(cid, redis_mock) is True
+
+
+# ── 상수 값 검증 ─────────────────────────────────────────────────────────────
+
+def test_constants():
+    """상수가 기대값과 일치하는지 확인."""
+    assert EVENT_COUNT_MIN == 8
+    assert SEVERITY_MIN == 40
+    assert SOURCES_MIN == 3
+    assert MAX_AGE_HOURS == 48
+    assert COOLDOWN_SECONDS == 21600       # 6시간
+    assert COOLDOWN_SECONDS_CRITICAL == 10800  # 3시간
