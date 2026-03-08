@@ -15,26 +15,41 @@ const notoSansKrFont = fetch(
   "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLTq8H4hfeE.ttf"
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-const TOPIC_KO: Record<string, string> = {
-  conflict: "무장 충돌",
-  terror: "폭력·테러",
-  coup: "정변·쿠데타",
-  sanctions: "경제 제재",
-  cyber: "사이버 공격",
-  protest: "시위·집회",
-  diplomacy: "외교",
-  maritime: "해상 분쟁",
-  disaster: "재난·재해",
-  health: "감염병·보건",
-  unknown: "이슈",
+const TOPIC: Record<string, { ko: string; en: string }> = {
+  conflict: { ko: "무장 충돌", en: "Armed Conflict" },
+  terror: { ko: "폭력·테러", en: "Violence & Terror" },
+  coup: { ko: "정변·쿠데타", en: "Coup & Upheaval" },
+  sanctions: { ko: "경제 제재", en: "Sanctions" },
+  cyber: { ko: "사이버 공격", en: "Cyber Attack" },
+  protest: { ko: "시위·집회", en: "Protest" },
+  diplomacy: { ko: "외교", en: "Diplomacy" },
+  maritime: { ko: "해상 분쟁", en: "Maritime Dispute" },
+  disaster: { ko: "재난·재해", en: "Disaster" },
+  health: { ko: "감염병·보건", en: "Health Crisis" },
+  unknown: { ko: "이슈", en: "Issue" },
 };
 
-const COUNTRY_NAMES: Record<string, string> = {
-  UA: "우크라이나", RU: "러시아", CN: "중국", US: "미국",
-  KR: "대한민국", KP: "북한", JP: "일본", TW: "대만",
-  IL: "이스라엘", PS: "팔레스타인", IR: "이란", SY: "시리아",
-  MM: "미얀마", AF: "아프가니스탄", SD: "수단", YE: "예멘",
-  ET: "에티오피아", SO: "소말리아", LB: "레바논", IQ: "이라크",
+const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
+  UA: { ko: "우크라이나", en: "Ukraine" },
+  RU: { ko: "러시아", en: "Russia" },
+  CN: { ko: "중국", en: "China" },
+  US: { ko: "미국", en: "United States" },
+  KR: { ko: "대한민국", en: "South Korea" },
+  KP: { ko: "북한", en: "North Korea" },
+  JP: { ko: "일본", en: "Japan" },
+  TW: { ko: "대만", en: "Taiwan" },
+  IL: { ko: "이스라엘", en: "Israel" },
+  PS: { ko: "팔레스타인", en: "Palestine" },
+  IR: { ko: "이란", en: "Iran" },
+  SY: { ko: "시리아", en: "Syria" },
+  MM: { ko: "미얀마", en: "Myanmar" },
+  AF: { ko: "아프가니스탄", en: "Afghanistan" },
+  SD: { ko: "수단", en: "Sudan" },
+  YE: { ko: "예멘", en: "Yemen" },
+  ET: { ko: "에티오피아", en: "Ethiopia" },
+  SO: { ko: "소말리아", en: "Somalia" },
+  LB: { ko: "레바논", en: "Lebanon" },
+  IQ: { ko: "이라크", en: "Iraq" },
 };
 
 const SEVERITY_CONFIG = [
@@ -86,6 +101,8 @@ export async function GET(
   const ogFonts: { name: string; data: ArrayBuffer; weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900; style: "normal" }[] = [];
   if (playfairData) ogFonts.push({ name: "Playfair Display", data: playfairData, weight: 900 as const, style: "normal" });
   if (notoSansKrData) ogFonts.push({ name: "Noto Sans KR", data: notoSansKrData, weight: 700 as const, style: "normal" });
+
+  const lang = req.nextUrl.searchParams.get("lang") === "en" ? "en" : "ko";
 
   let logoSrc: string | null = null;
   try {
@@ -149,12 +166,13 @@ export async function GET(
     );
   }
 
-  const rawTitle = issue.title_ko || issue.title;
+  const rawTitle = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
   const headline = cleanTitle(rawTitle);
   const titleSize = headline.length <= 18 ? 56 : headline.length <= 30 ? 46 : headline.length <= 50 ? 38 : 32;
   const config = getConfig(issue.severity);
-  const topicKo = TOPIC_KO[issue.topic] || TOPIC_KO.unknown;
-  const countryName = issue.country_code ? (COUNTRY_NAMES[issue.country_code] || issue.country_code) : "";
+  const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
+  const cn = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;
+  const countryName = cn ? cn[lang] : (issue.country_code || "");
   const kscore = issue.kscore ?? 0;
 
   // Satori는 외부 URL을 직접 fetch할 수 없으므로 Base64로 변환
@@ -284,7 +302,7 @@ export async function GET(
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
-                실시간 글로벌 분쟁 모니터링
+                {lang === "en" ? "Real-time Global Conflict Monitor" : "실시간 글로벌 분쟁 모니터링"}
               </span>
               <div
                 style={{
@@ -350,7 +368,7 @@ export async function GET(
                     border: "1px solid #334155",
                   }}
                 >
-                  {topicKo}
+                  {topicLabel}
                 </span>
               </div>
 
@@ -380,7 +398,7 @@ export async function GET(
                     {issue.severity}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
-                    위기지수
+                    {lang === "en" ? "Severity" : "위기지수"}
                   </span>
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
@@ -398,7 +416,7 @@ export async function GET(
                     {issue.event_count}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 700 }}>
-                    보도 건수
+                    {lang === "en" ? "Sources" : "보도 건수"}
                   </span>
                 </div>
               </div>
@@ -415,7 +433,7 @@ export async function GET(
                 }}
               >
                 <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
-                  KScore 7일 추이
+                  {lang === "en" ? "KScore 7-Day Trend" : "KScore 7일 추이"}
                 </span>
                 <div
                   style={{
@@ -453,10 +471,10 @@ export async function GET(
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[0].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
                   </span>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               </div>
@@ -479,6 +497,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size }
+    { ...size, fonts: ogFonts }
   );
 }

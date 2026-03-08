@@ -72,6 +72,7 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   const code = params.code.toUpperCase();
+  const lang = req.nextUrl.searchParams.get("lang") === "en" ? "en" : "ko";
 
   // 폰트 로드
   const [playfairData, notoSansKrData] = await Promise.all([playfairFont, notoSansKrFont]);
@@ -172,7 +173,7 @@ export async function GET(
 
   // 상위 이슈 2개 표시
   const topIssues = tension.top5_clusters.slice(0, 2).map((c) => {
-    const raw = c.title_ko || c.title;
+    const raw = lang === "en" ? (c.title || c.title_ko || "") : (c.title_ko || c.title || "");
     return raw.length > 35 ? raw.slice(0, 35) + "…" : raw;
   });
 
@@ -272,7 +273,7 @@ export async function GET(
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <span style={{ color: "#94A3B8", fontSize: 20, fontWeight: 700 }}>
-                실시간 글로벌 분쟁 모니터링
+                {lang === "en" ? "Real-time Global Conflict Monitor" : "실시간 글로벌 분쟁 모니터링"}
               </span>
               <div
                 style={{
@@ -287,7 +288,7 @@ export async function GET(
                   letterSpacing: "0.5px",
                 }}
               >
-                {config.label} · {config.labelEn}
+                {lang === "en" ? config.labelEn : config.label}
               </div>
             </div>
           </div>
@@ -322,10 +323,10 @@ export async function GET(
                     letterSpacing: "-1.5px",
                   }}
                 >
-                  {countryKo}
+                  {lang === "en" ? countryEn : countryKo}
                 </span>
                 <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 700 }}>
-                  {countryEn}
+                  {lang === "en" ? countryKo : countryEn}
                 </span>
               </div>
 
@@ -394,7 +395,7 @@ export async function GET(
                 }}
               >
                 <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 700 }}>
-                  7일 추이
+                  {lang === "en" ? "7-Day Trend" : "7일 추이"}
                 </span>
                 <div
                   style={{
@@ -435,10 +436,10 @@ export async function GET(
                 {/* 날짜 라벨 */}
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[0].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
                   </span>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               </div>
@@ -457,7 +458,7 @@ export async function GET(
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {topIssues.length > 0 && (
                 <span style={{ color: "#64748B", fontSize: 16, fontWeight: 700, marginBottom: "2px" }}>
-                  주요 이슈
+                  {lang === "en" ? "Top Issues" : "주요 이슈"}
                 </span>
               )}
               {topIssues.map((t, i) => (
@@ -476,6 +477,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size }
+    { ...size, fonts: ogFonts }
   );
 }

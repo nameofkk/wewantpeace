@@ -8,20 +8,24 @@ export const dynamicParams = true;
 
 interface Props {
   params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 const SITE_URL = "https://www.wewantpeace.live";
 const SITE_DESC = "195개국 분쟁·안보 실시간 모니터링 플랫폼";
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
+  const lang = searchParams.lang === "en" ? "en" : "ko";
+  const isEn = lang === "en";
+
   if (!issue) {
     return {
       title: "WeWantPeace",
-      description: SITE_DESC,
+      description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
       openGraph: {
         title: "WeWantPeace",
-        description: SITE_DESC,
+        description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
         type: "website",
         url: SITE_URL,
         siteName: "WeWantPeace",
@@ -30,38 +34,41 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       twitter: {
         card: "summary_large_image",
         title: "WeWantPeace",
-        description: SITE_DESC,
+        description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
         images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
       },
     };
   }
 
-  const title = issue.title_ko || issue.title;
+  const title = isEn ? (issue.title || issue.title_ko || "Issue") : (issue.title_ko || issue.title || "이슈");
   // 카카오톡: og:title이 길면 description 영역을 밀어내서 숨김
   // 띄어쓰기 기준으로 자연스럽게 자름
-  let ogTitle = title;
+  let ogTitle: string = title;
   if (title.length > 40) {
     const cut = title.lastIndexOf(" ", 40);
     ogTitle = (cut > 10 ? title.slice(0, cut) : title.slice(0, 40)) + "…";
   }
 
-  const ogImage = `${SITE_URL}/issues/${issue.id}/og`;
+  const langSuffix = isEn ? "?lang=en" : "";
+  const ogImage = `${SITE_URL}/issues/${issue.id}/og${langSuffix}`;
+  const pageUrl = `${SITE_URL}/issues/${issue.id}${langSuffix}`;
+  const desc = isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC;
 
   return {
     title,
-    description: SITE_DESC,
+    description: desc,
     openGraph: {
       title: ogTitle,
-      description: SITE_DESC,
+      description: desc,
       type: "website",
-      url: `${SITE_URL}/issues/${issue.id}`,
+      url: pageUrl,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
-      description: SITE_DESC,
+      description: desc,
       images: [{ url: ogImage }],
     },
   };

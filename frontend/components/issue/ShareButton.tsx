@@ -20,7 +20,11 @@ export function ShareButton({
   const lang = useAppStore((s) => s.lang);
   const [copied, setCopied] = useState(false);
 
-  const url = urlProp ?? `https://www.wewantpeace.live/issues/${issueId}`;
+  const baseUrl = urlProp ?? `https://www.wewantpeace.live/issues/${issueId}`;
+  // 영문 사용자가 공유하면 OG 이미지도 영문으로 생성
+  const url = lang === "en"
+    ? `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}lang=en`
+    : baseUrl;
 
   async function handleShare() {
     trackEvent(analyticsEvent, { url, method: "unknown" });

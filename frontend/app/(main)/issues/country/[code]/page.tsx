@@ -6,6 +6,7 @@ export const dynamicParams = true;
 
 interface Props {
   params: { code: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 // Country name lookup for metadata
@@ -32,16 +33,22 @@ const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
   IQ: { ko: "이라크", en: "Iraq" },
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const code = params.code.toUpperCase();
+  const lang = searchParams.lang === "en" ? "en" : "ko";
+  const isEn = lang === "en";
   const country = COUNTRY_NAMES[code];
   const nameKo = country?.ko || code;
   const nameEn = country?.en || code;
 
-  const title = `${nameKo} 긴장도`;
-  const siteDesc = "195개국 분쟁·안보 실시간 모니터링 플랫폼";
+  const title = isEn ? `${nameEn} Tension Index` : `${nameKo} 긴장도`;
+  const siteDesc = isEn
+    ? "Real-time monitoring of conflicts across 195 countries"
+    : "195개국 분쟁·안보 실시간 모니터링 플랫폼";
 
-  const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og`;
+  const langSuffix = isEn ? "?lang=en" : "";
+  const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og${langSuffix}`;
+  const pageUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}${langSuffix}`;
 
   return {
     title,
@@ -50,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `${title} | WeWantPeace`,
       description: siteDesc,
       type: "website",
-      url: `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`,
+      url: pageUrl,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],
     },
