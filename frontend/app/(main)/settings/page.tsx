@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -1288,6 +1288,17 @@ export default function SettingsPage() {
                 <span className="text-muted-foreground text-xs">→</span>
               </a>
             )}
+            <a
+              href="/api-docs"
+              className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
+            >
+              <Code className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <p>{t(lang, "api_docs_developers")}</p>
+                <p className="text-[11px] text-muted-foreground">{t(lang, "api_docs_developers_desc")}</p>
+              </div>
+              <span className="text-muted-foreground text-xs">→</span>
+            </a>
           </div>
         </section>
 
