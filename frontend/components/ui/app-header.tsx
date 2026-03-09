@@ -109,42 +109,8 @@ function AppHeaderInner() {
   );
 }
 
-/** Toss 미니앱용 간소 헤더 — 로고만 표시 (공통 내비게이션 바 요건 충족) */
-function TossHeader() {
-  return (
-    <>
-      <header className="fixed top-0 left-0 right-0 z-40 bg-background/85 backdrop-blur-md border-b border-border/50">
-        <div className="flex items-center justify-center h-[48px] px-4">
-          <div className="flex items-center gap-2">
-            <div
-              className="relative overflow-hidden"
-              style={{ width: 32, height: 32 }}
-            >
-              <Image
-                src="/logo.png"
-                alt="WeWantPeace"
-                fill
-                priority
-                className="object-cover"
-                style={{
-                  objectPosition: "50% 50%",
-                  transform: "scale(2.5)",
-                  transformOrigin: "50% 50%",
-                }}
-              />
-            </div>
-            <span className="text-[14px] font-semibold tracking-wide text-foreground">
-              Wewantpeace
-            </span>
-          </div>
-        </div>
-      </header>
-      <div className="h-[48px]" />
-    </>
-  );
-}
-
 export function AppHeader() {
-  if (isTossMiniApp()) return <TossHeader />;
+  // 토스 미니앱: 토스가 공통 내비게이션 바(로고+이름)를 자동 렌더링하므로 자체 헤더 불필요
+  if (isTossMiniApp()) return null;
   return <AppHeaderInner />;
 }

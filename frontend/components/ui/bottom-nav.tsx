@@ -7,6 +7,7 @@ import { Home, Map, Activity, MessageSquare, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { isTossMiniApp } from "@/lib/platform";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -30,9 +31,23 @@ export function BottomNav() {
 
   if (pathname === "/onboarding" || pathname.startsWith("/login") || pathname.startsWith("/admin")) return null;
 
+  const toss = isTossMiniApp();
+
   return (
-    <nav className="tab-bar fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm" role="tablist" aria-label="Main navigation">
-      <div className="flex h-[60px] items-center justify-around px-2">
+    <nav
+      className={cn(
+        "fixed z-50",
+        toss
+          ? "bottom-[calc(12px+env(safe-area-inset-bottom))] left-4 right-4 rounded-full bg-background/90 backdrop-blur-xl shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+          : "tab-bar bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur-sm"
+      )}
+      role="tablist"
+      aria-label="Main navigation"
+    >
+      <div className={cn(
+        "flex items-center justify-around",
+        toss ? "h-[56px] px-3" : "h-[60px] px-2"
+      )}>
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           // /issues/*, /notifications/* 등은 /home의 하위 플로우로 간주
           const isActive = pathname.startsWith(href) ||

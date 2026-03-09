@@ -3,6 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { isTossMiniApp } from "@/lib/platform";
 import { NewEventBanner } from "@/components/ui/new-event-banner";
 import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
 import { SmartAppBanner } from "@/components/ui/smart-app-banner";
@@ -89,7 +90,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <SessionTracker />
       <NewEventBanner />
       <WelcomeModal />
-      <main className="pb-[60px]">{children}</main>
+      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[60px]"}>{children}</main>
       <BottomNav />
       <PWAInstallPrompt />
       <SmartAppBanner />
