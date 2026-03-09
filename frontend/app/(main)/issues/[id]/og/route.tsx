@@ -261,14 +261,23 @@ export async function GET(
   const displayFont = lang === "en" ? "'Noto Serif KR', serif" : "'Gothic A1', sans-serif";
 
   // Satori는 외부 URL을 직접 fetch할 수 없으므로 Base64로 변환
+  // Satori가 지원하는 포맷: JPEG, PNG, GIF (WebP 미지원 → 크래시)
+  // Edge Runtime 메모리 한계로 대용량 이미지도 스킵
+  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
+  const MAX_IMAGE_BYTES = 800_000; // 800KB
   let bgImageSrc: string | null = null;
   if (issue.image_url) {
     try {
       const imgRes = await fetch(issue.image_url, { signal: AbortSignal.timeout(3000) });
       if (imgRes.ok) {
-        const ct = imgRes.headers.get("content-type") || "image/jpeg";
-        const buf = await imgRes.arrayBuffer();
-        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+        const ct = imgRes.headers.get("content-type") || "";
+        const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
+        if (ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t)) && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
+          const buf = await imgRes.arrayBuffer();
+          if (buf.byteLength <= MAX_IMAGE_BYTES) {
+            bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+          }
+        }
       }
     } catch {}
   }

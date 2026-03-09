@@ -166,15 +166,23 @@ export async function GET(
   }
 
   // 상위 이슈 이미지를 배경으로 (Satori는 외부 URL 불가 → Base64 변환)
+  // Satori 지원 포맷: JPEG, PNG, GIF (WebP 미지원 → 크래시)
+  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
+  const MAX_IMAGE_BYTES = 800_000;
   const topImageUrl = tension.top5_clusters?.find((c) => c.image_url)?.image_url ?? null;
   let bgImageSrc: string | null = null;
   if (topImageUrl) {
     try {
       const imgRes = await fetch(topImageUrl, { signal: AbortSignal.timeout(3000) });
       if (imgRes.ok) {
-        const ct = imgRes.headers.get("content-type") || "image/jpeg";
-        const buf = await imgRes.arrayBuffer();
-        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+        const ct = imgRes.headers.get("content-type") || "";
+        const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
+        if (ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t)) && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
+          const buf = await imgRes.arrayBuffer();
+          if (buf.byteLength <= MAX_IMAGE_BYTES) {
+            bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+          }
+        }
       }
     } catch {}
   }
