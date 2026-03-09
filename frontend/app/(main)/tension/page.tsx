@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
-import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Lock, Radio, Settings, MapPin, Pencil, ExternalLink } from "lucide-react";
+import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
@@ -469,9 +469,19 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
       {/* 원인 이슈 */}
       {data.top5_clusters.length > 0 && (
         <div className={cn("mt-3 rounded-lg p-3", isCritical ? "bg-red-950/30 border border-red-900/30" : "bg-secondary/50")}>
-          <p className="text-[10px] font-medium text-muted-foreground mb-2">
-            {t(lang, "tension_cause_issues", { n: data.top5_clusters.length })}
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-medium text-muted-foreground">
+              {t(lang, "tension_cause_issues", { n: data.top5_clusters.length })}
+            </p>
+            <Link
+              href={`/issues/country/${data.country_code.toLowerCase()}`}
+              className="flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span>{t(lang, "tension_view_all_issues")}</span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
           <div className="space-y-1.5">
             {data.top5_clusters.map((c, i) => {
               const rawTitle = lang === "en" ? c.title : (c.title_ko ?? c.title);
@@ -507,13 +517,6 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
           title={`${getCountryName(data.country_code, lang)} ${lang === "ko" ? "긴장도" : "Tension"}`}
           analyticsEvent="tension_card_share"
         />
-        <Link
-          href={`/issues/country/${data.country_code.toLowerCase()}`}
-          className="flex items-center gap-1 rounded-full bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors whitespace-nowrap"
-        >
-          <ExternalLink className="h-3 w-3" />
-          {t(lang, "tension_view_all_issues")}
-        </Link>
         <button
           onClick={() => setShowHistory((v) => !v)}
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1 ml-auto"
