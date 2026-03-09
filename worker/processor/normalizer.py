@@ -166,6 +166,8 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "chemical attack", "nerve agent", "sarin", "mustard gas",
         "dirty bomb", "radiological", "wmds", "weapons of mass destruction",
         "intercontinental", "icbm", "hypersonic",
+        # 추가: 군사작전 변형
+        "airstrikes", "ground invasion", "naval strike",
     ],
     "terror": [
         "terror", "terrorist", "hostage", "isis", "al-qaeda", "extremist",
@@ -212,6 +214,9 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "trade war", "currency manipulation", "supply chain crisis",
         "oil embargo", "energy crisis", "gas crisis", "price shock",
         "government shutdown", "budget crisis",
+        # 에너지/원자재 급등 · 시장 충격
+        "oil price", "oil surge", "gas spike", "barrel",
+        "stock plunge", "market crash", "economic shock",
     ],
     "cyber": [
         "cyberattack", "hacked", "ransomware", "malware", "ddos",
@@ -252,6 +257,9 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "resignation", "expelled", "recalled ambassador",
         "diplomatic crisis", "severed ties", "recalled envoy",
         "persona non grata", "expelled diplomats",
+        # 지도자 교체 · 정치 전환
+        "supreme leader", "successor", "appointed leader",
+        "assembly of experts", "political transition", "regime change",
     ],
     "maritime": [
         "naval", "ship", "vessel", "strait", "blockade", "coast guard",
@@ -495,12 +503,44 @@ COUNTRY_MAP: dict[str, tuple[str, float, float]] = {
     "israel": ("IL", 31.5, 34.8),
     "israeli": ("IL", 31.5, 34.8),
     "tel aviv": ("IL", 32.08, 34.78),
+    "haifa": ("IL", 32.79, 34.99),
+    "jerusalem": ("IL", 31.77, 35.23),
+    "beer sheva": ("IL", 31.25, 34.79),
+    "beersheba": ("IL", 31.25, 34.79),
+    "netanya": ("IL", 32.33, 34.86),
+    "ashkelon": ("IL", 31.67, 34.57),
+    "ashdod": ("IL", 31.80, 34.65),
+    "idf": ("IL", 31.5, 34.8),
+    "iron dome": ("IL", 31.5, 34.8),
+    "negev": ("IL", 30.85, 34.78),
+    "golan": ("IL", 33.0, 35.75),
+    "west bank": ("PS", 31.95, 35.25),
+    "rafah": ("PS", 31.28, 34.25),
+    "khan younis": ("PS", 31.35, 34.30),
+    "khan yunis": ("PS", 31.35, 34.30),
+    "jabalia": ("PS", 31.53, 34.48),
+    "hamas": ("PS", 31.5, 34.47),
+    "hezbollah": ("LB", 33.9, 35.5),
     "gaza": ("PS", 31.5, 34.47),
     "palestine": ("PS", 31.9, 35.3),
     "palestinian": ("PS", 31.9, 35.3),
     "iran": ("IR", 32.0, 53.0),
     "iranian": ("IR", 32.0, 53.0),
     "tehran": ("IR", 35.69, 51.39),
+    "isfahan": ("IR", 32.65, 51.68),
+    "esfahan": ("IR", 32.65, 51.68),
+    "bushehr": ("IR", 28.97, 50.84),
+    "tabriz": ("IR", 38.08, 46.29),
+    "shiraz": ("IR", 29.59, 52.58),
+    "mashhad": ("IR", 36.30, 59.60),
+    "qom": ("IR", 34.64, 50.88),
+    "ahvaz": ("IR", 31.32, 48.67),
+    "bandar abbas": ("IR", 27.19, 56.27),
+    "natanz": ("IR", 33.51, 51.92),
+    "fordow": ("IR", 34.88, 51.59),
+    "khamenei": ("IR", 32.0, 53.0),
+    "irgc": ("IR", 32.0, 53.0),
+    "persian gulf": ("IR", 26.5, 52.0),
     "china": ("CN", 35.0, 105.0),
     "chinese": ("CN", 35.0, 105.0),
     "beijing": ("CN", 39.91, 116.39),
@@ -758,9 +798,19 @@ COUNTRY_MAP: dict[str, tuple[str, float, float]] = {
     "우크라이나": ("UA", 49.0, 31.0),
     "러시아": ("RU", 61.0, 105.0),
     "이스라엘": ("IL", 31.5, 34.8),
+    "예루살렘": ("IL", 31.77, 35.23),
+    "하이파": ("IL", 32.79, 34.99),
+    "텔아비브": ("IL", 32.08, 34.78),
     "팔레스타인": ("PS", 31.9, 35.3),
     "가자": ("PS", 31.5, 34.47),
+    "하마스": ("PS", 31.5, 34.47),
+    "헤즈볼라": ("LB", 33.9, 35.5),
+    "서안지구": ("PS", 31.95, 35.25),
     "이란": ("IR", 32.0, 53.0),
+    "테헤란": ("IR", 35.69, 51.39),
+    "이스파한": ("IR", 32.65, 51.68),
+    "부셰르": ("IR", 28.97, 50.84),
+    "혁명수비대": ("IR", 32.0, 53.0),
     "중국": ("CN", 35.0, 105.0),
     "대만": ("TW", 23.7, 121.0),
     "북한": ("KP", 40.3, 127.5),
@@ -1419,6 +1469,9 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "invasion", "invade", "armed conflict", "military conflict",
                   "weapons transfer", "arms transfer",
                   "nuclear", "explosion", "troops deployed", "war zone",
+                  "war",  # 대부분의 "war" 기사는 실제 분쟁
+                  "airstrike", "airstrikes", "ground invasion", "naval strike",
+                  "military operation",
                   # WMD · 극단적 폭력
                   "icbm", "hypersonic", "chemical attack", "nerve agent",
                   "dirty bomb", "ethnic cleansing", "genocide", "massacre",
@@ -1597,15 +1650,32 @@ def _has_non_military_context(text: str) -> bool:
     return False
 
 
+_EN_SUFFIXES = ("s", "es", "ed", "ing", "er", "ers", "ion", "ions", "ment", "ments")
+
+
 def _kw_in_text(kw: str, text: str) -> bool:
-    """단어 경계를 고려한 키워드 매칭. 'coup'이 'coupang'에 매칭되지 않도록."""
+    """단어 경계를 고려한 키워드 매칭. 'coup'이 'coupang'에 매칭되지 않도록.
+
+    영어(ASCII only) 키워드는 일반 접미사(s, es, ed, ing, er, ers, ion, ions,
+    ment, ments)가 붙은 변형도 매칭 허용. 한국어/아랍어 등 비-ASCII 키워드는
+    기존 엄격 매칭 유지.
+    """
     idx = text.find(kw)
     while idx != -1:
         before_ok = idx == 0 or not text[idx - 1].isalnum()
         end = idx + len(kw)
-        after_ok = end >= len(text) or not text[end].isalnum()
-        if before_ok and after_ok:
-            return True
+        if before_ok:
+            # 정확히 단어 끝이면 바로 매칭
+            if end >= len(text) or not text[end].isalnum():
+                return True
+            # 영어(ASCII) 키워드에 한해 접미사 허용
+            if kw.isascii():
+                tail = text[end:]
+                for sfx in _EN_SUFFIXES:
+                    if tail.startswith(sfx):
+                        sfx_end = end + len(sfx)
+                        if sfx_end >= len(text) or not text[sfx_end].isalnum():
+                            return True
         idx = text.find(kw, idx + 1)
     return False
 
