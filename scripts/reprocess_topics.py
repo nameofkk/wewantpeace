@@ -342,6 +342,69 @@ async def step6_refresh_cluster_title_prefix(db):
     print(f"  title_ko 수정: {updated}개\n")
 
 
+async def step7_unlink_mismatched_cluster_events(db):
+    """
+    재분류 후 이벤트의 {country_code}:{topic}과 클러스터의 {country_code}:{topic}이
+    불일치하는 cluster_events 링크를 제거.
+
+    제거된 이벤트는 다음 클러스터링 사이클에서 올바른 클러스터로 재배치됨.
+    마지막 이벤트 보호: 클러스터에 이벤트가 1개만 남으면 제거하지 않음.
+    """
+    print("[Step 7] 불일치 cluster_events 링크 제거 (이벤트 country:topic ≠ 클러스터 country:topic)")
+
+    # 불일치 링크 확인 (디버그 출력)
+    r = await db.execute(text("""
+        SELECT ce.cluster_id, ce.event_id,
+               ne.country_code AS ev_cc, ne.topic AS ev_topic,
+               c.country_code AS cl_cc, c.topic AS cl_topic,
+               ne.title
+        FROM cluster_events ce
+        JOIN normalized_events ne ON ne.id = ce.event_id
+        JOIN issue_clusters c ON c.id = ce.cluster_id
+        WHERE (COALESCE(ne.country_code, '') || ':' || ne.topic)
+           != (COALESCE(c.country_code, '') || ':' || c.topic)
+    """))
+    targets = r.fetchall()
+
+    if targets:
+        for t in targets:
+            print(f"  불일치: ev[{t.ev_cc}:{t.ev_topic}] ≠ cl[{t.cl_cc}:{t.cl_topic}] | {(t.title or '')[:50]}")
+
+    # 불일치 링크 삭제 (마지막 이벤트 보호)
+    result = await db.execute(text("""
+        DELETE FROM cluster_events ce
+        USING normalized_events ne, issue_clusters c
+        WHERE ce.event_id = ne.id
+          AND ce.cluster_id = c.id
+          AND (COALESCE(ne.country_code, '') || ':' || ne.topic)
+           != (COALESCE(c.country_code, '') || ':' || c.topic)
+          AND (
+              SELECT COUNT(*) FROM cluster_events ce2
+              WHERE ce2.cluster_id = ce.cluster_id
+          ) > 1
+        RETURNING ce.cluster_id
+    """))
+    removed_rows = result.fetchall()
+    removed = len(removed_rows)
+
+    # 영향받은 클러스터의 event_count 재계산
+    if removed > 0:
+        await db.execute(text("""
+            UPDATE issue_clusters c
+            SET event_count = sub.cnt
+            FROM (
+                SELECT cluster_id, COUNT(*) AS cnt
+                FROM cluster_events
+                GROUP BY cluster_id
+            ) sub
+            WHERE c.id = sub.cluster_id
+              AND c.event_count != sub.cnt
+        """))
+
+    await db.commit()
+    print(f"  제거된 불일치 링크: {removed}개\n")
+
+
 async def main():
     async with AsyncSessionLocal() as db:
         changed = await step1_reprocess_events(db)
@@ -366,6 +429,9 @@ async def main():
 
     async with AsyncSessionLocal() as db:
         await step6_refresh_cluster_title_prefix(db)
+
+    async with AsyncSessionLocal() as db:
+        await step7_unlink_mismatched_cluster_events(db)
 
     print("=== 전체 재처리 완료 ===")
     print("  홈 / 지도 / 긴장도 탭에 자동 반영됩니다 (staleTime 만료 또는 새로고침 시).")

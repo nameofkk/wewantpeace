@@ -24,13 +24,17 @@ from worker.processor.ai_title import generate_ai_title
 logger = logging.getLogger(__name__)
 
 WINDOW_MINUTES = 1440  # 24시간 — 국제 뉴스 시차 고려, Filtered Jaccard로 오병합 방지
+MAX_CLUSTER_AGE_HOURS = 72  # 클러스터 절대 수명 상한 — window_start 기준 72시간 초과 시 새 클러스터 생성
 
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2
 
+# 클러스터당 최대 이벤트 수 — 초과 시 새 클러스터 생성
+MAX_EVENTS_PER_CLUSTER = 50
+
 # 제목 유사도 임계값 (Filtered Jaccard 기준 — 노이즈 단어 제거 후)
 MIN_TITLE_OVERLAP = 0.15           # 일반 이벤트 (0.25→0.15, 필터링이 노이즈 제거)
-MIN_TITLE_OVERLAP_HIGH_SEV = 0.08  # 고심각도 (severity >= 50 양쪽)
+MIN_TITLE_OVERLAP_HIGH_SEV = 0.13  # 고심각도 (severity >= 50 양쪽) — 0.08에서 상향
 # AI 판정 경계 영역: 이 구간에서만 GPT-4o-mini로 "같은 사건?" 확인
 AI_MATCH_LOW = 0.10   # 이 미만은 무조건 분리
 AI_MATCH_HIGH = 0.20  # 이 이상은 무조건 병합 (MIN_TITLE_OVERLAP보다 크면 의미 없음)
@@ -493,6 +497,14 @@ async def assign_cluster(
     for cand in candidates:
         no_country = not event.country_code
         no_geo = not event.geohash5
+
+        # (0a) 클러스터 절대 수명 상한: window_start 기준 72시간 초과 시 매칭 제외
+        if cand.window_start and (event.event_time - cand.window_start).total_seconds() > MAX_CLUSTER_AGE_HOURS * 3600:
+            continue
+
+        # (0b) 대형 클러스터 상한: 이벤트 50개 초과 시 매칭 제외
+        if cand.event_count >= MAX_EVENTS_PER_CLUSTER:
+            continue
 
         # (1) 지오/국가 미분류 버킷이 MAX_EVENTS 초과 → 이 후보 건너뛰기
         if no_country and no_geo and cand.event_count >= MAX_EVENTS_UNKNOWN_GEO:
