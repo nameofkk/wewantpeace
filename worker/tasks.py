@@ -3117,3 +3117,98 @@ def send_daily_checklist():
     """Phase 1 마케팅 일일 체크리스트를 텔레그램으로 전송 (매일 KST 09:00)."""
     from worker.social.daily_checklist import send_daily_checklist as _send
     return _send()
+
+
+# ── 비활성 RSS 피드 자동 복구 ─────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.recheck_inactive_feeds",
+    queue="collect",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=300,
+)
+def recheck_inactive_feeds(self):
+    """비활성화된 RSS 피드를 HTTP HEAD로 재확인, 200 OK면 자동 복구 (매일 06:00 UTC)."""
+
+    async def _run():
+        import httpx
+        from sqlalchemy import select
+        from backend.app.models.source_channel import SourceChannel
+        from backend.app.core.redis import get_redis
+
+        redis = get_redis()
+        recovered = []
+        checked = 0
+
+        async with AsyncSessionLocal() as db:
+            # is_active=False인 RSS 피드만 조회
+            stmt = select(SourceChannel).where(
+                SourceChannel.is_active == False,  # noqa: E712
+                SourceChannel.source_type == "rss",
+                SourceChannel.feed_url.isnot(None),
+            )
+            result = await db.execute(stmt)
+            inactive_feeds = list(result.scalars().all())
+
+            if not inactive_feeds:
+                logger.info("recheck_inactive_feeds: 비활성 RSS 피드 없음")
+                return {"checked": 0, "recovered": 0, "feeds": []}
+
+            async with httpx.AsyncClient(
+                timeout=15.0,
+                follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; WeWantPeace/1.0)"},
+            ) as client:
+                for feed in inactive_feeds:
+                    checked += 1
+                    try:
+                        resp = await client.head(feed.feed_url)
+                        if resp.status_code == 200:
+                            # 복구: is_active=True로 변경
+                            feed.is_active = True
+                            db.add(feed)
+
+                            # Redis 에러 카운트 리셋
+                            if redis is not None:
+                                try:
+                                    await redis.delete(f"rss:consecutive_errors:{feed.id}")
+                                    await redis.delete(f"rss:not_found:{feed.id}")
+                                except Exception:
+                                    pass
+
+                            recovered.append(feed.display_name)
+                            logger.info(
+                                "RSS 피드 자동 복구: %s (%s) — HTTP %d",
+                                feed.display_name, feed.feed_url, resp.status_code,
+                            )
+                        else:
+                            logger.debug(
+                                "RSS 피드 여전히 비활성: %s — HTTP %d",
+                                feed.display_name, resp.status_code,
+                            )
+                    except Exception as e:
+                        logger.debug(
+                            "RSS 피드 재확인 실패: %s — %s",
+                            feed.display_name, e,
+                        )
+
+            if recovered:
+                await db.commit()
+
+        logger.info(
+            "recheck_inactive_feeds 완료: %d개 확인, %d개 복구 — %s",
+            checked, len(recovered), ", ".join(recovered) if recovered else "없음",
+        )
+        return {
+            "checked": checked,
+            "recovered": len(recovered),
+            "feeds": recovered,
+        }
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("recheck_inactive_feeds 오류: %s", exc)
+        raise self.retry(exc=exc)

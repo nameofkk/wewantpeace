@@ -207,6 +207,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=0),  # UTC 00:00 = KST 09:00
         "options": {"queue": "process"},
     },
+    # ── 비활성 RSS 피드 자동 복구 ──
+    "recheck-inactive-feeds": {
+        "task": "worker.tasks.recheck_inactive_feeds",
+        "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC
+        "options": {"queue": "collect"},
+    },
 }
 
 

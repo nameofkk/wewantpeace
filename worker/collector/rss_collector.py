@@ -409,17 +409,39 @@ class RSSCollector:
             await self._track_error(redis, source, db, str(e))
             return result
 
-        # HTTP 상태 확인: 404/410 → 자동 비활성화
+        # HTTP 상태 확인: 404/410 → 연속 3회 이상 시 자동 비활성화
         http_status = getattr(parsed, "status", 200)
         if http_status in (404, 410):
-            source.is_active = False
-            db.add(source)
-            await db.flush()
-            logger.warning(
-                "RSS 피드 자동 비활성화 (HTTP %d): %s (%s)",
-                http_status, source.display_name, source.feed_url,
-            )
-            result.errors.append(f"HTTP {http_status} — 자동 비활성화")
+            not_found_key = f"rss:not_found:{source.id}"
+            not_found_count = 0
+            if redis is not None:
+                try:
+                    not_found_count = await redis.incr(not_found_key)
+                    await redis.expire(not_found_key, 86400 * 3)  # 3일 TTL
+                except Exception as e:
+                    logger.warning("Redis 404 카운트 실패 (%s): %s", source.display_name, e)
+                    not_found_count = 1
+
+            if not_found_count >= 3:
+                source.is_active = False
+                db.add(source)
+                await db.flush()
+                if redis is not None:
+                    try:
+                        await redis.delete(not_found_key)
+                    except Exception:
+                        pass
+                logger.warning(
+                    "RSS 피드 자동 비활성화 (HTTP %d, 연속 %d회): %s (%s)",
+                    http_status, not_found_count, source.display_name, source.feed_url,
+                )
+                result.errors.append(f"HTTP {http_status} — 연속 {not_found_count}회, 자동 비활성화")
+            else:
+                logger.warning(
+                    "RSS 피드 HTTP %d 감지 (%d/3회): %s (%s)",
+                    http_status, not_found_count, source.display_name, source.feed_url,
+                )
+                result.errors.append(f"HTTP {http_status} — 연속 {not_found_count}/3회")
             return result
 
         # URL 리다이렉트 감지: 최종 URL이 다르면 feed_url 자동 갱신
@@ -437,6 +459,13 @@ class RSSCollector:
             result.errors.append(f"피드 오류: {parsed.bozo_exception}")
             await self._track_error(redis, source, db, str(parsed.bozo_exception))
             return result
+
+        # bozo=True이지만 entries가 있으면 마이너 XML 오류 → 에러 카운트 증가 없이 정상 처리
+        if parsed.bozo and parsed.entries:
+            logger.debug(
+                "RSS 피드 마이너 XML 오류 (무시): %s — %s",
+                source.display_name, parsed.bozo_exception,
+            )
 
         # 정상 수집 도달 → 에러 카운트 초기화
         await self._reset_error_count(redis, source)
