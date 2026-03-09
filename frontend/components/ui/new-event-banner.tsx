@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, X, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { cn, TOPIC_LABELS } from "@/lib/utils";
-import { COUNTRY_MAP, getFlag } from "@/lib/countries";
+import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { API_BASE } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
@@ -192,7 +192,7 @@ export function NewEventBanner() {
     const td = banner.data;
     const accent = TENSION_ACCENT[td.tension_level] ?? "bg-slate-500";
     const dot = TENSION_DOT[td.tension_level] ?? "bg-slate-400";
-    const countryName = COUNTRY_MAP[td.country_code]?.name ?? td.country_code;
+    const countryName = getCountryName(td.country_code, lang);
     const flag = getFlag(td.country_code);
     const prevLabel = getTensionLevelLabel(td.prev_level as 0 | 1 | 2 | 3 | 4, lang);
     const newLabel = getTensionLevelLabel(td.tension_level as 0 | 1 | 2 | 3 | 4, lang);
@@ -225,7 +225,7 @@ export function NewEventBanner() {
                 </span>
               </div>
               <p className="text-sm font-medium text-foreground truncate">
-                {flag} {countryName} {prevLabel}→{newLabel} ({td.raw_score.toFixed(1)}{t(lang, "banner_score_suffix")})
+                {flag} {countryName} {prevLabel}→{newLabel}
               </p>
             </div>
 
@@ -303,7 +303,7 @@ export function NewEventBanner() {
               </span>
             </div>
             <p className="text-sm font-medium text-foreground truncate">
-              {item?.keyword_ko || item?.keyword}
+              {lang === "ko" ? (item?.keyword_ko || item?.keyword) : item?.keyword}
             </p>
           </div>
 
