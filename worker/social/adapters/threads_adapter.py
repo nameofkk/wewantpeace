@@ -177,6 +177,7 @@ def _post_reply(client, parent_thread_id: str, cluster_id) -> None:
     """v7: 메인 포스트에 링크+홍보 댓글 달기."""
     reply_text = (
         f"🔗 Full analysis: https://wewantpeace.live/issues/{cluster_id}\n"
+        f"📡 Telegram: https://t.me/wewantpeace_live\n"
         f"📊 Real-time conflict tracking · WeWantPeace\n"
         f"상세 분석 보기 · 실시간 분쟁 모니터링"
     )

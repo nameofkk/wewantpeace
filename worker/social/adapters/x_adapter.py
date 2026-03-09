@@ -209,19 +209,23 @@ def _build_reply_text(post: SocialPost) -> str | None:
     """
     base_url = "https://www.wewantpeace.live"
 
+    tg = "https://t.me/wewantpeace_live"
+
     if post.source_cluster_id:
         link = f"{base_url}/issues/{post.source_cluster_id}?lang=en"
         return (
             "📊 Full timeline · sources · severity breakdown\n"
             "타임라인 · 출처 · 심각도 분석 보기\n\n"
-            f"🔗 {link}\n\n"
+            f"🔗 {link}\n"
+            f"📡 Telegram: {tg}\n\n"
             "🆓 Free · 195 countries · Updated every 3 min"
         )
 
     return (
         "🌐 Real-time conflict monitoring across 195 countries\n"
         "195개국 분쟁 상황 실시간 모니터링\n\n"
-        f"🔗 {base_url}\n\n"
+        f"🔗 {base_url}\n"
+        f"📡 Telegram: {tg}\n\n"
         "🆓 Free · No signup required"
     )
 
