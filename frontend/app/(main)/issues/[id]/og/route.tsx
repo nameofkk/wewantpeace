@@ -214,7 +214,7 @@ export async function GET(
 
   let kscoreHistory: KScorePoint[] = [];
   try {
-    const res = await fetch(`${API_BASE}/issues/${params.id}/kscore-history?days=7`, {
+    const res = await fetch(`${API_BASE}/trending/kscore-history/${params.id}?days=7`, {
       next: { revalidate: 300 },
     });
     if (res.ok) kscoreHistory = await res.json();

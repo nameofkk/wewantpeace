@@ -102,8 +102,8 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/10"),  # 매 10분
         "options": {"queue": "process"},
     },
-    "build-missed-spike-summary": {
-        "task": "worker.tasks.build_missed_spike_summary",
+    "build-missed-alert-summary": {
+        "task": "worker.tasks.build_missed_alert_summary",
         "schedule": crontab(minute="*/30"),  # 매 30분
         "options": {"queue": "process"},
     },
@@ -147,8 +147,8 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=0),  # 매일 00:00 UTC = KST 09:00
         "options": {"queue": "process"},
     },
-    "generate-spike-social": {
-        "task": "worker.tasks.generate_spike_social",
+    "generate-kscore-social": {
+        "task": "worker.tasks.generate_kscore_social",
         "schedule": crontab(minute="*/10"),  # 10분마다 (부하 분산)
         "options": {"queue": "process"},
     },
