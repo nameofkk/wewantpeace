@@ -71,7 +71,7 @@ function getConfig(severity: number) {
   return SEVERITY_CONFIG.find((c) => severity >= c.min) || SEVERITY_CONFIG[SEVERITY_CONFIG.length - 1];
 }
 
-function cleanTitle(raw: string): string {
+function cleanTitle(raw: string, lang: string = "ko"): string {
   let t = raw
     .replace(
       /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu,
@@ -96,14 +96,24 @@ function cleanTitle(raw: string): string {
     .replace(/(습니다|합니다|됩니다|입니다|했다|됐다|였다|이다)\.?$/, "")
     .replace(/[.…]+$/, "")
     .trim();
-  // 40자 초과 시 자연스러운 지점에서 자르기 (쉼표, 말줄임표, 접속조사)
-  if (t.length > 40) {
+  // 자연스러운 지점에서 자르기 (영어는 글자 폭이 좁아 더 긴 임계값 사용)
+  const maxLen = lang === "en" ? 55 : 40;
+  const hardMax = lang === "en" ? 58 : 45;
+  const hardCut = lang === "en" ? 52 : 42;
+  if (t.length > maxLen) {
     const cutPoints = [",", "…", "·", " - ", "–"];
     for (const sep of cutPoints) {
-      const idx = t.lastIndexOf(sep, 40);
+      const idx = t.lastIndexOf(sep, maxLen);
       if (idx >= 15) { t = t.slice(0, idx).trim(); break; }
     }
-    if (t.length > 45) t = t.slice(0, 42) + "…";
+    if (t.length > hardMax) {
+      if (lang === "en") {
+        const lastSpace = t.lastIndexOf(" ", hardCut);
+        t = lastSpace > 15 ? t.slice(0, lastSpace) + "…" : t.slice(0, hardCut) + "…";
+      } else {
+        t = t.slice(0, hardCut) + "…";
+      }
+    }
   }
   return t || raw;
 }
@@ -116,8 +126,9 @@ function cleanTitle(raw: string): string {
  *   3. 첫 줄 최소 8자, 둘째 줄 최소 4자
  *   4. 구분자가 없으면 1줄 유지 (CSS 자동 줄바꿈에 맡김)
  */
-function splitHeadline(text: string): string[] {
-  if (text.length <= 18) return [text];
+function splitHeadline(text: string, lang: string = "ko"): string[] {
+  const singleLineMax = lang === "en" ? 28 : 18;
+  if (text.length <= singleLineMax) return [text];
 
   const seps = [", ", "…", "· ", " - ", "– ", "— ", "; "];
   const target = Math.floor(text.length * 0.55); // 첫 줄을 약간 길게
@@ -143,6 +154,16 @@ function splitHeadline(text: string): string[] {
     const line2 = text.slice(bestAt).trim();
     return [line1, line2];
   }
+
+  // 영어: 구분자 없으면 단어 경계에서 분할
+  if (lang === "en" && text.length > singleLineMax) {
+    const target = Math.floor(text.length * 0.55);
+    const spaceIdx = text.lastIndexOf(" ", target);
+    if (spaceIdx >= 8 && spaceIdx <= text.length - 4) {
+      return [text.slice(0, spaceIdx), text.slice(spaceIdx + 1)];
+    }
+  }
+
   return [text];
 }
 
@@ -227,9 +248,11 @@ export async function GET(
   }
 
   const rawTitle = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
-  const headline = cleanTitle(rawTitle);
-  const headlineLines = splitHeadline(headline);
-  const titleSize = headline.length <= 10 ? 72 : headline.length <= 18 ? 60 : headline.length <= 28 ? 48 : headline.length <= 40 ? 40 : 34;
+  const headline = cleanTitle(rawTitle, lang);
+  const headlineLines = splitHeadline(headline, lang);
+  const titleSize = lang === "en"
+    ? (headline.length <= 15 ? 72 : headline.length <= 25 ? 60 : headline.length <= 38 ? 48 : headline.length <= 52 ? 40 : 34)
+    : (headline.length <= 10 ? 72 : headline.length <= 18 ? 60 : headline.length <= 28 ? 48 : headline.length <= 40 ? 40 : 34);
   const config = getConfig(issue.severity);
   const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
   const cn = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;

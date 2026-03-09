@@ -42,11 +42,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
   const title = isEn ? (issue.title || issue.title_ko || "Issue") : (issue.title_ko || issue.title || "이슈");
   // 카카오톡: og:title이 길면 description이 완전히 숨겨짐
-  // 25자 이내로 강제 절단하여 description 영역 확보
+  // 영어 글자는 좁아서 35자까지 허용, 한국어는 25자
+  const maxOgTitle = isEn ? 35 : 25;
   let ogTitle: string = title;
-  if (title.length > 25) {
-    const cut = title.lastIndexOf(" ", 25);
-    ogTitle = (cut > 8 ? title.slice(0, cut) : title.slice(0, 25)) + "…";
+  if (title.length > maxOgTitle) {
+    const cut = title.lastIndexOf(" ", maxOgTitle);
+    ogTitle = (cut > 8 ? title.slice(0, cut) : title.slice(0, maxOgTitle)) + "…";
   }
 
   const langSuffix = isEn ? "?lang=en" : "";

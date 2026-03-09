@@ -183,7 +183,8 @@ export async function GET(
   // 상위 이슈 2개 표시
   const topIssues = tension.top5_clusters.slice(0, 2).map((c) => {
     const raw = lang === "en" ? (c.title || c.title_ko || "") : (c.title_ko || c.title || "");
-    return raw.length > 35 ? raw.slice(0, 35) + "…" : raw;
+    const maxLen = lang === "en" ? 45 : 35;
+    return raw.length > maxLen ? raw.slice(0, maxLen) + "…" : raw;
   });
 
   return new ImageResponse(
@@ -334,9 +335,11 @@ export async function GET(
                 >
                   {lang === "en" ? countryEn : countryKo}
                 </span>
-                <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 600 }}>
-                  {lang === "en" ? countryKo : countryEn}
-                </span>
+                {lang === "ko" && (
+                  <span style={{ color: "#94A3B8", fontSize: 28, fontWeight: 600 }}>
+                    {countryEn}
+                  </span>
+                )}
               </div>
 
               {/* 점수 */}
