@@ -25,6 +25,12 @@ async def execute_fix(action: str, params: dict) -> str:
         "reprocess_topics": _fix_reprocess_topics,
         "split_mega_cluster": _fix_split_mega_cluster,
         "reset_openai_rate_limit": _fix_reset_openai_rate_limit,
+        "cleanup_stale_fcm_tokens": _fix_cleanup_stale_fcm_tokens,
+        "expire_stale_subscriptions": _fix_expire_stale_subscriptions,
+        "recalculate_tension": _fix_recalculate_tension,
+        "cleanup_redis_keys": _fix_cleanup_redis_keys,
+        "reprocess_orphans": _fix_reprocess_orphans,
+        "retry_sns_publish": _fix_retry_sns_publish,
     }
 
     handler = handlers.get(action)
@@ -244,3 +250,258 @@ async def _fix_reset_openai_rate_limit(params: dict) -> str:
         return f"Redis 리셋 오류: {e}"
 
     return f"OpenAI 에러 카운터 {len(reset_keys)}개 리셋 완료"
+
+
+# ── Action: cleanup_stale_fcm_tokens ──────────────────────────────────────
+
+
+async def _fix_cleanup_stale_fcm_tokens(params: dict) -> str:
+    """alert_delivery_log에서 만료/미등록 토큰 감지 → user_push_tokens에서 삭제."""
+    try:
+        async with AsyncSessionLocal() as db:
+            # failure_reason에 'token_expired' 또는 'NotRegistered' 포함하는 유저 추출
+            stale_q = await db.execute(
+                text("""
+                    SELECT DISTINCT adl.user_id
+                    FROM alert_delivery_log adl
+                    WHERE adl.failure_reason IS NOT NULL
+                      AND (
+                          adl.failure_reason ILIKE '%token_expired%'
+                          OR adl.failure_reason ILIKE '%NotRegistered%'
+                      )
+                """)
+            )
+            user_ids = [row.user_id for row in stale_q.fetchall()]
+
+            if not user_ids:
+                return "만료된 FCM 토큰 없음"
+
+            # user_push_tokens에서 해당 유저의 토큰 삭제
+            result = await db.execute(
+                text(
+                    "DELETE FROM user_push_tokens"
+                    " WHERE user_id = ANY(:uids)"
+                    " AND status != 'active'"
+                ),
+                {"uids": user_ids},
+            )
+            deleted_inactive = result.rowcount or 0
+
+            # 실패 기록이 있는 유저의 오래된 토큰도 정리 (30일 이상 미사용)
+            result2 = await db.execute(
+                text(
+                    "DELETE FROM user_push_tokens"
+                    " WHERE user_id = ANY(:uids)"
+                    " AND last_used < NOW() - INTERVAL '30 days'"
+                ),
+                {"uids": user_ids},
+            )
+            deleted_old = result2.rowcount or 0
+
+            await db.commit()
+
+        total = deleted_inactive + deleted_old
+        return f"FCM 토큰 정리 완료: 유저 {len(user_ids)}명, 삭제 {total}개 (비활성 {deleted_inactive} + 미사용 {deleted_old})"
+
+    except Exception as e:
+        if "does not exist" in str(e) or "relation" in str(e).lower():
+            return "토큰 관리 모델 미발견 (user_push_tokens 테이블 없음)"
+        raise
+
+
+# ── Action: expire_stale_subscriptions ────────────────────────────────────
+
+
+async def _fix_expire_stale_subscriptions(params: dict) -> str:
+    """만료일 지난 active 구독을 expired로 변경 + 유저 plan을 free로 다운그레이드."""
+    async with AsyncSessionLocal() as db:
+        try:
+            # 1) 만료된 구독 찾기
+            expired_q = await db.execute(
+                text("""
+                    SELECT id, user_id, plan
+                    FROM subscriptions
+                    WHERE status = 'active'
+                      AND expires_at IS NOT NULL
+                      AND expires_at < NOW()
+                """)
+            )
+            expired_rows = expired_q.fetchall()
+
+            if not expired_rows:
+                return "만료 처리할 구독 없음"
+
+            sub_ids = [row.id for row in expired_rows]
+            user_ids = list({row.user_id for row in expired_rows})
+
+            # 2) 구독 상태 → expired
+            await db.execute(
+                text(
+                    "UPDATE subscriptions"
+                    " SET status = 'expired', updated_at = :now"
+                    " WHERE id = ANY(:sids)"
+                ),
+                {"sids": sub_ids, "now": datetime.now(timezone.utc)},
+            )
+
+            # 3) 해당 유저의 plan → free (다른 active 구독이 없는 경우만)
+            downgraded = 0
+            for uid in user_ids:
+                active_check = await db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM subscriptions"
+                        " WHERE user_id = :uid AND status = 'active'"
+                    ),
+                    {"uid": uid},
+                )
+                if (active_check.scalar() or 0) == 0:
+                    await db.execute(
+                        text(
+                            "UPDATE users SET plan = 'free'"
+                            " WHERE id = :uid AND plan != 'free'"
+                        ),
+                        {"uid": uid},
+                    )
+                    downgraded += 1
+
+            await db.commit()
+
+            return (
+                f"구독 만료 처리 완료: {len(sub_ids)}건 expired, "
+                f"{downgraded}명 free 다운그레이드"
+            )
+
+        except Exception as e:
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            if "does not exist" in str(e):
+                return "subscriptions 테이블 미발견"
+            raise
+
+
+# ── Action: recalculate_tension ───────────────────────────────────────────
+
+
+async def _fix_recalculate_tension(params: dict) -> str:
+    """긴장도 지수 재계산을 Celery 태스크로 트리거."""
+    try:
+        from worker.celery_app import app as celery_app
+
+        celery_app.send_task(
+            "worker.tasks.calculate_tension",
+            queue="process",
+        )
+        return "calculate_tension 태스크 전송 완료 (비동기 실행 중)"
+    except Exception as e:
+        return f"calculate_tension 트리거 실패: {type(e).__name__}: {e}"
+
+
+# ── Action: cleanup_redis_keys ────────────────────────────────────────────
+
+
+async def _fix_cleanup_redis_keys(params: dict) -> str:
+    """TTL이 -1인 영구 Redis 키 중 불필요한 것들을 정리."""
+    redis = get_redis()
+    deleted_count = 0
+    scanned_count = 0
+
+    # 정리 대상 패턴 (임시/캐시성 키)
+    cleanup_patterns = ["rss:*", "anomaly:*", "health:pending:*"]
+    # 절대 건드리면 안 되는 패턴
+    protected_prefixes = [
+        "tension:baseline:",
+        "tension:history:",
+        "celery",
+    ]
+
+    try:
+        for pattern in cleanup_patterns:
+            cursor = 0
+            while True:
+                cursor, keys = await redis.scan(
+                    cursor, match=pattern, count=200
+                )
+                for key in keys:
+                    scanned_count += 1
+                    # bytes → str 변환
+                    key_str = key if isinstance(key, str) else key.decode("utf-8")
+
+                    # 보호 대상 스킵
+                    if any(key_str.startswith(p) for p in protected_prefixes):
+                        continue
+
+                    # TTL 확인: -1이면 영구 키
+                    ttl = await redis.ttl(key)
+                    if ttl == -1:
+                        await redis.delete(key)
+                        deleted_count += 1
+
+                if cursor == 0:
+                    break
+
+    except Exception as e:
+        return f"Redis 키 정리 중 오류: {type(e).__name__}: {e} (스캔 {scanned_count}, 삭제 {deleted_count})"
+
+    return f"Redis 키 정리 완료: 스캔 {scanned_count}개, 영구키 삭제 {deleted_count}개"
+
+
+# ── Action: reprocess_orphans ─────────────────────────────────────────────
+
+
+async def _fix_reprocess_orphans(params: dict) -> str:
+    """클러스터 미할당 이벤트(오펀) 재처리를 Celery 태스크로 트리거."""
+    try:
+        from worker.celery_app import app as celery_app
+
+        celery_app.send_task(
+            "worker.tasks.reprocess_orphans",
+            queue="process",
+        )
+        return "reprocess_orphans 태스크 전송 완료 (비동기 실행 중)"
+    except Exception as e:
+        return f"reprocess_orphans 트리거 실패: {type(e).__name__}: {e}"
+
+
+# ── Action: retry_sns_publish ─────────────────────────────────────────────
+
+
+async def _fix_retry_sns_publish(params: dict) -> str:
+    """승인 후 30분 이상 미발행 상태인 SNS 포스트를 재발행 트리거."""
+    try:
+        async with AsyncSessionLocal() as db:
+            # approved 상태이고 approved_at이 30분 이상 지난 포스트 조회
+            stale_q = await db.execute(
+                text("""
+                    SELECT id, content_type, lang
+                    FROM social_posts
+                    WHERE status = 'approved'
+                      AND approved_at IS NOT NULL
+                      AND approved_at < NOW() - INTERVAL '30 minutes'
+                """)
+            )
+            stale_posts = stale_q.fetchall()
+
+            if not stale_posts:
+                return "재발행 대상 SNS 포스트 없음"
+
+            post_ids = [str(row.id) for row in stale_posts]
+
+        # Celery 태스크로 발행 트리거
+        try:
+            from worker.celery_app import app as celery_app
+
+            celery_app.send_task(
+                "worker.tasks.publish_approved_social",
+                queue="process",
+            )
+        except Exception as e:
+            return f"publish 태스크 트리거 실패: {e} (대상 {len(post_ids)}건)"
+
+        return f"SNS 재발행 트리거 완료: {len(post_ids)}건 (publish_approved_social 태스크 전송)"
+
+    except Exception as e:
+        if "does not exist" in str(e):
+            return "social_posts 테이블 미발견"
+        raise
