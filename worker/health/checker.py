@@ -1,7 +1,9 @@
-"""헬스체크 로직 — 6가지 시스템 건강 체크.
+"""헬스체크 로직 — 18가지 시스템 건강 체크.
 
 6시간마다 실행되어 파이프라인 품질, 소스채널 건강, 클러스터 품질,
-OpenAI API 상태, RSS 수집 지연, 워커 프로세스 상태를 점검합니다.
+OpenAI API 상태, RSS 수집 지연, 워커 프로세스 상태, Celery Beat,
+API 소스, 중복률, FCM 전송, 구독 무결성, 긴장도 지수, Redis,
+고아 이벤트, SNS 포스팅, SNS 토큰, 스파이크 전송, K점수 분포를 점검합니다.
 """
 import asyncio
 import logging
@@ -490,21 +492,875 @@ async def check_worker_resources() -> HealthCheckResult:
         )
 
 
+# ── Check 7: Celery Beat 건강 ──────────────────────────────────────────────
+
+
+async def check_celery_beat_health() -> HealthCheckResult:
+    """Redis에서 beat heartbeat와 핵심 태스크 마지막 실행 시각 확인."""
+    try:
+        redis = get_redis()
+        issues: list[HealthIssue] = []
+        parts: list[str] = []
+
+        # beat:heartbeat 키 확인 (TTL 10분)
+        heartbeat = await redis.get("beat:heartbeat")
+        if not heartbeat:
+            issues.append(HealthIssue(
+                check_name="celery_beat_health",
+                severity="warning",
+                message="beat:heartbeat 키 없음 — Celery Beat 중단 의심",
+                auto_fix_available=False,
+            ))
+            parts.append("heartbeat: 없음")
+        else:
+            ttl = await redis.ttl("beat:heartbeat")
+            parts.append(f"heartbeat: TTL {ttl}s")
+
+        # 핵심 태스크 마지막 실행 시각 확인
+        core_tasks = ["collect_rss", "calculate_tension", "collect_telegram"]
+        now = datetime.now(timezone.utc)
+        for task_name in core_tasks:
+            key = f"celery:last_run:{task_name}"
+            last_run_str = await redis.get(key)
+            if not last_run_str:
+                parts.append(f"{task_name}: 기록없음")
+                continue
+            try:
+                last_run = datetime.fromisoformat(last_run_str.decode() if isinstance(last_run_str, bytes) else last_run_str)
+                if last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=timezone.utc)
+                age_min = int((now - last_run).total_seconds() / 60)
+                if age_min > 10:
+                    issues.append(HealthIssue(
+                        check_name="celery_beat_health",
+                        severity="warning",
+                        message=f"{task_name}: {age_min}분 미실행 (임계값 10분)",
+                        auto_fix_available=False,
+                    ))
+                parts.append(f"{task_name}: {age_min}분 전")
+            except Exception:
+                parts.append(f"{task_name}: 파싱오류")
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="celery_beat_health",
+            status=status,
+            message="\n  └ ".join(["Celery Beat"] + parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("Celery Beat 체크 오류")
+        return HealthCheckResult(
+            check_name="celery_beat_health",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 8: API 소스 수집 지연 ────────────────────────────────────────────
+
+
+# API 소스별 기대 주기 (분)
+_API_SOURCE_INTERVALS: dict[str, int] = {
+    "gdelt": 15,
+    "usgs": 5,
+    "telegram": 5,
+    "reliefweb": 30,
+    "acled": 1440,  # 일 1회
+    "travel_advisory": 360,  # 6시간
+}
+
+
+async def check_api_sources(db: AsyncSession) -> HealthCheckResult:
+    """API 소스별 최신 수집 시각 확인. 주기 대비 2배 이상 지연 시 warning."""
+    try:
+        issues: list[HealthIssue] = []
+        parts: list[str] = []
+        now = datetime.now(timezone.utc)
+
+        result = await db.execute(
+            text(
+                "SELECT source_type, MAX(collected_at) as last_at"
+                " FROM raw_events"
+                " WHERE source_type != 'rss'"
+                " GROUP BY source_type"
+            )
+        )
+        rows = result.fetchall()
+        source_map = {row.source_type: row.last_at for row in rows}
+
+        for src, interval_min in _API_SOURCE_INTERVALS.items():
+            last_at = source_map.get(src)
+            if not last_at:
+                parts.append(f"{src}: 수집기록없음")
+                continue
+            if last_at.tzinfo is None:
+                last_at = last_at.replace(tzinfo=timezone.utc)
+            age_min = int((now - last_at).total_seconds() / 60)
+            threshold = interval_min * 2
+            if age_min > threshold:
+                issues.append(HealthIssue(
+                    check_name="api_sources",
+                    severity="warning",
+                    message=f"{src}: {age_min}분 지연 (기대 주기 {interval_min}분, 임계값 {threshold}분)",
+                    auto_fix_available=False,
+                ))
+            parts.append(f"{src}: {age_min}분 전")
+
+        status = "ok" if not issues else "warning"
+        return HealthCheckResult(
+            check_name="api_sources",
+            status=status,
+            message="\n  └ ".join(["API 소스 수집"] + parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("API 소스 체크 오류")
+        return HealthCheckResult(
+            check_name="api_sources",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 9: 중복률 ───────────────────────────────────────────────────────
+
+
+async def check_duplicate_rate(db: AsyncSession) -> HealthCheckResult:
+    """24시간 중복률 계산. 70% 초과 또는 10% 미만이면 warning."""
+    try:
+        total_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM normalized_events"
+                " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+            )
+        )
+        total = total_q.scalar() or 0
+
+        if total == 0:
+            return HealthCheckResult(
+                check_name="duplicate_rate",
+                status="ok",
+                message="최근 24h 이벤트 없음",
+            )
+
+        dup_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM normalized_events"
+                " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+                " AND is_duplicate = true"
+            )
+        )
+        dup = dup_q.scalar() or 0
+        rate = (dup / total) * 100
+
+        issues: list[HealthIssue] = []
+        if rate > 70:
+            issues.append(HealthIssue(
+                check_name="duplicate_rate",
+                severity="warning",
+                message=f"중복률 {rate:.1f}% (임계값 70%)\n  └ {dup}/{total} 이벤트 중복 — 소스 중복 과다",
+                auto_fix_available=False,
+            ))
+        elif rate < 10 and total >= 50:
+            issues.append(HealthIssue(
+                check_name="duplicate_rate",
+                severity="warning",
+                message=f"중복률 {rate:.1f}% (임계값 10%)\n  └ {dup}/{total} — 수집 다양성 저하 의심",
+                auto_fix_available=False,
+            ))
+
+        return HealthCheckResult(
+            check_name="duplicate_rate",
+            status="warning" if issues else "ok",
+            message=f"중복률 {rate:.1f}% ({dup}/{total}, 최근 24h)",
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("중복률 체크 오류")
+        return HealthCheckResult(
+            check_name="duplicate_rate",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 10: FCM Push 건강 ───────────────────────────────────────────────
+
+
+async def check_fcm_push_health(db: AsyncSession) -> HealthCheckResult:
+    """alert_delivery_log에서 최근 6시간 전송 결과 집계."""
+    try:
+        # 테이블 존재 확인
+        result = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM alert_delivery_log"
+                " WHERE created_at >= NOW() - INTERVAL '6 hours'"
+                " AND decision = 'sent'"
+            )
+        )
+        sent = result.scalar() or 0
+
+        failed_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM alert_delivery_log"
+                " WHERE created_at >= NOW() - INTERVAL '6 hours'"
+                " AND decision = 'failed'"
+            )
+        )
+        failed = failed_q.scalar() or 0
+
+        pending_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM alert_delivery_log"
+                " WHERE decision = 'pending'"
+            )
+        )
+        pending = pending_q.scalar() or 0
+
+        issues: list[HealthIssue] = []
+        total_delivery = sent + failed
+        parts = [f"전송: {sent}", f"실패: {failed}", f"대기: {pending}"]
+
+        if total_delivery > 0:
+            success_rate = (sent / total_delivery) * 100
+            if success_rate < 80:
+                issues.append(HealthIssue(
+                    check_name="fcm_push_health",
+                    severity="warning",
+                    message=f"FCM 성공률 {success_rate:.1f}% (임계값 80%)\n  └ sent={sent}, failed={failed}",
+                    auto_fix_available=True,
+                    fix_action="cleanup_stale_fcm_tokens",
+                    fix_params={},
+                ))
+
+        if pending > 20:
+            issues.append(HealthIssue(
+                check_name="fcm_push_health",
+                severity="warning",
+                message=f"대기 건수 {pending}개 (임계값 20)",
+                auto_fix_available=True,
+                fix_action="cleanup_stale_fcm_tokens",
+                fix_params={},
+            ))
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="fcm_push_health",
+            status=status,
+            message="FCM Push: " + " | ".join(parts),
+            issues=issues,
+        )
+    except Exception as e:
+        # 테이블 미존재 등 — skip
+        if "alert_delivery_log" in str(e).lower() or "relation" in str(e).lower():
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return HealthCheckResult(
+                check_name="fcm_push_health",
+                status="ok",
+                message="alert_delivery_log 테이블 없음 — 건너뜀",
+            )
+        logger.exception("FCM Push 체크 오류")
+        return HealthCheckResult(
+            check_name="fcm_push_health",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 11: 구독 무결성 ─────────────────────────────────────────────────
+
+
+async def check_subscription_integrity(db: AsyncSession) -> HealthCheckResult:
+    """만료된 활성 구독, 플랜 불일치 등 무결성 검사."""
+    try:
+        # 활성인데 만료된 구독
+        expired_active_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM subscriptions"
+                " WHERE status = 'active'"
+                " AND expires_at < NOW()"
+            )
+        )
+        expired_active = expired_active_q.scalar() or 0
+
+        # pro/pro_plus 플랜인데 활성 구독 없는 유저
+        orphan_plan_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM users u"
+                " WHERE u.plan IN ('pro', 'pro_plus')"
+                " AND NOT EXISTS ("
+                "   SELECT 1 FROM subscriptions s"
+                "   WHERE s.user_id = u.id AND s.status = 'active'"
+                " )"
+                " AND u.referral_pro_expires_at IS NULL"
+            )
+        )
+        orphan_plan = orphan_plan_q.scalar() or 0
+
+        issues: list[HealthIssue] = []
+        parts = [f"만료된 활성구독: {expired_active}", f"구독없는 유료플랜: {orphan_plan}"]
+
+        if expired_active > 0:
+            issues.append(HealthIssue(
+                check_name="subscription_integrity",
+                severity="warning",
+                message=f"만료된 활성 구독 {expired_active}건",
+                auto_fix_available=True,
+                fix_action="expire_stale_subscriptions",
+                fix_params={"count": expired_active},
+            ))
+
+        if orphan_plan > 0:
+            issues.append(HealthIssue(
+                check_name="subscription_integrity",
+                severity="warning",
+                message=f"활성 구독 없는 유료 플랜 유저 {orphan_plan}명",
+                auto_fix_available=True,
+                fix_action="expire_stale_subscriptions",
+                fix_params={"orphan_plan_count": orphan_plan},
+            ))
+
+        return HealthCheckResult(
+            check_name="subscription_integrity",
+            status="warning" if issues else "ok",
+            message="구독 무결성: " + " | ".join(parts),
+            issues=issues,
+        )
+    except Exception as e:
+        if "subscriptions" in str(e).lower() or "relation" in str(e).lower():
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return HealthCheckResult(
+                check_name="subscription_integrity",
+                status="ok",
+                message="subscriptions 테이블 없음 — 건너뜀",
+            )
+        logger.exception("구독 무결성 체크 오류")
+        return HealthCheckResult(
+            check_name="subscription_integrity",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 12: 긴장도 지수 건강 ────────────────────────────────────────────
+
+
+async def check_tension_index_health(db: AsyncSession) -> HealthCheckResult:
+    """tension_index 최근 레코드 시각 및 0점 비율 확인."""
+    try:
+        # 최신 레코드 시각
+        latest_q = await db.execute(
+            text("SELECT MAX(time) FROM tension_index")
+        )
+        latest = latest_q.scalar()
+
+        if not latest:
+            return HealthCheckResult(
+                check_name="tension_index_health",
+                status="warning",
+                message="tension_index 레코드 없음",
+            )
+
+        if latest.tzinfo is None:
+            latest = latest.replace(tzinfo=timezone.utc)
+
+        age = datetime.now(timezone.utc) - latest
+        age_min = int(age.total_seconds() / 60)
+
+        issues: list[HealthIssue] = []
+        parts = [f"최신: {age_min}분 전"]
+
+        if age_min > 15:
+            issues.append(HealthIssue(
+                check_name="tension_index_health",
+                severity="warning",
+                message=f"긴장도 지수 {age_min}분 지연 (5분 주기, 임계값 15분)",
+                auto_fix_available=True,
+                fix_action="recalculate_tension",
+                fix_params={},
+            ))
+
+        # 최신 배치의 0점 국가 비율
+        zero_q = await db.execute(
+            text("""
+                WITH latest_batch AS (
+                    SELECT country_code, score
+                    FROM tension_index
+                    WHERE time = (SELECT MAX(time) FROM tension_index)
+                )
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE score = 0) as zero_cnt
+                FROM latest_batch
+            """)
+        )
+        row = zero_q.fetchone()
+        total_countries = row.total if row else 0
+        zero_countries = row.zero_cnt if row else 0
+
+        if total_countries > 0:
+            zero_pct = (zero_countries / total_countries) * 100
+            parts.append(f"0점 비율: {zero_pct:.0f}% ({zero_countries}/{total_countries})")
+            if zero_pct > 90:
+                issues.append(HealthIssue(
+                    check_name="tension_index_health",
+                    severity="warning",
+                    message=f"0점 국가 비율 {zero_pct:.0f}% (임계값 90%)",
+                    auto_fix_available=True,
+                    fix_action="recalculate_tension",
+                    fix_params={},
+                ))
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="tension_index_health",
+            status=status,
+            message="\n  └ ".join(["긴장도 지수"] + parts),
+            issues=issues,
+        )
+    except Exception as e:
+        if "tension_index" in str(e).lower() or "relation" in str(e).lower():
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return HealthCheckResult(
+                check_name="tension_index_health",
+                status="ok",
+                message="tension_index 테이블 없음 — 건너뜀",
+            )
+        logger.exception("긴장도 지수 체크 오류")
+        return HealthCheckResult(
+            check_name="tension_index_health",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 13: Redis 건강 ──────────────────────────────────────────────────
+
+
+async def check_redis_health() -> HealthCheckResult:
+    """Redis 메모리 사용량, 키 수 확인."""
+    try:
+        redis = get_redis()
+        info = await redis.info("memory")
+        used_mb = info.get("used_memory", 0) / (1024 * 1024)
+        peak_mb = info.get("used_memory_peak", 0) / (1024 * 1024)
+
+        dbsize = await redis.dbsize()
+
+        issues: list[HealthIssue] = []
+        parts = [f"메모리: {used_mb:.1f}MB (peak {peak_mb:.1f}MB)", f"키 수: {dbsize:,}"]
+
+        if dbsize > 100_000:
+            issues.append(HealthIssue(
+                check_name="redis_health",
+                severity="warning",
+                message=f"Redis 키 {dbsize:,}개 (임계값 100,000)",
+                auto_fix_available=True,
+                fix_action="cleanup_redis_keys",
+                fix_params={"dbsize": dbsize},
+            ))
+
+        status = "ok" if not issues else "warning"
+
+        return HealthCheckResult(
+            check_name="redis_health",
+            status=status,
+            message="Redis: " + " | ".join(parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("Redis 건강 체크 오류")
+        return HealthCheckResult(
+            check_name="redis_health",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 14: 고아 이벤트 ─────────────────────────────────────────────────
+
+
+async def check_orphan_events(db: AsyncSession) -> HealthCheckResult:
+    """cluster_events에 없는 normalized_events (severity >= 20, 최근 7일) 카운트."""
+    try:
+        orphan_q = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM normalized_events ne
+                WHERE ne.severity >= 20
+                  AND ne.is_duplicate = false
+                  AND ne.created_at >= NOW() - INTERVAL '7 days'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM cluster_events ce WHERE ce.event_id = ne.id
+                  )
+            """)
+        )
+        orphan_count = orphan_q.scalar() or 0
+
+        issues: list[HealthIssue] = []
+        if orphan_count > 500:
+            issues.append(HealthIssue(
+                check_name="orphan_events",
+                severity="critical",
+                message=f"고아 이벤트 {orphan_count}개 (임계값 500)",
+                auto_fix_available=True,
+                fix_action="reprocess_orphans",
+                fix_params={"count": orphan_count},
+            ))
+        elif orphan_count > 100:
+            issues.append(HealthIssue(
+                check_name="orphan_events",
+                severity="warning",
+                message=f"고아 이벤트 {orphan_count}개 (임계값 100)",
+                auto_fix_available=True,
+                fix_action="reprocess_orphans",
+                fix_params={"count": orphan_count},
+            ))
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="orphan_events",
+            status=status,
+            message=f"고아 이벤트: {orphan_count}개 (severity>=20, 최근 7일)",
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("고아 이벤트 체크 오류")
+        return HealthCheckResult(
+            check_name="orphan_events",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 15: SNS 포스팅 건강 ─────────────────────────────────────────────
+
+
+async def check_sns_posting_health(db: AsyncSession) -> HealthCheckResult:
+    """social_posts에서 stale approved, 장기 pending_review 탐지."""
+    try:
+        # approved인데 30분 이상 미발행
+        stale_approved_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM social_posts"
+                " WHERE status = 'approved'"
+                " AND approved_at < NOW() - INTERVAL '30 minutes'"
+                " AND published_at IS NULL"
+            )
+        )
+        stale_approved = stale_approved_q.scalar() or 0
+
+        # pending_review 48시간 이상 대기
+        stale_pending_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM social_posts"
+                " WHERE status = 'pending_review'"
+                " AND created_at < NOW() - INTERVAL '48 hours'"
+            )
+        )
+        stale_pending = stale_pending_q.scalar() or 0
+
+        issues: list[HealthIssue] = []
+        parts = [f"stale approved: {stale_approved}", f"48h+ pending: {stale_pending}"]
+
+        if stale_approved > 5:
+            issues.append(HealthIssue(
+                check_name="sns_posting_health",
+                severity="warning",
+                message=f"approved 후 30분+ 미발행 {stale_approved}건 (임계값 5)",
+                auto_fix_available=True,
+                fix_action="retry_sns_publish",
+                fix_params={"stale_approved": stale_approved},
+            ))
+
+        if stale_pending > 0:
+            issues.append(HealthIssue(
+                check_name="sns_posting_health",
+                severity="warning",
+                message=f"48시간+ 대기 중인 pending_review {stale_pending}건",
+                auto_fix_available=False,
+            ))
+
+        return HealthCheckResult(
+            check_name="sns_posting_health",
+            status="warning" if issues else "ok",
+            message="SNS 포스팅: " + " | ".join(parts),
+            issues=issues,
+        )
+    except Exception as e:
+        if "social_posts" in str(e).lower() or "relation" in str(e).lower():
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return HealthCheckResult(
+                check_name="sns_posting_health",
+                status="ok",
+                message="social_posts 테이블 없음 — 건너뜀",
+            )
+        logger.exception("SNS 포스팅 체크 오류")
+        return HealthCheckResult(
+            check_name="sns_posting_health",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 16: SNS 토큰 유효성 ─────────────────────────────────────────────
+
+
+async def check_sns_token_validity() -> HealthCheckResult:
+    """각 SNS 어댑터의 is_configured() 체크."""
+    try:
+        adapters: dict[str, bool] = {}
+
+        # 동적 import — 어댑터가 없어도 안전
+        adapter_modules = {
+            "X (Twitter)": "worker.social.adapters.x_adapter",
+            "Telegram": "worker.social.adapters.telegram_channel_adapter",
+            "Threads": "worker.social.adapters.threads_adapter",
+            "Instagram": "worker.social.adapters.instagram_adapter",
+            "LinkedIn": "worker.social.adapters.linkedin_adapter",
+        }
+
+        import importlib
+        for name, module_path in adapter_modules.items():
+            try:
+                mod = importlib.import_module(module_path)
+                adapters[name] = mod.is_configured()
+            except Exception:
+                adapters[name] = False
+
+        unconfigured = [name for name, ok in adapters.items() if not ok]
+        configured = [name for name, ok in adapters.items() if ok]
+
+        parts = []
+        if configured:
+            parts.append(f"설정됨: {', '.join(configured)}")
+        if unconfigured:
+            parts.append(f"미설정: {', '.join(unconfigured)}")
+
+        issues: list[HealthIssue] = []
+        if unconfigured:
+            issues.append(HealthIssue(
+                check_name="sns_token_validity",
+                severity="info" if len(unconfigured) < len(adapters) else "warning",
+                message=f"미설정 어댑터: {', '.join(unconfigured)}",
+                auto_fix_available=False,
+            ))
+
+        # info 레벨은 ok 상태 유지
+        status = "ok"
+        if issues and all(i.severity == "warning" for i in issues):
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="sns_token_validity",
+            status=status,
+            message="SNS 토큰: " + " | ".join(parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("SNS 토큰 체크 오류")
+        return HealthCheckResult(
+            check_name="sns_token_validity",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 17: 스파이크 알림 전송 ──────────────────────────────────────────
+
+
+async def check_spike_delivery(db: AsyncSession) -> HealthCheckResult:
+    """최근 6시간 내 severity >= 50인 스파이크 중 알림 미전송 탐지."""
+    try:
+        undelivered_q = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM spike_events se
+                WHERE se.severity >= 50
+                  AND se.triggered_at >= NOW() - INTERVAL '6 hours'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM alert_delivery_log adl
+                      WHERE adl.spike_event_id = se.id
+                        AND adl.decision = 'sent'
+                  )
+            """)
+        )
+        undelivered = undelivered_q.scalar() or 0
+
+        issues: list[HealthIssue] = []
+        if undelivered > 0:
+            issues.append(HealthIssue(
+                check_name="spike_delivery",
+                severity="warning",
+                message=f"미전송 스파이크 알림 {undelivered}건 (severity>=50, 최근 6h)",
+                auto_fix_available=True,
+                fix_action="retry_spike_alerts",
+                fix_params={"undelivered": undelivered},
+            ))
+
+        return HealthCheckResult(
+            check_name="spike_delivery",
+            status="warning" if issues else "ok",
+            message=f"스파이크 알림 전송: 미전송 {undelivered}건",
+            issues=issues,
+        )
+    except Exception as e:
+        if "spike_events" in str(e).lower() or "alert_delivery_log" in str(e).lower() or "relation" in str(e).lower():
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            return HealthCheckResult(
+                check_name="spike_delivery",
+                status="ok",
+                message="spike_events/alert_delivery_log 테이블 없음 — 건너뜀",
+            )
+        logger.exception("스파이크 알림 체크 오류")
+        return HealthCheckResult(
+            check_name="spike_delivery",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
+# ── Check 18: K점수 분포 ──────────────────────────────────────────────────
+
+
+async def check_kscore_distribution(db: AsyncSession) -> HealthCheckResult:
+    """issue_clusters 활성 클러스터의 kscore 분포 확인."""
+    try:
+        result = await db.execute(
+            text("""
+                SELECT
+                    AVG(kscore) as avg_kscore,
+                    MAX(kscore) as max_kscore,
+                    MIN(kscore) as min_kscore,
+                    COUNT(*) as cnt
+                FROM issue_clusters
+                WHERE is_active = true AND severity > 0
+            """)
+        )
+        row = result.fetchone()
+        cnt = row.cnt if row else 0
+
+        if cnt == 0:
+            return HealthCheckResult(
+                check_name="kscore_distribution",
+                status="ok",
+                message="활성 클러스터 없음",
+            )
+
+        avg_k = row.avg_kscore or 0
+        max_k = row.max_kscore or 0
+        min_k = row.min_kscore or 0
+
+        issues: list[HealthIssue] = []
+        parts = [
+            f"AVG: {avg_k:.2f}",
+            f"MAX: {max_k:.2f}",
+            f"MIN: {min_k:.2f}",
+            f"클러스터: {cnt}개",
+        ]
+
+        if max_k == 0:
+            issues.append(HealthIssue(
+                check_name="kscore_distribution",
+                severity="critical",
+                message="모든 활성 클러스터 kscore=0 — 계산 중단 의심",
+                auto_fix_available=False,
+            ))
+        elif avg_k > 7:
+            issues.append(HealthIssue(
+                check_name="kscore_distribution",
+                severity="warning",
+                message=f"평균 K점수 {avg_k:.2f} (임계값 7) — 과대평가 의심",
+                auto_fix_available=False,
+            ))
+        elif avg_k < 0.5:
+            issues.append(HealthIssue(
+                check_name="kscore_distribution",
+                severity="warning",
+                message=f"평균 K점수 {avg_k:.2f} (임계값 0.5) — 과소평가 의심",
+                auto_fix_available=False,
+            ))
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="kscore_distribution",
+            status=status,
+            message="\n  └ ".join(["K점수 분포"] + parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("K점수 분포 체크 오류")
+        return HealthCheckResult(
+            check_name="kscore_distribution",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
 # ── 전체 헬스체크 실행 ──────────────────────────────────────────────────────
 
 
 async def run_all_checks() -> list[HealthCheckResult]:
-    """6가지 헬스 체크를 모두 실행. 각 체크는 독립 try/except."""
+    """18가지 헬스 체크를 모두 실행. 각 체크는 독립 try/except."""
     results: list[HealthCheckResult] = []
 
     async with AsyncSessionLocal() as db:
-        # DB 의존 체크들
+        # DB 의존 체크들 (기존 5개 + 신규 8개)
         db_checks = [
             check_misclassification_rate,
             check_source_channels,
             check_cluster_quality,
             check_openai_status,
             check_rss_freshness,
+            # ── 신규 DB 의존 체크 ──
+            check_api_sources,
+            check_duplicate_rate,
+            check_fcm_push_health,
+            check_subscription_integrity,
+            check_tension_index_health,
+            check_orphan_events,
+            check_sns_posting_health,
+            check_spike_delivery,
+            check_kscore_distribution,
         ]
         for check_fn in db_checks:
             try:
@@ -521,15 +1377,22 @@ async def run_all_checks() -> list[HealthCheckResult]:
                 )
             results.append(r)
 
-    # DB 독립 체크
-    try:
-        r = await check_worker_resources()
-    except Exception as e:
-        r = HealthCheckResult(
-            check_name="worker_resources",
-            status="warning",
-            message=f"체크 오류: {e}",
-        )
-    results.append(r)
+    # DB 독립 체크 (기존 1개 + 신규 3개)
+    independent_checks = [
+        ("worker_resources", check_worker_resources),
+        ("celery_beat_health", check_celery_beat_health),
+        ("redis_health", check_redis_health),
+        ("sns_token_validity", check_sns_token_validity),
+    ]
+    for name, check_fn in independent_checks:
+        try:
+            r = await check_fn()
+        except Exception as e:
+            r = HealthCheckResult(
+                check_name=name,
+                status="warning",
+                message=f"체크 오류: {e}",
+            )
+        results.append(r)
 
     return results
