@@ -338,6 +338,21 @@ async def _poll_updates():
                         username = from_user.get("username", from_user.get("first_name", "unknown"))
                         chat_id = cq.get("message", {}).get("chat", {}).get("id")
 
+                        # 헬스체크 승인 콜백 → health notifier로 위임
+                        if cb_data.startswith("hfix:") or cb_data.startswith("hskip:"):
+                            try:
+                                from worker.health.notifier import _handle_health_callback
+                                reply = await _handle_health_callback(client, cq, cb_data, username)
+                            except Exception as e:
+                                logger.warning("Health callback 처리 오류: %s", e)
+                                reply = f"Health 처리 오류: {e}"
+                            if chat_id:
+                                await client.post(
+                                    f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                                    json={"chat_id": chat_id, "text": reply},
+                                )
+                            continue
+
                         reply = await handle_callback(cb_data, username)
 
                         # edit 액션이면 대기 상태 등록

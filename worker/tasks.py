@@ -3212,3 +3212,58 @@ def recheck_inactive_feeds(self):
     except Exception as exc:
         logger.error("recheck_inactive_feeds 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── 시스템 헬스체크 + 자동수정 ────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.health_check",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def health_check(self):
+    """6시간마다 시스템 건강 체크 → 텔레그램 리포트 전송."""
+
+    async def _run():
+        from worker.health.checker import run_all_checks
+        from worker.health.notifier import send_health_report
+
+        results = await run_all_checks()
+        await send_health_report(results)
+
+        ok_count = sum(1 for r in results if r.status == "ok")
+        issue_count = sum(len(r.issues) for r in results)
+        return {
+            "status": "ok",
+            "checks": len(results),
+            "healthy": ok_count,
+            "issues": issue_count,
+        }
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("health_check 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.process_health_approvals",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def process_health_approvals(self):
+    """5분마다 텔레그램 승인 확인 → 승인된 수정 실행."""
+
+    async def _run():
+        from worker.health.notifier import process_approvals
+        return await process_approvals()
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("process_health_approvals 오류: %s", exc)
+        raise self.retry(exc=exc)

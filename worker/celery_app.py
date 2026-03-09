@@ -213,6 +213,17 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC
         "options": {"queue": "collect"},
     },
+    # ── 시스템 헬스체크 + 자동수정 ──
+    "health-check": {
+        "task": "worker.tasks.health_check",
+        "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
+        "options": {"queue": "process"},
+    },
+    "process-health-approvals": {
+        "task": "worker.tasks.process_health_approvals",
+        "schedule": 300.0,  # 5분마다
+        "options": {"queue": "process"},
+    },
 }
 
 
