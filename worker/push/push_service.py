@@ -966,7 +966,7 @@ async def send_alert(
     2. Critical 바이패스 (sev>=80 AND Pro/Pro+)
     3. 놓친 알림 카운터 (Free 상한 초과 시)
     """
-    # Redis 중복방지
+    # Redis 중복방지 (같은 cluster_id)
     if alert_kind in ("fast", "combined"):
         dedup_key = f"alert:fast:{cluster_id}"
         if await redis.exists(dedup_key):
@@ -979,6 +979,37 @@ async def send_alert(
             logger.info("Verified alert 중복 스킵: cluster_id=%s", cluster_id)
             if alert_kind == "verified":
                 return {"status": "dedup", "sent": 0}
+
+    # Cross-cluster 유사도 중복방지: 같은 국가 + 유사 제목의 다른 클러스터에
+    # 이미 알림 보냈으면 스킵 (6시간 내)
+    if country_code and cluster_title:
+        try:
+            from backend.app.models.issue_cluster import IssueCluster
+            from worker.processor.clusterer import _title_similarity
+            _cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            _recent = await db.execute(
+                select(IssueCluster.id, IssueCluster.title, IssueCluster.title_ko).where(
+                    IssueCluster.country_code == country_code,
+                    IssueCluster.severity > 0,
+                    IssueCluster.id != _uuid.UUID(cluster_id),
+                    IssueCluster.last_event_at >= _cutoff,
+                )
+            )
+            for _row in _recent:
+                _sim = _title_similarity(
+                    cluster_title, _row.title or "",
+                    ko_a=cluster_title_ko, ko_b=_row.title_ko,
+                )
+                if _sim >= 0.20:
+                    _other_key = f"alert:fast:{_row.id}"
+                    if await redis.exists(_other_key):
+                        logger.info(
+                            "Cross-cluster 중복 스킵: %s (sim=%.3f with %s)",
+                            cluster_id, _sim, _row.id,
+                        )
+                        return {"status": "cross_dedup", "sent": 0, "similar_cluster": str(_row.id)}
+        except Exception:
+            logger.debug("Cross-cluster dedup check 실패 (무시)", exc_info=True)
 
     collapse_key = cluster_id
     sent_verified = 0

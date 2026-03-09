@@ -646,24 +646,37 @@ def calculate_trending(self):
     """트렌딩 키워드 계산 (15분마다). 분산 클러스터 자동 병합 포함."""
 
     async def _merge_fragmented_clusters(db):
-        """같은 cluster_key의 분산된 클러스터를 병합 (보수적).
+        """같은 cluster_key 또는 같은 국가+관련토픽의 분산된 클러스터를 병합 (보수적).
 
         병합 조건:
+        Phase 1 — 같은 cluster_key 병합 (기존):
         - 8개 토픽 (conflict/terror/coup + diplomacy/maritime/protest/sanctions/cyber)
         - cluster_key가 '0000'으로 시작하지 않을 것 (위치 미상 = 혼합 위험)
         - winner의 event_count가 100 이하일 때만
         - loser의 last_event_at이 winner 기준 72시간 이내
         - 광범위 토픽은 title_overlap >= 0.25 필요
+
+        Phase 2 — cross-topic 병합 (신규):
+        - 같은 국가코드 + 관련 토픽 (conflict↔coup↔terror) 간
+        - title 유사도 >= 0.20 AND 6시간 이내
         """
         from collections import defaultdict
         from sqlalchemy import select, text
         from backend.app.models.issue_cluster import IssueCluster
         from worker.processor.trending_engine import _calc_kscore
+        from worker.processor.clusterer import _title_similarity
+        from worker.processor.trending_engine import _is_junk_title
 
         _MERGE_TOPICS = {"conflict", "terror", "coup", "diplomacy", "maritime", "protest", "sanctions", "cyber"}
         _BROAD_TOPICS = {"diplomacy", "protest", "maritime", "sanctions", "cyber"}
+        # cross-topic 병합 대상: 이 토픽들끼리는 같은 이벤트일 수 있음
+        _CROSS_TOPIC_GROUPS = [
+            {"conflict", "coup", "terror"},
+        ]
         _MAX_EVENTS = 100
         _TIME_WINDOW = timedelta(hours=72)
+        _CROSS_TOPIC_WINDOW = timedelta(hours=6)
+        _CROSS_TOPIC_SIM = 0.20
 
         result = await db.execute(
             select(IssueCluster).where(
@@ -676,12 +689,33 @@ def calculate_trending(self):
         )
         clusters = result.scalars().all()
 
+        # Phase 1: 같은 cluster_key 병합
         groups: dict[str, list] = defaultdict(list)
         for c in clusters:
             if c.cluster_key and not c.cluster_key.startswith("0000"):
                 groups[c.cluster_key].append(c)
 
         merged_total = 0
+
+        def _do_merge(winner, loser):
+            """loser를 winner에 병합하는 공통 로직."""
+            if _is_junk_title(winner.title or "") and not _is_junk_title(loser.title or ""):
+                winner.title = loser.title
+                winner.title_ko = loser.title_ko
+            winner.event_count += loser.event_count
+            winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
+            if loser.severity > winner.severity:
+                winner.severity = loser.severity
+            winner.confidence = round(max(winner.confidence, loser.confidence), 3)
+            existing = list(winner.source_tiers or [])
+            existing.extend(loser.source_tiers or [])
+            winner.source_tiers = existing
+            if loser.first_event_at and (not winner.first_event_at or loser.first_event_at < winner.first_event_at):
+                winner.first_event_at = loser.first_event_at
+            if loser.last_event_at and (not winner.last_event_at or loser.last_event_at > winner.last_event_at):
+                winner.last_event_at = loser.last_event_at
+                winner.window_end = loser.last_event_at + timedelta(minutes=720)
+
         for key, group in groups.items():
             if len(group) <= 1:
                 continue
@@ -692,32 +726,12 @@ def calculate_trending(self):
                 if (winner.last_event_at and loser.last_event_at
                         and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _TIME_WINDOW.total_seconds()):
                     continue
-                # 광범위 토픽: 제목 유사도 체크 (다른 이슈 오병합 방지)
                 topic = winner.topic or ""
                 if topic in _BROAD_TOPICS:
-                    from worker.processor.clusterer import _title_similarity
                     if _title_similarity(winner.title or "", loser.title or "") < 0.25:
                         continue
 
-                # 제목 교체: winner가 쓰레기 제목이면 loser 것으로 승격
-                from worker.processor.trending_engine import _is_junk_title
-                if _is_junk_title(winner.title or "") and not _is_junk_title(loser.title or ""):
-                    winner.title = loser.title
-                    winner.title_ko = loser.title_ko
-
-                winner.event_count += loser.event_count
-                winner.independent_sources = (winner.independent_sources or 1) + (loser.independent_sources or 1)
-                if loser.severity > winner.severity:
-                    winner.severity = loser.severity
-                winner.confidence = round(max(winner.confidence, loser.confidence), 3)
-                existing = list(winner.source_tiers or [])
-                existing.extend(loser.source_tiers or [])
-                winner.source_tiers = existing
-                if loser.first_event_at and (not winner.first_event_at or loser.first_event_at < winner.first_event_at):
-                    winner.first_event_at = loser.first_event_at
-                if loser.last_event_at and (not winner.last_event_at or loser.last_event_at > winner.last_event_at):
-                    winner.last_event_at = loser.last_event_at
-                    winner.window_end = loser.last_event_at + timedelta(minutes=720)
+                _do_merge(winner, loser)
                 await db.execute(
                     text("UPDATE cluster_events SET cluster_id = :w WHERE cluster_id = :l"),
                     {"w": winner.id, "l": loser.id},
@@ -738,8 +752,83 @@ def calculate_trending(self):
             )
             winner.updated_at = datetime.now(timezone.utc)
 
+        # Phase 2: cross-topic 병합 (같은 국가, 관련 토픽, 유사 제목)
+        cross_merged = 0
+        # 활성 클러스터만 재조회 (Phase 1에서 severity=0으로 비활성화된 것 제외)
+        active = [c for c in clusters if c.severity > 0 and c.country_code]
+        # 국가별 그룹
+        by_country: dict[str, list] = defaultdict(list)
+        for c in active:
+            by_country[c.country_code].append(c)
+
+        for cc, cc_clusters in by_country.items():
+            if len(cc_clusters) <= 1:
+                continue
+            # kscore 높은 순 정렬
+            cc_clusters.sort(key=lambda x: x.kscore, reverse=True)
+            merged_ids: set = set()
+            for i, winner in enumerate(cc_clusters):
+                if winner.id in merged_ids:
+                    continue
+                for j in range(i + 1, len(cc_clusters)):
+                    loser = cc_clusters[j]
+                    if loser.id in merged_ids:
+                        continue
+                    if winner.event_count >= _MAX_EVENTS:
+                        break
+                    # 토픽이 같으면 Phase 1에서 이미 처리됨
+                    if winner.topic == loser.topic:
+                        continue
+                    # 관련 토픽 그룹에 속하는지 확인
+                    in_same_group = any(
+                        (winner.topic or "") in grp and (loser.topic or "") in grp
+                        for grp in _CROSS_TOPIC_GROUPS
+                    )
+                    if not in_same_group:
+                        continue
+                    # 시간 제한
+                    if (winner.last_event_at and loser.last_event_at
+                            and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _CROSS_TOPIC_WINDOW.total_seconds()):
+                        continue
+                    # 제목 유사도 체크
+                    sim = _title_similarity(
+                        winner.title or "", loser.title or "",
+                        ko_a=winner.title_ko, ko_b=loser.title_ko,
+                    )
+                    if sim < _CROSS_TOPIC_SIM:
+                        continue
+
+                    logger.info(
+                        "Cross-topic 병합: %s(%s) ← %s(%s) sim=%.3f",
+                        winner.cluster_key, winner.title[:30],
+                        loser.cluster_key, loser.title[:30], sim,
+                    )
+                    _do_merge(winner, loser)
+                    await db.execute(
+                        text("UPDATE cluster_events SET cluster_id = :w WHERE cluster_id = :l"),
+                        {"w": winner.id, "l": loser.id},
+                    )
+                    loser.severity = 0
+                    loser.kscore = 0
+                    merged_ids.add(loser.id)
+                    cross_merged += 1
+
+                if winner.id not in merged_ids:
+                    age_hours = (datetime.now(timezone.utc) - winner.last_event_at).total_seconds() / 3600 if winner.last_event_at else 0.0
+                    winner.kscore, _ = _calc_kscore(
+                        event_count=winner.event_count,
+                        is_spike=winner.is_spike,
+                        confidence=winner.confidence,
+                        severity=winner.severity,
+                        independent_sources=winner.independent_sources or 1,
+                        source_tiers=winner.source_tiers or [],
+                        age_hours=age_hours,
+                    )
+                    winner.updated_at = datetime.now(timezone.utc)
+
+        merged_total += cross_merged
         if merged_total:
-            logger.info("분산 클러스터 %d개 병합 완료", merged_total)
+            logger.info("분산 클러스터 %d개 병합 완료 (cross-topic: %d)", merged_total, cross_merged)
         return merged_total
 
     async def _run():
