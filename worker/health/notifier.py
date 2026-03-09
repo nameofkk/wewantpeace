@@ -169,6 +169,18 @@ def _get_fix_description(action: str, params: dict) -> str:
         return f"{len(ids)}개 메가 클러스터 분할"
     elif action == "reset_openai_rate_limit":
         return "OpenAI 에러 카운터 리셋"
+    elif action == "cleanup_stale_fcm_tokens":
+        return "만료된 FCM 토큰 정리"
+    elif action == "expire_stale_subscriptions":
+        return "만료 구독 상태 업데이트"
+    elif action == "recalculate_tension":
+        return "Tension Index 재계산"
+    elif action == "cleanup_redis_keys":
+        return "Redis 불필요 키 정리"
+    elif action == "reprocess_orphans":
+        return "오펀 이벤트 재클러스터링"
+    elif action == "retry_sns_publish":
+        return "미발행 SNS 포스트 재시도"
     return action
 
 

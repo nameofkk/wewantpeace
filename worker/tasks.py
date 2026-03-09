@@ -4,12 +4,39 @@ Celery 태스크 정의.
 """
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+import os
+from datetime import datetime, timezone, timedelta, UTC
 from email.utils import parsedate_to_datetime
+
+import redis as _sync_redis
+
 from worker.celery_app import app
 from backend.app.core.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+
+# ── Sync Redis (heartbeat 기록용) ─────────────────────────────────────────────
+_sync_redis_client: _sync_redis.Redis | None = None
+
+
+def _get_sync_redis() -> _sync_redis.Redis:
+    """Celery 워커(동기)에서 사용할 sync Redis 클라이언트."""
+    global _sync_redis_client
+    if _sync_redis_client is None:
+        _sync_redis_client = _sync_redis.from_url(
+            os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+            decode_responses=True,
+        )
+    return _sync_redis_client
+
+
+def _record_heartbeat(task_name: str) -> None:
+    """태스크 시작 시 Redis에 마지막 실행 시각 기록."""
+    try:
+        r = _get_sync_redis()
+        r.set(f"celery:last_run:{task_name}", datetime.now(UTC).isoformat(), ex=3600)
+    except Exception:
+        logger.debug("heartbeat 기록 실패: %s", task_name, exc_info=True)
 
 
 def run_async(coro):
@@ -39,6 +66,7 @@ def run_async(coro):
 )
 def collect_telegram(self):
     """Telegram 화이트리스트 채널 수집 (5분마다)."""
+    _record_heartbeat("collect_telegram_channels")
 
     async def _run():
         from worker.collector.telegram_collector import TelegramCollector
@@ -79,6 +107,7 @@ def collect_telegram(self):
 )
 def collect_rss(self):
     """RSS 피드 수집 (10분마다)."""
+    _record_heartbeat("collect_rss")
 
     async def _run():
         from worker.collector.rss_collector import RSSCollector
@@ -123,6 +152,7 @@ def collect_rss(self):
 )
 def collect_gdelt(self):
     """GDELT DOC API 수집 (15분마다)."""
+    _record_heartbeat("collect_gdelt")
 
     async def _run():
         from worker.collector.gdelt_collector import GDELTCollector
@@ -243,6 +273,7 @@ def collect_reliefweb(self):
 )
 def collect_usgs(self):
     """USGS 지진 API 수집 (5분마다, M5.0+)."""
+    _record_heartbeat("collect_usgs")
 
     async def _run():
         from worker.collector.usgs_earthquake import USGSEarthquakeCollector
@@ -596,6 +627,7 @@ def process_raw_event(self, raw_event_id: str):
 )
 def calculate_tension(self):
     """긴장도 지수 계산 (15분마다)."""
+    _record_heartbeat("calculate_tension")
 
     async def _run():
         from worker.processor.tension_calculator import calculate_all_tensions
@@ -3267,3 +3299,12 @@ def process_health_approvals(self):
     except Exception as exc:
         logger.error("process_health_approvals 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── Beat heartbeat ────────────────────────────────────────────────────────────
+
+@app.task(name="beat_heartbeat")
+def beat_heartbeat():
+    """Beat 프로세스가 살아있음을 표시."""
+    r = _get_sync_redis()
+    r.set("beat:heartbeat", datetime.now(UTC).isoformat(), ex=600)
