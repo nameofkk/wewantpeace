@@ -1,12 +1,13 @@
 """X (Twitter) 어댑터 — tweepy v4+ OAuth 1.0a.
 
 X 2026 알고리즘 최적화:
-- Grok이 본문을 직접 읽음 → 해시태그 불필요 (과다 사용 시 페널티)
-- 비프리미엄 계정 링크 포스트 노출 0 → URL 제거, 브랜드명만
+- 해시태그 1-2개 사용 → 리트윗 확률 +33% (3개 이상은 역효과 -17%)
+- 링크는 본문이 아닌 첫 번째 답글에 → 본문 노출 극대화
 - 네이티브 이미지 = 10x 더 높은 인게이지먼트
 - 초기 6시간 내 engagement가 핵심 (6시간마다 점수 절반 감소)
 - 간결하고 임팩트 있는 뉴스 헤드라인 스타일 (70~100자 최적)
 - 리플/RT 유도 > 좋아요 (13-20x 가치)
+- 커뮤니티 게시 = 전체 사용자 노출 (2026~)
 
 이미지 첨부: v1.1 media_upload(로컬파일) → v2 create_tweet(media_ids)
 """
@@ -30,6 +31,54 @@ def is_configured() -> bool:
 
 _CTA = "— WeWantPeace · 실시간 분쟁 추적"
 
+# 토픽 → 해시태그 매핑 (국가 해시태그와 조합하여 1-2개 선택)
+_TOPIC_HASHTAGS: dict[str, str] = {
+    "conflict": "#OSINT",
+    "terror": "#Security",
+    "coup": "#Geopolitics",
+    "sanctions": "#Geopolitics",
+    "cyber": "#Cybersecurity",
+    "protest": "#WorldNews",
+    "diplomacy": "#Geopolitics",
+    "maritime": "#Security",
+    "disaster": "#BreakingNews",
+    "health": "#GlobalHealth",
+}
+
+
+def _pick_hashtags(post: SocialPost, max_tags: int = 2) -> str:
+    """토픽 + 국가 기반으로 해시태그 1-2개 선택.
+
+    3개 이상 사용 시 인게이지먼트 -17% → 최대 2개로 제한.
+    """
+    tags: list[str] = []
+
+    # 1) DB에 저장된 해시태그에서 국가 태그 우선 사용 (#WeWantPeace 제외)
+    if post.hashtags:
+        for t in post.hashtags:
+            if t != "#WeWantPeace" and t not in tags:
+                tags.append(t)
+                if len(tags) >= max_tags:
+                    break
+
+    # 2) 부족하면 토픽 해시태그 추가
+    if len(tags) < max_tags and hasattr(post, "content_type"):
+        # source_cluster에서 topic 추출 시도
+        topic_tag = None
+        body = post.body_text or ""
+        for topic, tag in _TOPIC_HASHTAGS.items():
+            if topic.lower() in body.lower():
+                topic_tag = tag
+                break
+        if topic_tag and topic_tag not in tags:
+            tags.append(topic_tag)
+
+    # 3) 여전히 0개면 범용 태그
+    if not tags:
+        tags.append("#OSINT")
+
+    return " ".join(tags[:max_tags])
+
 
 def _build_text(post: SocialPost) -> str:
     """X 최적화 본문 조합 (280자 제한).
@@ -37,13 +86,13 @@ def _build_text(post: SocialPost) -> str:
     X 전용 톤:
     - 뉴스 속보 스타일, 짧고 강렬
     - bilingual → 각 언어 첫 문장만 (간결)
-    - URL 완전 제거 (비프리미엄 페널티)
-    - 해시태그 사용 안 함 (Grok이 직접 분류, 과다 시 페널티)
-    - 브랜드명 CTA만 (프로필 링크로 유도)
+    - URL 제거 (첫 답글에서 별도 게시)
+    - 해시태그 1-2개 자동 추가 (토픽+국가 기반)
+    - 브랜드명 CTA
     """
     body = post.body_text
 
-    # URL, CTA 라인, 해시태그 제거
+    # URL, CTA 라인, 기존 해시태그 제거 (새로 추가할 것이므로)
     body = re.sub(r'https?://\S+', '', body).strip()
     body = re.sub(r'www\.\S+', '', body).strip()
     body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
@@ -75,14 +124,16 @@ def _build_text(post: SocialPost) -> str:
     elif ko_head:
         body = f"🚨 {ko_head}"
 
-    footer = f"\n\n{_CTA}"
+    # 해시태그 1-2개 추가
+    hashtag_str = _pick_hashtags(post)
+    footer = f"\n\n{hashtag_str}\n{_CTA}"
 
     if len(body) + len(footer) <= 280:
         return body + footer
 
     # 본문이 길면 잘라서 맞춤
     max_body = 280 - len(footer) - 3
-    return f"{body[:max_body]}...\n\n{_CTA}"
+    return f"{body[:max_body]}...\n\n{hashtag_str}\n{_CTA}"
 
 
 def _download_to_temp(url: str) -> str | None:
@@ -149,8 +200,26 @@ def _upload_media(image_source: str) -> str | None:
         return None
 
 
+def _build_reply_text(post: SocialPost) -> str | None:
+    """소스 링크를 포함한 답글 텍스트 생성.
+
+    링크는 본문이 아닌 첫 번째 답글에 게시해야 노출 페널티 없음.
+    클러스터 ID가 있으면 이슈 상세 링크, 없으면 메인 링크.
+    """
+    base_url = "https://www.wewantpeace.live"
+
+    if post.source_cluster_id:
+        link = f"{base_url}/issues/{post.source_cluster_id}?lang=en"
+        return f"📊 Full analysis · 상세 분석\n{link}"
+
+    return f"🌐 Real-time monitoring · 실시간 모니터링\n{base_url}"
+
+
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
-    """X에 트윗 발행.
+    """X에 트윗 발행 + 소스 링크 답글.
+
+    1. 메인 트윗: 헤드라인 + 해시태그 + 이미지 (링크 없음 → 노출 극대화)
+    2. 첫 답글: 소스 링크 (답글에 링크 → 페널티 없음)
 
     Returns:
         (platform_post_id, error_message)
@@ -177,7 +246,7 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             if media_id:
                 media_ids = [media_id]
 
-        # 트윗 발행
+        # 메인 트윗 발행 (링크 없음)
         kwargs = {"text": full_text}
         if media_ids:
             kwargs["media_ids"] = media_ids
@@ -185,6 +254,20 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
         response = client.create_tweet(**kwargs)
         tweet_id = str(response.data["id"])
         logger.info("X 트윗 발행 완료: tweet_id=%s, post_id=%s", tweet_id, post.id)
+
+        # 첫 번째 답글로 소스 링크 게시
+        reply_text = _build_reply_text(post)
+        if reply_text:
+            try:
+                client.create_tweet(
+                    text=reply_text,
+                    in_reply_to_tweet_id=tweet_id,
+                )
+                logger.info("X 링크 답글 게시 완료: parent=%s", tweet_id)
+            except Exception as reply_err:
+                # 답글 실패해도 메인 트윗은 성공으로 처리
+                logger.warning("X 링크 답글 실패 (무시): %s", str(reply_err)[:200])
+
         return tweet_id, None
 
     except Exception as e:
