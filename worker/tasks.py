@@ -2447,7 +2447,16 @@ def generate_kscore_social(self):
         async with AsyncSessionLocal() as db:
             async with db.begin():
                 cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
-                result = await db.execute(
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+                # 이미 오늘 포스팅된 클러스터 ID 목록 (limit(10) 전에 제외)
+                existing_ids_result = await db.execute(
+                    select(SocialPost.source_cluster_id)
+                    .where(SocialPost.dedup_key.like(f"kscore_alert%{today}"))
+                )
+                already_posted = {r[0] for r in existing_ids_result.fetchall()}
+
+                query = (
                     select(IssueCluster)
                     .where(
                         IssueCluster.kscore >= KSCORE_SOCIAL_MIN,
@@ -2458,19 +2467,13 @@ def generate_kscore_social(self):
                     .order_by(IssueCluster.kscore.desc())
                     .limit(10)
                 )
+                if already_posted:
+                    query = query.where(IssueCluster.id.notin_(already_posted))
+                result = await db.execute(query)
                 clusters = result.scalars().all()
 
                 posts_to_notify = []
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 for cluster in clusters:
-                    # cluster_id + 날짜 기반 dedup (클러스터당 하루 1건)
-                    dedup_key = f"kscore_alert:{cluster.id}:{today}"
-                    existing = await db.execute(
-                        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-                    )
-                    if existing.scalar_one_or_none():
-                        continue
-
                     post = await generate_kscore_alert(cluster, db)
                     if post:
                         posts_to_notify.append(post)
