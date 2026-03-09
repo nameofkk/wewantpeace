@@ -6,9 +6,16 @@
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "";
 const FCM_TOKEN_KEY = "fcm_token";
 
+/** iOS 기기인지 확인 */
+export function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 /** 푸시 알림을 지원하는 환경인지 확인 */
 export function isPushSupported(): boolean {
   if (typeof window === "undefined") return false;
+  if (isIOS()) return false;
   if (!("Notification" in window)) return false;
   if (!("serviceWorker" in navigator)) return false;
   return true;

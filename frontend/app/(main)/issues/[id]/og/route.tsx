@@ -167,11 +167,6 @@ function splitHeadline(text: string, lang: string = "ko"): string[] {
   return [text];
 }
 
-interface KScorePoint {
-  time: string;
-  kscore: number;
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -210,14 +205,6 @@ export async function GET(
       next: { revalidate: 120 },
     });
     if (res.ok) issue = await res.json();
-  } catch {}
-
-  let kscoreHistory: KScorePoint[] = [];
-  try {
-    const res = await fetch(`${API_BASE}/trending/kscore-history/${params.id}?days=7`, {
-      next: { revalidate: 300 },
-    });
-    if (res.ok) kscoreHistory = await res.json();
   } catch {}
 
   if (!issue) {
@@ -268,37 +255,28 @@ export async function GET(
   let bgImageSrc: string | null = null;
   if (issue.image_url) {
     try {
-      const imgRes = await fetch(issue.image_url, { signal: AbortSignal.timeout(3000) });
+      // WebP → JPEG 변환: wsrv.nl 프록시 사용 (Satori WebP 미지원)
+      const isWebP = /\.webp(\?|$)/i.test(issue.image_url);
+      const fetchUrl = isWebP
+        ? `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=80&w=1200`
+        : issue.image_url;
+
+      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
       if (imgRes.ok) {
         const ct = imgRes.headers.get("content-type") || "";
         const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
-        if (ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t)) && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
+        const isAllowed = isWebP || ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t));
+        if (isAllowed && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
           const buf = await imgRes.arrayBuffer();
           if (buf.byteLength <= MAX_IMAGE_BYTES) {
-            bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+            const mimeType = isWebP ? "image/jpeg" : ct;
+            bgImageSrc = `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`;
           }
         }
       }
     } catch {}
   }
   const hasBackground = !!bgImageSrc;
-
-  // KScore 그래프
-  const graphWidth = 420;
-  const graphHeight = 120;
-  let svgPath = "";
-  let svgAreaPath = "";
-  const graphPoints = kscoreHistory.length >= 2 ? kscoreHistory : [];
-  if (graphPoints.length >= 2) {
-    const maxK = Math.max(...graphPoints.map((p) => p.kscore), 1);
-    const step = graphWidth / (graphPoints.length - 1);
-    const pts = graphPoints.map((p, i) => ({
-      x: Math.round(i * step),
-      y: Math.round(graphHeight - (p.kscore / maxK) * (graphHeight - 8)),
-    }));
-    svgPath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-    svgAreaPath = `${svgPath} L${pts[pts.length - 1].x},${graphHeight} L${pts[0].x},${graphHeight} Z`;
-  }
 
   return new ImageResponse(
     (
@@ -519,63 +497,6 @@ export async function GET(
               </div>
             </div>
 
-            {/* 오른쪽: KScore 그래프 (한국어만) */}
-            {lang === "ko" && graphPoints.length >= 2 && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  width: "440px",
-                  gap: "8px",
-                }}
-              >
-                <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600 }}>
-                  KScore 7일 추이
-                </span>
-                <div
-                  style={{
-                    display: "flex",
-                    position: "relative",
-                    width: `${graphWidth}px`,
-                    height: `${graphHeight}px`,
-                    background: "rgba(15,23,42,0.6)",
-                    borderRadius: "12px",
-                    border: "1px solid #1E293B",
-                  }}
-                >
-                  <svg
-                    width={graphWidth}
-                    height={graphHeight}
-                    viewBox={`0 0 ${graphWidth} ${graphHeight}`}
-                    style={{ position: "absolute", top: 0, left: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id="kGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={config.barColor} stopOpacity="0.3" />
-                        <stop offset="100%" stopColor={config.barColor} stopOpacity="0.02" />
-                      </linearGradient>
-                    </defs>
-                    <path d={svgAreaPath} fill="url(#kGrad)" />
-                    <path d={svgPath} fill="none" stroke={config.barColor} strokeWidth="4" />
-                    {(() => {
-                      const maxK = Math.max(...graphPoints.map((p) => p.kscore), 1);
-                      const lastPt = graphPoints[graphPoints.length - 1];
-                      const lx = graphWidth;
-                      const ly = graphHeight - (lastPt.kscore / maxK) * (graphHeight - 8);
-                      return <circle cx={lx - 1} cy={ly} r="7" fill={config.barColor} />;
-                    })()}
-                  </svg>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
-                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                  </span>
-                  <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* 하단: 브랜드 */}

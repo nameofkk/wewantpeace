@@ -570,7 +570,7 @@ export const translations = {
     // settings - notification inline strings
     settings_push_title: "푸시 알림",
     settings_push_desc_enabled: "이슈 발생 시 즉시 알림을 받습니다",
-    settings_push_desc_unsupported: "이 브라우저에서는 푸시 알림을 지원하지 않습니다. Chrome/Safari에서 열어주세요",
+    settings_push_desc_unsupported: "iOS에서는 웹 푸시를 지원하지 않습니다. 앱을 설치하거나 PC에서 이용해주세요",
     settings_push_desc_denied: "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요",
     settings_push_desc_default: "중요 이슈 발생 시 즉시 알림 수신",
     settings_push_off_hint: "푸시 알림을 켜면 설정할 수 있습니다",
@@ -1871,7 +1871,7 @@ export const translations = {
     // settings - notification inline strings
     settings_push_title: "Push Notifications",
     settings_push_desc_enabled: "You'll get instant alerts for new issues",
-    settings_push_desc_unsupported: "Push not supported in this browser. Open in Chrome/Safari",
+    settings_push_desc_unsupported: "Web push is not supported on iOS. Install our app or use PC instead",
     settings_push_desc_denied: "Blocked — allow in your browser settings",
     settings_push_desc_default: "Get instant alerts for critical events",
     settings_push_off_hint: "Enable push to configure these settings",
