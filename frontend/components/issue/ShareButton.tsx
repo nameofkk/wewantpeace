@@ -56,7 +56,7 @@ export function ShareButton({
   return (
     <button
       onClick={handleShare}
-      className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+      className="flex items-center justify-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
     >
       {copied ? (
         <>

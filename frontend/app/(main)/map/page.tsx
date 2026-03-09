@@ -691,10 +691,10 @@ export default function MapPage() {
               )}
             </div>
           </div>
-          {/* Row 2: 범례 */}
-          <div className="flex items-center gap-3" data-tour="map-filters">
+          {/* Row 2: 범례 + 히트맵 */}
+          <div className="flex items-center gap-1.5 flex-wrap" data-tour="map-filters">
             {LEGEND.map(([label, col]) => (
-              <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span key={label} className="flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: col }} />
                 {label}
               </span>
@@ -710,14 +710,14 @@ export default function MapPage() {
                 }
               }}
               className={cn(
-                "ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors border",
+                "ml-auto flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors border whitespace-nowrap shrink-0",
                 showHeatmap
                   ? "bg-primary/15 text-primary border-primary/30"
                   : "text-muted-foreground border-border hover:text-foreground",
                 heatmapPulse && "animate-pulse"
               )}
             >
-              <MapIcon className="h-3.5 w-3.5" />
+              <MapIcon className="h-3 w-3" />
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
           </div>
