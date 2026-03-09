@@ -137,7 +137,7 @@ export const translations = {
     settings_notif_push_denied: "브라우저 설정에서 알림 허용 필요",
     settings_plan_pro: "Pro 플랜",
     settings_plan_free: "Free 플랜",
-    settings_plan_pro_desc: "관심 국가 5개 · 일일 20건 · 신뢰 알림 · KScore 3.0~10.0",
+    settings_plan_pro_desc: "관심 국가 5개 · 일일 20건 · 신뢰 알림 · 긴급 상한 무시 · KScore 3.0~10.0",
     settings_plan_free_desc: "관심 국가 {n}개 · 일일 5건 · 신속 알림",
     settings_upgrade_btn: "Pro로 업그레이드",
     settings_plan_change: "플랜 변경하기",
@@ -601,7 +601,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ 플랜",
-    settings_plan_proplus_desc: "무제한 국가 · 일일 100건 · 신뢰 알림 · KScore 1.5~10.0 · 90일 히스토리",
+    settings_plan_proplus_desc: "무제한 국가 · 일일 100건 · 신뢰 알림 · 긴급 상한 무시 · KScore 1.5~10.0 · 90일 히스토리",
     settings_plan_upgrade_proplus: "Pro+로 업그레이드",
     settings_plan_active: "현재 플랜",
     settings_plan_started: "결제 시작일",
@@ -1438,7 +1438,7 @@ export const translations = {
     settings_notif_push_denied: "Allow notifications in browser settings",
     settings_plan_pro: "Pro Plan",
     settings_plan_free: "Free Plan",
-    settings_plan_pro_desc: "5 countries · 20/day · Verified alerts · KScore 3.0–10.0",
+    settings_plan_pro_desc: "5 countries · 20/day · Verified alerts · Critical bypass · KScore 3.0–10.0",
     settings_plan_free_desc: "{n} countries · 5/day · Fast alerts",
     settings_upgrade_btn: "Upgrade to Pro",
     settings_plan_change: "Change Plan",
@@ -1902,7 +1902,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ Plan",
-    settings_plan_proplus_desc: "Unlimited countries · 100/day · Verified alerts · KScore 1.5–10.0 · 90-day history",
+    settings_plan_proplus_desc: "Unlimited countries · 100/day · Verified alerts · Critical bypass · KScore 1.5–10.0 · 90-day history",
     settings_plan_upgrade_proplus: "Upgrade to Pro+",
     settings_plan_active: "Current Plan",
     settings_plan_started: "Billing started",
