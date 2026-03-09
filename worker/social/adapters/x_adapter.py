@@ -126,14 +126,14 @@ def _build_text(post: SocialPost) -> str:
 
     # 해시태그 1-2개 추가
     hashtag_str = _pick_hashtags(post)
-    footer = f"\n\n{hashtag_str}\n{_CTA}"
+    footer = f"\n\n{hashtag_str}\n\n{_CTA}"
 
     if len(body) + len(footer) <= 280:
         return body + footer
 
     # 본문이 길면 잘라서 맞춤
     max_body = 280 - len(footer) - 3
-    return f"{body[:max_body]}...\n\n{hashtag_str}\n{_CTA}"
+    return f"{body[:max_body]}...\n\n{hashtag_str}\n\n{_CTA}"
 
 
 def _download_to_temp(url: str) -> str | None:
@@ -205,14 +205,25 @@ def _build_reply_text(post: SocialPost) -> str | None:
 
     링크는 본문이 아닌 첫 번째 답글에 게시해야 노출 페널티 없음.
     클러스터 ID가 있으면 이슈 상세 링크, 없으면 메인 링크.
+    클릭 유도 문구 포함.
     """
     base_url = "https://www.wewantpeace.live"
 
     if post.source_cluster_id:
         link = f"{base_url}/issues/{post.source_cluster_id}?lang=en"
-        return f"📊 Full analysis · 상세 분석\n{link}"
+        return (
+            "📊 Full timeline · sources · severity breakdown\n"
+            "타임라인 · 출처 · 심각도 분석 보기\n\n"
+            f"🔗 {link}\n\n"
+            "🆓 Free · 195 countries · Updated every 3 min"
+        )
 
-    return f"🌐 Real-time monitoring · 실시간 모니터링\n{base_url}"
+    return (
+        "🌐 Real-time conflict monitoring across 195 countries\n"
+        "195개국 분쟁 상황 실시간 모니터링\n\n"
+        f"🔗 {base_url}\n\n"
+        "🆓 Free · No signup required"
+    )
 
 
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
