@@ -16,6 +16,10 @@ TELEGRAM_CHAT_ID = os.getenv("SOCIAL_TG_CHAT_ID", "")
 THREAD_START_DATE = date(2026, 3, 9)
 THREAD_TOTAL_DAYS = 7
 
+# GeekNews 가입일: 2026-03-09, 글 작성 가능일: 7일 후
+GEEKNEWS_SIGNUP_DATE = date(2026, 3, 9)
+GEEKNEWS_WAIT_DAYS = 7
+
 
 def _thread_day(today: date) -> int:
     """오늘이 Thread Day 몇인지 계산. Day 1~7, 이후 8+."""
@@ -45,6 +49,29 @@ def _build_message(today: date) -> str:
         )
         footer = "\U0001f4a1 X Thread 7개 완료! 다음 단계를 계획하세요."
 
+    # GeekNews 섹션
+    gn_available_date = GEEKNEWS_SIGNUP_DATE + timedelta(days=GEEKNEWS_WAIT_DAYS)
+    days_until_gn = (gn_available_date - today).days
+    if days_until_gn > 0:
+        geeknews_section = (
+            "<b>\U0001f4e2 GeekNews Show GN</b>\n"
+            "\u2502 \u23f3 글 작성까지 {d}일 남음 ({avail}부터 가능)\n"
+            "\n"
+        ).format(d=days_until_gn, avail=gn_available_date.strftime("%m/%d"))
+    elif days_until_gn == 0:
+        geeknews_section = (
+            "<b>\U0001f6a8 GeekNews Show GN</b>\n"
+            "\u2502 \u2757 오늘부터 글 작성 가능!\n"
+            "\u25a1 https://news.hada.io/show 에서 Show GN 글 올리기\n"
+            "\n"
+        )
+    else:
+        geeknews_section = (
+            "<b>\U0001f4e2 GeekNews Show GN</b>\n"
+            "\u25a1 Show GN 글 올리기 (가입 대기 완료)\n"
+            "\n"
+        )
+
     msg = (
         "\U0001f4cb <b>Phase 1 Daily Checklist</b> \u2014 {date}\n"
         "\n"
@@ -68,12 +95,16 @@ def _build_message(today: date) -> str:
         "\u25a1 awesome-humanitarian-foss PR #6 확인\n"
         "\u25a1 ALL-about-RSS PR #128 확인\n"
         "\n"
+        "<b>\U0001f4f0 Show HN</b>\n"
+        "\u2502 \u2705 포스팅 완료 (item?id=47303606)\n"
+        "\u25a1 새 댓글 확인 + 답변\n"
+        "\n"
+        "{geeknews_section}"
         "<b>\U0001f514 기타</b>\n"
-        "\u25a1 Show HN IP 차단 해제 확인 (news.ycombinator.com 접속 시도)\n"
         "\u25a1 Product Hunt 런칭일 결정\n"
         "\n"
         "{footer}"
-    ).format(date=date_str, x_section=x_section, footer=footer)
+    ).format(date=date_str, x_section=x_section, geeknews_section=geeknews_section, footer=footer)
 
     return msg
 
