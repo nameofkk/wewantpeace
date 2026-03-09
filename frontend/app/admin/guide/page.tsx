@@ -74,8 +74,8 @@ const SECTIONS: GuideSection[] = [
     id: "pipeline",
     titleKo: "파이프라인",
     titleEn: "Pipeline",
-    bodyKo: "데이터 수집→정규화→중복제거→클러스터링→스파이크 감지→트렌딩 계산 전체 파이프라인의 건강 상태를 모니터링합니다.",
-    bodyEn: "Monitor the full data pipeline health: collection → normalization → dedup → clustering → spike detection → trending.",
+    bodyKo: "데이터 수집→정규화→중복제거→클러스터링→KScore 알림→트렌딩 계산 전체 파이프라인의 건강 상태를 모니터링합니다.",
+    bodyEn: "Monitor the full data pipeline health: collection → normalization → dedup → clustering → KScore alerts → trending.",
   },
   {
     id: "clusters",
@@ -123,8 +123,8 @@ const SECTIONS: GuideSection[] = [
     id: "settings",
     titleKo: "설정",
     titleEn: "Settings",
-    bodyKo: "어드민 시스템 설정을 관리합니다. 글로벌 설정값(스파이크 임계값, 푸시 설정 등)을 JSON으로 편집합니다.",
-    bodyEn: "Manage admin system settings. Edit global config values (spike thresholds, push settings, etc.) in JSON format.",
+    bodyKo: "어드민 시스템 설정을 관리합니다. 글로벌 설정값(KScore 알림 임계값, 푸시 설정 등)을 JSON으로 편집합니다.",
+    bodyEn: "Manage admin system settings. Edit global config values (KScore alert thresholds, push settings, etc.) in JSON format.",
   },
   {
     id: "logs",

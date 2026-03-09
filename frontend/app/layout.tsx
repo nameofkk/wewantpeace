@@ -127,7 +127,7 @@ export default function RootLayout({
                   "operatingSystem": "Web, Android (TWA)",
                   "browserRequirements": "Requires JavaScript. Requires HTML5.",
                   "description":
-                    "Monitor real-time global conflicts, security threats, and geopolitical tensions across 195 countries. Features AI-powered KScore impact scoring, Tension Index per country, spike detection alerts, and interactive crisis maps.",
+                    "Monitor real-time global conflicts, security threats, and geopolitical tensions across 195 countries. Features AI-powered KScore impact scoring, Tension Index per country, KScore-based real-time alerts, and interactive crisis maps.",
                   "offers": [
                     {
                       "@type": "Offer",
@@ -135,7 +135,7 @@ export default function RootLayout({
                       "price": "0",
                       "priceCurrency": "USD",
                       "description":
-                        "Real-time trending issues, basic tension index, spike alerts",
+                        "Real-time trending issues, basic tension index, KScore alerts",
                     },
                     {
                       "@type": "Offer",
@@ -150,7 +150,7 @@ export default function RootLayout({
                     "Real-time conflict monitoring across 195 countries",
                     "KScore (Key Impact Score) personalized to your country",
                     "Country-level Tension Index (0-100)",
-                    "AI-powered spike detection with push notifications",
+                    "AI-powered KScore alerts with push notifications",
                     "Interactive global crisis map",
                     "Multi-source news aggregation (RSS, Telegram)",
                     "Bilingual interface (Korean/English)",
@@ -201,7 +201,7 @@ export default function RootLayout({
                       "name": "Is WeWantPeace free to use?",
                       "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "Yes, WeWantPeace offers a free tier that includes real-time trending issues, basic tension index views, and spike alert notifications. Pro and Pro+ plans unlock additional features like the interactive issue map, more watched countries, KScore filtering, quiet hours, and extended history (30 or 90 days).",
+                        "text": "Yes, WeWantPeace offers a free tier that includes real-time trending issues, basic tension index views, and KScore alert notifications. Pro and Pro+ plans unlock additional features like the interactive issue map, more watched countries, KScore filtering, quiet hours, and extended history (30 or 90 days).",
                       },
                     },
                     {

@@ -159,7 +159,7 @@ async def _check_push_failures(db: AsyncSession) -> CheckResult:
     )
 
 
-async def _check_unpublished_spikes(db: AsyncSession) -> CheckResult:
+async def _check_unpublished_alerts(db: AsyncSession) -> CheckResult:
     """8. v7: 미발행 고KScore 클러스터 (KScore >= 5.0)."""
     result = await db.execute(
         text("""
@@ -192,7 +192,7 @@ _ALL_CHECKS = [
     _check_cluster_freshness,
     _check_sns_failures,
     _check_push_failures,
-    _check_unpublished_spikes,
+    _check_unpublished_alerts,
 ]
 
 
@@ -308,10 +308,12 @@ async def handle_status_command() -> str:
                 )
             )).scalar() or 0
 
-            spikes_24h = (await db.execute(
+            kscore_alerts_24h = (await db.execute(
                 text(
-                    "SELECT COUNT(*) FROM spike_events"
-                    " WHERE triggered_at >= NOW() - INTERVAL '24 hours'"
+                    "SELECT COUNT(*) FROM issue_clusters"
+                    " WHERE kscore >= 5.0 AND severity >= 50"
+                    " AND last_event_at >= NOW() - INTERVAL '24 hours'"
+                    " AND is_active = true"
                 )
             )).scalar() or 0
 
@@ -325,7 +327,7 @@ async def handle_status_command() -> str:
         lines.append("")
         lines.append(f"📈 활성 클러스터: {active_clusters}개")
         lines.append(f"📰 24h 이벤트: {events_24h}건")
-        lines.append(f"⚡ 24h 스파이크: {spikes_24h}건")
+        lines.append(f"⚡ 24h KScore 알림: {kscore_alerts_24h}건")
         lines.append(f"📝 대기 포스트: {pending_posts}건")
     except Exception as e:
         lines.append(f"\n⚠️ 통계 조회 오류: {e}")
@@ -345,26 +347,28 @@ async def handle_ai_question(question: str) -> str:
     context_parts: list[str] = []
     try:
         async with AsyncSessionLocal() as db:
-            # 최근 스파이크 (6시간 이내)
-            spikes = await db.execute(
+            # 최근 고KScore 클러스터 (6시간 이내)
+            alerts = await db.execute(
                 text("""
                     SELECT ic.title_ko, ic.title, ic.severity, ic.country_code,
-                           se.triggered_at
-                    FROM spike_events se
-                    JOIN issue_clusters ic ON se.cluster_id = ic.id
-                    WHERE se.triggered_at >= NOW() - INTERVAL '6 hours'
-                    ORDER BY se.triggered_at DESC
+                           ic.kscore, ic.last_event_at
+                    FROM issue_clusters ic
+                    WHERE ic.kscore >= 5.0
+                      AND ic.severity >= 50
+                      AND ic.is_active = true
+                      AND ic.last_event_at >= NOW() - INTERVAL '6 hours'
+                    ORDER BY ic.kscore DESC
                     LIMIT 5
                 """)
             )
-            spike_rows = spikes.fetchall()
-            if spike_rows:
-                context_parts.append("최근 스파이크:")
-                for row in spike_rows:
+            alert_rows = alerts.fetchall()
+            if alert_rows:
+                context_parts.append("최근 KScore 알림:")
+                for row in alert_rows:
                     title = row.title_ko or row.title
                     context_parts.append(
-                        f"  - {title} (severity={row.severity}, "
-                        f"country={row.country_code}, {row.triggered_at})"
+                        f"  - {title} (severity={row.severity}, kscore={row.kscore:.1f}, "
+                        f"country={row.country_code}, {row.last_event_at})"
                     )
 
             # TOP 10 활성 클러스터

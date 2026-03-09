@@ -1304,17 +1304,17 @@ build_missed_spike_summary = build_missed_alert_summary
     max_retries=1,
 )
 def reconcile_delivery_logs(self):
-    """sent 로그의 토큰 유효성 재확인, missed_spike 보정.
+    """sent 로그의 토큰 유효성 재확인, missed_alert 보정.
 
     매일 04:00 UTC 실행.
     - sent인데 해당 유저의 토큰이 모두 expired인 경우 -> failed로 보정
-    - suppressed(plan_locked/dnd) 중 missed_spike_summary에 누락된 건 보정
+    - suppressed(plan_locked/dnd) 중 missed_alert_summary에 누락된 건 보정
     """
 
     async def _run():
         from sqlalchemy import select, update as sa_update, and_, exists, not_
         from backend.app.models.alert_delivery_log import AlertDeliveryLog
-        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.user_missed_spike import UserMissedAlertSummary
         from backend.app.models.user import UserPushToken
 
         now = datetime.now(timezone.utc)
@@ -1344,7 +1344,7 @@ def reconcile_delivery_logs(self):
                         log.updated_at = now
                         fixed_sent += 1
 
-                # 2. suppressed(plan_locked/dnd) 중 missed_spike_summary 누락 보정
+                # 2. suppressed(plan_locked/dnd) 중 missed_alert_summary 누락 보정
                 suppressed_logs = await db.execute(
                     select(AlertDeliveryLog).where(
                         AlertDeliveryLog.decision == "suppressed",
@@ -1357,16 +1357,16 @@ def reconcile_delivery_logs(self):
                     if log.spike_event_id is None:
                         continue
                     existing = await db.execute(
-                        select(UserMissedSpikeSummary).where(
-                            UserMissedSpikeSummary.user_id == log.user_id,
-                            UserMissedSpikeSummary.spike_event_id == log.spike_event_id,
+                        select(UserMissedAlertSummary).where(
+                            UserMissedAlertSummary.user_id == log.user_id,
+                            UserMissedAlertSummary.alert_cluster_id == log.spike_event_id,
                         ).limit(1)
                     )
                     if existing.scalar_one_or_none() is None:
-                        summary = UserMissedSpikeSummary(
+                        summary = UserMissedAlertSummary(
                             user_id=log.user_id,
                             cluster_id=log.cluster_id,
-                            spike_event_id=log.spike_event_id,
+                            alert_cluster_id=log.spike_event_id,
                             reason=log.suppression_reason,
                         )
                         db.add(summary)
@@ -1483,7 +1483,7 @@ def send_trial_nudges(self):
         from sqlalchemy import func
         from backend.app.models.subscription import Subscription
         from backend.app.models.user import User
-        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.user_missed_spike import UserMissedAlertSummary
         from backend.app.models.notification import Notification
 
         now = datetime.now(timezone.utc)
@@ -1509,13 +1509,13 @@ def send_trial_nudges(self):
                 for sub in d3_subs.scalars().all():
                     lang = await _get_user_lang(sub.user_id, db)
 
-                    # missed spikes 카운트
+                    # missed alerts 카운트
                     missed_result = await db.execute(
                         select(func.count())
-                        .select_from(UserMissedSpikeSummary)
+                        .select_from(UserMissedAlertSummary)
                         .where(
-                            UserMissedSpikeSummary.user_id == sub.user_id,
-                            UserMissedSpikeSummary.is_shown == False,
+                            UserMissedAlertSummary.user_id == sub.user_id,
+                            UserMissedAlertSummary.is_shown == False,
                         )
                     )
                     missed_count = missed_result.scalar() or 0
@@ -1523,14 +1523,14 @@ def send_trial_nudges(self):
                     if lang == "en":
                         if missed_count > 0:
                             title = f"Pro Trial · Day 3"
-                            body = f"{missed_count} spikes detected in the last 72 hours"
+                            body = f"{missed_count} alerts detected in the last 72 hours"
                         else:
                             title = "Pro Trial · Day 3"
                             body = "Check the tension level in your monitored regions"
                     else:
                         if missed_count > 0:
                             title = f"Pro 체험 중 · 3일 경과"
-                            body = f"지난 72시간 스파이크 {missed_count}건이 감지되었습니다"
+                            body = f"지난 72시간 알림 {missed_count}건이 감지되었습니다"
                         else:
                             title = "Pro 체험 중 · 3일 경과"
                             body = "현재 관심 지역의 긴장도를 확인하세요"
@@ -1573,13 +1573,13 @@ def send_trial_nudges(self):
                     )
                     user = user_result.scalar_one_or_none()
 
-                    # missed spikes 카운트
+                    # missed alerts 카운트
                     missed_result = await db.execute(
                         select(func.count())
-                        .select_from(UserMissedSpikeSummary)
+                        .select_from(UserMissedAlertSummary)
                         .where(
-                            UserMissedSpikeSummary.user_id == sub.user_id,
-                            UserMissedSpikeSummary.is_shown == False,
+                            UserMissedAlertSummary.user_id == sub.user_id,
+                            UserMissedAlertSummary.is_shown == False,
                         )
                     )
                     missed_count = missed_result.scalar() or 0
@@ -1653,7 +1653,7 @@ def send_expired_trial_offers(self):
         from sqlalchemy import func
         from backend.app.models.subscription import Subscription
         from backend.app.models.user import User
-        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.user_missed_spike import UserMissedAlertSummary
         from backend.app.models.notification import Notification
 
         now = datetime.now(timezone.utc)
@@ -1696,11 +1696,11 @@ def send_expired_trial_offers(self):
                     if active_sub.scalar_one_or_none():
                         continue
 
-                    # missed spikes
+                    # missed alerts
                     missed_result = await db.execute(
                         select(func.count())
-                        .select_from(UserMissedSpikeSummary)
-                        .where(UserMissedSpikeSummary.user_id == sub.user_id)
+                        .select_from(UserMissedAlertSummary)
+                        .where(UserMissedAlertSummary.user_id == sub.user_id)
                     )
                     missed_count = missed_result.scalar() or 0
 
@@ -1785,8 +1785,8 @@ def send_expired_trial_offers(self):
 
                     missed_result = await db.execute(
                         select(func.count())
-                        .select_from(UserMissedSpikeSummary)
-                        .where(UserMissedSpikeSummary.user_id == sub.user_id)
+                        .select_from(UserMissedAlertSummary)
+                        .where(UserMissedAlertSummary.user_id == sub.user_id)
                     )
                     missed_count = missed_result.scalar() or 0
 
