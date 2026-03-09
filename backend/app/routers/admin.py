@@ -667,6 +667,41 @@ async def list_clusters(
     }
 
 
+@router.get("/spike-clusters")
+async def list_spike_clusters(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """현재 활성 스파이크 클러스터 목록 (is_spike=True, severity>0)."""
+    q = (
+        select(IssueCluster)
+        .where(IssueCluster.severity > 0, IssueCluster.is_spike == True)
+        .order_by(IssueCluster.last_event_at.desc())
+        .limit(20)
+    )
+    result = await db.execute(q)
+    clusters = result.scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(c.id),
+                "title": c.title,
+                "title_ko": c.title_ko,
+                "country_code": c.country_code,
+                "topic": c.topic,
+                "severity": c.severity,
+                "kscore": round(c.kscore, 2),
+                "event_count": c.event_count,
+                "is_spike": c.is_spike,
+                "is_active": c.is_active,
+                "first_event_at": c.first_event_at.isoformat(),
+                "last_event_at": c.last_event_at.isoformat(),
+            }
+            for c in clusters
+        ],
+    }
+
+
 @router.patch("/clusters/{cluster_id}")
 async def update_cluster(
     cluster_id: str,

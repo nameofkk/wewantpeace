@@ -245,6 +245,12 @@ export default function AdminPipelinePage() {
     refetchInterval: 60_000,
   });
 
+  const { data: spikeClustersData } = useQuery<{ items: ClusterItem[] }>({
+    queryKey: ["admin-spike-clusters-pipeline"],
+    queryFn: () => adminFetch("/admin/spike-clusters"),
+    refetchInterval: 60_000,
+  });
+
   const { data: sourcesData } = useQuery<{ items: SourceItem[] }>({
     queryKey: ["admin-sources-pipeline"],
     queryFn: () => adminFetch("/admin/sources?limit=100"),
@@ -300,6 +306,7 @@ export default function AdminPipelinePage() {
     onSuccess: () => {
       toast(t(lang, "admin_toast_updated"), "success");
       queryClient.invalidateQueries({ queryKey: ["admin-clusters-pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-spike-clusters-pipeline"] });
       queryClient.invalidateQueries({ queryKey: ["pipeline-stats"] });
     },
   });
@@ -326,6 +333,7 @@ export default function AdminPipelinePage() {
       setEditingCluster(null);
       toast(t(lang, "admin_toast_updated"), "success");
       queryClient.invalidateQueries({ queryKey: ["admin-clusters-pipeline"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-spike-clusters-pipeline"] });
     },
   });
 
@@ -340,7 +348,7 @@ export default function AdminPipelinePage() {
   const trending = trendingData ?? [];
   const tensions = tensionData ?? [];
   const clusters = clustersData?.items ?? [];
-  const spikeClusters = clusters.filter((c) => c.is_spike);
+  const spikeClusters = spikeClustersData?.items ?? [];
 
   if (isLoading) {
     return (
