@@ -519,8 +519,8 @@ export async function GET(
               </div>
             </div>
 
-            {/* 오른쪽: KScore 그래프 */}
-            {graphPoints.length >= 2 && (
+            {/* 오른쪽: KScore 그래프 (한국어만) */}
+            {lang === "ko" && graphPoints.length >= 2 && (
               <div
                 style={{
                   display: "flex",
@@ -530,7 +530,7 @@ export async function GET(
                 }}
               >
                 <span style={{ color: "#94A3B8", fontSize: 18, fontWeight: 600 }}>
-                  {lang === "en" ? "KScore 7-Day Trend" : "KScore 7일 추이"}
+                  KScore 7일 추이
                 </span>
                 <div
                   style={{
@@ -568,10 +568,10 @@ export async function GET(
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", width: `${graphWidth}px` }}>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[0].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[0].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
                   <span style={{ color: "#64748B", fontSize: 15, fontWeight: 600 }}>
-                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { month: "short", day: "numeric" })}
+                    {new Date(graphPoints[graphPoints.length - 1].time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
                   </span>
                 </div>
               </div>

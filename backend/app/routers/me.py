@@ -59,7 +59,7 @@ class PreferencesOut(BaseModel):
     quiet_hours_start: Optional[str]
     quiet_hours_end: Optional[str]
     timezone: str
-    home_country: str = "KR"
+    home_country: str = ""
 
 
 class PreferencesPatch(BaseModel):
@@ -402,8 +402,8 @@ async def update_preferences(
             if len(new_hc) != 2 or not new_hc.isalpha():
                 raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
             new_hc = new_hc.upper()
-            # Free 플랜은 기본 고정 국가(KR)만 허용, 다른 국가 변경 불가
-            if current_user.plan.lower() == "free" and new_hc != "KR":
+            # Free 플랜은 BASIC 모드(빈 문자열)만 허용, 기준국가 변경 불가
+            if current_user.plan.lower() == "free":
                 raise HTTPException(
                     status_code=403,
                     detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},

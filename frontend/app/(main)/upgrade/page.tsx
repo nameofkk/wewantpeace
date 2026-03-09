@@ -30,8 +30,8 @@ const FEATURES: Feature[] = [
     free: { ko: "2개", en: "2" },      pro: { ko: "5개", en: "5" },      proplus: { ko: "무제한", en: "Unlimited" },
   },
   {
-    labelKo: "내 국가 변경",           labelEn: "Home country",
-    free: { ko: "KR 고정", en: "KR only" }, pro: true,                   proplus: true,
+    labelKo: "기준국가",                labelEn: "Home country",
+    free: { ko: "BASIC 고정", en: "BASIC only" }, pro: true,              proplus: true,
   },
   {
     labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",

@@ -169,20 +169,23 @@ export async function GET(
   // Satori 지원 포맷: JPEG, PNG, GIF (WebP 미지원 → 크래시)
   const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
   const MAX_IMAGE_BYTES = 800_000;
-  const topImageUrl = tension.top5_clusters?.find((c) => c.image_url)?.image_url ?? null;
+  // 여러 이미지를 순차 시도 (첫 번째 성공한 것 사용)
+  const candidateUrls = (tension.top5_clusters ?? [])
+    .map((c) => c.image_url)
+    .filter((u): u is string => !!u);
   let bgImageSrc: string | null = null;
-  if (topImageUrl) {
+  for (const imgUrl of candidateUrls) {
+    if (bgImageSrc) break;
     try {
-      const imgRes = await fetch(topImageUrl, { signal: AbortSignal.timeout(3000) });
-      if (imgRes.ok) {
-        const ct = imgRes.headers.get("content-type") || "";
-        const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
-        if (ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t)) && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
-          const buf = await imgRes.arrayBuffer();
-          if (buf.byteLength <= MAX_IMAGE_BYTES) {
-            bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
-          }
-        }
+      const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(3000) });
+      if (!imgRes.ok) continue;
+      const ct = imgRes.headers.get("content-type") || "";
+      const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
+      if (!ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t))) continue;
+      if (cl > 0 && cl > MAX_IMAGE_BYTES) continue;
+      const buf = await imgRes.arrayBuffer();
+      if (buf.byteLength <= MAX_IMAGE_BYTES) {
+        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
       }
     } catch {}
   }
