@@ -219,11 +219,9 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
         "options": {"queue": "process"},
     },
-    "process-health-approvals": {
-        "task": "worker.tasks.process_health_approvals",
-        "schedule": 300.0,  # 5분마다
-        "options": {"queue": "process"},
-    },
+    # "process-health-approvals" 제거됨 (2026-03-10)
+    # telegram_bot.py의 _poll_updates()가 이미 hfix:/hskip: 콜백을 처리하므로
+    # 독립 getUpdates polling은 409 Conflict만 유발함
     # ── Beat heartbeat ──
     "beat-heartbeat": {
         "task": "beat_heartbeat",

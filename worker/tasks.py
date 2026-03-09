@@ -3306,24 +3306,9 @@ def health_check(self):
         raise self.retry(exc=exc)
 
 
-@app.task(
-    name="worker.tasks.process_health_approvals",
-    queue="process",
-    bind=True,
-    max_retries=1,
-)
-def process_health_approvals(self):
-    """5분마다 텔레그램 승인 확인 → 승인된 수정 실행."""
-
-    async def _run():
-        from worker.health.notifier import process_approvals
-        return await process_approvals()
-
-    try:
-        return run_async(_run())
-    except Exception as exc:
-        logger.error("process_health_approvals 오류: %s", exc)
-        raise self.retry(exc=exc)
+# process_health_approvals 제거됨 (2026-03-10)
+# telegram_bot.py _poll_updates()가 hfix:/hskip: 콜백을 직접 처리하므로
+# 독립 getUpdates polling이 불필요하며 409 Conflict만 유발함
 
 
 # ── Beat heartbeat ────────────────────────────────────────────────────────────

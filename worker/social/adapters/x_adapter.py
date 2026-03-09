@@ -238,50 +238,61 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
     if not is_configured():
         return None, "X API 키 미설정"
 
-    try:
-        import tweepy
+    import time
+    _RETRYABLE_CODES = ("402", "403", "429")
+    _MAX_RETRIES = 2
 
-        client = tweepy.Client(
-            consumer_key=X_API_KEY,
-            consumer_secret=X_API_SECRET,
-            access_token=X_ACCESS_TOKEN,
-            access_token_secret=X_ACCESS_SECRET,
-        )
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            import tweepy
 
-        full_text = _build_text(post)
+            client = tweepy.Client(
+                consumer_key=X_API_KEY,
+                consumer_secret=X_API_SECRET,
+                access_token=X_ACCESS_TOKEN,
+                access_token_secret=X_ACCESS_SECRET,
+            )
 
-        # 이미지 첨부 (로컬 경로 또는 Supabase URL)
-        media_ids = None
-        if post.image_url:
-            media_id = _upload_media(post.image_url)
-            if media_id:
-                media_ids = [media_id]
+            full_text = _build_text(post)
 
-        # 메인 트윗 발행 (링크 없음)
-        kwargs = {"text": full_text}
-        if media_ids:
-            kwargs["media_ids"] = media_ids
+            # 이미지 첨부 (로컬 경로 또는 Supabase URL)
+            media_ids = None
+            if post.image_url:
+                media_id = _upload_media(post.image_url)
+                if media_id:
+                    media_ids = [media_id]
 
-        response = client.create_tweet(**kwargs)
-        tweet_id = str(response.data["id"])
-        logger.info("X 트윗 발행 완료: tweet_id=%s, post_id=%s", tweet_id, post.id)
+            # 메인 트윗 발행 (링크 없음)
+            kwargs = {"text": full_text}
+            if media_ids:
+                kwargs["media_ids"] = media_ids
 
-        # 첫 번째 답글로 소스 링크 게시
-        reply_text = _build_reply_text(post)
-        if reply_text:
-            try:
-                client.create_tweet(
-                    text=reply_text,
-                    in_reply_to_tweet_id=tweet_id,
-                )
-                logger.info("X 링크 답글 게시 완료: parent=%s", tweet_id)
-            except Exception as reply_err:
-                # 답글 실패해도 메인 트윗은 성공으로 처리
-                logger.warning("X 링크 답글 실패 (무시): %s", str(reply_err)[:200])
+            response = client.create_tweet(**kwargs)
+            tweet_id = str(response.data["id"])
+            logger.info("X 트윗 발행 완료: tweet_id=%s, post_id=%s", tweet_id, post.id)
 
-        return tweet_id, None
+            # 첫 번째 답글로 소스 링크 게시
+            reply_text = _build_reply_text(post)
+            if reply_text:
+                try:
+                    client.create_tweet(
+                        text=reply_text,
+                        in_reply_to_tweet_id=tweet_id,
+                    )
+                    logger.info("X 링크 답글 게시 완료: parent=%s", tweet_id)
+                except Exception as reply_err:
+                    # 답글 실패해도 메인 트윗은 성공으로 처리
+                    logger.warning("X 링크 답글 실패 (무시): %s", str(reply_err)[:200])
 
-    except Exception as e:
-        error_msg = str(e)[:500]
-        logger.error("X 트윗 발행 실패 [post=%s]: %s", post.id, error_msg)
-        return None, error_msg
+            return tweet_id, None
+
+        except Exception as e:
+            error_msg = str(e)[:500]
+            # 402/403/429는 재시도 가치 있음 (크레딧/rate limit 일시 오류)
+            if attempt < _MAX_RETRIES and any(code in error_msg for code in _RETRYABLE_CODES):
+                wait = (attempt + 1) * 30
+                logger.warning("X 트윗 발행 재시도 [%d/%d] %ds 후: %s", attempt + 1, _MAX_RETRIES, wait, error_msg)
+                time.sleep(wait)
+                continue
+            logger.error("X 트윗 발행 실패 [post=%s]: %s", post.id, error_msg)
+            return None, error_msg

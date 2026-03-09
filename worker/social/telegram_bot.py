@@ -310,8 +310,13 @@ def start_polling_loop():
 async def _poll_updates():
     """Telegram Bot API long polling."""
     import httpx
+    from backend.app.core.redis import get_redis
 
-    offset = 0
+    _OFFSET_KEY = "social:tg_poll_offset"
+    redis = get_redis()
+    # Redis에서 offset 복원 (워커 재시작 시에도 중복 처리 방지)
+    _stored = await redis.get(_OFFSET_KEY)
+    offset = int(_stored) if _stored else 0
     # 수정 대기 중인 post_id 추적 {chat_id: (post_id, created_at)}
     edit_pending: dict[int, tuple[uuid.UUID, datetime]] = {}
 
@@ -330,6 +335,7 @@ async def _poll_updates():
                 data = resp.json()
                 for update in data.get("result", []):
                     offset = update["update_id"] + 1
+                    await redis.set(_OFFSET_KEY, str(offset))
 
                     # 콜백 쿼리 처리
                     if "callback_query" in update:
