@@ -54,6 +54,7 @@ class EventOut(BaseModel):
     title: str
     title_ko: Optional[str] = None
     body: str
+    body_ko: Optional[str] = None
     topic: str
     severity: int
     confidence: float
@@ -140,6 +141,7 @@ def _event_to_out(
         title=e.title,
         title_ko=e.title_ko,
         body=e.body or "",
+        body_ko=getattr(e, "body_ko", None),
         topic=e.topic,
         severity=e.severity,
         confidence=round(e.confidence, 3),

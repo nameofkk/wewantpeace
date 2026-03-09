@@ -19,6 +19,7 @@ class NormalizedEvent(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     title_ko: Mapped[str | None] = mapped_column(String, nullable=True)
     body: Mapped[str | None] = mapped_column(String, nullable=True)
+    body_ko: Mapped[str | None] = mapped_column(String, nullable=True)
     topic: Mapped[str] = mapped_column(String(32), nullable=False)
     entity_anchor: Mapped[str | None] = mapped_column(String(256), nullable=True)
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)

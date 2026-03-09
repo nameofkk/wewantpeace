@@ -80,6 +80,7 @@ export default function AppTour({ tourId, steps, run, onComplete }: AppTourProps
       continuous
       showSkipButton
       disableScrolling={false}
+      scrollOffset={200}
       spotlightClicks={false}
       callback={handleCallback}
       styles={tourStyles}

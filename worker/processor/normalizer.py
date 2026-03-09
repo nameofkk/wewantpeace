@@ -1407,6 +1407,7 @@ class NormalizeResult:
     title: str
     title_ko: Optional[str]
     body: str
+    body_ko: Optional[str]
     topic: str
     entity_anchor: Optional[str]
     lat: Optional[float]
@@ -1906,6 +1907,13 @@ def normalize(
     # 한국어 제목: 뉴스 원제목(title)을 그대로 번역 (이벤트 타임라인 표시용)
     title_ko = _translate_to_korean(title)
 
+    # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 본문 앞 500자 한국어 번역
+    body_ko: Optional[str] = None
+    if lang == "ko":
+        body_ko = raw_text[:2000]
+    else:
+        body_ko = _translate_to_korean(text_for_analysis[:500])
+
     entity_anchor: Optional[str] = country_code
     if not entity_anchor:
         m = re.search(r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b", text_for_analysis)
@@ -1918,6 +1926,7 @@ def normalize(
         title=title,
         title_ko=title_ko,
         body=text_for_analysis[:2000],  # 번역된 본문 저장
+        body_ko=body_ko,
         topic=topic,
         entity_anchor=entity_anchor,
         lat=lat,

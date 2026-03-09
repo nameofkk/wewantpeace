@@ -199,7 +199,17 @@ export const translations = {
     glossary_confidence: "Confidence (신뢰도)",
     glossary_confidence_desc: "이슈 정보의 신뢰 수준 (0~1). 공식 매체(AP, Reuters 등) 비율이 높을수록 높음.",
     glossary_kscore_alert: "KScore Alert (KScore 알림)",
-    glossary_kscore_alert_desc: "KScore 기반으로 중요도를 판별하여 발송하는 알림. 신뢰 알림(Verified)과 신속 알림(Fast) 두 종류가 있습니다.",
+    glossary_kscore_alert_desc: "KScore가 사용자의 임계값을 넘는 이슈가 발생하면 푸시 알림. 기준국가 관점 KScore로 계산됩니다.",
+    glossary_home_country: "기준국가",
+    glossary_home_country_desc: "KScore 계산의 기준이 되는 국가. 이 국가 관점에서 글로벌 이슈의 영향도를 계산합니다.\nFree=KR 고정, Pro 이상 변경 가능.",
+    glossary_watched_country: "관심국가",
+    glossary_watched_country_desc: "알림을 받을 국가. 이 국가에서 발생한 이슈가 KScore 임계값을 넘으면 알림이 발송됩니다.\nFree 2개, Pro 5개, Pro+ 무제한.",
+    glossary_fast_alert: "속보 알림 (Fast Alert)",
+    glossary_fast_alert_desc: "KScore가 임계값을 넘으면 즉시 발송되는 알림. 공식 확인 전이라 오탐 가능성이 있습니다.\n모든 플랜에서 사용 가능.",
+    glossary_verified_alert: "신뢰 알림 (Verified Alert)",
+    glossary_verified_alert_desc: "AP, Reuters 등 공식 매체에서 확인된 이슈만 발송하는 알림.\nPro/Pro+ 전용.",
+    glossary_critical_bypass: "긴급 상한 무시 (Critical Bypass)",
+    glossary_critical_bypass_desc: "severity 80 이상의 긴급 이슈는 일일 알림 상한을 무시하고 발송됩니다.\nPro/Pro+ 전용.",
     glossary_source_t1: "Tier 1 (최상위 출처)",
     glossary_source_t1_desc: "AP, Reuters, BBC, Al Jazeera 등 국제 공인 통신사·방송사.",
     glossary_source_t2: "Tier 2 (주요 출처)",
@@ -1242,9 +1252,11 @@ export const translations = {
 
     // 가이드 투어 — Settings
     tour_settings_page_role: "알림, 내 국가, 관심 국가 등 개인 설정을 관리하는 페이지입니다.",
-    tour_settings_home_country: "KScore가 이 국가 관점에서 계산됩니다.",
-    tour_settings_watched: "관심 국가의 이슈를 우선적으로 확인할 수 있습니다.",
-    tour_settings_notifications: "KScore 알림, 일일 요약 등 알림을 설정합니다.",
+    tour_settings_home_country: "기준국가: KScore가 이 국가 관점에서 계산됩니다. 알림도 이 KScore 기준으로 발송됩니다. Pro 이상에서 변경 가능.",
+    tour_settings_watched: "관심국가: 이 국가에서 발생한 이슈를 우선 모니터링합니다. 속보/신뢰 알림을 개별 설정할 수 있습니다.",
+    tour_settings_notifications: "KScore 임계값을 조절하여 알림 민감도를 설정합니다. 값이 낮을수록 더 많은 알림을 받습니다.",
+    tour_settings_kscore_slider: "KScore 슬라이더: 기준국가 관점의 KScore가 이 값을 넘으면 알림이 발송됩니다. 플랜에 따라 조절 범위가 다릅니다.",
+    tour_settings_plan: "현재 플랜 정보와 업그레이드 옵션을 확인할 수 있습니다.",
 
     // 가이드 투어 — Notifications
     tour_notifications_page_role: "지금까지 수신한 알림을 확인하는 페이지입니다.",
@@ -1300,7 +1312,7 @@ export const translations = {
     nav_settings: "Settings",
 
     // home page
-    home_title: "Today's Issues",
+    home_title: "Issues",
     home_subtitle: "Track global conflict and tension events in real-time",
     home_tab_global: "Global",
     home_tab_mine: "My Countries",
@@ -1311,7 +1323,7 @@ export const translations = {
     home_refresh_interval: "Refreshes every 15 min",
 
     // tension
-    tension_title: "Tension Index",
+    tension_title: "Tension",
     tension_subtitle: "Monitor country-level tension scores and daily trends",
     tension_crisis: "Extreme",
     tension_warning: "Warning",
@@ -1487,7 +1499,17 @@ export const translations = {
     glossary_confidence: "Confidence",
     glossary_confidence_desc: "Information reliability (0-1). Higher when sourced from official media (AP, Reuters, etc.).",
     glossary_kscore_alert: "KScore Alert",
-    glossary_kscore_alert_desc: "Alerts triggered based on KScore importance scoring. Comes in two types: Verified Alert and Fast Alert.",
+    glossary_kscore_alert_desc: "Push alerts triggered when an issue's KScore exceeds your threshold. Calculated from your home country's perspective.",
+    glossary_home_country: "Home Country",
+    glossary_home_country_desc: "The country used as the basis for KScore calculation. Global issues are scored based on their impact on this country.\nFree=KR only, Pro+ can change.",
+    glossary_watched_country: "Watched Country",
+    glossary_watched_country_desc: "Countries you want alerts for. When an issue in these countries exceeds your KScore threshold, you'll be notified.\nFree: 2, Pro: 5, Pro+: Unlimited.",
+    glossary_fast_alert: "Fast Alert",
+    glossary_fast_alert_desc: "Sent immediately when KScore exceeds your threshold. May include unverified reports.\nAvailable on all plans.",
+    glossary_verified_alert: "Verified Alert",
+    glossary_verified_alert_desc: "Only sends alerts for issues confirmed by official sources (AP, Reuters, etc.).\nPro/Pro+ only.",
+    glossary_critical_bypass: "Critical Bypass",
+    glossary_critical_bypass_desc: "Issues with severity 80+ bypass the daily alert limit.\nPro/Pro+ only.",
     glossary_source_t1: "Tier 1 (Top Sources)",
     glossary_source_t1_desc: "International wire services: AP, Reuters, BBC, Al Jazeera.",
     glossary_source_t2: "Tier 2 (Major Sources)",
@@ -2536,9 +2558,11 @@ export const translations = {
 
     // Guide Tour — Settings
     tour_settings_page_role: "Manage notifications, your country, watched countries, and other settings.",
-    tour_settings_home_country: "KScore is calculated from this country's perspective.",
-    tour_settings_watched: "Prioritize issues from your watched countries.",
-    tour_settings_notifications: "Configure KScore alerts, daily summaries, and more.",
+    tour_settings_home_country: "Home Country: KScore is calculated from this country's perspective. Alerts are also based on this KScore. Changeable on Pro+.",
+    tour_settings_watched: "Watched Countries: Monitor issues from these countries. You can configure Fast/Verified alerts individually.",
+    tour_settings_notifications: "Adjust KScore threshold to control alert sensitivity. Lower values mean more alerts.",
+    tour_settings_kscore_slider: "KScore Slider: You'll receive alerts when your home country KScore exceeds this value. Adjustable range varies by plan.",
+    tour_settings_plan: "View your current plan and upgrade options.",
 
     // Guide Tour — Notifications
     tour_notifications_page_role: "View all notifications you have received.",

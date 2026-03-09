@@ -39,6 +39,7 @@ interface EventOut {
   title: string;
   title_ko?: string | null;
   body: string;
+  body_ko?: string | null;
   topic: string;
   severity: number;
   confidence: number;
@@ -226,7 +227,6 @@ export default function IssueDetailClient({ initialData }: Props) {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h1 className="text-sm font-bold flex-1 truncate">{displayTitle}</h1>
-          <ShareButton issueId={issue.id} title={displayTitle} />
         </div>
       </div>
 
@@ -444,14 +444,16 @@ export default function IssueDetailClient({ initialData }: Props) {
                               <><ChevronDown className="h-2.5 w-2.5" /> {t(lang, "event_show_body")}</>
                             )}
                           </button>
-                          {expandedBodies[event.id] && (
+                          {expandedBodies[event.id] && (() => {
+                            const displayBody = lang === "ko" ? (event.body_ko ?? event.body) : event.body;
+                            return (
                             <div className="mt-2 pt-2 border-t border-border/50">
                               <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-line">
-                                {event.body.length > 300 && !expandedFullBodies[event.id]
-                                  ? event.body.slice(0, 300) + "..."
-                                  : event.body}
+                                {displayBody.length > 300 && !expandedFullBodies[event.id]
+                                  ? displayBody.slice(0, 300) + "..."
+                                  : displayBody}
                               </p>
-                              {event.body.length > 300 && (
+                              {displayBody.length > 300 && (
                                 <button
                                   onClick={() => setExpandedFullBodies((prev) => ({ ...prev, [event.id]: !prev[event.id] }))}
                                   className="mt-1 text-[10px] text-primary hover:text-primary/80 transition-colors font-medium"
@@ -460,7 +462,8 @@ export default function IssueDetailClient({ initialData }: Props) {
                                 </button>
                               )}
                             </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

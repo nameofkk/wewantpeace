@@ -490,10 +490,12 @@ def process_raw_event(self, raw_event_id: str):
                     s_dedup = _make_dedup_key(raw_event.raw_text)
                     s_title_ko = _translate_to_korean(s_title)
 
+                    s_body_ko = _translate_to_korean(raw_event.raw_text[:500])
                     norm = NormalizeResult(
                         title=s_title[:120],
                         title_ko=s_title_ko,
                         body=raw_event.raw_text[:2000],
+                        body_ko=s_body_ko,
                         topic=s_topic,
                         entity_anchor=s_cc or s_title[:64],
                         lat=s_lat,
@@ -540,6 +542,7 @@ def process_raw_event(self, raw_event_id: str):
                     title=norm.title,
                     title_ko=norm.title_ko,
                     body=norm.body,
+                    body_ko=norm.body_ko,
                     topic=norm.topic,
                     entity_anchor=norm.entity_anchor,
                     lat=norm.lat,

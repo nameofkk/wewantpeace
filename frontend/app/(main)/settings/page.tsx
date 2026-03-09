@@ -198,14 +198,27 @@ export default function SettingsPage() {
     {
       target: "[data-tour='settings-home-country']",
       content: t(lang, "tour_settings_home_country"),
+      placement: "bottom" as const,
     },
     {
       target: "[data-tour='settings-watched']",
       content: t(lang, "tour_settings_watched"),
+      placement: "bottom" as const,
     },
     {
       target: "[data-tour='settings-notifications']",
       content: t(lang, "tour_settings_notifications"),
+      placement: "bottom" as const,
+    },
+    {
+      target: "[data-tour='settings-kscore-slider']",
+      content: t(lang, "tour_settings_kscore_slider"),
+      placement: "bottom" as const,
+    },
+    {
+      target: "[data-tour='settings-plan']",
+      content: t(lang, "tour_settings_plan"),
+      placement: "bottom" as const,
     },
   ], [lang]);
 
@@ -927,7 +940,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 2. KScore 슬라이더 */}
-            <div className={cn("p-4", !hasFCMToken && "opacity-50 pointer-events-none")}>
+            <div className={cn("p-4", !hasFCMToken && "opacity-50 pointer-events-none")} data-tour="settings-kscore-slider">
               <div className="flex items-center justify-between mb-1">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "notif_kscore_title")}</p>
@@ -1120,7 +1133,7 @@ export default function SettingsPage() {
         </section>
 
         {/* ── 플랜 ──────────────────────────────────────────────────── */}
-        <section>
+        <section data-tour="settings-plan">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             {t(lang, "settings_plan")}
           </h2>
@@ -1232,59 +1245,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-
-            {/* 플랜별 알림 기능 비교 테이블 */}
-            <div className="mt-4 rounded-lg border border-border overflow-hidden">
-              <div className="bg-muted/30 px-3 py-2">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t(lang, "settings_plan_comparison_title")}
-                </p>
-              </div>
-              <table className="w-full text-[11px]">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-3 py-1.5 text-muted-foreground font-medium" />
-                    <th className="text-center px-2 py-1.5 text-muted-foreground font-medium">Free</th>
-                    <th className="text-center px-2 py-1.5 text-yellow-400 font-medium">Pro</th>
-                    <th className="text-center px-2 py-1.5 text-purple-400 font-medium">Pro+</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  <tr>
-                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_fast")}</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_verified")}</td>
-                    <td className="text-center py-1.5 text-muted-foreground/40">
-                      <Lock className="h-3 w-3 mx-auto" />
-                    </td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_daily_limit")}</td>
-                    <td className="text-center py-1.5 font-mono">5</td>
-                    <td className="text-center py-1.5 font-mono">20</td>
-                    <td className="text-center py-1.5 font-mono">100</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_critical")}</td>
-                    <td className="text-center py-1.5 text-muted-foreground/40">—</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                    <td className="text-center py-1.5 text-green-400">✓</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_kscore_range")}</td>
-                    <td className="text-center py-1.5 font-mono text-muted-foreground/60">3.0 {t(lang, "settings_plan_fixed")}</td>
-                    <td className="text-center py-1.5 font-mono">3.0–10.0</td>
-                    <td className="text-center py-1.5 font-mono">1.5–10.0</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
 
             {/* 플랜 변경/업그레이드 버튼 */}
             {plan === "free" && (

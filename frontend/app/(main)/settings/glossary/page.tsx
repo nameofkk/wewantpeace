@@ -1,29 +1,35 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
 import { LogoIcon } from "@/components/ui/logo-icon";
+import { cn } from "@/lib/utils";
 
 type GlossaryItem = { key: string; label: string; desc: string };
-type GlossaryCategory = { title: string; color: string; items: GlossaryItem[] };
+type GlossaryCategory = { title: string; color: string; icon: string; items: GlossaryItem[] };
 
 function getCategories(lang: Lang): GlossaryCategory[] {
   return [
     {
       title: t(lang, "glossary_cat_core"),
       color: "border-l-blue-500",
+      icon: "🧩",
       items: [
         { key: "issue", label: t(lang, "glossary_issue"), desc: t(lang, "glossary_issue_desc") },
         { key: "event", label: t(lang, "glossary_event"), desc: t(lang, "glossary_event_desc") },
         { key: "trending", label: t(lang, "glossary_trending"), desc: t(lang, "glossary_trending_desc") },
         { key: "tension", label: t(lang, "glossary_tension"), desc: t(lang, "glossary_tension_desc") },
+        { key: "home_country", label: t(lang, "glossary_home_country"), desc: t(lang, "glossary_home_country_desc") },
+        { key: "watched_country", label: t(lang, "glossary_watched_country"), desc: t(lang, "glossary_watched_country_desc") },
       ],
     },
     {
       title: t(lang, "glossary_cat_levels"),
       color: "border-l-green-500",
+      icon: "📊",
       items: [
         { key: "stable", label: t(lang, "glossary_level_stable"), desc: t(lang, "glossary_level_stable_desc") },
         { key: "caution", label: t(lang, "glossary_level_caution"), desc: t(lang, "glossary_level_caution_desc") },
@@ -35,6 +41,7 @@ function getCategories(lang: Lang): GlossaryCategory[] {
     {
       title: t(lang, "glossary_cat_topics"),
       color: "border-l-orange-500",
+      icon: "🏷️",
       items: [
         { key: "conflict", label: t(lang, "glossary_topic_conflict"), desc: t(lang, "glossary_topic_conflict_desc") },
         { key: "terror", label: t(lang, "glossary_topic_terror"), desc: t(lang, "glossary_topic_terror_desc") },
@@ -51,16 +58,21 @@ function getCategories(lang: Lang): GlossaryCategory[] {
     {
       title: t(lang, "glossary_cat_scoring"),
       color: "border-l-purple-500",
+      icon: "🔢",
       items: [
         { key: "kscore", label: t(lang, "glossary_kscore"), desc: t(lang, "glossary_kscore_desc") },
         { key: "severity", label: t(lang, "glossary_severity"), desc: t(lang, "glossary_severity_desc") },
         { key: "confidence", label: t(lang, "glossary_confidence"), desc: t(lang, "glossary_confidence_desc") },
         { key: "kscore_alert", label: t(lang, "glossary_kscore_alert"), desc: t(lang, "glossary_kscore_alert_desc") },
+        { key: "fast_alert", label: t(lang, "glossary_fast_alert"), desc: t(lang, "glossary_fast_alert_desc") },
+        { key: "verified_alert", label: t(lang, "glossary_verified_alert"), desc: t(lang, "glossary_verified_alert_desc") },
+        { key: "critical_bypass", label: t(lang, "glossary_critical_bypass"), desc: t(lang, "glossary_critical_bypass_desc") },
       ],
     },
     {
       title: t(lang, "glossary_cat_sources"),
       color: "border-l-emerald-500",
+      icon: "📡",
       items: [
         { key: "t1", label: t(lang, "glossary_source_t1"), desc: t(lang, "glossary_source_t1_desc") },
         { key: "t2", label: t(lang, "glossary_source_t2"), desc: t(lang, "glossary_source_t2_desc") },
@@ -70,10 +82,48 @@ function getCategories(lang: Lang): GlossaryCategory[] {
   ];
 }
 
+function AccordionItem({ item, color }: { item: GlossaryItem; color: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`border-l-2 ${color}`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+      >
+        <p className="text-sm font-medium">{item.label}</p>
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        )}
+      </button>
+      {open && (
+        <div className="px-4 pb-3">
+          <p className="text-[11px] text-muted-foreground whitespace-pre-line leading-relaxed">
+            {item.desc}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GlossaryPage() {
   const router = useRouter();
   const { lang } = useAppStore();
   const categories = getCategories(lang);
+  const [search, setSearch] = useState("");
+
+  const filteredCategories = search.trim()
+    ? categories.map((cat) => ({
+        ...cat,
+        items: cat.items.filter(
+          (item) =>
+            item.label.toLowerCase().includes(search.toLowerCase()) ||
+            item.desc.toLowerCase().includes(search.toLowerCase())
+        ),
+      })).filter((cat) => cat.items.length > 0)
+    : categories;
 
   return (
     <div className="flex flex-col">
@@ -94,26 +144,40 @@ export default function GlossaryPage() {
         </div>
         <h1 className="text-sm font-bold">{t(lang, "glossary_title")}</h1>
         <p className="text-[11px] text-muted-foreground">{t(lang, "settings_glossary_sub")}</p>
+
+        {/* 검색 필터 */}
+        <div className="relative mt-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder={lang === "ko" ? "용어 검색..." : "Search terms..."}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-border bg-secondary pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-primary"
+          />
+        </div>
       </div>
 
       <div className="px-4 py-4 space-y-5">
-        {categories.map((cat) => (
+        {filteredCategories.map((cat) => (
           <section key={cat.title}>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              {cat.title}
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <span>{cat.icon}</span>
+              <span>{cat.title}</span>
             </h2>
             <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
               {cat.items.map((item) => (
-                <div key={item.key} className={`px-4 py-3 border-l-2 ${cat.color}`}>
-                  <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 whitespace-pre-line leading-relaxed">
-                    {item.desc}
-                  </p>
-                </div>
+                <AccordionItem key={item.key} item={item} color={cat.color} />
               ))}
             </div>
           </section>
         ))}
+
+        {filteredCategories.length === 0 && (
+          <div className="text-center py-8 text-sm text-muted-foreground">
+            {lang === "ko" ? "검색 결과가 없습니다" : "No results found"}
+          </div>
+        )}
 
         <div className="pb-8" />
       </div>
