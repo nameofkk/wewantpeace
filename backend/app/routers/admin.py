@@ -1921,6 +1921,80 @@ async def pipeline_stats(
     )
     crisis_countries = len(crisis_q.all())
 
+    # ── alert delivery 통계 (최근 6시간) ──
+    alert_sent_6h = 0
+    alert_failed_6h = 0
+    alert_pending = 0
+    alert_suppressed_6h = 0
+    try:
+        _q = await db.execute(text(
+            "SELECT decision, COUNT(*) as cnt FROM alert_delivery_log"
+            " WHERE created_at >= NOW() - INTERVAL '6 hours'"
+            " GROUP BY decision"
+        ))
+        for row in _q.fetchall():
+            if row.decision == 'sent': alert_sent_6h = row.cnt
+            elif row.decision == 'failed': alert_failed_6h = row.cnt
+            elif row.decision == 'pending': alert_pending += row.cnt
+            elif row.decision == 'suppressed': alert_suppressed_6h = row.cnt
+    except Exception:
+        pass
+
+    # pending은 전체 시간에서
+    try:
+        _q2 = await db.execute(text("SELECT COUNT(*) FROM alert_delivery_log WHERE decision = 'pending'"))
+        alert_pending = _q2.scalar() or 0
+    except Exception:
+        pass
+
+    # ── spike delivery 통계 (최근 6시간) ──
+    spike_total_6h = 0
+    spike_delivered_6h = 0
+    spike_undelivered_6h = 0
+    try:
+        _q3 = await db.execute(text(
+            "SELECT COUNT(*) FROM spike_events WHERE triggered_at >= NOW() - INTERVAL '6 hours'"
+        ))
+        spike_total_6h = _q3.scalar() or 0
+
+        _q4 = await db.execute(text("""
+            SELECT COUNT(DISTINCT se.id) FROM spike_events se
+            JOIN alert_delivery_log adl ON adl.spike_event_id = se.id
+            WHERE se.triggered_at >= NOW() - INTERVAL '6 hours'
+              AND adl.decision = 'sent'
+        """))
+        spike_delivered_6h = _q4.scalar() or 0
+        spike_undelivered_6h = spike_total_6h - spike_delivered_6h
+    except Exception:
+        pass
+
+    # ── SNS 소셜 포스트 통계 ──
+    sns_pending_review = 0
+    sns_approved = 0
+    sns_published_24h = 0
+    sns_failed_24h = 0
+    try:
+        _q5 = await db.execute(text(
+            "SELECT status, COUNT(*) as cnt FROM social_posts"
+            " WHERE status IN ('pending_review', 'approved', 'published', 'failed')"
+            " GROUP BY status"
+        ))
+        for row in _q5.fetchall():
+            if row.status == 'pending_review': sns_pending_review = row.cnt
+            elif row.status == 'approved': sns_approved = row.cnt
+
+        _q6 = await db.execute(text(
+            "SELECT status, COUNT(*) as cnt FROM social_posts"
+            " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+            " AND status IN ('published', 'failed')"
+            " GROUP BY status"
+        ))
+        for row in _q6.fetchall():
+            if row.status == 'published': sns_published_24h = row.cnt
+            elif row.status == 'failed': sns_failed_24h = row.cnt
+    except Exception:
+        pass
+
     return {
         "total_sources": total_sources,
         "active_sources": active_sources,
@@ -1942,6 +2016,17 @@ async def pipeline_stats(
         "push_android": push_android,
         "push_ios": push_ios,
         "crisis_countries": crisis_countries,
+        "alert_sent_6h": alert_sent_6h,
+        "alert_failed_6h": alert_failed_6h,
+        "alert_pending": alert_pending,
+        "alert_suppressed_6h": alert_suppressed_6h,
+        "spike_total_6h": spike_total_6h,
+        "spike_delivered_6h": spike_delivered_6h,
+        "spike_undelivered_6h": spike_undelivered_6h,
+        "sns_pending_review": sns_pending_review,
+        "sns_approved": sns_approved,
+        "sns_published_24h": sns_published_24h,
+        "sns_failed_24h": sns_failed_24h,
     }
 
 

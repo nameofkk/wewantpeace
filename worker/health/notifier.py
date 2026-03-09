@@ -181,6 +181,8 @@ def _get_fix_description(action: str, params: dict) -> str:
         return "오펀 이벤트 재클러스터링"
     elif action == "retry_sns_publish":
         return "미발행 SNS 포스트 재시도"
+    elif action == "retry_spike_alerts":
+        return "미전송 스파이크 알림 재발송"
     return action
 
 

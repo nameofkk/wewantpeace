@@ -37,6 +37,17 @@ interface PipelineStats {
   push_android: number;
   push_ios: number;
   crisis_countries: number;
+  alert_sent_6h: number;
+  alert_failed_6h: number;
+  alert_pending: number;
+  alert_suppressed_6h: number;
+  spike_total_6h: number;
+  spike_delivered_6h: number;
+  spike_undelivered_6h: number;
+  sns_pending_review: number;
+  sns_approved: number;
+  sns_published_24h: number;
+  sns_failed_24h: number;
 }
 
 interface ClusterItem {
@@ -83,11 +94,22 @@ function getStageHealth(stats: PipelineStats | undefined, stage: number): Health
     case 2: return "green";
     case 3: return stats.noise_clusters > 20 ? "red" : stats.noise_clusters > 10 ? "yellow" : "green";
     case 4: return stats.spike_clusters > 5 ? "red" : stats.spike_clusters > 2 ? "yellow" : "green";
-    case 5: return "green";
-    case 6: return stats.crisis_countries > 3 ? "red" : stats.crisis_countries > 1 ? "yellow" : "green";
-    case 7: return "green";
-    case 8: return stats.push_tokens === 0 ? "red" : "green";
-    case 9: return "green";
+    case 5: {
+      // Alert Delivery health
+      const totalAlert = (stats.alert_sent_6h || 0) + (stats.alert_failed_6h || 0);
+      if (totalAlert > 0) {
+        const rate = stats.alert_sent_6h / totalAlert;
+        if (rate < 0.7) return "red";
+        if (rate < 0.9) return "yellow";
+      }
+      if ((stats.spike_undelivered_6h || 0) > 0) return "yellow";
+      return "green";
+    }
+    case 6: return "green"; // KScore (was 5)
+    case 7: return stats.crisis_countries > 3 ? "red" : stats.crisis_countries > 1 ? "yellow" : "green"; // Tension (was 6)
+    case 8: return "green"; // Trending (was 7)
+    case 9: return stats.push_tokens === 0 ? "red" : "green"; // Push (was 8)
+    case 10: return "green"; // Orphan (was 9)
     default: return "green";
   }
 }
@@ -98,23 +120,24 @@ const HEALTH_RING: Record<Health, string> = { green: "ring-green-500/30", yellow
 /* ─── stage config ─── */
 const STAGE_KEYS = [
   "pipeline_stage_collect", "pipeline_stage_normalize", "pipeline_stage_dedup",
-  "pipeline_stage_cluster", "pipeline_stage_spike", "pipeline_stage_kscore",
-  "pipeline_stage_tension", "pipeline_stage_trending", "pipeline_stage_push",
-  "pipeline_stage_orphan",
+  "pipeline_stage_cluster", "pipeline_stage_spike", "pipeline_stage_alert_delivery",
+  "pipeline_stage_kscore", "pipeline_stage_tension", "pipeline_stage_trending",
+  "pipeline_stage_push", "pipeline_stage_orphan",
 ] as const;
 
-const STAGE_ICONS = [Radio, FileText, Copy, Layers, Zap, TrendingUp, Activity, TrendingUp, Bell, RefreshCw];
+const STAGE_ICONS = [Radio, FileText, Copy, Layers, Zap, Bell, TrendingUp, Activity, TrendingUp, Bell, RefreshCw];
 
 // 각 스테이지의 상세 관리 페이지 링크
 const STAGE_DETAIL_HREFS = [
   "/admin/sources", "/admin/events", null, "/admin/clusters", "/admin/clusters",
-  "/admin/kscore", "/admin/tension", "/admin/kscore", null, null,
+  null, "/admin/kscore", "/admin/tension", "/admin/kscore", null, null,
 ];
 
 const ARROW_LABELS = [
   "pipeline_label_raw", "pipeline_label_normalized", "pipeline_label_deduped",
-  "pipeline_label_clustered", "pipeline_label_scored", "pipeline_label_tension",
-  "pipeline_label_trending", "pipeline_label_notification", "pipeline_label_orphan",
+  "pipeline_label_clustered", "pipeline_label_alerted", "pipeline_label_scored",
+  "pipeline_label_tension", "pipeline_label_trending", "pipeline_label_notification",
+  "pipeline_label_orphan",
 ] as const;
 
 /* ─── stat pill ─── */
@@ -543,10 +566,64 @@ export default function AdminPipelinePage() {
           )}
         </StageCard>
 
+        <Arrow label="pipeline_label_alerted" lang={lang} />
+
+        {/* Stage 5: 알림 전달 */}
+        <StageCard index={5} lang={lang} health={getStageHealth(stats, 5)} sectionRef={(el) => (sectionRefs.current[5] = el)}>
+          {/* FCM 전달 현황 */}
+          <p className="text-[10px] font-medium text-muted-foreground mb-1">{t(lang, "pipeline_alert_fcm")}</p>
+          <div className="grid grid-cols-4 gap-2">
+            <Pill label={t(lang, "pipeline_alert_sent")} value={stats?.alert_sent_6h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_failed")} value={stats?.alert_failed_6h ?? 0} warn={(stats?.alert_failed_6h ?? 0) > 5} />
+            <Pill label={t(lang, "pipeline_alert_pending")} value={stats?.alert_pending ?? 0} warn={(stats?.alert_pending ?? 0) > 20} />
+            <Pill label={t(lang, "pipeline_alert_suppressed")} value={stats?.alert_suppressed_6h ?? 0} />
+          </div>
+
+          {/* 스파이크 알림 전달 */}
+          <p className="text-[10px] font-medium text-muted-foreground mb-1 mt-3">{t(lang, "pipeline_alert_spike")}</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Pill label={t(lang, "pipeline_alert_spike_total")} value={stats?.spike_total_6h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_spike_delivered")} value={stats?.spike_delivered_6h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_spike_undelivered")} value={stats?.spike_undelivered_6h ?? 0} warn={(stats?.spike_undelivered_6h ?? 0) > 0} />
+          </div>
+          {(stats?.spike_undelivered_6h ?? 0) > 0 && (
+            <p className="text-[10px] text-red-400 flex items-center gap-1 mt-1">
+              <AlertTriangle className="h-3 w-3" />
+              {t(lang, "pipeline_alert_spike_warning")}
+            </p>
+          )}
+
+          {/* SNS 소셜 포스트 현황 */}
+          <p className="text-[10px] font-medium text-muted-foreground mb-1 mt-3">{t(lang, "pipeline_alert_sns")}</p>
+          <div className="grid grid-cols-4 gap-2">
+            <Pill label={t(lang, "pipeline_alert_sns_pending")} value={stats?.sns_pending_review ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_sns_approved")} value={stats?.sns_approved ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_sns_published")} value={stats?.sns_published_24h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_sns_failed")} value={stats?.sns_failed_24h ?? 0} warn={(stats?.sns_failed_24h ?? 0) > 0} />
+          </div>
+
+          {/* 전체 알림 성공률 */}
+          {((stats?.alert_sent_6h ?? 0) + (stats?.alert_failed_6h ?? 0)) > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all"
+                  style={{
+                    width: `${Math.round((stats!.alert_sent_6h / (stats!.alert_sent_6h + stats!.alert_failed_6h)) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {Math.round((stats!.alert_sent_6h / (stats!.alert_sent_6h + stats!.alert_failed_6h)) * 100)}%
+              </span>
+            </div>
+          )}
+        </StageCard>
+
         <Arrow label="pipeline_label_scored" lang={lang} />
 
-        {/* Stage 5: KScore */}
-        <StageCard index={5} lang={lang} health={getStageHealth(stats, 5)} sectionRef={(el) => (sectionRefs.current[5] = el)}>
+        {/* Stage 6: KScore */}
+        <StageCard index={6} lang={lang} health={getStageHealth(stats, 6)} sectionRef={(el) => (sectionRefs.current[6] = el)}>
           {trending.length > 0 ? (
             <div className="space-y-1">
               <p className="text-[10px] text-muted-foreground">{t(lang, "pipeline_top5_trending")}</p>
@@ -567,8 +644,8 @@ export default function AdminPipelinePage() {
 
         <Arrow label="pipeline_label_tension" lang={lang} />
 
-        {/* Stage 6: 긴장도 */}
-        <StageCard index={6} lang={lang} health={getStageHealth(stats, 6)} sectionRef={(el) => (sectionRefs.current[6] = el)}>
+        {/* Stage 7: 긴장도 */}
+        <StageCard index={7} lang={lang} health={getStageHealth(stats, 7)} sectionRef={(el) => (sectionRefs.current[7] = el)}>
           <Pill label={t(lang, "pipeline_crisis_countries")} value={stats?.crisis_countries ?? 0} warn={(stats?.crisis_countries ?? 0) > 1} />
           {tensions.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -599,8 +676,8 @@ export default function AdminPipelinePage() {
 
         <Arrow label="pipeline_label_trending" lang={lang} />
 
-        {/* Stage 7: 트렌딩 */}
-        <StageCard index={7} lang={lang} health={getStageHealth(stats, 7)} sectionRef={(el) => (sectionRefs.current[7] = el)}>
+        {/* Stage 8: 트렌딩 */}
+        <StageCard index={8} lang={lang} health={getStageHealth(stats, 8)} sectionRef={(el) => (sectionRefs.current[8] = el)}>
           <Pill label={t(lang, "pipeline_active_keywords")} value={trending.length} />
           {trending.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -620,8 +697,8 @@ export default function AdminPipelinePage() {
 
         <Arrow label="pipeline_label_notification" lang={lang} />
 
-        {/* Stage 8: 푸시 */}
-        <StageCard index={8} lang={lang} health={getStageHealth(stats, 8)} sectionRef={(el) => (sectionRefs.current[8] = el)}>
+        {/* Stage 9: 푸시 */}
+        <StageCard index={9} lang={lang} health={getStageHealth(stats, 9)} sectionRef={(el) => (sectionRefs.current[9] = el)}>
           <div className="grid grid-cols-2 gap-2">
             <Pill label={t(lang, "pipeline_push_tokens")} value={stats?.push_tokens ?? 0} />
             <Pill label="Web" value={stats?.push_web ?? 0} />
@@ -635,8 +712,8 @@ export default function AdminPipelinePage() {
 
         <Arrow label="pipeline_label_orphan" lang={lang} />
 
-        {/* Stage 9: 오펀 재처리 */}
-        <StageCard index={9} lang={lang} health={getStageHealth(stats, 9)} sectionRef={(el) => (sectionRefs.current[9] = el)}>
+        {/* Stage 10: 오펀 재처리 */}
+        <StageCard index={10} lang={lang} health={getStageHealth(stats, 10)} sectionRef={(el) => (sectionRefs.current[10] = el)}>
           <p className="text-xs text-muted-foreground">{t(lang, "pipeline_orphan_schedule")}</p>
           <div className="flex gap-2 mt-2">
             <ActionBtn label={t(lang, "pipeline_trigger")} onClick={() => orphanMut.mutate()} loading={orphanMut.isPending} />
