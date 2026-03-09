@@ -1,142 +1,215 @@
-# WeWantPeace
+<p align="center">
+  <img src="docs/images/logo-eye.png" alt="WeWantPeace" width="80" />
+</p>
 
-세계정세 실시간 모니터링 플랫폼 — 알림 · 지도 · 긴장도 지수
-웹(PWA) + Android(TWA/Expo) + 토스 앱인토스
+<h1 align="center">WeWantPeace</h1>
 
-## 주요 기능
+<p align="center">
+  <strong>AI-powered real-time conflict & crisis monitoring platform</strong><br/>
+  Track global tensions, receive instant alerts, and stay informed with data-driven insights.
+</p>
 
-- **실시간 이슈 지도** — MapLibre GL 기반, 클러스터 마커 + 펄스 애니메이션 + 스파이크 감지
-- **긴장도 지수** — 국가별 위기 수준 계산·시계열 추적
-- **트렌딩 키워드** — 글로벌/개인화 트렌딩, KScore(Key Impact Score) 기반 급상승 감지
-- **커뮤니티** — 토론·분석·질문 게시판 (게시글·댓글·리액션)
-- **푸시 알림** — FCM 기반, 관심국가·토픽·심각도 필터링
-- **구독 결제** — Google Play Billing + Apple StoreKit + 토스 앱인토스
-- **다국어** — 한국어/영어 완전 지원 (1,600+ 번역 키)
-- **어드민 대시보드** — 이벤트·클러스터·긴장도·사용자·소스 관리
+<p align="center">
+  <a href="https://www.wewantpeace.live">Live Demo</a> &middot;
+  <a href="./METHODOLOGY.md">Methodology</a> &middot;
+  <a href="./DATA_DICTIONARY.md">Data Dictionary</a> &middot;
+  <a href="./README.ko.md">한국어</a>
+</p>
 
-## 기술 스택
+---
 
-| 레이어 | 기술 |
-|--------|------|
-| **Frontend** | Next.js 14 · React 18 · Tailwind CSS · MapLibre GL · Zustand · TanStack Query · Firebase Auth |
-| **Backend** | FastAPI · SQLAlchemy 2.0 (async) · Celery · Redis |
-| **Database** | PostgreSQL 15 · Supabase (프로덕션) |
-| **Worker** | Celery Beat + Worker (collect/process 큐 분리) |
-| **Mobile** | Expo 55 · React Native 0.83 · react-native-iap · FCM + Notifee |
-| **수집** | RSS/feedparser · Telegram (Telethon) · OpenAI API (분류/번역) |
-| **배포** | Railway.app · GitHub Actions CI/CD · Docker multi-stage |
+## Screenshots
 
-## 프로젝트 구조
+### Desktop — Today's Issues
+
+![Home](docs/images/01-home-desktop.png)
+
+Real-time issue feed with **RISING NOW** cards, KScore ticker, severity/speed/spread indicators, and live update status.
+
+### Issue Detail — Event Timeline
+
+![Issue Detail](docs/images/02-issue-detail.png)
+
+Deep dive into each issue cluster: severity score, confidence level, event count, source verification badges, KScore bar, and a chronological event timeline with original sources.
+
+### Tension Index — Country Risk Scores
+
+![Tension Index](docs/images/03-tension-desktop.png)
+
+Country-level tension scoring with breakdown (Events, Acceleration, Spillover), 30-day trend comparison, and Top Causes ranked by KScore.
+
+### Country Issues — Israel
+
+![Country Issues](docs/images/04-country-issues.png)
+
+Per-country view with tension trend chart (7-day history), severity-coded issue cards, and live event counts.
+
+### Mobile Views
+
+<p align="center">
+  <img src="docs/images/05-mobile-home.png" alt="Mobile Home" width="280" />
+  &nbsp;&nbsp;
+  <img src="docs/images/06-mobile-tension.png" alt="Mobile Tension" width="280" />
+</p>
+
+Fully responsive PWA — works on any device, installable as a native app on Android and iOS.
+
+---
+
+## Key Features
+
+- **Real-time Issue Tracking** — Collects from 100+ RSS feeds, Telegram channels, and APIs every 5 minutes
+- **AI Classification** — Automatic topic categorization, severity scoring, and country detection using OpenAI
+- **KScore (Key Impact Score)** — Proprietary 0-10 composite metric measuring Speed, Severity, and Spread
+- **Tension Index** — Country-level risk scores with daily trend tracking and acceleration detection
+- **Spike Detection** — Automatic identification of rapidly escalating events with instant push alerts
+- **Interactive Conflict Map** — MapLibre GL-based visualization with cluster markers and pulse animations
+- **Push Notifications** — FCM-based alerts filtered by your countries, topics, and severity thresholds
+- **Community Forum** — Discussion board for analysis, questions, and debate
+- **Bilingual** — Full Korean/English support (1,600+ translation keys)
+- **Admin Dashboard** — Complete control panel for events, clusters, sources, users, and pipeline health
+
+## Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌──────────────┐
+│  RSS Feeds  │     │  Telegram   │     │  USGS / APIs │
+│  (100+)     │     │  Channels   │     │              │
+└──────┬──────┘     └──────┬──────┘     └──────┬───────┘
+       │                   │                    │
+       └───────────┬───────┘────────────────────┘
+                   ▼
+         ┌─────────────────┐
+         │   Celery Worker  │  ← collect queue (5-min cycle)
+         │                  │
+         │  normalize →     │
+         │  deduplicate →   │
+         │  cluster →       │
+         │  spike detect →  │
+         │  tension calc →  │
+         │  trending →      │
+         │  push alerts     │
+         └────────┬─────────┘
+                  │
+         ┌────────▼─────────┐
+         │   PostgreSQL      │  (Supabase)
+         │   + Redis         │
+         └────────┬─────────┘
+                  │
+         ┌────────▼─────────┐     ┌──────────────────┐
+         │  FastAPI Backend  │────▶│  Next.js Frontend │
+         │  (REST API)       │     │  (PWA)            │
+         └──────────────────┘     └──────────────────┘
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 14, React 18, Tailwind CSS, MapLibre GL, Zustand, TanStack Query, Firebase Auth |
+| **Backend** | FastAPI, SQLAlchemy 2.0 (async), Celery, Redis |
+| **Database** | PostgreSQL 15 (Supabase) |
+| **Worker** | Celery Beat + Worker (separate collect/process queues) |
+| **Collection** | RSS/feedparser, Telegram (Telethon), OpenAI API (classification/translation) |
+| **Mobile** | Android TWA + Expo React Native (Google Play) |
+| **Deployment** | Railway.app, GitHub Actions CI/CD |
+
+## Data Pipeline
+
+```
+RSS/Telegram Collection → Normalization (topic/severity/geo) → Deduplication → Clustering
+    → Spike Detection → Trending Calculation → Tension Index → Push Notifications
+```
+
+| Metric | Current |
+|--------|---------|
+| Data Sources | 58+ (RSS 37+ / Telegram 12 / API 3) |
+| Countries Monitored | 69 (expanding to 120+) |
+| Refresh Interval | Every 5 minutes |
+| KScore Range | 0–10 (personalized by user's tracked countries) |
+
+## Project Structure
 
 ```
 wewantpeace/
 ├── backend/
 │   ├── app/
-│   │   ├── routers/      # API (issues, trending, tension, community, auth, admin, me, subscriptions)
-│   │   ├── models/       # SQLAlchemy 모델 (22개)
-│   │   ├── services/     # Google Play / Apple StoreKit 결제 처리
-│   │   └── core/         # config, database, auth, redis, firebase
-│   ├── alembic/          # DB 마이그레이션 (37개)
-│   └── tests/            # pytest 테스트 (173+ 통과)
+│   │   ├── routers/        # API endpoints (issues, tension, trending, community, auth, admin)
+│   │   ├── models/         # SQLAlchemy models (22 tables)
+│   │   ├── services/       # Payment processing (Google Play / Apple StoreKit)
+│   │   └── core/           # config, database, auth, redis, firebase
+│   ├── alembic/            # DB migrations (37+)
+│   └── tests/              # pytest tests (173+ passing)
 ├── worker/
-│   ├── collector/        # RSS·Telegram 수집기
-│   ├── processor/        # normalizer, clusterer, deduplicator, spike detector, tension calculator, trending engine
-│   └── push/             # FCM 푸시 서비스
+│   ├── collector/          # RSS & Telegram collectors
+│   ├── processor/          # normalizer, clusterer, deduplicator, spike detector, tension calculator
+│   └── push/               # FCM push notification service
 ├── frontend/
-│   ├── app/(main)/       # 사용자 페이지 (홈, 지도, 긴장도, 커뮤니티, 설정)
-│   ├── app/admin/        # 어드민 대시보드
-│   ├── components/       # UI 컴포넌트
-│   └── lib/              # api, auth, i18n, store, fcm, play-billing
-├── mobile/               # React Native Expo 앱
-│   └── src/services/     # push, iap, bridge (네이티브 브릿지)
-├── scripts/              # reprocess_topics, seed_channels, ai_retitle 등
-├── infra/                # Dockerfile.backend, .frontend, .worker, docker-compose.yml
-└── .github/workflows/    # CI 테스트 + Railway 배포
+│   ├── app/(main)/         # User pages (home, map, tension, community, settings)
+│   ├── app/admin/          # Admin dashboard (14 sections)
+│   ├── components/         # Shared UI components
+│   └── lib/                # api, auth, i18n (1,600+ keys), store, fcm
+├── scripts/                # Maintenance scripts (reprocess, seed, retitle)
+├── infra/                  # Docker configs (backend, frontend, worker)
+└── .github/workflows/      # CI tests + Railway deployment
 ```
 
-## 빠른 시작
+## Quick Start
 
 ```bash
-# 1. 환경변수
+# 1. Environment variables
 cp .env.example .env
-# DATABASE_URL, REDIS_URL, TELEGRAM_BOT_TOKEN, SECRET_KEY 등 설정
+# Set DATABASE_URL, REDIS_URL, TELEGRAM_BOT_TOKEN, SECRET_KEY, etc.
 
-# 2. Docker로 인프라 실행
+# 2. Start infrastructure with Docker
 cd infra && docker-compose up -d
 
-# 3. DB 마이그레이션 (backend 컨테이너 시작 시 자동 실행됨)
-# 수동:
+# 3. Run DB migrations
 DATABASE_URL=postgresql+asyncpg://wwp:wwplocal@localhost/wewantpeace \
   python -m alembic -c backend/alembic.ini upgrade head
 
-# 4. 프론트엔드
+# 4. Start frontend
 cd frontend && npm install && npm run dev
 
-# 5. Worker (별도 터미널)
+# 5. Start worker (separate terminal)
 celery -A worker.celery_app worker --beat --loglevel=info -Q collect,process -c 2
 ```
 
 ## API
 
-- Swagger UI: http://localhost:8000/docs (DEBUG=true 시)
-- Health check: `GET /health`
-- OpenAPI spec: `GET /openapi.json`
+- **Swagger UI**: http://localhost:8000/docs (when `DEBUG=true`)
+- **Health check**: `GET /health`
+- **Public API**: `GET /api/v1/issues`, `GET /api/v1/tension` — [API Docs](https://www.wewantpeace.live/api-docs)
 
-## 테스트
+## Testing
 
 ```bash
-bash scripts/run_tests.sh           # 전체 (173+ 통과)
-bash scripts/run_tests.sh -u        # 단위 테스트만
-bash scripts/run_tests.sh -c        # 커버리지 포함
+bash scripts/run_tests.sh           # Full suite (173+ passing)
+bash scripts/run_tests.sh -u        # Unit tests only
+bash scripts/run_tests.sh -c        # With coverage report
 ```
 
-## 배포
+## Deployment
 
-- **Railway.app**: backend · worker · frontend (3 서비스)
-- **CI/CD**: `main` 브랜치 push → GitHub Actions → Railway GraphQL API 호출
-- **DB**: Supabase PostgreSQL (ap-northeast-2)
-- **도메인**: `www.wewantpeace.live` (프론트) · `api.wewantpeace.live` (백엔드)
+- **Railway.app**: 3 services (backend, worker, frontend)
+- **CI/CD**: Push to `main` → GitHub Actions → Railway GraphQL API deployment
+- **Database**: Supabase PostgreSQL (ap-northeast-2)
+- **Domains**: `www.wewantpeace.live` (frontend), `api.wewantpeace.live` (backend)
 
-## 모바일 앱
+## Methodology
 
-- **버전**: 2.1.0 (Android versionCode 7)
-- **패키지**: `com.wewantpeace.app`
-- **빌드**: `cd mobile && npx expo prebuild && cd android && ./gradlew assembleRelease`
-- **기능**: 푸시 알림, 인앱 결제, WebView 네이티브 브릿지 (mailto/tel 처리)
+Our algorithms are fully documented in [METHODOLOGY.md](./METHODOLOGY.md), covering:
+- KScore calculation (Speed, Severity, Spread composite)
+- Tension Index formula (Events, Acceleration, Spillover)
+- Spike detection thresholds and alerting logic
+- Data quality scoring and source grading
 
-## 데이터 처리 파이프라인
+## Contributing
 
-```
-RSS/Telegram 수집 → 정규화(topic/severity/geo) → 중복제거 → 클러스터링
-    → 스파이크 감지 → 트렌딩 계산 → 긴장도 지수 → 푸시 알림
-```
+We welcome contributions! Please see our data dictionary and methodology docs for context on how the system works.
 
-## 환경변수
+## License
 
-| 변수 | 설명 |
-|------|------|
-| `DATABASE_URL` | PostgreSQL asyncpg URL |
-| `REDIS_URL` | Redis 연결 URL |
-| `SECRET_KEY` | JWT/세션 시크릿 (프로덕션 필수) |
-| `TELEGRAM_BOT_TOKEN` | Telegram 수집용 봇 토큰 |
-| `TELEGRAM_API_ID` / `API_HASH` | Telegram MTProto API |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin SDK (푸시) |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Play Billing 서버 검증 |
-| `ALLOWED_ORIGINS` | CORS 허용 도메인 (JSON 배열) |
-| `NEXT_PUBLIC_API_URL` | 프론트→백엔드 API URL |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | MapLibre 지도 토큰 |
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — Creative Commons Attribution-NonCommercial 4.0 International
 
-## 방법론
-
-알고리즘 설명: [METHODOLOGY.md](./METHODOLOGY.md)
-
-| 항목 | 현재 |
-|------|------|
-| 데이터 소스 | 58개 (RSS 37+ / Telegram 12 / API 3) |
-| 모니터링 국가 | 69개국 (120+ 확대 예정) |
-| 갱신 주기 | 5분 (긴장도/트렌딩/RSS/Telegram) |
-| KScore | Key Impact Score (0-10, 사용자 기준 국가 영향도) |
-
-## 라이선스
-
-Private — All rights reserved.
+Copyright (c) 2026 WeWantPeace
