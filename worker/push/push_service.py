@@ -695,10 +695,14 @@ def _split_and_send_with_context(
     topic: Optional[str],
     severity: int = 0,
     collapse_key: Optional[str] = None,
+    title_ko: Optional[str] = None,
+    body_ko: Optional[str] = None,
+    body_en: Optional[str] = None,
 ) -> tuple[int, list[str], dict[str, str]]:
     """
     토큰을 (home_country, language)별로 그룹화하여 개인화된 컨텍스트를 body에 추가 발송.
-    각 그룹마다 generate_spike_context()로 "why this matters" 1줄 생성.
+    각 그룹마다 generate_alert_context()로 "why this matters" 1줄 생성.
+    lang에 따라 title/body를 분기 (ko/en).
     Returns: (성공 수, 무효 토큰 리스트, 토큰별 failure_reason)
     """
     if not token_infos:
@@ -714,6 +718,11 @@ def _split_and_send_with_context(
     all_failures: dict[str, str] = {}
 
     for (home_country, lang), group_tokens in groups.items():
+        # 언어별 title 선택
+        group_title = (title_ko if lang == "ko" and title_ko else title)
+        # 언어별 body 선택
+        group_body = (body_ko if lang == "ko" and body_ko else body_en if lang != "ko" and body_en else base_body)
+
         # 컨텍스트 생성
         if event_country:
             context = generate_alert_context(home_country, event_country, topic or "unknown", lang)
@@ -721,14 +730,14 @@ def _split_and_send_with_context(
             context = "글로벌 긴장도 상승 — 주시 필요" if lang == "ko" else "Global tension rising — monitor"
 
         # body에 컨텍스트 추가 (줄바꿈 구분)
-        personalized_body = f"{base_body}\n{context}"
+        personalized_body = f"{group_body}\n{context}"
 
         # data에도 context 추가 (웹 SW에서 활용 가능)
         personalized_data = {**data, "context": context}
 
         sent, invalid, failures = _split_and_send(
             token_infos=group_tokens,
-            title=title,
+            title=group_title,
             body=personalized_body,
             data=personalized_data,
             severity=severity,
@@ -944,6 +953,7 @@ async def send_alert(
     db: AsyncSession,
     redis,
     spike_event_id: Optional[str] = None,
+    cluster_title_ko: Optional[str] = None,
 ) -> dict:
     """
     v7 통합 알림 발송.
@@ -993,15 +1003,20 @@ async def send_alert(
             target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
         )
 
+        _title_en = f"⚠️ {cluster_title}"
+        _title_ko = f"⚠️ {cluster_title_ko or cluster_title}"
         sent_verified, invalid_v, failures_v = _split_and_send_with_context(
             token_infos=target_v.tokens,
-            title=f"⚠️ {cluster_title}",
-            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
+            title=_title_en,
+            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified",
             data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
             event_country=country_code,
             topic=cluster_topic,
             severity=severity,
             collapse_key=collapse_key,
+            title_ko=_title_ko,
+            body_ko=f"심각도 {severity} · KScore {kscore:.1f} · 신뢰 알림",
+            body_en=f"Severity {severity} · KScore {kscore:.1f} · Verified Alert",
         )
         await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
         all_invalid.extend(invalid_v)
@@ -1026,21 +1041,27 @@ async def send_alert(
             target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
         )
 
-        # combined일 때 body에 "추후 신뢰 인증될 수 있음" 안내 포함 여부
+        _title_en_f = f"🚨 {cluster_title}"
+        _title_ko_f = f"🚨 {cluster_title_ko or cluster_title}"
         if alert_kind == "fast" and not is_verified:
-            fast_body = f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림\n⏳ 추후 신뢰 인증 가능 / May be verified later"
+            _body_ko_f = f"심각도 {severity} · 속보 알림\n⏳ 추후 신뢰 인증 가능"
+            _body_en_f = f"Severity {severity} · Fast Alert\n⏳ May be verified later"
         else:
-            fast_body = f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림"
+            _body_ko_f = f"심각도 {severity} · 속보 알림"
+            _body_en_f = f"Severity {severity} · Fast Alert"
 
         sent_fast, invalid_f, failures_f = _split_and_send_with_context(
             token_infos=target_f.tokens,
-            title=f"🚨 {cluster_title}",
-            base_body=fast_body,
+            title=_title_en_f,
+            base_body=_body_en_f,
             data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
             event_country=country_code,
             topic=cluster_topic,
             severity=severity,
             collapse_key=collapse_key,
+            title_ko=_title_ko_f,
+            body_ko=_body_ko_f,
+            body_en=_body_en_f,
         )
         await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
         all_invalid.extend(invalid_f)

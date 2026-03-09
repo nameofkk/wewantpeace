@@ -874,6 +874,7 @@ def push_alert(self, cluster_id: str, alert_kind: str = "fast"):
                     alert_kind=alert_kind,
                     db=db,
                     redis=redis,
+                    cluster_title_ko=cluster.title_ko,
                 )
 
                 # 인앱 알림 저장
