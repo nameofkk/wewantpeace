@@ -5,7 +5,7 @@ import { Bell, X, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { cn, TOPIC_LABELS } from "@/lib/utils";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, useMyPreferences } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
 const POLL_INTERVAL = 60_000;
@@ -115,6 +115,12 @@ function markSeenTension(key: string) {
 
 export function NewEventBanner() {
   const lang = useAppStore((s) => s.lang);
+  const { data: prefs } = useMyPreferences();
+  const minKscoreRef = useRef(1);
+  // 사용자의 KScore 임계값을 ref에 동기화 (비로그인 시 기본 1)
+  useEffect(() => {
+    if (prefs?.min_kscore != null) minKscoreRef.current = prefs.min_kscore;
+  }, [prefs?.min_kscore]);
   const [banner, setBanner] = useState<BannerData | null>(null);
   const [visible, setVisible] = useState(false);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,9 +164,10 @@ export function NewEventBanner() {
         }
       } catch {}
 
-      // 이슈 배너
+      // 이슈 배너 (사용자 KScore 필터 기준)
+      const userKscore = minKscoreRef.current;
       const res = await fetch(
-        `${API_BASE}/trending/peek?min_kscore=1&since=${encodeURIComponent(since)}`
+        `${API_BASE}/trending/peek?min_kscore=${userKscore}&since=${encodeURIComponent(since)}`
       );
       if (!res.ok) return;
 
