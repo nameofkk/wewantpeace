@@ -31,7 +31,8 @@ async def execute_fix(action: str, params: dict) -> str:
         "cleanup_redis_keys": _fix_cleanup_redis_keys,
         "reprocess_orphans": _fix_reprocess_orphans,
         "retry_sns_publish": _fix_retry_sns_publish,
-        "retry_spike_alerts": _fix_retry_spike_alerts,
+        "retry_alerts": _fix_retry_alerts,
+        "retry_spike_alerts": _fix_retry_alerts,  # 하위호환
     }
 
     handler = handlers.get(action)
@@ -508,50 +509,54 @@ async def _fix_retry_sns_publish(params: dict) -> str:
         raise
 
 
-# ── Action: retry_spike_alerts ──────────────────────────────────────────────
+# ── Action: retry_alerts (v7: KScore 기반) ──────────────────────────────
 
 
-async def _fix_retry_spike_alerts(params: dict) -> str:
-    """미전송 스파이크 알림을 재발송 트리거."""
+async def _fix_retry_alerts(params: dict) -> str:
+    """v7: 미전송 KScore 알림을 재발송 트리거."""
     try:
         async with AsyncSessionLocal() as db:
-            # severity >= 50, 최근 6시간, alert_delivery_log에 sent 기록 없는 스파이크
             q = await db.execute(
                 text("""
-                    SELECT se.id, se.cluster_id FROM spike_events se
-                    WHERE se.severity >= 50
-                      AND se.triggered_at >= NOW() - INTERVAL '6 hours'
+                    SELECT ic.id FROM issue_clusters ic
+                    WHERE ic.kscore >= 5.0
+                      AND ic.severity >= 50
+                      AND ic.is_active = true
+                      AND ic.last_event_at >= NOW() - INTERVAL '6 hours'
                       AND NOT EXISTS (
                           SELECT 1 FROM alert_delivery_log adl
-                          WHERE adl.spike_event_id = se.id
+                          WHERE adl.cluster_id = ic.id
                             AND adl.decision = 'sent'
+                            AND adl.created_at >= NOW() - INTERVAL '6 hours'
                       )
                 """)
             )
             rows = q.fetchall()
 
             if not rows:
-                return "재발송 대상 스파이크 없음"
+                return "재발송 대상 알림 없음"
 
-        # 각 스파이크에 대해 push_spike_alert Celery 태스크 전송
         from worker.celery_app import app as celery_app
 
         triggered = 0
         for row in rows:
             try:
                 celery_app.send_task(
-                    "worker.tasks.push_spike_alert",
-                    args=[str(row.cluster_id)],
-                    kwargs={"spike_event_id": str(row.id)},
+                    "worker.tasks.push_alert",
+                    args=[str(row.id), "fast"],
                     queue="process",
                 )
                 triggered += 1
             except Exception as e:
-                logger.warning("스파이크 알림 재발송 실패 [%s]: %s", row.id, e)
+                logger.warning("알림 재발송 실패 [%s]: %s", row.id, e)
 
-        return f"스파이크 알림 재발송 트리거: {triggered}/{len(rows)}건"
+        return f"KScore 알림 재발송 트리거: {triggered}/{len(rows)}건"
 
     except Exception as e:
         if "does not exist" in str(e) or "relation" in str(e).lower():
-            return "spike_events/alert_delivery_log 테이블 미발견"
+            return "alert_delivery_log 테이블 미발견"
         raise
+
+
+# 하위호환
+_fix_retry_spike_alerts = _fix_retry_alerts

@@ -386,7 +386,7 @@ def process_raw_event(self, raw_event_id: str):
         from worker.processor.normalizer import normalize, is_relevant
         from worker.processor.deduplicator import check_duplicate
         from worker.processor.clusterer import assign_cluster
-        from worker.processor.spike_detector import evaluate_spike
+        from worker.processor.calibration import KSCORE_MIN
         from backend.app.core.redis import get_redis
 
         async with AsyncSessionLocal() as db:
@@ -559,48 +559,38 @@ def process_raw_event(self, raw_event_id: str):
                 db.add(ne)
                 await db.flush()
 
-                # 6. 중복 아닌 경우 클러스터 할당 + 스파이크 평가
+                # 6. 중복 아닌 경우 클러스터 할당 + KScore 기반 알림 트리거
                 cluster_id = None
-                is_spike = False
-                spike_event_id = None
 
                 just_verified = False
-                is_new_spike = False
+                should_alert_fast = False
                 if not is_dup:
                     cluster, just_verified = await assign_cluster(ne, db)
                     if cluster is not None:
                         cluster_id = str(cluster.id)
 
-                        # 스파이크 감지 (누적 기반) — 이미 스파이크인 클러스터는 스킵
-                        if not cluster.is_spike:
+                        # v7: KScore 기반 알림 트리거 (스파이크 감지 대체)
+                        from worker.processor.calibration import ALERT_SEVERITY_MIN
+                        if cluster.kscore >= KSCORE_MIN and cluster.severity >= ALERT_SEVERITY_MIN:
                             try:
                                 redis = get_redis()
-                                is_spike, spike_event_id = await evaluate_spike(
-                                    cluster_id=cluster_id,
-                                    severity=cluster.severity,
-                                    event_count=cluster.event_count,
-                                    independent_sources=cluster.independent_sources or 1,
-                                    first_event_at=cluster.first_event_at,
-                                    kscore=cluster.kscore,
-                                    redis=redis,
-                                )
-                                if is_spike:
-                                    cluster.is_spike = True
-                                    cluster.spike_at = datetime.now(timezone.utc)
-                                    is_new_spike = True
+                                fast_key = f"alert:fast:{cluster_id}"
+                                if not await redis.exists(fast_key):
+                                    should_alert_fast = True
                             except Exception as e:
-                                logger.warning("스파이크 감지 오류 (무시): %s", e)
+                                logger.warning("KScore 알림 트리거 체크 오류 (무시): %s", e)
 
                 # 7. 처리 완료 플래그
                 raw_event.processed = True
 
-        # 새 스파이크만 알림 태스크 체이닝 (트랜잭션 밖에서)
-        if is_new_spike and cluster_id:
-            push_spike_alert.delay(cluster_id, spike_event_id)
+        # v7: KScore 기반 알림 태스크 체이닝 (트랜잭션 밖에서)
+        if should_alert_fast and cluster_id:
+            alert_kind = "combined" if cluster.is_verified else "fast"
+            push_alert.delay(cluster_id, alert_kind)
 
         # 공식확인 전환 시 verified 알림 태스크 체이닝
         if just_verified and cluster_id:
-            push_verified_alert.delay(cluster_id)
+            push_alert.delay(cluster_id, "verified")
 
         return {
             "status": "ok",
@@ -609,7 +599,6 @@ def process_raw_event(self, raw_event_id: str):
             "cluster_id": cluster_id,
             "topic": norm.topic,
             "severity": norm.severity,
-            "is_spike": is_spike,
         }
 
     try:
@@ -782,9 +771,7 @@ def reprocess_orphans(self):
         from backend.app.models.normalized_event import NormalizedEvent
         from backend.app.models.issue_cluster import ClusterEvent
         from worker.processor.clusterer import assign_cluster
-        from worker.processor.spike_detector import evaluate_spike
-        from backend.app.core.redis import get_redis
-        from datetime import datetime, timezone, timedelta, timedelta
+        from datetime import datetime, timezone, timedelta
 
         reassigned = 0
         skipped = 0
@@ -813,23 +800,6 @@ def reprocess_orphans(self):
                         cluster, _ = await assign_cluster(ev, db)
                         if cluster:
                             reassigned += 1
-                            # 스파이크 재평가 (누적 기반)
-                            try:
-                                redis = get_redis()
-                                is_spike, _spike_eid = await evaluate_spike(
-                                    cluster_id=str(cluster.id),
-                                    severity=cluster.severity,
-                                    event_count=cluster.event_count,
-                                    independent_sources=cluster.independent_sources or 1,
-                                    first_event_at=cluster.first_event_at,
-                                    kscore=cluster.kscore,
-                                    redis=redis,
-                                )
-                                if is_spike and not cluster.is_spike:
-                                    cluster.is_spike = True
-                                    cluster.spike_at = datetime.now(timezone.utc)
-                            except Exception:
-                                pass
                         else:
                             skipped += 1
                     except Exception as e:
@@ -867,19 +837,19 @@ def reprocess_orphans(self):
 
 
 @app.task(
-    name="worker.tasks.push_spike_alert",
+    name="worker.tasks.push_alert",
     queue="process",
     bind=True,
     max_retries=2,
 )
-def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
-    """스파이크 알림 발송."""
+def push_alert(self, cluster_id: str, alert_kind: str = "fast"):
+    """v7: KScore 기반 통합 알림 발송. alert_kind: 'fast' | 'verified' | 'combined'"""
 
     async def _run():
         import uuid
         from sqlalchemy import select
         from backend.app.models.issue_cluster import IssueCluster
-        from worker.push.push_service import send_spike_alert
+        from worker.push.push_service import send_alert, save_in_app_notifications
         from backend.app.core.redis import get_redis
 
         async with AsyncSessionLocal() as db:
@@ -889,11 +859,11 @@ def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
                 )
                 cluster = result.scalar_one_or_none()
                 if not cluster:
-                    logger.warning("push_spike_alert: cluster 없음 %s", cluster_id)
+                    logger.warning("push_alert: cluster 없음 %s", cluster_id)
                     return {"status": "not_found"}
 
                 redis = get_redis()
-                result = await send_spike_alert(
+                result = await send_alert(
                     cluster_id=cluster_id,
                     cluster_title=cluster.title,
                     country_code=cluster.country_code,
@@ -901,88 +871,37 @@ def push_spike_alert(self, cluster_id: str, spike_event_id: str | None = None):
                     kscore=cluster.kscore,
                     is_verified=cluster.is_verified,
                     cluster_topic=cluster.topic,
+                    alert_kind=alert_kind,
                     db=db,
                     redis=redis,
-                    spike_event_id=spike_event_id,
                 )
 
                 # 인앱 알림 저장
-                from worker.push.push_service import save_in_app_notifications
+                notif_type = "verified" if alert_kind == "verified" else "fast"
                 await save_in_app_notifications(
                     cluster_id=cluster_id,
                     cluster_title=cluster.title_ko or cluster.title,
                     country_code=cluster.country_code,
-                    notif_type="spike",
+                    notif_type=notif_type,
                     db=db,
                     cluster_topic=cluster.topic,
                 )
 
-                logger.info("push_spike_alert 완료: %s", result)
+                logger.info("push_alert 완료: kind=%s result=%s", alert_kind, result)
                 return result
 
     try:
         return run_async(_run())
     except Exception as exc:
-        logger.error("push_spike_alert 오류 [%s]: %s", cluster_id, exc)
+        logger.error("push_alert 오류 [%s]: %s", cluster_id, exc)
         raise self.retry(exc=exc)
 
 
-@app.task(
-    name="worker.tasks.push_verified_alert",
-    queue="process",
-    bind=True,
-    max_retries=2,
+# 하위호환 alias
+push_spike_alert = push_alert
+push_verified_alert = lambda self_or_id, cluster_id=None: push_alert(
+    self_or_id if cluster_id is None else cluster_id, "verified"
 )
-def push_verified_alert(self, cluster_id: str):
-    """공식확인(verified) 전환 알림 발송."""
-
-    async def _run():
-        import uuid
-        from sqlalchemy import select
-        from backend.app.models.issue_cluster import IssueCluster
-        from worker.push.push_service import send_verified_alert, save_in_app_notifications
-        from backend.app.core.redis import get_redis
-
-        async with AsyncSessionLocal() as db:
-            async with db.begin():
-                result = await db.execute(
-                    select(IssueCluster).where(IssueCluster.id == uuid.UUID(cluster_id))
-                )
-                cluster = result.scalar_one_or_none()
-                if not cluster:
-                    logger.warning("push_verified_alert: cluster 없음 %s", cluster_id)
-                    return {"status": "not_found"}
-
-                redis = get_redis()
-                result = await send_verified_alert(
-                    cluster_id=cluster_id,
-                    cluster_title=cluster.title_ko or cluster.title,
-                    country_code=cluster.country_code,
-                    severity=cluster.severity,
-                    kscore=cluster.kscore,
-                    cluster_topic=cluster.topic,
-                    db=db,
-                    redis=redis,
-                )
-
-                # 인앱 알림 저장
-                await save_in_app_notifications(
-                    cluster_id=cluster_id,
-                    cluster_title=cluster.title_ko or cluster.title,
-                    country_code=cluster.country_code,
-                    notif_type="verified",
-                    db=db,
-                    cluster_topic=cluster.topic,
-                )
-
-                logger.info("push_verified_alert 완료: %s", result)
-                return result
-
-    try:
-        return run_async(_run())
-    except Exception as exc:
-        logger.error("push_verified_alert 오류 [%s]: %s", cluster_id, exc)
-        raise self.retry(exc=exc)
 
 
 @app.task(
@@ -1316,18 +1235,18 @@ def timeout_pending_deliveries(self):
 
 
 @app.task(
-    name="worker.tasks.build_missed_spike_summary",
+    name="worker.tasks.build_missed_alert_summary",
     queue="process",
     bind=True,
     max_retries=1,
 )
-def build_missed_spike_summary(self):
-    """suppressed(plan_locked/dnd) 기록에서 missed spike 요약 생성. primary 모드만."""
+def build_missed_alert_summary(self):
+    """suppressed(plan_locked/dnd/daily_limit) 기록에서 missed alert 요약 생성. primary 모드만."""
 
     async def _run():
         from sqlalchemy import select
         from backend.app.models.alert_delivery_log import AlertDeliveryLog
-        from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+        from backend.app.models.user_missed_spike import UserMissedAlertSummary
 
         # pipeline_mode='primary'만 집계 (PRD 9)
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
@@ -1336,7 +1255,7 @@ def build_missed_spike_summary(self):
                 result = await db.execute(
                     select(AlertDeliveryLog).where(
                         AlertDeliveryLog.decision == "suppressed",
-                        AlertDeliveryLog.suppression_reason.in_(["plan_locked", "dnd"]),
+                        AlertDeliveryLog.suppression_reason.in_(["plan_locked", "dnd", "daily_limit"]),
                         AlertDeliveryLog.pipeline_mode == "primary",
                         AlertDeliveryLog.created_at >= cutoff,
                     )
@@ -1345,33 +1264,37 @@ def build_missed_spike_summary(self):
 
                 created = 0
                 for log in logs:
-                    # 중복 체크
+                    # 중복 체크 (cluster_id 기반, spike_event_id 대체)
                     existing = await db.execute(
-                        select(UserMissedSpikeSummary).where(
-                            UserMissedSpikeSummary.user_id == log.user_id,
-                            UserMissedSpikeSummary.spike_event_id == log.spike_event_id,
+                        select(UserMissedAlertSummary).where(
+                            UserMissedAlertSummary.user_id == log.user_id,
+                            UserMissedAlertSummary.alert_cluster_id == log.cluster_id,
                         ).limit(1)
                     )
                     if existing.scalar_one_or_none():
                         continue
 
-                    summary = UserMissedSpikeSummary(
+                    summary = UserMissedAlertSummary(
                         user_id=log.user_id,
                         cluster_id=log.cluster_id,
-                        spike_event_id=log.spike_event_id,
+                        alert_cluster_id=log.cluster_id,
                         reason=log.suppression_reason,
                     )
                     db.add(summary)
                     created += 1
 
-                logger.info("build_missed_spike: %d건 생성", created)
+                logger.info("build_missed_alert: %d건 생성", created)
                 return {"created": created}
 
     try:
         return run_async(_run())
     except Exception as exc:
-        logger.error("build_missed_spike 오류: %s", exc)
+        logger.error("build_missed_alert 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# 하위호환 alias
+build_missed_spike_summary = build_missed_alert_summary
 
 
 @app.task(
@@ -2407,50 +2330,55 @@ def generate_daily_social(self):
 
 
 @app.task(
-    name="worker.tasks.generate_spike_social",
+    name="worker.tasks.generate_kscore_social",
     queue="process",
     bind=True,
     max_retries=1,
 )
-def generate_spike_social(self):
-    """미처리 스파이크 이벤트에 대한 SNS 포스트 생성."""
+def generate_kscore_social(self):
+    """v7: KScore >= 5.0 클러스터에 대한 SNS 포스트 생성 (SpikeEvent 테이블 조회 제거)."""
 
     async def _run():
-        from worker.social.config import SOCIAL_AUTOGEN_ENABLED, SPIKE_SOCIAL_SEVERITY_MIN
+        from worker.social.config import SOCIAL_AUTOGEN_ENABLED
+        from worker.processor.calibration import KSCORE_SOCIAL_MIN
         if not SOCIAL_AUTOGEN_ENABLED:
             return {"status": "disabled"}
 
         from sqlalchemy import select
-        from backend.app.models.spike_event import SpikeEvent
         from backend.app.models.issue_cluster import IssueCluster
         from backend.app.models.social_post import SocialPost
-        from worker.social.generators import generate_spike_alert
+        from worker.social.generators import generate_kscore_alert
         from worker.social.telegram_bot import send_review_message
 
         created = 0
         async with AsyncSessionLocal() as db:
             async with db.begin():
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
                 result = await db.execute(
-                    select(SpikeEvent, IssueCluster)
-                    .join(IssueCluster, SpikeEvent.cluster_id == IssueCluster.id)
-                    .where(SpikeEvent.severity >= SPIKE_SOCIAL_SEVERITY_MIN)
-                    .order_by(SpikeEvent.triggered_at.desc())
+                    select(IssueCluster)
+                    .where(
+                        IssueCluster.kscore >= KSCORE_SOCIAL_MIN,
+                        IssueCluster.severity >= 60,
+                        IssueCluster.is_active == True,
+                        IssueCluster.last_event_at >= cutoff,
+                    )
+                    .order_by(IssueCluster.kscore.desc())
                     .limit(10)
                 )
-                rows = result.all()
+                clusters = result.scalars().all()
 
                 posts_to_notify = []
                 today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                for spike, cluster in rows:
-                    # cluster_id + 날짜 기반 dedup (generate_spike_alert와 동일)
-                    dedup_key = f"spike_alert:{cluster.id}:{today}"
+                for cluster in clusters:
+                    # cluster_id + 날짜 기반 dedup (클러스터당 하루 1건)
+                    dedup_key = f"kscore_alert:{cluster.id}:{today}"
                     existing = await db.execute(
                         select(SocialPost).where(SocialPost.dedup_key == dedup_key)
                     )
                     if existing.scalar_one_or_none():
                         continue
 
-                    post = await generate_spike_alert(spike, cluster, db)
+                    post = await generate_kscore_alert(cluster, db)
                     if post:
                         posts_to_notify.append(post)
                         created += 1
@@ -2463,8 +2391,12 @@ def generate_spike_social(self):
     try:
         return run_async(_run())
     except Exception as exc:
-        logger.error("generate_spike_social 오류: %s", exc)
+        logger.error("generate_kscore_social 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# 하위호환 alias
+generate_spike_social = generate_kscore_social
 
 
 @app.task(

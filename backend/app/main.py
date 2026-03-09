@@ -92,7 +92,7 @@ async def _cleanup_stale_data():
                 for c in zero_clusters:
                     c.kscore, _ = _calc_kscore(
                         event_count=c.event_count,
-                        is_spike=c.is_spike,
+                        is_spike=False,  # v7: spike 비활성화
                         confidence=c.confidence,
                         severity=c.severity,
                         independent_sources=c.independent_sources or 1,

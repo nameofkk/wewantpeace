@@ -10,7 +10,7 @@ const FALLBACK_COOLDOWN_MS = 60 * 60 * 1000; // 서버 장애 폴백: 1시간
 
 type PaywallTrigger =
   | "map_locked"
-  | "fast_locked"
+  | "verified_locked"
   | "kscore_threshold_locked"
   | "watch_country_limit_locked";
 
@@ -73,7 +73,7 @@ export function applyFallbackCooldown(): void {
   try {
     const now = String(Date.now());
     localStorage.setItem(getCooldownKey("map_locked"), now);
-    localStorage.setItem(getCooldownKey("fast_locked"), now);
+    localStorage.setItem(getCooldownKey("verified_locked"), now);
     localStorage.setItem(getCooldownKey("kscore_threshold_locked"), now);
     localStorage.setItem(getCooldownKey("watch_country_limit_locked"), now);
   } catch {

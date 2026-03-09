@@ -291,7 +291,6 @@ async def trending_top(
             IssueCluster.topic,
             IssueCluster.lat,
             IssueCluster.lon,
-            IssueCluster.is_spike,
             IssueCluster.last_event_at,
             IssueCluster.image_url,
         )
@@ -315,7 +314,7 @@ async def trending_top(
                 "topic": r.topic,
                 "lat": r.lat,
                 "lon": r.lon,
-                "is_spike": r.is_spike,
+                "is_spike": False,  # v7: deprecated
                 "last_event_at": r.last_event_at.isoformat() if r.last_event_at else None,
                 "image_url": r.image_url,
             }

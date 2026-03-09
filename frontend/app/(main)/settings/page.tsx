@@ -175,7 +175,7 @@ export default function SettingsPage() {
   const [deleteInput, setDeleteInput] = useState("");
 
   // ── PaywallModal 훅 ──────────────────────────────────────────
-  const fastPaywall = usePaywall("fast_locked");
+  const verifiedPaywall = usePaywall("verified_locked");
   const kscorePaywall = usePaywall("kscore_threshold_locked");
   const watchCountryPaywall = usePaywall("watch_country_limit_locked");
 
@@ -637,74 +637,31 @@ export default function SettingsPage() {
                                 {!hasFCMToken && (
                                   <p className="text-[9px] text-muted-foreground">{t(lang, "settings_push_off_hint")}</p>
                                 )}
-                                {/* Verified 토글 */}
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => patchArea.mutate({ id: area.id, body: { notify_verified: !area.notify_verified } })}
-                                      disabled={!hasFCMToken}
-                                      className={cn(
-                                        "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
-                                        !hasFCMToken ? "bg-muted cursor-not-allowed"
-                                          : area.notify_verified ? "bg-green-500" : "bg-muted"
-                                      )}
-                                    >
-                                      <div className={cn(
-                                        "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
-                                        hasFCMToken && area.notify_verified ? "translate-x-3.5" : "translate-x-0.5"
-                                      )} />
-                                    </button>
-                                    <span className={cn("text-[11px]", hasFCMToken && area.notify_verified ? "text-green-400" : "text-muted-foreground")}>
-                                      {area.notify_verified
-                                        ? (t(lang, "settings_verified_on"))
-                                        : (t(lang, "settings_verified_off"))}
-                                    </span>
-                                    <button
-                                      onClick={() => setOpenInfo(openInfo === `verified-${code}` ? null : `verified-${code}`)}
-                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none pointer-events-auto"
-                                    >
-                                      ⓘ
-                                    </button>
-                                  </div>
-                                  {openInfo === `verified-${code}` && (
-                                    <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
-                                      {t(lang, "settings_verified_info")}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Fast 토글 */}
+                                {/* Fast 토글 — 모든 플랜에서 사용 가능 */}
                                 <div>
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => {
-                                        if (plan === "free") {
-                                          fastPaywall.show();
-                                          return;
-                                        }
                                         if (hasFCMToken) patchArea.mutate({ id: area.id, body: { notify_fast: !area.notify_fast } });
                                       }}
-                                      disabled={!hasFCMToken && plan !== "free"}
+                                      disabled={!hasFCMToken}
                                       className={cn(
                                         "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
-                                        plan === "free" ? "bg-muted opacity-60 cursor-pointer"
-                                          : !hasFCMToken ? "bg-muted opacity-40 cursor-not-allowed"
+                                        !hasFCMToken ? "bg-muted cursor-not-allowed"
                                           : area.notify_fast ? "bg-orange-500" : "bg-muted"
                                       )}
                                     >
                                       <div className={cn(
                                         "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
-                                        area.notify_fast && plan !== "free" && hasFCMToken ? "translate-x-3.5" : "translate-x-0.5"
+                                        hasFCMToken && area.notify_fast ? "translate-x-3.5" : "translate-x-0.5"
                                       )} />
                                     </button>
                                     <span className={cn(
                                       "text-[11px]",
-                                      (plan === "free" || !hasFCMToken) ? "text-muted-foreground/40"
+                                      !hasFCMToken ? "text-muted-foreground"
                                         : area.notify_fast ? "text-orange-400" : "text-muted-foreground"
                                     )}>
-                                      {plan === "free"
-                                        ? (t(lang, "settings_fast_pro_only"))
-                                        : area.notify_fast
+                                      {area.notify_fast
                                         ? (t(lang, "settings_fast_on"))
                                         : (t(lang, "settings_fast_off"))}
                                     </span>
@@ -718,6 +675,55 @@ export default function SettingsPage() {
                                   {openInfo === `fast-${code}` && (
                                     <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
                                       {t(lang, "settings_fast_info")}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Verified 토글 — Free 사용자 잠금 */}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        if (plan === "free") {
+                                          verifiedPaywall.show();
+                                          return;
+                                        }
+                                        if (hasFCMToken) patchArea.mutate({ id: area.id, body: { notify_verified: !area.notify_verified } });
+                                      }}
+                                      disabled={!hasFCMToken && plan !== "free"}
+                                      className={cn(
+                                        "h-4 w-7 rounded-full relative flex-shrink-0 transition-colors",
+                                        plan === "free" ? "bg-muted opacity-60 cursor-pointer"
+                                          : !hasFCMToken ? "bg-muted opacity-40 cursor-not-allowed"
+                                          : area.notify_verified ? "bg-green-500" : "bg-muted"
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "h-3 w-3 rounded-full bg-white absolute top-0.5 transition-transform",
+                                        area.notify_verified && plan !== "free" && hasFCMToken ? "translate-x-3.5" : "translate-x-0.5"
+                                      )} />
+                                    </button>
+                                    <span className={cn(
+                                      "text-[11px]",
+                                      (plan === "free" || !hasFCMToken) ? "text-muted-foreground/40"
+                                        : area.notify_verified ? "text-green-400" : "text-muted-foreground"
+                                    )}>
+                                      {plan === "free"
+                                        ? (t(lang, "settings_verified_pro_only"))
+                                        : area.notify_verified
+                                        ? (t(lang, "settings_verified_on"))
+                                        : (t(lang, "settings_verified_off"))}
+                                    </span>
+                                    <button
+                                      onClick={() => setOpenInfo(openInfo === `verified-${code}` ? null : `verified-${code}`)}
+                                      className="ml-auto text-[11px] text-muted-foreground/60 hover:text-muted-foreground leading-none pointer-events-auto"
+                                    >
+                                      ⓘ
+                                    </button>
+                                  </div>
+                                  {openInfo === `verified-${code}` && (
+                                    <p className="mt-1 ml-9 text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1">
+                                      {t(lang, "settings_verified_info")}
                                     </p>
                                   )}
                                 </div>
@@ -1213,7 +1219,7 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { icon: "🗺️", ko: "실시간 이슈 지도", en: "Real-time map" },
-                    { icon: "⚡", ko: "속보 알림", en: "Fast alerts" },
+                    { icon: "✅", ko: "신뢰 알림", en: "Verified alerts" },
                     { icon: "📊", ko: "KScore 필터", en: "KScore filter" },
                     { icon: "🔕", ko: "방해금지 시간", en: "Quiet hours" },
                     { icon: "📍", ko: `관심 국가 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} countries` },
@@ -1226,6 +1232,59 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* 플랜별 알림 기능 비교 테이블 */}
+            <div className="mt-4 rounded-lg border border-border overflow-hidden">
+              <div className="bg-muted/30 px-3 py-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {t(lang, "settings_plan_comparison_title")}
+                </p>
+              </div>
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-3 py-1.5 text-muted-foreground font-medium" />
+                    <th className="text-center px-2 py-1.5 text-muted-foreground font-medium">Free</th>
+                    <th className="text-center px-2 py-1.5 text-yellow-400 font-medium">Pro</th>
+                    <th className="text-center px-2 py-1.5 text-purple-400 font-medium">Pro+</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  <tr>
+                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_fast")}</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_verified")}</td>
+                    <td className="text-center py-1.5 text-muted-foreground/40">
+                      <Lock className="h-3 w-3 mx-auto" />
+                    </td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_daily_limit")}</td>
+                    <td className="text-center py-1.5 font-mono">5</td>
+                    <td className="text-center py-1.5 font-mono">20</td>
+                    <td className="text-center py-1.5 font-mono">100</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_critical")}</td>
+                    <td className="text-center py-1.5 text-muted-foreground/40">—</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                    <td className="text-center py-1.5 text-green-400">✓</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-1.5 text-muted-foreground">{t(lang, "settings_plan_feature_kscore_range")}</td>
+                    <td className="text-center py-1.5 font-mono text-muted-foreground/60">3.0 {t(lang, "settings_plan_fixed")}</td>
+                    <td className="text-center py-1.5 font-mono">3.0–10.0</td>
+                    <td className="text-center py-1.5 font-mono">1.5–10.0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
             {/* 플랜 변경/업그레이드 버튼 */}
             {plan === "free" && (
@@ -1426,7 +1485,7 @@ export default function SettingsPage() {
           </p>
 
           {/* ── PaywallModal들 ──────────────────────────────────────── */}
-          <PaywallModal trigger="fast_locked" isOpen={fastPaywall.isOpen} onClose={fastPaywall.close} />
+          <PaywallModal trigger="verified_locked" isOpen={verifiedPaywall.isOpen} onClose={verifiedPaywall.close} />
           <PaywallModal trigger="kscore_threshold_locked" isOpen={kscorePaywall.isOpen} onClose={kscorePaywall.close} />
           <PaywallModal trigger="watch_country_limit_locked" isOpen={watchCountryPaywall.isOpen} onClose={watchCountryPaywall.close} />
 

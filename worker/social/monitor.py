@@ -160,25 +160,27 @@ async def _check_push_failures(db: AsyncSession) -> CheckResult:
 
 
 async def _check_unpublished_spikes(db: AsyncSession) -> CheckResult:
-    """8. 미발행 스파이크."""
+    """8. v7: 미발행 고KScore 클러스터 (KScore >= 5.0)."""
     result = await db.execute(
         text("""
-            SELECT COUNT(*) FROM spike_events se
-            JOIN issue_clusters ic ON se.cluster_id = ic.id
+            SELECT COUNT(*) FROM issue_clusters ic
             WHERE ic.severity >= 70
-              AND se.triggered_at >= NOW() - INTERVAL '6 hours'
+              AND ic.kscore >= 5.0
+              AND ic.is_active = true
+              AND ic.last_event_at >= NOW() - INTERVAL '6 hours'
               AND NOT EXISTS (
                   SELECT 1 FROM social_posts sp
-                  WHERE sp.source_spike_id = se.id
+                  WHERE sp.source_cluster_id = ic.id
+                    AND sp.created_at >= NOW() - INTERVAL '24 hours'
               )
         """)
     )
     count = result.scalar() or 0
     ok = count == 0
     return CheckResult(
-        "unpublished_spikes",
+        "unpublished_alerts",
         ok,
-        "모든 스파이크 처리됨" if ok else f"미발행 스파이크: {count}건 (severity≥70)",
+        "모든 고KScore 클러스터 처리됨" if ok else f"미발행 알림: {count}건 (KScore≥5.0, severity≥70)",
     )
 
 

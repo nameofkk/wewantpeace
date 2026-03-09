@@ -31,7 +31,7 @@ interface PipelineStats {
   duplicates_24h: number;
   active_clusters: number;
   noise_clusters: number;
-  spike_clusters: number;
+  spike_clusters: number;  // backend API field name retained
   push_tokens: number;
   push_web: number;
   push_android: number;
@@ -58,7 +58,6 @@ interface ClusterItem {
   severity: number;
   kscore: number;
   country_code: string;
-  is_spike: boolean;
 }
 
 interface TrendingItem {
@@ -120,7 +119,7 @@ const HEALTH_RING: Record<Health, string> = { green: "ring-green-500/30", yellow
 /* ─── stage config ─── */
 const STAGE_KEYS = [
   "pipeline_stage_collect", "pipeline_stage_normalize", "pipeline_stage_dedup",
-  "pipeline_stage_cluster", "pipeline_stage_spike", "pipeline_stage_alert_delivery",
+  "pipeline_stage_cluster", "pipeline_stage_kscore_alert", "pipeline_stage_alert_delivery",
   "pipeline_stage_kscore", "pipeline_stage_tension", "pipeline_stage_trending",
   "pipeline_stage_push", "pipeline_stage_orphan",
 ] as const;
@@ -484,7 +483,7 @@ export default function AdminPipelinePage() {
           <div className="grid grid-cols-3 gap-2">
             <Pill label={t(lang, "pipeline_active_clusters")} value={stats?.active_clusters ?? 0} />
             <Pill label={t(lang, "pipeline_noise_clusters")} value={stats?.noise_clusters ?? 0} warn={(stats?.noise_clusters ?? 0) > 10} />
-            <Pill label={t(lang, "pipeline_spike_clusters")} value={stats?.spike_clusters ?? 0} />
+            <Pill label={t(lang, "pipeline_kscore_alert_clusters")} value={stats?.spike_clusters ?? 0} />
           </div>
           {clusters.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -541,9 +540,9 @@ export default function AdminPipelinePage() {
 
         <Arrow label="pipeline_label_clustered" lang={lang} />
 
-        {/* Stage 4: 스파이크 */}
+        {/* Stage 4: KScore 알림 */}
         <StageCard index={4} lang={lang} health={getStageHealth(stats, 4)} sectionRef={(el) => (sectionRefs.current[4] = el)}>
-          <Pill label={t(lang, "pipeline_spike_clusters")} value={stats?.spike_clusters ?? 0} warn={(stats?.spike_clusters ?? 0) > 2} />
+          <Pill label={t(lang, "pipeline_kscore_alert_clusters")} value={stats?.spike_clusters ?? 0} warn={(stats?.spike_clusters ?? 0) > 2} />
           {spikeClusters.length > 0 ? (
             <div className="mt-2 space-y-1">
               {spikeClusters.map((c) => (
@@ -561,7 +560,7 @@ export default function AdminPipelinePage() {
           ) : (
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
               <CheckCircle className="h-3 w-3 text-green-500" />
-              {t(lang, "pipeline_no_spikes")}
+              {t(lang, "pipeline_no_kscore_alerts")}
             </p>
           )}
         </StageCard>
@@ -579,17 +578,17 @@ export default function AdminPipelinePage() {
             <Pill label={t(lang, "pipeline_alert_suppressed")} value={stats?.alert_suppressed_6h ?? 0} />
           </div>
 
-          {/* 스파이크 알림 전달 */}
-          <p className="text-[10px] font-medium text-muted-foreground mb-1 mt-3">{t(lang, "pipeline_alert_spike")}</p>
+          {/* KScore 알림 전달 */}
+          <p className="text-[10px] font-medium text-muted-foreground mb-1 mt-3">{t(lang, "pipeline_alert_kscore")}</p>
           <div className="grid grid-cols-3 gap-2">
-            <Pill label={t(lang, "pipeline_alert_spike_total")} value={stats?.spike_total_6h ?? 0} />
-            <Pill label={t(lang, "pipeline_alert_spike_delivered")} value={stats?.spike_delivered_6h ?? 0} />
-            <Pill label={t(lang, "pipeline_alert_spike_undelivered")} value={stats?.spike_undelivered_6h ?? 0} warn={(stats?.spike_undelivered_6h ?? 0) > 0} />
+            <Pill label={t(lang, "pipeline_alert_kscore_total")} value={stats?.spike_total_6h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_kscore_delivered")} value={stats?.spike_delivered_6h ?? 0} />
+            <Pill label={t(lang, "pipeline_alert_kscore_undelivered")} value={stats?.spike_undelivered_6h ?? 0} warn={(stats?.spike_undelivered_6h ?? 0) > 0} />
           </div>
           {(stats?.spike_undelivered_6h ?? 0) > 0 && (
             <p className="text-[10px] text-red-400 flex items-center gap-1 mt-1">
               <AlertTriangle className="h-3 w-3" />
-              {t(lang, "pipeline_alert_spike_warning")}
+              {t(lang, "pipeline_alert_kscore_warning")}
             </p>
           )}
 

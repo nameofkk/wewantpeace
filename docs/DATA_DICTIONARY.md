@@ -77,8 +77,8 @@ Groups of related normalized_events, aggregated by topic + geohash + time window
 | severity | SMALLINT | No | Maximum severity among member events (0-100) |
 | confidence | FLOAT | No | Weighted confidence score |
 | kscore | FLOAT | No | KScore value 0-10 (see [KScore Formula](#kscore-formula)) |
-| is_spike | BOOLEAN | No | Whether a spike was detected (sudden event surge) |
-| spike_at | TIMESTAMPTZ | Yes | When the spike was detected |
+| is_spike | BOOLEAN | No | Whether a KScore-based alert was triggered (sudden event surge). *Legacy field name retained for backward compatibility.* |
+| spike_at | TIMESTAMPTZ | Yes | When the KScore alert was triggered. *Legacy field name retained for backward compatibility.* |
 | source_tiers | TEXT[] | No | Array of distinct source tiers (e.g. `["A","B","C"]`) |
 | independent_sources | INTEGER | No | Count of distinct source_channels contributing events |
 | first_event_at | TIMESTAMPTZ | No | Earliest event_time in the cluster |
@@ -129,7 +129,7 @@ Periodically computed trending issues ranked by KScore. Calculated every 5 minut
 | cluster_ids | UUID[] | No | Array of source cluster UUIDs |
 | event_count | INTEGER | No | Number of events in the source cluster |
 | severity | INTEGER | No | Severity of the source cluster (0-100) |
-| is_spike | BOOLEAN | No | Whether the source cluster has a spike |
+| is_spike | BOOLEAN | No | Whether the source cluster triggered a KScore alert |
 | scope | VARCHAR(64) | No | Scope identifier: `global` or user-specific |
 | calculated_at | TIMESTAMPTZ | No | When this KScore was computed |
 | valid_until | TIMESTAMPTZ | No | Expiration timestamp for this entry |
@@ -170,22 +170,22 @@ Raw = 0.55 * EventScore + 0.35 * ActivityScore + 0.10 * Spillover
 
 ---
 
-### spike_events
+### spike_events (KScore Alert Events)
 
-Records detected spike events -- sudden surges in event volume for a cluster.
+Records KScore-based alert events -- sudden surges in event volume for a cluster. *Table name `spike_events` retained for backward compatibility.*
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | id | UUID | No | Primary key (auto-generated UUIDv4) |
 | cluster_id | UUID | No | FK to `issue_clusters.id` (CASCADE on delete) |
-| severity | SMALLINT | No | Severity at the time of spike detection |
-| kscore | FLOAT | No | KScore at the time of spike detection |
+| severity | SMALLINT | No | Severity at the time of KScore alert |
+| kscore | FLOAT | No | KScore at the time of alert |
 | c1 | INTEGER | No | Event count in the last 1 minute |
 | c10 | INTEGER | No | Event count in the last 10 minutes |
 | baseline | FLOAT | No | Historical baseline event rate |
-| ratio | FLOAT | No | c1/baseline ratio (spike magnitude) |
-| unique_sources | INTEGER | No | Number of distinct sources during the spike |
-| triggered_at | TIMESTAMPTZ | No | When the spike was detected |
+| ratio | FLOAT | No | c1/baseline ratio (alert magnitude) |
+| unique_sources | INTEGER | No | Number of distinct sources during the alert |
+| triggered_at | TIMESTAMPTZ | No | When the KScore alert was triggered |
 
 ---
 
@@ -266,7 +266,7 @@ Auto-generated social media post drafts based on trending clusters.
 | image_url | VARCHAR(1024) | Yes | Attached image URL |
 | risk_level | VARCHAR(8) | No | Content risk: `low`, `medium`, `high` |
 | source_cluster_id | UUID | Yes | FK to `issue_clusters.id` |
-| source_spike_id | UUID | Yes | FK to `spike_events.id` |
+| source_spike_id | UUID | Yes | FK to `spike_events.id` (KScore alert event) |
 | dedup_key | VARCHAR(128) | No | Unique key to prevent duplicate posts |
 | status | VARCHAR(16) | No | `pending_review`, `approved`, `published`, `rejected` |
 | created_at | TIMESTAMPTZ | No | Creation timestamp |
@@ -582,7 +582,7 @@ KScore = raw * 10 * decay
 
 | Component | Weight | Formula |
 |-----------|--------|---------|
-| velocity | 30% | `min(6.0, event_count^0.7 * spike_factor) / 6.0` |
+| velocity | 30% | `min(6.0, event_count^0.7 * alert_factor) / 6.0` |
 | quality | 10% | `min(1.0, confidence + tier_bonus)` |
 | severity | 30% | `severity / 100` |
 | spread | 30% | `min(1.0, independent_sources / 12)` |
@@ -646,7 +646,7 @@ Raw = 0.55 * EventScore + 0.35 * ActivityScore + 0.10 * Spillover
 | Type | Trigger | Description |
 |------|---------|-------------|
 | `verified` | Admin verifies a cluster in user's watched area | Confirmed-event alert |
-| `spike` | Spike detected in user's watched area | Sudden event surge alert |
+| `spike` | KScore alert triggered in user's watched area | KScore-based real-time alert |
 
 ---
 

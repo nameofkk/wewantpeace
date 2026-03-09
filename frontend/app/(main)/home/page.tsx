@@ -8,7 +8,7 @@ import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { calcImpactFactor } from "@/lib/impact-factors";
-import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedSpikes, useTensionAll, useMySubscription } from "@/lib/api";
+import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedAlerts, useTensionAll, useMySubscription } from "@/lib/api";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -97,7 +97,6 @@ interface TrendingItem {
   topic: string | null;
   country_codes: string[];
   cluster_ids?: string[];
-  is_spike?: boolean;
   event_count?: number;
   severity?: number;
   reason?: string;
@@ -174,7 +173,6 @@ function useElapsed(isoString?: string, lang: Lang = "ko") {
 // ── 트렌딩 신호 (KScore 3요소 개별 바) ───────────────────────────────────
 function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number }) {
   const lang = useAppStore((s) => s.lang);
-  const hasSpike = item.is_spike;
   const eventCount = item.event_count ?? 0;
   const spread = item.independent_sources ?? 1;
   const [filled, setFilled] = useState(false);
@@ -186,8 +184,8 @@ function TrendingSignals({ item, delay }: { item: TrendingItem; delay: number })
   const bars = [
     {
       label: t(lang, "signal_speed"),
-      value: Math.min(1.0, (eventCount / 10) * (hasSpike ? 1.5 : 1.0)),
-      display: hasSpike ? t(lang, "signal_count_spike", { n: eventCount }) : t(lang, "signal_count", { n: eventCount }),
+      value: Math.min(1.0, eventCount / 10),
+      display: t(lang, "signal_count", { n: eventCount }),
       color: "bg-blue-500",
       tooltip: t(lang, "signal_speed_tooltip"),
     },
@@ -759,9 +757,9 @@ function HomePageContent() {
     }
   }, [userPlan, storePlan, setUserPlan]);
 
-  // Sprint 3: 놓친 스파이크 배너
-  const { data: missedSpikes } = useMissedSpikes();
-  const missedCount = Array.isArray(missedSpikes) ? missedSpikes.length : 0;
+  // Sprint 3: 놓친 알림 배너
+  const { data: missedAlerts } = useMissedAlerts();
+  const missedCount = Array.isArray(missedAlerts) ? missedAlerts.length : 0;
   const paywall = usePaywall("map_locked");
 
   // Trial/Promo 배너
@@ -810,7 +808,6 @@ function HomePageContent() {
         topic: c.topic,
         country_codes: c.country_code ? [c.country_code] : [],
         cluster_ids: [c.id],
-        is_spike: c.is_spike,
         event_count: c.event_count,
         severity: c.severity,
         reason: "",
@@ -966,10 +963,10 @@ function HomePageContent() {
         >
           <Bell className="h-4 w-4 text-amber-500 shrink-0" />
           <span className="flex-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-            {t(lang, "missed_spike_banner", { n: missedCount })}
+            {t(lang, "missed_alert_banner", { n: missedCount })}
           </span>
           <span className="shrink-0 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 px-3 py-1 text-[10px] font-bold text-white">
-            {t(lang, "missed_spike_cta")}
+            {t(lang, "missed_alert_cta")}
           </span>
         </button>
       )}

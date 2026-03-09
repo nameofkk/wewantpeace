@@ -9,7 +9,7 @@ from backend.app.models.notification import Notification
 from backend.app.models.subscription import Subscription
 from backend.app.models.spike_event import SpikeEvent
 from backend.app.models.alert_delivery_log import AlertDeliveryLog
-from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+from backend.app.models.user_missed_spike import UserMissedAlertSummary, UserMissedSpikeSummary
 from backend.app.models.paywall_event import PaywallEvent
 from backend.app.models.app_event import AppEvent
 from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
@@ -33,6 +33,7 @@ __all__ = [
     "Subscription",
     "SpikeEvent",
     "AlertDeliveryLog",
+    "UserMissedAlertSummary",
     "UserMissedSpikeSummary",
     "PaywallEvent",
     "AppEvent",

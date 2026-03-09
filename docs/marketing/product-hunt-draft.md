@@ -4,7 +4,7 @@
 > See every conflict on Earth, scored for your country.
 
 ## Subtitle (200 chars max)
-> WeWantPeace monitors 195 countries in real-time, using AI to score how each crisis impacts you. Track tensions, get spike alerts, and explore an interactive conflict map -- all from one dashboard.
+> WeWantPeace monitors 195 countries in real-time, using AI to score how each crisis impacts you. Track tensions, get KScore-based real-time alerts, and explore an interactive conflict map -- all from one dashboard.
 
 ## Description (500 chars)
 
@@ -12,7 +12,7 @@ Every 5 minutes, WeWantPeace scans hundreds of RSS feeds and Telegram channels f
 
 **KScore** (0-10) tells you how much an issue matters from your country's perspective, factoring in geography, security alliances, and economic ties. The **Tension Index** (0-100) tracks each nation's risk level over time.
 
-Get push notifications when a spike is detected. Explore crises on an interactive global map. Free tier included -- no signup wall for core features.
+Get push notifications with KScore-based real-time alerts. Explore crises on an interactive global map. Free tier included -- no signup wall for core features.
 
 Built with Next.js, FastAPI, Celery, PostgreSQL, and GPT-4o-mini.
 
@@ -26,7 +26,7 @@ Built with Next.js, FastAPI, Celery, PostgreSQL, and GPT-4o-mini.
 
 > Hey PH! I built WeWantPeace because I was frustrated by how hard it is to get a clear, real-time picture of global security.
 >
-> Most conflict trackers are either academic (updated monthly) or paywalled. I wanted something that refreshes every 5 minutes, scores events for *my* country, and sends me a push when something spikes.
+> Most conflict trackers are either academic (updated monthly) or paywalled. I wanted something that refreshes every 5 minutes, scores events for *my* country, and sends me a push when KScore detects a critical escalation.
 >
 > The tech: ~200 RSS feeds + Telegram channels -> FastAPI worker pipeline -> GPT-4o-mini classification -> PostgreSQL + TimescaleDB -> Next.js frontend. All deployed on Railway.
 >

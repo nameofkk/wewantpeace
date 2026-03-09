@@ -55,7 +55,7 @@ function getCategories(lang: Lang): GlossaryCategory[] {
         { key: "kscore", label: t(lang, "glossary_kscore"), desc: t(lang, "glossary_kscore_desc") },
         { key: "severity", label: t(lang, "glossary_severity"), desc: t(lang, "glossary_severity_desc") },
         { key: "confidence", label: t(lang, "glossary_confidence"), desc: t(lang, "glossary_confidence_desc") },
-        { key: "spike", label: t(lang, "glossary_spike"), desc: t(lang, "glossary_spike_desc") },
+        { key: "kscore_alert", label: t(lang, "glossary_kscore_alert"), desc: t(lang, "glossary_kscore_alert_desc") },
       ],
     },
     {

@@ -73,8 +73,8 @@ function stageHealth(ps: PipelineStats | undefined, stage: number): Health {
 const HEALTH_BG: Record<Health, string> = { green: "bg-green-500", yellow: "bg-yellow-500", red: "bg-red-500" };
 const HEALTH_RING: Record<Health, string> = { green: "ring-green-500/30", yellow: "ring-yellow-500/30", red: "ring-red-500/30" };
 
-const STAGE_LABELS_KO = ["수집", "정규화", "중복제거", "클러스터", "스파이크", "KScore", "긴장도", "트렌딩", "푸시", "오펀"];
-const STAGE_LABELS_EN = ["Collect", "Normalize", "Dedup", "Cluster", "Spike", "KScore", "Tension", "Trending", "Push", "Orphan"];
+const STAGE_LABELS_KO = ["수집", "정규화", "중복제거", "클러스터", "KScore 알림", "KScore", "긴장도", "트렌딩", "푸시", "오펀"];
+const STAGE_LABELS_EN = ["Collect", "Normalize", "Dedup", "Cluster", "KScore Alert", "KScore", "Tension", "Trending", "Push", "Orphan"];
 
 export default function AdminDashboard() {
   const { lang } = useAppStore();

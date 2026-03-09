@@ -50,7 +50,8 @@ _SEV_COLORS = {
 
 _TYPE_CONFIG = {
     "daily_movers": ("DAILY BRIEF", _ACCENT),
-    "spike_alert": ("BREAKING", (239, 68, 68)),
+    "kscore_alert": ("BREAKING", (239, 68, 68)),
+    "spike_alert": ("BREAKING", (239, 68, 68)),  # 하위호환
     "weekly_recap": ("WEEKLY", (168, 85, 247)),
 }
 

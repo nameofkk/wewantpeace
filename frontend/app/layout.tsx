@@ -206,10 +206,10 @@ export default function RootLayout({
                     },
                     {
                       "@type": "Question",
-                      "name": "What is spike detection?",
+                      "name": "How does the KScore alert system work?",
                       "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "Spike detection is an automated system that identifies sudden surges in conflict or security events. When an issue's event count rapidly increases beyond normal patterns, it is flagged as a spike. Users receive real-time push notifications (via Firebase Cloud Messaging) for spikes related to their watched countries, ensuring they are alerted to breaking crises as they unfold.",
+                        "text": "The KScore alert system monitors global conflict and security events in real-time. When an issue's KScore exceeds the user's configured threshold and severity reaches a minimum level, users receive push notifications (via Firebase Cloud Messaging) for issues related to their watched countries. Fast alerts are available for all plans, while verified alerts (confirmed by trusted sources) are available for Pro and Pro+ plans.",
                       },
                     },
                     {
@@ -217,7 +217,7 @@ export default function RootLayout({
                       "name": "How often is the data updated?",
                       "acceptedAnswer": {
                         "@type": "Answer",
-                        "text": "Data is collected continuously: RSS feeds are polled every 5 minutes and Telegram channels every 3 minutes. The KScore trending rankings are recalculated every 15 minutes, and the Tension Index is updated every 5 minutes. Spike detection runs in real-time as new events are processed.",
+                        "text": "Data is collected continuously: RSS feeds are polled every 5 minutes and Telegram channels every 3 minutes. The KScore trending rankings are recalculated every 15 minutes, and the Tension Index is updated every 5 minutes. KScore-based alerts are processed in real-time as new events arrive.",
                       },
                     },
                   ],

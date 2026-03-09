@@ -17,7 +17,6 @@ export interface IssueServer {
   severity: number;
   confidence: number;
   event_count: number;
-  is_spike: boolean;
   is_verified: boolean;
   kscore: number;
   first_event_at: string;

@@ -52,7 +52,6 @@ interface Cluster {
   severity: number;
   confidence: number;
   event_count: number;
-  is_spike: boolean;
   is_verified: boolean;
   kscore: number;
   first_event_at: string;
@@ -122,7 +121,7 @@ function groupByPixelProximity(clusters: Cluster[], map: any, threshold: number)
     const group = indices.map((i) => clusters[i]);
     const lead = group.reduce((a, b) => (repScore(a) > repScore(b) ? a : b));
     const totalEvents = group.reduce((s, c) => s + (c.grouped_total_events ?? c.event_count), 0);
-    return { ...lead, grouped_total_events: totalEvents, severity: Math.max(...group.map((c) => c.severity)), kscore: Math.max(...group.map((c) => c.kscore)), is_spike: group.some((c) => c.is_spike), grouped_count: group.reduce((sum, c) => sum + (c.grouped_count ?? 1), 0) };
+    return { ...lead, grouped_total_events: totalEvents, severity: Math.max(...group.map((c) => c.severity)), kscore: Math.max(...group.map((c) => c.kscore)), grouped_count: group.reduce((sum, c) => sum + (c.grouped_count ?? 1), 0) };
   });
 }
 
@@ -155,7 +154,6 @@ function groupClustersByCountry(clusters: Cluster[]): Cluster[] {
       grouped_total_events: totalEvents,
       severity: Math.max(...group.map((c) => c.severity)),
       kscore: Math.max(...group.map((c) => c.kscore)),
-      is_spike: group.some((c) => c.is_spike),
       grouped_count: group.length,
     });
   });
@@ -182,11 +180,6 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <div className="flex items-center gap-1.5 flex-wrap mb-1">
-            {cluster.is_spike && (
-              <span className="flex items-center gap-1 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
-                <AlertTriangle className="h-2.5 w-2.5" /> {t(lang, "map_popup_spike")}
-              </span>
-            )}
             {cluster.is_verified && (
               <span className="rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
                 {t(lang, "map_popup_verified")}
@@ -612,8 +605,7 @@ export default function MapPage() {
         innerEl.style.cssText = `width:100%;height:100%;border-radius:50%;background-color:${color}22;border:2.5px solid ${color};cursor:pointer;display:flex;align-items:center;justify-content:center;color:${color};font-size:11px;font-weight:bold;transition:transform 0.15s;opacity:1;position:relative;will-change:transform;`;
         // 애니메이션은 다음 프레임에 적용 (초기 opacity:0 문제 방지)
         requestAnimationFrame(() => {
-          innerEl.className = "marker-enter"
-            + (cluster.is_spike ? " marker-spike" : "");
+          innerEl.className = "marker-enter";
         });
         innerEl.textContent = displayCount > 99 ? "99+" : String(displayCount);
         markerEl.appendChild(innerEl);
@@ -656,7 +648,6 @@ export default function MapPage() {
   }, [refetch]);
 
   const elapsed = useElapsed(lastFetchedAt, lang);
-  const spikeCount = clusters.filter((c) => c.is_spike).length;
 
   const LEGEND = [
     [t(lang, "map_level_stable"), "#10b981"],
@@ -686,12 +677,6 @@ export default function MapPage() {
                 <Layers className="h-3 w-3" />
                 {t(lang, "map_issues", { n: clusters.length })}
               </span>
-              {spikeCount > 0 && (
-                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400 shrink-0">
-                  <AlertTriangle className="h-2.5 w-2.5" />
-                  {t(lang, "map_spike", { n: spikeCount })}
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <button

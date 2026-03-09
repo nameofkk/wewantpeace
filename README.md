@@ -62,7 +62,7 @@ Fully responsive PWA — works on any device, installable as a native app on And
 - **AI Classification** — Automatic topic categorization, severity scoring, and country detection using OpenAI
 - **KScore (Key Impact Score)** — Proprietary 0-10 composite metric measuring Speed, Severity, and Spread
 - **Tension Index** — Country-level risk scores with daily trend tracking and acceleration detection
-- **Spike Detection** — Automatic identification of rapidly escalating events with instant push alerts
+- **KScore-based Real-time Alerts** — Automatic identification of rapidly escalating events with instant push notifications
 - **Interactive Conflict Map** — MapLibre GL-based visualization with cluster markers and pulse animations
 - **Push Notifications** — FCM-based alerts filtered by your countries, topics, and severity thresholds
 - **Community Forum** — Discussion board for analysis, questions, and debate
@@ -85,7 +85,7 @@ Fully responsive PWA — works on any device, installable as a native app on And
          │  normalize →     │
          │  deduplicate →   │
          │  cluster →       │
-         │  spike detect →  │
+         │  KScore alerts → │
          │  tension calc →  │
          │  trending →      │
          │  push alerts     │
@@ -118,7 +118,7 @@ Fully responsive PWA — works on any device, installable as a native app on And
 
 ```
 RSS/Telegram Collection → Normalization (topic/severity/geo) → Deduplication → Clustering
-    → Spike Detection → Trending Calculation → Tension Index → Push Notifications
+    → KScore Alerts → Trending Calculation → Tension Index → Push Notifications
 ```
 
 | Metric | Current |
@@ -142,7 +142,7 @@ wewantpeace/
 │   └── tests/              # pytest tests (173+ passing)
 ├── worker/
 │   ├── collector/          # RSS & Telegram collectors
-│   ├── processor/          # normalizer, clusterer, deduplicator, spike detector, tension calculator
+│   ├── processor/          # normalizer, clusterer, deduplicator, alert engine, tension calculator
 │   └── push/               # FCM push notification service
 ├── frontend/
 │   ├── app/(main)/         # User pages (home, map, tension, community, settings)
@@ -201,7 +201,7 @@ bash scripts/run_tests.sh -c        # With coverage report
 Our algorithms are fully documented in [METHODOLOGY.md](./METHODOLOGY.md), covering:
 - KScore calculation (Speed, Severity, Spread composite)
 - Tension Index formula (Events, Acceleration, Spillover)
-- Spike detection thresholds and alerting logic
+- KScore-based alert thresholds and alerting logic
 - Data quality scoring and source grading
 
 ## Contributing

@@ -37,7 +37,7 @@ class ClusterOut(BaseModel):
     severity: int
     confidence: float
     event_count: int
-    is_spike: bool
+    is_spike: bool = False  # v7: deprecated, always False
     is_verified: bool
     kscore: float
     independent_sources: int = 0
@@ -103,7 +103,7 @@ def _cluster_to_out(c: IssueCluster) -> ClusterOut:
         severity=c.severity,
         confidence=round(c.confidence, 3),
         event_count=c.event_count,
-        is_spike=c.is_spike,
+        is_spike=False,  # v7: deprecated
         is_verified=c.is_verified,
         kscore=round(c.kscore, 3),
         independent_sources=c.independent_sources or 0,

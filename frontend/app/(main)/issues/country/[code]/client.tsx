@@ -24,7 +24,6 @@ interface ClusterOut {
   severity: number;
   confidence: number;
   event_count: number;
-  is_spike: boolean;
   is_verified: boolean;
   kscore: number;
   first_event_at: string;
@@ -193,11 +192,6 @@ export default function CountryIssuesPage() {
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                    {cluster.is_spike && (
-                      <span className="flex items-center gap-0.5 rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
-                        <AlertTriangle className="h-2.5 w-2.5" /> {t(lang, "country_issue_spike")}
-                      </span>
-                    )}
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", TENSION_BG[level])}>
                       {levelLabel}
                     </span>

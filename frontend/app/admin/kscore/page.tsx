@@ -20,7 +20,6 @@ interface TrendingRow {
   country_codes: string[];
   event_count: number;
   severity: number;
-  is_spike: boolean;
   independent_sources: number;
   confidence: number;
   calculated_at: string;
@@ -130,7 +129,6 @@ export default function AdminKScorePage() {
 
   // 통계
   const activeCount = (data ?? []).filter((r) => !r.is_expired).length;
-  const spikeCount = (data ?? []).filter((r) => r.is_spike).length;
   const avgKscore = data?.length ? (data.reduce((s, r) => s + r.kscore, 0) / data.length) : 0;
   const maxKscore = data?.length ? Math.max(...data.map((r) => r.kscore)) : 0;
 
@@ -164,7 +162,7 @@ export default function AdminKScorePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           { label: lang === "ko" ? "총 트렌딩" : "Total", value: String(data?.length ?? 0), icon: TrendingUp },
-          { label: lang === "ko" ? "스파이크" : "Spikes", value: String(spikeCount), icon: Zap },
+          { label: lang === "ko" ? "활성" : "Active", value: String(activeCount), icon: Zap },
           { label: lang === "ko" ? "평균 KScore" : "Avg KScore", value: avgKscore.toFixed(2), icon: TrendingUp },
           { label: lang === "ko" ? "최고 KScore" : "Max KScore", value: maxKscore.toFixed(2), icon: AlertTriangle },
         ].map(({ label, value, icon: Icon }) => (
@@ -289,7 +287,6 @@ export default function AdminKScorePage() {
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-2.5 max-w-[260px]">
                         <div className="flex items-center gap-2">
-                          {row.is_spike && <Zap className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
                           <span className="text-sm font-medium truncate">
                             {lang === "ko" ? (row.keyword_ko || row.keyword) : row.keyword}
                           </span>
@@ -355,7 +352,6 @@ export default function AdminKScorePage() {
                 )}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {row.is_spike && <Zap className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
                       <span className="text-sm font-medium truncate">
                         {lang === "ko" ? (row.keyword_ko || row.keyword) : row.keyword}
                       </span>

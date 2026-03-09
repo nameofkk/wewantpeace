@@ -1,6 +1,6 @@
 # WeWantPeace Early Detection Case Studies
 
-> Analysis of production spike data from 2026-03-01 to 2026-03-09.
+> Analysis of production KScore alert data from 2026-03-01 to 2026-03-09.
 > All timestamps are UTC. "Lead time" = how much earlier our system collected the signal
 > via Tier-B/C sources (regional media, Telegram OSINT channels) compared to when
 > Tier-A sources (Reuters, AP, BBC, Al Jazeera, etc.) first published.
@@ -9,7 +9,7 @@
 
 ## Case 1: Mojtaba Khamenei Succession — Telegram OSINT 24.5h Ahead of Major Outlets
 
-- **Spike Detected**: 2026-03-07 16:22 UTC (cluster created)
+- **KScore Alert Triggered**: 2026-03-07 16:22 UTC (cluster created)
 - **First Signal Collected**: 2026-03-03 21:33 UTC (Telegram, Tier-C)
 - **First Tier-A Coverage**: 2026-03-04 22:00 UTC (RSS)
 - **Lead Time**: ~24.5 hours ahead of major outlets
@@ -74,11 +74,11 @@ The Gulf missile defense events unfolded across multiple countries simultaneousl
 
 ## Case 4: Tehran Oil Depot Strike — Largest Cluster, 119 Events from 21 Sources
 
-- **Spike Detected**: 2026-03-08 00:28 UTC
+- **KScore Alert Triggered**: 2026-03-08 00:28 UTC
 - **First Signal Collected**: 2026-03-01 16:00 UTC (RSS, Tier-B)
 - **Cluster Created**: 2026-03-07 20:03 UTC
 - **Severity**: 100 (maximum)
-- **KScore**: 5.62 (spike-time) / 7.37 (spike event)
+- **KScore**: 5.62 (alert-time) / 7.37 (alert event)
 - **Event Count**: 119 (21 independent sources)
 - **Source Breakdown**: Tier-A: 41, Tier-B: 70, Tier-C: 8
 
@@ -93,7 +93,7 @@ This is the **largest cluster in the database** with 119 events from 21 independ
 | Mar 3 | Hundreds killed; 787 civilian deaths reported by Red Crescent |
 | Mar 4 | US submarine sinks Iranian warship off Sri Lanka |
 | Mar 5-7 | Continuous escalation across multiple theaters |
-| Mar 8 | Spike triggered as oil depot strike confirmed |
+| Mar 8 | KScore alert triggered as oil depot strike confirmed |
 
 ### Significance
 
@@ -103,12 +103,12 @@ This cluster demonstrates WeWantPeace's ability to **track evolving crises over 
 
 ## Case 5: Tehran Military Academy Struck — Tier-B Reports 4h Before Tier-A Confirmation
 
-- **Spike Detected**: 2026-03-07 16:54 UTC
+- **KScore Alert Triggered**: 2026-03-07 16:54 UTC
 - **First Tier-B Signal**: 2026-03-06 06:40 UTC (RSS)
 - **First Tier-A Confirmation**: 2026-03-06 11:00 UTC (RSS)
 - **Lead Time**: ~4.3 hours (B before A on the specific military academy report)
 - **Severity**: 96
-- **KScore**: 9.16 (spike event) / 2.85 (cluster)
+- **KScore**: 9.16 (alert event) / 2.85 (cluster)
 - **Event Count**: 15 (10 independent sources)
 - **Source Breakdown**: Tier-A: 8, Tier-B: 7
 
@@ -120,7 +120,7 @@ The story then evolved: by 13:44 UTC, Tier-A sources began reporting a **probe i
 
 ### Significance
 
-The KScore of 9.16 at spike time was the **highest in the entire dataset**, reflecting extremely strong multi-source corroboration. This case illustrates how Tier-B sources — regional and Arabic-language media — can report specific military targets hours before international outlets confirm them. For subscribers monitoring escalation patterns, the military academy strike was a critical data point signaling expanded targeting doctrine.
+The KScore of 9.16 at alert time was the **highest in the entire dataset**, reflecting extremely strong multi-source corroboration. This case illustrates how Tier-B sources — regional and Arabic-language media — can report specific military targets hours before international outlets confirm them. For subscribers monitoring escalation patterns, the military academy strike was a critical data point signaling expanded targeting doctrine.
 
 ---
 
@@ -128,13 +128,13 @@ The KScore of 9.16 at spike time was the **highest in the entire dataset**, refl
 
 | Metric | Value |
 |--------|-------|
-| Total spike events analyzed | 5 |
+| Total KScore alert events analyzed | 5 |
 | Total high-severity clusters (>=80) | 30 |
 | Clusters where Tier-B/C beat Tier-A | 23 of 50 analyzed (46%) |
 | Median lead time (B/C before A) | ~12.9 hours |
 | Maximum lead time observed | ~39.2 hours |
 | Largest cluster (by event count) | 119 events, 21 independent sources |
-| Highest KScore at spike | 9.16 |
+| Highest KScore at alert | 9.16 |
 
 ## Key Takeaways
 
@@ -146,7 +146,7 @@ The KScore of 9.16 at spike time was the **highest in the entire dataset**, refl
 
 4. **Continuous aggregation captures evolving crises.** The Tehran oil depot cluster (119 events / 7 days) shows the system's ability to maintain situational awareness across prolonged, multi-theater conflicts.
 
-5. **High KScore correlates with high-impact events.** The 5 spike events all had severity >= 80 and KScores >= 2.53, confirming the scoring model's alignment with real-world significance.
+5. **High KScore correlates with high-impact events.** The 5 KScore alert events all had severity >= 80 and KScores >= 2.53, confirming the scoring model's alignment with real-world significance.
 
 ---
 

@@ -48,7 +48,6 @@ const ENDPOINTS: Endpoint[] = [
             topic: "conflict",
             lat: 48.38,
             lon: 35.04,
-            is_spike: true,
             last_event_at: "2026-03-09T12:00:00+00:00",
             image_url: null,
           },

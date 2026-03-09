@@ -310,8 +310,14 @@ VELOCITY_EXPONENT: float = 0.7
 # 공식: velocity = min(VELOCITY_CAP, k10^VELOCITY_EXPONENT * spike_factor)
 VELOCITY_CAP: float = 6.0
 
-# 스파이크 보너스 배율
-SPIKE_FACTOR: float = 1.5
+# 스파이크 보너스 배율 (v7: 비활성화, KScore 알림 모델 전환)
+SPIKE_FACTOR: float = 1.0
+
+# ── 알림 시스템 플래그 (v7: KScore 기반 알림 모델) ─────────────────────────
+USE_SPIKE_DETECTION: bool = False  # 롤백 시 True로 복원
+ALERT_SEVERITY_MIN: int = 50      # 알림 트리거 최소 severity
+CRITICAL_SEVERITY_MIN: int = 80   # Critical 알림 (상한 무시) 최소 severity
+KSCORE_SOCIAL_MIN: float = 5.0    # SNS 자동 포스트 최소 KScore
 
 # spread 포화점: 독립출처 수가 이 값 이상이면 spread=1.0
 # 공식: spread = min(1.0, independent_sources / SPREAD_SATURATION)

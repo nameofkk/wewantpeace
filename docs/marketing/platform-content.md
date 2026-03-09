@@ -22,7 +22,7 @@ WeWantPeace는 60개 이상의 글로벌 뉴스 소스에서 3~5분 간격으로
 
 WeWantPeace는 Freemium SaaS 모델로 운영된다. 무료 플랜으로 기본 모니터링 기능을 이용할 수 있으며, Pro(월 4,900원)와 Pro+(월 9,900원) 플랜에서 고급 분석, 알림 커스터마이징 등 확장 기능을 제공한다. 한국어·영어를 지원하고, PWA와 Android 앱으로 접속할 수 있으며, 공개 API도 제공해 외부 서비스 연동이 가능하다.
 
-기술적으로는 Next.js 14 기반 프론트엔드, FastAPI·Celery·PostgreSQL 기반 백엔드로 구성되어 있으며, 스파이크 감지 알고리즘을 통해 급변 상황을 자동으로 포착한다.
+기술적으로는 Next.js 14 기반 프론트엔드, FastAPI·Celery·PostgreSQL 기반 백엔드로 구성되어 있으며, KScore 기반 실시간 알림 시스템을 통해 급변 상황을 자동으로 포착한다.
 
 ### 서비스 개요
 - 서비스명: WeWantPeace
@@ -90,7 +90,7 @@ WeWantPeace는 "모든 사람이 안전한 세상을 미리 준비할 수 있도
 **핵심 지표**
 - Tension Index: 국가별 긴장도를 0~100으로 수치화. 뉴스 빈도, 심각도, 소스 다양성 등 다차원 분석.
 - KScore: 사용자 위치·관심 국가 기반 개인화 영향도 (0~10)
-- 스파이크 감지: 긴장도 급등 시 실시간 푸시 알림
+- KScore 기반 실시간 알림: 긴장도 급등 시 실시간 푸시 알림
 
 ## 어려웠던 것들
 
@@ -145,7 +145,7 @@ WeWantPeace는 60개 이상의 글로벌 뉴스 소스에서 3~5분 간격으로
 - 195개국 실시간 분쟁 모니터링
 - 국가별 Tension Index (0~100)
 - 개인 맞춤 KScore (0~10)
-- 스파이크 감지 → 푸시 알림
+- KScore 기반 알림 → 푸시 알림
 - 지도 기반 시각화
 
 **요금**
@@ -253,7 +253,7 @@ GPT-4o-mini classifies, maps countries, and scores severity.
 
 Tension Index (0-100) per country. KScore (0-10) personalized to you.
 
-Spike detection → instant push notifications.
+KScore-based real-time alerts → instant push notifications.
 
 Next.js 14 + FastAPI + Celery + PostgreSQL.
 

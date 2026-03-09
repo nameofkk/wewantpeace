@@ -5,7 +5,7 @@
 
 ## 주요 기능
 
-- **실시간 이슈 지도** — MapLibre GL 기반, 클러스터 마커 + 펄스 애니메이션 + 스파이크 감지
+- **실시간 이슈 지도** — MapLibre GL 기반, 클러스터 마커 + 펄스 애니메이션 + KScore 기반 실시간 알림
 - **긴장도 지수** — 국가별 위기 수준 계산·시계열 추적
 - **트렌딩 키워드** — 글로벌/개인화 트렌딩, KScore(Key Impact Score) 기반 급상승 감지
 - **커뮤니티** — 토론·분석·질문 게시판 (게시글·댓글·리액션)
@@ -40,7 +40,7 @@ wewantpeace/
 │   └── tests/            # pytest 테스트 (173+ 통과)
 ├── worker/
 │   ├── collector/        # RSS·Telegram 수집기
-│   ├── processor/        # normalizer, clusterer, deduplicator, spike detector, tension calculator, trending engine
+│   ├── processor/        # normalizer, clusterer, deduplicator, alert engine, tension calculator, trending engine
 │   └── push/             # FCM 푸시 서비스
 ├── frontend/
 │   ├── app/(main)/       # 사용자 페이지 (홈, 지도, 긴장도, 커뮤니티, 설정)
@@ -108,7 +108,7 @@ bash scripts/run_tests.sh -c        # 커버리지 포함
 
 ```
 RSS/Telegram 수집 → 정규화(topic/severity/geo) → 중복제거 → 클러스터링
-    → 스파이크 감지 → 트렌딩 계산 → 긴장도 지수 → 푸시 알림
+    → KScore 기반 알림 → 트렌딩 계산 → 긴장도 지수 → 푸시 알림
 ```
 
 ## 환경변수

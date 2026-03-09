@@ -1,4 +1,4 @@
-"""SNS 콘텐츠 생성기 — Daily Movers / Spike Alert / Weekly Recap (bilingual)."""
+"""SNS 콘텐츠 생성기 — Daily Movers / KScore Alert / Weekly Recap (bilingual)."""
 import logging
 import os
 import uuid
@@ -8,7 +8,6 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.issue_cluster import IssueCluster
-from backend.app.models.spike_event import SpikeEvent
 from backend.app.models.social_post import SocialPost
 
 logger = logging.getLogger(__name__)
@@ -35,13 +34,36 @@ def _risk_from_severity(severity: int) -> str:
     return "high"
 
 
-def _build_hashtags(country_codes: list[str]) -> list[str]:
-    tags = ["#WeWantPeace"]
+# v7: 토픽→해시태그 매핑
+_TOPIC_HASHTAGS: dict[str, list[str]] = {
+    "conflict": ["#Breaking", "#Conflict"],
+    "terror": ["#Breaking", "#Terror"],
+    "coup": ["#Breaking", "#Coup"],
+    "sanctions": ["#Sanctions", "#Geopolitics"],
+    "cyber": ["#CyberAttack", "#CyberSecurity"],
+    "protest": ["#Protest", "#Unrest"],
+    "diplomacy": ["#Diplomacy", "#Peace"],
+    "maritime": ["#Maritime", "#Security"],
+    "disaster": ["#Disaster", "#HumanitarianCrisis"],
+    "health": ["#HealthCrisis", "#Global"],
+}
+
+
+def _build_hashtags(country_codes: list[str], topic: str = "") -> list[str]:
+    """v7: 동적 토픽+국가 기반 해시태그 (고정 #WeWantPeace 제거)."""
+    tags: list[str] = []
+    # 토픽 기반 해시태그
+    topic_tags = _TOPIC_HASHTAGS.get(topic, [])
+    for t in topic_tags:
+        if t not in tags:
+            tags.append(t)
+    # 국가 기반 해시태그
     for cc in country_codes:
         tag = _COUNTRY_HASHTAGS.get(cc)
         if tag and tag not in tags:
             tags.append(tag)
-    return tags
+    # 최대 3개로 제한
+    return tags[:3] if tags else ["#WeWantPeace"]
 
 
 def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
@@ -199,7 +221,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
             country_codes.append(c.country_code)
         max_severity = max(max_severity, c.severity)
 
-    hashtags = _build_hashtags(country_codes)
+    hashtags = _build_hashtags(country_codes, topic=top_clusters[0].topic or "")
     risk = _risk_from_severity(max_severity)
 
     user_prompt = "Summarize these top global issues:\n" + "\n".join(items)
@@ -232,27 +254,26 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
     return post
 
 
-# ── Spike Alert ──────────────────────────────────────────────────────────────
+# ── KScore Alert (v7: Spike Alert 대체) ───────────────────────────────────
 
-async def generate_spike_alert(
-    spike: SpikeEvent,
+async def generate_kscore_alert(
     cluster: IssueCluster,
     db: AsyncSession,
 ) -> SocialPost | None:
-    """스파이크 이벤트 기반 긴급 포스트 생성 (bilingual)."""
+    """v7: KScore 기반 긴급 포스트 생성 (SpikeEvent 파라미터 제거, bilingual)."""
     # cluster_id + 날짜 기반 dedup — 같은 클러스터는 하루 1회만 포스트
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    dedup_key = f"spike_alert:{cluster.id}:{today}"
+    dedup_key = f"kscore_alert:{cluster.id}:{today}"
 
     existing = await db.execute(
         select(SocialPost).where(SocialPost.dedup_key == dedup_key)
     )
     if existing.scalar_one_or_none():
-        logger.info("Spike Alert 이미 존재: %s", dedup_key)
+        logger.info("KScore Alert 이미 존재: %s", dedup_key)
         return None
 
     country_codes = [cluster.country_code] if cluster.country_code else []
-    hashtags = _build_hashtags(country_codes)
+    hashtags = _build_hashtags(country_codes, topic=cluster.topic or "")
     risk = "high" if cluster.severity >= 70 else "medium"
 
     title_en = cluster.title
@@ -276,21 +297,26 @@ async def generate_spike_alert(
         body = body[:497] + "..."
 
     post = SocialPost(
-        content_type="spike_alert",
+        content_type="kscore_alert",
         lang="bi",
         body_text=body,
         hashtags=hashtags,
         risk_level=risk,
         source_cluster_id=cluster.id,
-        source_spike_id=spike.id,
         dedup_key=dedup_key,
         status="pending_review",
     )
     db.add(post)
     await db.flush()
     await _generate_card_for_post(post, [cluster])
-    logger.info("Spike Alert [bi] 생성: %s (risk=%s)", post.id, risk)
+    logger.info("KScore Alert [bi] 생성: %s (risk=%s)", post.id, risk)
     return post
+
+
+# 하위호환 alias
+async def generate_spike_alert(spike, cluster, db):
+    """Deprecated: use generate_kscore_alert instead."""
+    return await generate_kscore_alert(cluster, db)
 
 
 # ── Weekly Recap ─────────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@ happening where, and how bad is it" at a glance.
   - **KScore** (0-10): Personalized impact score — "how much does this issue
     affect YOUR country" based on geographic proximity, alliances, and economic
     ties
-- Spike detection flags sudden surges and sends push notifications
+- KScore-based real-time alerts flag sudden surges and send push notifications
 
 **Tech stack:**
 

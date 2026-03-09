@@ -102,7 +102,7 @@ const RISK_COLORS: Record<string, string> = {
 
 const CONTENT_TYPE_LABELS: Record<string, { ko: string; en: string }> = {
   daily_movers: { ko: "Daily Movers", en: "Daily Movers" },
-  spike_alert: { ko: "Spike Alert", en: "Spike Alert" },
+  kscore_alert: { ko: "KScore Alert", en: "KScore Alert" },
   weekly_recap: { ko: "Weekly Recap", en: "Weekly Recap" },
 };
 
@@ -581,7 +581,7 @@ function DetailModal({
 interface AutoApproveRules {
   daily_movers: boolean;
   weekly_report: boolean;
-  spike_alert: boolean;
+  kscore_alert: boolean;
 }
 
 function AutoApproveSection({
@@ -611,7 +611,7 @@ function AutoApproveSection({
   const items: { key: keyof AutoApproveRules; label: { ko: string; en: string }; locked?: boolean }[] = [
     { key: "daily_movers", label: { ko: "Daily Movers", en: "Daily Movers" } },
     { key: "weekly_report", label: { ko: "Weekly Report", en: "Weekly Report" } },
-    { key: "spike_alert", label: { ko: "Spike Alert (수동)", en: "Spike Alert (Manual)" }, locked: true },
+    { key: "kscore_alert", label: { ko: "KScore Alert (수동)", en: "KScore Alert (Manual)" }, locked: true },
   ];
 
   return (
@@ -842,7 +842,7 @@ export default function AdminSocialPage() {
         >
           <option value="">{t(lang, "admin_all")}</option>
           <option value="daily_movers">Daily Movers</option>
-          <option value="spike_alert">Spike Alert</option>
+          <option value="kscore_alert">KScore Alert</option>
           <option value="weekly_recap">Weekly Recap</option>
         </select>
 

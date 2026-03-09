@@ -19,7 +19,8 @@ SOCIAL_TG_CHAT_ID = os.getenv("SOCIAL_TG_CHAT_ID", "")
 _RISK_EMOJI = {"low": "\U0001f7e2", "medium": "\U0001f7e1", "high": "\U0001f534"}
 _CONTENT_TYPE_LABEL = {
     "daily_movers": "Daily Movers",
-    "spike_alert": "Spike Alert",
+    "kscore_alert": "KScore Alert",
+    "spike_alert": "KScore Alert",  # 하위호환
     "weekly_recap": "Weekly Recap",
 }
 

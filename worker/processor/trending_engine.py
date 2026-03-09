@@ -76,7 +76,8 @@ def _calc_kscore(
     """
     k10 = max(1, event_count)
 
-    sf = SPIKE_FACTOR if is_spike else 1.0
+    # v7: SPIKE_FACTOR 비활성화 (1.0 고정, is_spike 파라미터는 호환성용 유지)
+    sf = 1.0
     # v4: velocity를 0~1 정규화 (기존: 1.0~6.0 비정규화 → 63% 지배 버그)
     velocity_raw = min(VELOCITY_CAP, (k10 ** VELOCITY_EXPONENT) * sf)
     velocity_norm = velocity_raw / VELOCITY_CAP
@@ -146,8 +147,8 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             source_tiers=c.source_tiers or [],
             age_hours=age_hours,
         )
-        # 포함 조건: KSCORE_MIN 이상 또는 스파이크 클러스터는 항상 포함
-        if kscore < KSCORE_MIN and not c.is_spike:
+        # v7: 포함 조건 — KSCORE_MIN 이상만 (스파이크 무조건 포함 제거)
+        if kscore < KSCORE_MIN:
             continue
 
         scored.append({
@@ -158,7 +159,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
             "raw_score": raw_score,
             "topic": c.topic,
             "country_codes": [c.country_code] if c.country_code else [],
-            "is_spike": c.is_spike,
+            "is_spike": False,
             "severity": c.severity,
             "event_count": c.event_count,
             "k10": c.event_count,
@@ -340,8 +341,6 @@ async def _fix_junk_titles(db: AsyncSession, clusters: list[IssueCluster]) -> No
 
 def _make_reason(cluster: IssueCluster, kscore: float) -> str:
     """'왜 뜸?' 설명 문자열 생성."""
-    if cluster.is_spike:
-        return f"1분간 이벤트 급증 (KScore {kscore:.1f})"
     if cluster.independent_sources >= 3:
         return f"{cluster.independent_sources}개 독립출처 동시 보도 (KScore {kscore:.1f})"
     return f"60분간 {cluster.event_count}개 이벤트 (KScore {kscore:.1f})"

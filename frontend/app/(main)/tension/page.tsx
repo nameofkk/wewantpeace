@@ -336,7 +336,7 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
   const label = getCountryName(data.country_code, lang);
   const isExtreme = displayLevel >= 4;
   const isCritical = displayLevel >= 3;
-  const isSpike = data.percentile_30d >= 75 && displayLevel < 3;
+  const isSurge = data.percentile_30d >= 75 && displayLevel < 3;
 
   const locale = lang === "en" ? "en-US" : "ko-KR";
   const updatedTime = new Date(data.updated_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
@@ -380,14 +380,14 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
                 <AlertTriangle className="h-2 w-2" /> {t(lang, "tension_crisis_badge")}
               </span>
             )}
-            {isSpike && (
+            {isSurge && (
               <span className="flex items-center gap-0.5">
-                <span className="spike-pulse rounded-full bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
-                  {t(lang, "tension_spike_label")}
+                <span className="surge-pulse rounded-full bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
+                  {t(lang, "tension_surge_label")}
                 </span>
                 <InfoTooltip
                   direction="up"
-                  text={t(lang, "tension_spike_tooltip", { pct: Math.round(100 - data.percentile_30d) })}
+                  text={t(lang, "tension_surge_tooltip", { pct: Math.round(100 - data.percentile_30d) })}
                 />
               </span>
             )}

@@ -18,7 +18,6 @@ interface PeekItem {
   kscore: number;
   topic: string | null;
   cluster_ids: string[];
-  is_spike: boolean;
 }
 
 interface TensionPeekItem {
@@ -299,11 +298,6 @@ export function NewEventBanner() {
               </span>
               <span className="text-[10px] text-muted-foreground/60">·</span>
               <span className="text-[10px] text-muted-foreground">{topicLabel}</span>
-              {item?.is_spike && (
-                <span className="text-[10px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full leading-none">
-                  {t(lang, "banner_spike")}
-                </span>
-              )}
               <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
                 KScore {item?.kscore.toFixed(1)}
               </span>

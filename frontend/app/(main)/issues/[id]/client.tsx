@@ -71,7 +71,6 @@ interface ClusterDetail {
   severity: number;
   confidence: number;
   event_count: number;
-  is_spike: boolean;
   is_verified: boolean;
   kscore: number;
   independent_sources?: number;
@@ -235,12 +234,6 @@ export default function IssueDetailClient({ initialData }: Props) {
         {/* 요약 카드 */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2 flex-wrap mb-3">
-            {issue.is_spike && (
-              <span className="flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {t(lang, "issue_spike")}
-              </span>
-            )}
             <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium", statusColor)}>
               {issue.is_verified && <CheckCircle className="h-2.5 w-2.5" />}
               {statusLabel}

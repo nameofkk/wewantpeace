@@ -91,7 +91,13 @@ async def evaluate_spike(
     누적 기반 스파이크 조건 평가.
     Returns (triggered, spike_event_id).
     triggered=True 시 cluster.is_spike = True 로 업데이트해야 함.
+
+    v7: USE_SPIKE_DETECTION=False 시 즉시 (False, None) 반환 (KScore 알림 모델 전환).
     """
+    from worker.processor.calibration import USE_SPIKE_DETECTION
+    if not USE_SPIKE_DETECTION:
+        return False, None
+
     # 이미 스파이크면 다시 평가 불필요 (쿨다운으로 처리)
     if redis and await is_in_cooldown(cluster_id, redis):
         return False, None

@@ -8,24 +8,24 @@ import { t } from "@/lib/i18n";
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Free 사용자가 스파이크 알림을 3회 이상 확인하면 표시되는 Pro 전환 유도 배너.
+ * Free 사용자가 알림을 3회 이상 확인하면 표시되는 Pro 전환 유도 배너.
  * - 닫기(X) 버튼으로 dismiss → 일주일 후 다시 표시
  * - localStorage (Zustand persist)로 카운트/dismiss 상태 관리
  */
 export function UpgradeNudgeBanner() {
   const lang = useAppStore((s) => s.lang);
   const userPlan = useAppStore((s) => s.userPlan);
-  const spikeAlertCount = useAppStore((s) => s.spikeAlertCount);
-  const spikeAlertDismissedAt = useAppStore((s) => s.spikeAlertDismissedAt);
+  const missedAlertCount = useAppStore((s) => s.missedAlertCount);
+  const missedAlertDismissedAt = useAppStore((s) => s.missedAlertDismissedAt);
   const dismissUpgradeNudge = useAppStore((s) => s.dismissUpgradeNudge);
 
   // 표시 조건: Free 사용자 + 3회 이상 + dismiss 안 했거나 일주일 지남
   const isDismissedRecently =
-    spikeAlertDismissedAt != null &&
-    Date.now() - spikeAlertDismissedAt < ONE_WEEK_MS;
+    missedAlertDismissedAt != null &&
+    Date.now() - missedAlertDismissedAt < ONE_WEEK_MS;
 
   if (userPlan !== "free") return null;
-  if (spikeAlertCount < 3) return null;
+  if (missedAlertCount < 3) return null;
   if (isDismissedRecently) return null;
 
   return (
@@ -40,7 +40,7 @@ export function UpgradeNudgeBanner() {
       </button>
 
       <p className="text-xs text-blue-400 leading-relaxed pr-6">
-        {t(lang, "upgrade_nudge_message", { count: spikeAlertCount })}
+        {t(lang, "upgrade_nudge_message", { count: missedAlertCount })}
       </p>
 
       <Link

@@ -37,7 +37,7 @@ class AreaCreate(BaseModel):
     country_code: Optional[str] = None
     label: Optional[str] = None
     notify_verified: bool = True
-    notify_fast: bool = False
+    notify_fast: bool = True  # v7: 모든 플랜에서 기본 활성화
 
 
 class AreaOut(BaseModel):
@@ -196,11 +196,12 @@ async def create_area(
             },
         )
 
-    # notify_fast는 Pro 이상만 허용
-    if body.notify_fast and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
+    # v7: notify_fast는 모든 플랜에서 허용 (신속 알림)
+    # notify_verified는 Pro 이상만 허용 (신뢰 알림)
+    if body.notify_verified and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
         raise HTTPException(
             status_code=403,
-            detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_fast"},
+            detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_verified"},
         )
 
     # 중복 방지: 같은 country_code가 이미 있으면 기존 레코드 반환
@@ -323,12 +324,13 @@ async def update_preferences(
         db.add(pref)
         await db.flush()
 
-    # notify_fast는 Pro 이상만 가능
-    if getattr(body, "notify_fast_global", None) is True:
+    # v7: notify_fast는 모든 플랜에서 가능 (제한 제거)
+    # notify_verified_global은 Pro 이상만 가능
+    if getattr(body, "notify_verified_global", None) is True:
         if _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_fast"},
+                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_verified"},
             )
 
     if body.language is not None:
@@ -695,34 +697,39 @@ async def track_paywall_event(
     return {"status": "ok"}
 
 
-# ── /me/missed-spikes ────────────────────────────────────────────────────
+# ── /me/missed-alerts (v7: missed-spikes → missed-alerts) ─────────────────
 
-class MissedSpikeOut(BaseModel):
+class MissedAlertOut(BaseModel):
     id: str
     cluster_id: str
     reason: str
     created_at: str
 
 
-@router.get("/missed-spikes", response_model=list[MissedSpikeOut])
-async def list_missed_spikes(
+# 하위호환: /me/missed-spikes 경로도 유지
+MissedSpikeOut = MissedAlertOut
+
+
+@router.get("/missed-alerts", response_model=list[MissedAlertOut])
+@router.get("/missed-spikes", response_model=list[MissedAlertOut], include_in_schema=False)
+async def list_missed_alerts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """놓친 스파이크 목록 (is_shown=False, 최근 30개)."""
-    from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+    """놓친 알림 목록 (is_shown=False, 최근 30개)."""
+    from backend.app.models.user_missed_spike import UserMissedAlertSummary
 
     result = await db.execute(
-        select(UserMissedSpikeSummary)
+        select(UserMissedAlertSummary)
         .where(
-            UserMissedSpikeSummary.user_id == current_user.id,
-            UserMissedSpikeSummary.is_shown == False,
+            UserMissedAlertSummary.user_id == current_user.id,
+            UserMissedAlertSummary.is_shown == False,
         )
-        .order_by(UserMissedSpikeSummary.created_at.desc())
+        .order_by(UserMissedAlertSummary.created_at.desc())
         .limit(30)
     )
     return [
-        MissedSpikeOut(
+        MissedAlertOut(
             id=str(s.id),
             cluster_id=str(s.cluster_id),
             reason=s.reason,
@@ -732,25 +739,26 @@ async def list_missed_spikes(
     ]
 
 
-@router.patch("/missed-spikes/{spike_id}/shown")
-async def mark_missed_spike_shown(
-    spike_id: str,
+@router.patch("/missed-alerts/{alert_id}/shown")
+@router.patch("/missed-spikes/{alert_id}/shown", include_in_schema=False)
+async def mark_missed_alert_shown(
+    alert_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """놓친 스파이크를 '확인 완료'로 표시."""
+    """놓친 알림을 '확인 완료'로 표시."""
     import uuid as _uuid
-    from backend.app.models.user_missed_spike import UserMissedSpikeSummary
+    from backend.app.models.user_missed_spike import UserMissedAlertSummary
 
     result = await db.execute(
-        select(UserMissedSpikeSummary).where(
-            UserMissedSpikeSummary.id == _uuid.UUID(spike_id),
-            UserMissedSpikeSummary.user_id == current_user.id,
+        select(UserMissedAlertSummary).where(
+            UserMissedAlertSummary.id == _uuid.UUID(alert_id),
+            UserMissedAlertSummary.user_id == current_user.id,
         )
     )
     summary = result.scalar_one_or_none()
     if not summary:
-        raise HTTPException(status_code=404, detail={"code": "MISSED_SPIKE_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail={"code": "MISSED_ALERT_NOT_FOUND"})
     summary.is_shown = True
     await db.flush()
     return {"status": "ok"}

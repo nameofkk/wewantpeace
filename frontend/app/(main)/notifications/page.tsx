@@ -15,12 +15,12 @@ import type { Step } from "react-joyride";
 
 const NOTIF_TYPE_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
   verified: { bg: "bg-green-500/20", text: "text-green-400", labelKo: "확인", labelEn: "Verified" },
-  spike: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "스파이크", labelEn: "Spike" },
+  fast: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "긴급", labelEn: "Fast" },
   daily_summary: { bg: "bg-blue-500/20", text: "text-blue-400", labelKo: "일일 요약", labelEn: "Daily" },
   weekly_report: { bg: "bg-purple-500/20", text: "text-purple-400", labelKo: "주간", labelEn: "Weekly" },
 };
 
-const NOTIF_TYPE_FALLBACK = NOTIF_TYPE_STYLES.spike;
+const NOTIF_TYPE_FALLBACK = NOTIF_TYPE_STYLES.fast;
 
 function getNotifStyle(type: string) {
   return NOTIF_TYPE_STYLES[type] ?? NOTIF_TYPE_FALLBACK;
@@ -61,16 +61,16 @@ export default function NotificationsPage() {
     },
   ], [lang]);
 
-  const incrementSpikeAlertCount = useAppStore((s) => s.incrementSpikeAlertCount);
+  const incrementMissedAlertCount = useAppStore((s) => s.incrementMissedAlertCount);
 
   const hasUnread = notifications?.some((n) => !n.is_read);
 
   const handleClick = (notif: NotificationItem) => {
     if (!notif.is_read) {
       markRead.mutate(notif.id);
-      // 스파이크 알림 확인 시 카운트 증가 (구독 전환 유도용)
-      if (notif.type === "spike") {
-        incrementSpikeAlertCount();
+      // 긴급 알림 확인 시 카운트 증가 (구독 전환 유도용)
+      if (notif.type === "fast") {
+        incrementMissedAlertCount();
       }
     }
     if (notif.cluster_id) {

@@ -21,7 +21,6 @@ interface ClusterItem {
   kscore: number;
   event_count: number;
   confidence: number;
-  is_spike: boolean;
   first_event_at: string;
   last_event_at: string;
   created_at: string;
@@ -194,9 +193,6 @@ export default function AdminClustersPage() {
                   <tr key={c.id} className="hover:bg-secondary/20">
                     <td className="px-3 py-3 max-w-[250px]">
                       <p className="text-sm truncate font-medium">{lang === "ko" && c.title_ko ? c.title_ko : c.title}</p>
-                      {c.is_spike && (
-                        <span className="text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>
-                      )}
                     </td>
                     <td className="px-3 py-3 text-xs">
                       {c.country_code ? `${getFlag(c.country_code)} ${c.country_code}` : "\u2014"}
@@ -262,7 +258,6 @@ export default function AdminClustersPage() {
                     <p className="text-sm font-medium truncate">{lang === "ko" && c.title_ko ? c.title_ko : c.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {c.country_code ? `${getFlag(c.country_code)} ${c.country_code}` : "\u2014"}
-                      {c.is_spike && <span className="ml-2 text-[9px] rounded-full bg-amber-500/20 text-amber-400 px-1.5 py-0.5 font-bold">SPIKE</span>}
                     </p>
                   </div>
                   <span className={cn("text-xs font-bold tabular-nums", c.kscore >= 7 ? "text-red-400" : c.kscore >= 5 ? "text-orange-400" : c.kscore >= 3 ? "text-yellow-400" : "text-muted-foreground")}>

@@ -1198,21 +1198,24 @@ async def check_sns_token_validity() -> HealthCheckResult:
         )
 
 
-# ── Check 17: 스파이크 알림 전송 ──────────────────────────────────────────
+# ── Check 17: KScore 기반 알림 전송 (v7: 스파이크 → KScore) ──────────────
 
 
 async def check_spike_delivery(db: AsyncSession) -> HealthCheckResult:
-    """최근 6시간 내 severity >= 50인 스파이크 중 알림 미전송 탐지."""
+    """v7: KScore >= 5.0 + severity >= 50 클러스터 중 알림 미전송 탐지."""
     try:
         undelivered_q = await db.execute(
             text("""
-                SELECT COUNT(*) FROM spike_events se
-                WHERE se.severity >= 50
-                  AND se.triggered_at >= NOW() - INTERVAL '6 hours'
+                SELECT COUNT(*) FROM issue_clusters ic
+                WHERE ic.kscore >= 5.0
+                  AND ic.severity >= 50
+                  AND ic.is_active = true
+                  AND ic.last_event_at >= NOW() - INTERVAL '6 hours'
                   AND NOT EXISTS (
                       SELECT 1 FROM alert_delivery_log adl
-                      WHERE adl.spike_event_id = se.id
+                      WHERE adl.cluster_id = ic.id
                         AND adl.decision = 'sent'
+                        AND adl.created_at >= NOW() - INTERVAL '6 hours'
                   )
             """)
         )
@@ -1221,34 +1224,34 @@ async def check_spike_delivery(db: AsyncSession) -> HealthCheckResult:
         issues: list[HealthIssue] = []
         if undelivered > 0:
             issues.append(HealthIssue(
-                check_name="spike_delivery",
+                check_name="alert_delivery",
                 severity="warning",
-                message=f"미전송 스파이크 알림 {undelivered}건 (severity>=50, 최근 6h)",
+                message=f"미전송 KScore 알림 {undelivered}건 (KScore>=5.0, severity>=50, 최근 6h)",
                 auto_fix_available=True,
-                fix_action="retry_spike_alerts",
+                fix_action="retry_alerts",
                 fix_params={"undelivered": undelivered},
             ))
 
         return HealthCheckResult(
-            check_name="spike_delivery",
+            check_name="alert_delivery",
             status="warning" if issues else "ok",
-            message=f"스파이크 알림 전송: 미전송 {undelivered}건",
+            message=f"KScore 알림 전송: 미전송 {undelivered}건",
             issues=issues,
         )
     except Exception as e:
-        if "spike_events" in str(e).lower() or "alert_delivery_log" in str(e).lower() or "relation" in str(e).lower():
+        if "alert_delivery_log" in str(e).lower() or "relation" in str(e).lower():
             try:
                 await db.rollback()
             except Exception:
                 pass
             return HealthCheckResult(
-                check_name="spike_delivery",
+                check_name="alert_delivery",
                 status="ok",
-                message="spike_events/alert_delivery_log 테이블 없음 — 건너뜀",
+                message="alert_delivery_log 테이블 없음 — 건너뜀",
             )
-        logger.exception("스파이크 알림 체크 오류")
+        logger.exception("KScore 알림 체크 오류")
         return HealthCheckResult(
-            check_name="spike_delivery",
+            check_name="alert_delivery",
             status="warning",
             message=f"체크 오류: {e}",
         )

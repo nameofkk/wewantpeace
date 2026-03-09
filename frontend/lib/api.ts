@@ -289,7 +289,7 @@ export function useDeletePushToken() {
 // --- 알림 훅 ---
 export interface NotificationItem {
   id: number;
-  type: string;       // "verified" | "spike"
+  type: string;       // "verified" | "fast"
   cluster_id: string | null;
   title: string;
   body: string;
@@ -359,23 +359,29 @@ export function useSubmitFeedback() {
   });
 }
 
-// --- 놓친 스파이크 훅 ---
-export interface MissedSpike {
+// --- 놓친 알림 훅 ---
+export interface MissedAlert {
   id: string;
   cluster_id: string;
   reason: string;
   created_at: string;
 }
 
-export function useMissedSpikes() {
+export function useMissedAlerts() {
   return useQuery({
-    queryKey: ["me", "missed-spikes"],
-    queryFn: () => apiFetch<MissedSpike[]>("/me/missed-spikes"),
+    queryKey: ["me", "missed-alerts"],
+    queryFn: () => apiFetch<MissedAlert[]>("/me/missed-alerts"),
     retry: false,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
   });
 }
+
+// Backward compat aliases
+/** @deprecated Use MissedAlert instead */
+export type MissedSpike = MissedAlert;
+/** @deprecated Use useMissedAlerts instead */
+export const useMissedSpikes = useMissedAlerts;
 
 // --- 어드민: 클러스터 제목 수정 훅 ---
 export function usePatchCluster() {

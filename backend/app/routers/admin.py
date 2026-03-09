@@ -655,7 +655,7 @@ async def list_clusters(
                 "kscore": round(c.kscore, 2),
                 "event_count": c.event_count,
                 "confidence": round(c.confidence, 3),
-                "is_spike": c.is_spike,
+                "is_spike": False,  # v7: deprecated
                 "is_active": c.is_active,
                 "is_flagged": c.is_flagged,
                 "first_event_at": c.first_event_at.isoformat(),
@@ -672,11 +672,11 @@ async def list_spike_clusters(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """현재 활성 스파이크 클러스터 목록 (is_spike=True, severity>0)."""
+    """v7: 고KScore 클러스터 목록 (KScore >= 5.0, severity>0). 기존 spike-clusters 경로 유지."""
     q = (
         select(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.is_spike == True)
-        .order_by(IssueCluster.last_event_at.desc())
+        .where(IssueCluster.severity > 0, IssueCluster.kscore >= 5.0)
+        .order_by(IssueCluster.kscore.desc())
         .limit(20)
     )
     result = await db.execute(q)
@@ -692,7 +692,7 @@ async def list_spike_clusters(
                 "severity": c.severity,
                 "kscore": round(c.kscore, 2),
                 "event_count": c.event_count,
-                "is_spike": c.is_spike,
+                "is_spike": False,  # v7: deprecated
                 "is_active": c.is_active,
                 "first_event_at": c.first_event_at.isoformat(),
                 "last_event_at": c.last_event_at.isoformat(),
@@ -1895,9 +1895,10 @@ async def pipeline_stats(
     noise_clusters = (await db.execute(
         select(func.count()).select_from(IssueCluster).where(IssueCluster.severity == 0)
     )).scalar() or 0
+    # v7: spike_clusters → high_kscore_clusters (KScore >= 5.0)
     spike_clusters = (await db.execute(
         select(func.count()).select_from(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.is_spike == True)
+        .where(IssueCluster.severity > 0, IssueCluster.kscore >= 5.0)
     )).scalar() or 0
 
     # 6) 푸시 토큰 통계
@@ -2993,13 +2994,13 @@ async def social_stats(
 # ── 소셜 자동 승인 규칙 ───────────────────────────────────────────────
 
 SOCIAL_AUTO_APPROVE_KEY = "admin:social:auto_approve_rules"
-DEFAULT_AUTO_APPROVE_RULES = {"daily_movers": True, "weekly_report": True, "spike_alert": False}
+DEFAULT_AUTO_APPROVE_RULES = {"daily_movers": True, "weekly_report": True, "kscore_alert": False}
 
 
 class AutoApproveRulesBody(BaseModel):
     daily_movers: bool = True
     weekly_report: bool = True
-    spike_alert: bool = False
+    kscore_alert: bool = False
 
 
 @router.get("/social/auto-approve-rules")
@@ -3025,8 +3026,8 @@ async def update_auto_approve_rules(
 ):
     import json
     rules = body.dict()
-    # spike_alert은 항상 수동 (False 강제)
-    rules["spike_alert"] = False
+    # kscore_alert은 항상 수동 (False 강제)
+    rules["kscore_alert"] = False
     try:
         redis = get_redis()
         await redis.set(SOCIAL_AUTO_APPROVE_KEY, json.dumps(rules))

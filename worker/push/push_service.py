@@ -57,9 +57,9 @@ _SPIKE_PUSH_COUNT_TTL = 30 * 86400  # 30일
 
 # T12: 일일 푸시 상한
 DAILY_PUSH_LIMITS = {
-    "free": 3,
-    "pro": 10,
-    "pro_plus": 50,
+    "free": 5,
+    "pro": 20,
+    "pro_plus": 100,
 }
 _DAILY_PUSH_KEY_PREFIX = "push:daily:"
 
@@ -162,11 +162,15 @@ async def _get_target_tokens_by_platform(
     kscore: float,
     cluster_topic: Optional[str],
     db: AsyncSession,
+    alert_kind: str = "",
 ) -> _TargetResult:
     """
     해당 국가에 관심 설정한 사용자의 FCM 토큰 + 플랫폼 수집.
-    notify_fast=True: fast 레인 (notify_fast=True 사용자)
-    notify_fast=False: verified 레인 (notify_verified=True 사용자)
+
+    v7 변경:
+      Fast alert → 모든 플랜의 관심국가 구독자 대상 (notify_fast 체크 불필요, is_active만)
+      Verified alert → notify_verified=True AND plan in ("pro","pro_plus") 조건
+
     kscore: 사용자 min_kscore 이하인 경우만 발송
     cluster_topic: 사용자 topics 목록에 포함된 경우만 발송
     quiet_hours: 사용자 현지 시각이 조용한 시간이면 제외
@@ -176,13 +180,21 @@ async def _get_target_tokens_by_platform(
     if not country_code:
         return _TargetResult([], [])
 
-    if notify_fast:
+    if alert_kind == "verified":
+        # v7: Verified alert → notify_verified=True AND Pro/Pro+ only
         area_filter = (
             UserArea.country_code == country_code,
             UserArea.is_active == True,
-            UserArea.notify_fast == True,
+            UserArea.notify_verified == True,
+        )
+    elif alert_kind == "fast" or notify_fast:
+        # v7: Fast alert → 모든 관심국가 구독자 (notify_fast 무관)
+        area_filter = (
+            UserArea.country_code == country_code,
+            UserArea.is_active == True,
         )
     else:
+        # legacy: verified lane
         area_filter = (
             UserArea.country_code == country_code,
             UserArea.is_active == True,
@@ -271,8 +283,14 @@ async def _get_target_tokens_by_platform(
 
 async def _apply_daily_limits(
     target: _TargetResult, db: AsyncSession, redis,
+    severity: int = 0,
 ) -> _TargetResult:
-    """T12: 일일 푸시 상한 초과 유저를 tokens에서 제거하고 suppressed로 이동."""
+    """T12: 일일 푸시 상한 초과 유저를 tokens에서 제거하고 suppressed로 이동.
+
+    v7 Critical 바이패스: severity >= CRITICAL_SEVERITY_MIN(80) AND plan in ("pro","pro_plus")
+    → 일일 상한 무시.
+    """
+    from worker.processor.calibration import CRITICAL_SEVERITY_MIN
     if not target.tokens:
         return target
 
@@ -290,9 +308,22 @@ async def _apply_daily_limits(
 
     for t in target.tokens:
         plan = user_plans.get(t.user_id, "free")
+        # v7: Critical 바이패스 — Pro/Pro+ 사용자는 sev>=80 시 상한 무시
+        if severity >= CRITICAL_SEVERITY_MIN and plan in ("pro", "pro_plus"):
+            allowed_tokens.append(t)
+            continue
         exceeded = await _check_daily_limit(str(t.user_id), plan, redis, tz_name=t.tz_name)
         if exceeded:
             extra_suppressed.append(_SuppressedInfo(t.user_id, t.platform, "daily_limit"))
+            # v7: Free 유저 놓친 알림 카운터 추적
+            if plan == "free":
+                try:
+                    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    missed_key = f"missed_alert_count:{t.user_id}:{today}"
+                    await redis.incr(missed_key)
+                    await redis.expire(missed_key, 7 * 86400)  # 7일 TTL
+                except Exception:
+                    pass
         else:
             allowed_tokens.append(t)
 
@@ -312,11 +343,17 @@ async def _increment_daily_push_for_tokens(tokens: list[_TokenInfo], redis):
 async def _get_plan_locked_users(
     country_code: Optional[str],
     db: AsyncSession,
+    alert_kind: str = "verified",
 ) -> list[_SuppressedInfo]:
-    """Free 유저 중 해당 국가를 관심 등록했지만 Fast 알림을 받을 수 없는 유저 조회.
-    → 'plan_locked' suppression 사유로 delivery log에 기록."""
+    """v7: Free 유저 중 해당 국가를 관심 등록했지만 Verified 알림을 받을 수 없는 유저 조회.
+    → 'plan_locked' suppression 사유로 delivery log에 기록.
+
+    변경: 기존 Fast 잠금 → Verified 잠금 (Fast는 모든 플랜에서 가능)
+    """
     if not country_code:
         return []
+    if alert_kind != "verified":
+        return []  # Fast alert는 plan 제한 없음
     result = await db.execute(
         select(User.id, UserPushToken.platform, UserPushToken.last_seen_at)
         .join(UserArea, UserArea.user_id == User.id)
@@ -324,7 +361,6 @@ async def _get_plan_locked_users(
         .where(
             UserArea.country_code == country_code,
             UserArea.is_active == True,
-            UserArea.notify_fast == False,
             User.plan == "free",
             UserPushToken.status == "active",
         )
@@ -389,7 +425,7 @@ _RELATION_TEMPLATES_EN: dict[str, list[tuple[float, str]]] = {
 }
 
 
-def generate_spike_context(
+def generate_alert_context(
     home_country: str,
     event_country: str,
     topic: str,
@@ -442,6 +478,9 @@ def generate_spike_context(
 
     return f"{home_label}: {desc}"
 
+
+# 하위호환 alias
+generate_spike_context = generate_alert_context
 
 FCM_BATCH_SIZE = 500  # FCM MulticastMessage 최대 토큰 수
 
@@ -677,7 +716,7 @@ def _split_and_send_with_context(
     for (home_country, lang), group_tokens in groups.items():
         # 컨텍스트 생성
         if event_country:
-            context = generate_spike_context(home_country, event_country, topic or "unknown", lang)
+            context = generate_alert_context(home_country, event_country, topic or "unknown", lang)
         else:
             context = "글로벌 긴장도 상승 — 주시 필요" if lang == "ko" else "Global tension rising — monitor"
 
@@ -888,7 +927,139 @@ async def _increment_spike_push_counts(
             logger.debug("spike_push_count incr 실패: user_id=%s", uid)
 
 
-# ── 메인 발송 함수 ──────────────────────────────────────────────────────
+# ── 메인 발송 함수 (v7: KScore 기반 알림 모델) ────────────────────────────
+
+_VERIFIED_COOLDOWN_KEY_PREFIX = "push:verified_cooldown:"
+
+
+async def send_alert(
+    cluster_id: str,
+    cluster_title: str,
+    country_code: Optional[str],
+    severity: int,
+    kscore: float,
+    is_verified: bool,
+    cluster_topic: Optional[str],
+    alert_kind: str,
+    db: AsyncSession,
+    redis,
+    spike_event_id: Optional[str] = None,
+) -> dict:
+    """
+    v7 통합 알림 발송.
+    alert_kind: "fast" | "verified" | "combined"
+      - fast: 모든 플랜의 관심국가 구독자에게 신속 알림
+      - verified: Pro/Pro+ 구독자에게 신뢰 알림
+      - combined: fast+verified 동시 충족 → 1건만 발송
+
+    1. Redis 중복방지 (클러스터 단위, 72h TTL)
+    2. Critical 바이패스 (sev>=80 AND Pro/Pro+)
+    3. 놓친 알림 카운터 (Free 상한 초과 시)
+    """
+    # Redis 중복방지
+    if alert_kind in ("fast", "combined"):
+        dedup_key = f"alert:fast:{cluster_id}"
+        if await redis.exists(dedup_key):
+            logger.info("Fast alert 중복 스킵: cluster_id=%s", cluster_id)
+            if alert_kind == "fast":
+                return {"status": "dedup", "sent": 0}
+    if alert_kind in ("verified", "combined"):
+        dedup_key_v = f"alert:verified:{cluster_id}"
+        if await redis.exists(dedup_key_v):
+            logger.info("Verified alert 중복 스킵: cluster_id=%s", cluster_id)
+            if alert_kind == "verified":
+                return {"status": "dedup", "sent": 0}
+
+    collapse_key = cluster_id
+    sent_verified = 0
+    sent_fast = 0
+    all_invalid: list[str] = []
+
+    # ── Verified 레인 (combined 또는 verified) ──
+    if alert_kind in ("verified", "combined") and is_verified:
+        target_v = await _get_target_tokens_by_platform(
+            country_code, notify_fast=False, kscore=kscore,
+            cluster_topic=cluster_topic, db=db, alert_kind="verified",
+        )
+        target_v = await _apply_daily_limits(target_v, db, redis, severity=severity)
+
+        # plan_locked: Free 유저가 Verified를 받으려 하는 경우
+        plan_locked_v = await _get_plan_locked_users(country_code, db, alert_kind="verified")
+        await _insert_suppressed_logs(
+            target_v.suppressed + plan_locked_v, cluster_id, spike_event_id, "verified", db,
+        )
+
+        token_to_log_v = await _insert_pending_logs(
+            target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
+        )
+
+        sent_verified, invalid_v, failures_v = _split_and_send_with_context(
+            token_infos=target_v.tokens,
+            title=f"⚠️ {cluster_title}",
+            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
+            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+            event_country=country_code,
+            topic=cluster_topic,
+            severity=severity,
+            collapse_key=collapse_key,
+        )
+        await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
+        all_invalid.extend(invalid_v)
+        await _increment_daily_push_for_tokens(target_v.tokens, redis)
+
+        # Redis 중복방지 설정
+        await redis.setex(f"alert:verified:{cluster_id}", 259200, "1")  # 72h
+
+    # ── Fast 레인 (combined 또는 fast) ──
+    if alert_kind in ("fast", "combined"):
+        target_f = await _get_target_tokens_by_platform(
+            country_code, notify_fast=True, kscore=kscore,
+            cluster_topic=cluster_topic, db=db, alert_kind="fast",
+        )
+        target_f = await _apply_daily_limits(target_f, db, redis, severity=severity)
+
+        await _insert_suppressed_logs(
+            target_f.suppressed, cluster_id, spike_event_id, "fast", db,
+        )
+
+        token_to_log_f = await _insert_pending_logs(
+            target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
+        )
+
+        # combined일 때 body에 "추후 신뢰 인증될 수 있음" 안내 포함 여부
+        if alert_kind == "fast" and not is_verified:
+            fast_body = f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림\n⏳ 추후 신뢰 인증 가능 / May be verified later"
+        else:
+            fast_body = f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림"
+
+        sent_fast, invalid_f, failures_f = _split_and_send_with_context(
+            token_infos=target_f.tokens,
+            title=f"🚨 {cluster_title}",
+            base_body=fast_body,
+            data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
+            event_country=country_code,
+            topic=cluster_topic,
+            severity=severity,
+            collapse_key=collapse_key,
+        )
+        await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
+        all_invalid.extend(invalid_f)
+        await _increment_daily_push_for_tokens(target_f.tokens, redis)
+
+        # Redis 중복방지 설정
+        await redis.setex(f"alert:fast:{cluster_id}", 259200, "1")  # 72h
+
+    # 만료/무효 토큰 자동 정리
+    await cleanup_invalid_tokens(all_invalid, db)
+
+    return {
+        "status": "sent",
+        "alert_kind": alert_kind,
+        "sent_verified": sent_verified,
+        "sent_fast": sent_fast,
+        "total": sent_verified + sent_fast,
+        "cleaned_tokens": len(all_invalid),
+    }
 
 
 async def send_spike_alert(
@@ -903,123 +1074,21 @@ async def send_spike_alert(
     redis,
     spike_event_id: Optional[str] = None,
 ) -> dict:
-    """
-    스파이크 알림 발송.
-    1. 쿨다운 확인
-    2. Verified 레인: is_verified이면 발송
-    3. Fast 레인: 항상 발송 (Pro 사용자, notify_fast=True)
-    topics/quiet_hours 필터는 _get_target_tokens_by_platform 내부에서 적용됨.
-
-    Delivery Integrity: pending -> sent/failed 로깅, suppressed 로깅.
-    """
-    if await _is_in_cooldown(cluster_id, redis):
-        logger.info("쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
-        return {"status": "cooldown", "sent": 0}
-
-    # cluster_id 기반 collapse — 같은 이슈 중복 푸시 방지
-    collapse_key = cluster_id
-    sent_verified = 0
-    sent_fast = 0
-    all_invalid: list[str] = []
-    target_v_for_count = _TargetResult([], [])
-
-    # Verified 레인
-    if is_verified:
-        target_v = await _get_target_tokens_by_platform(
-            country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
-        )
-        target_v = await _apply_daily_limits(target_v, db, redis)
-
-        # 1. suppressed 로그
-        await _insert_suppressed_logs(
-            target_v.suppressed, cluster_id, spike_event_id, "verified", db,
-        )
-
-        # 2. pending 로그
-        token_to_log_v = await _insert_pending_logs(
-            target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
-        )
-
-        # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
-        sent_verified, invalid_v, failures_v = _split_and_send_with_context(
-            token_infos=target_v.tokens,
-            title=f"⚠️ {cluster_title}",
-            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
-            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
-            event_country=country_code,
-            topic=cluster_topic,
-            severity=severity,
-            collapse_key=collapse_key,
-        )
-
-        # 4. 결과 반영 (sent/failed)
-        await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
-        all_invalid.extend(invalid_v)
-
-        # 5. 일일 카운터 증가
-        await _increment_daily_push_for_tokens(target_v.tokens, redis)
-        target_v_for_count = target_v
-
-    # Fast 레인 (항상)
-    target_f = await _get_target_tokens_by_platform(
-        country_code, notify_fast=True, kscore=kscore, cluster_topic=cluster_topic, db=db
-    )
-    target_f = await _apply_daily_limits(target_f, db, redis)
-
-    # plan_locked 억제: Free 유저 중 해당 국가를 관심 등록했지만 Fast 알림 불가한 유저
-    plan_locked = await _get_plan_locked_users(country_code, db)
-    all_suppressed_fast = list(target_f.suppressed) + plan_locked
-
-    # 1. suppressed 로그
-    await _insert_suppressed_logs(
-        all_suppressed_fast, cluster_id, spike_event_id, "fast", db,
-    )
-
-    # 2. pending 로그
-    token_to_log_f = await _insert_pending_logs(
-        target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
-    )
-
-    # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
-    sent_fast, invalid_f, failures_f = _split_and_send_with_context(
-        token_infos=target_f.tokens,
-        title=f"🚨 {cluster_title}",
-        base_body=f"Severity {severity} · Fast Alert / 심각도 {severity} · 빠른 알림",
-        data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
-        event_country=country_code,
-        topic=cluster_topic,
+    """하위호환 wrapper: send_alert()로 위임."""
+    alert_kind = "combined" if is_verified else "fast"
+    return await send_alert(
+        cluster_id=cluster_id,
+        cluster_title=cluster_title,
+        country_code=country_code,
         severity=severity,
-        collapse_key=collapse_key,
+        kscore=kscore,
+        is_verified=is_verified,
+        cluster_topic=cluster_topic,
+        alert_kind=alert_kind,
+        db=db,
+        redis=redis,
+        spike_event_id=spike_event_id,
     )
-
-    # 4. 결과 반영
-    await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
-    all_invalid.extend(invalid_f)
-
-    # 5. 일일 카운터 증가
-    await _increment_daily_push_for_tokens(target_f.tokens, redis)
-
-    # 만료/무효 토큰 자동 정리
-    await cleanup_invalid_tokens(all_invalid, db)
-
-    await _set_cooldown(cluster_id, redis, severity=severity)
-
-    # ── FREE 유저 spike push 카운트 추적 (Pro 전환 프롬프트용) ──
-    try:
-        await _increment_spike_push_counts(target_v_for_count, target_f, db, redis)
-    except Exception:
-        logger.debug("spike_push_count 추적 실패 (무시)")
-
-    return {
-        "status": "sent",
-        "sent_verified": sent_verified,
-        "sent_fast": sent_fast,
-        "total": sent_verified + sent_fast,
-        "cleaned_tokens": len(all_invalid),
-    }
-
-
-_VERIFIED_COOLDOWN_KEY_PREFIX = "push:verified_cooldown:"
 
 
 async def send_verified_alert(
@@ -1033,61 +1102,20 @@ async def send_verified_alert(
     redis,
     spike_event_id: Optional[str] = None,
 ) -> dict:
-    """
-    공식확인(verified) 전환 시 알림 발송.
-    Verified 레인만 발송. 별도 쿨다운 키 사용.
-
-    Delivery Integrity: pending -> sent/failed 로깅, suppressed 로깅.
-    """
-    cooldown_key = f"{_VERIFIED_COOLDOWN_KEY_PREFIX}{cluster_id}"
-    if await redis.exists(cooldown_key):
-        logger.info("Verified 쿨다운 중 - 발송 스킵: cluster_id=%s", cluster_id)
-        return {"status": "cooldown", "sent": 0}
-
-    # cluster_id 기반 collapse — 같은 이슈 중복 푸시 방지
-    collapse_key = cluster_id
-
-    target_v = await _get_target_tokens_by_platform(
-        country_code, notify_fast=False, kscore=kscore, cluster_topic=cluster_topic, db=db
-    )
-
-    # 1. suppressed 로그
-    await _insert_suppressed_logs(
-        target_v.suppressed, cluster_id, spike_event_id, "verified", db,
-    )
-
-    # 2. pending 로그
-    token_to_log_v = await _insert_pending_logs(
-        target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
-    )
-
-    # 3. FCM 발송 (개인화된 "why this matters" 컨텍스트 포함)
-    sent_verified, invalid_v, failures_v = _split_and_send_with_context(
-        token_infos=target_v.tokens,
-        title=f"⚠️ {cluster_title}",
-        base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified / 심각도 {severity} · 확인된 이슈",
-        data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
-        event_country=country_code,
-        topic=cluster_topic,
+    """하위호환 wrapper: send_alert(alert_kind="verified")로 위임."""
+    return await send_alert(
+        cluster_id=cluster_id,
+        cluster_title=cluster_title,
+        country_code=country_code,
         severity=severity,
-        collapse_key=collapse_key,
+        kscore=kscore,
+        is_verified=True,
+        cluster_topic=cluster_topic,
+        alert_kind="verified",
+        db=db,
+        redis=redis,
+        spike_event_id=spike_event_id,
     )
-
-    # 4. 결과 반영
-    await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
-
-    # 만료/무효 토큰 자동 정리
-    await cleanup_invalid_tokens(invalid_v, db)
-
-    ttl = COOLDOWN_SECONDS_CRITICAL if severity >= 90 else COOLDOWN_SECONDS
-    await redis.setex(cooldown_key, ttl, "1")
-
-    return {
-        "status": "sent",
-        "sent_verified": sent_verified,
-        "total": sent_verified,
-        "cleaned_tokens": len(invalid_v),
-    }
 
 
 async def save_in_app_notifications(
@@ -1100,7 +1128,7 @@ async def save_in_app_notifications(
 ) -> int:
     """
     해당 국가 관심지역 사용자에게 인앱 Notification 레코드 배치 INSERT.
-    notif_type: "verified" | "spike"
+    notif_type: "verified" | "fast" (v7: "spike" → "fast")
     cluster_topic: 이벤트 토픽 (컨텍스트 생성용)
     Returns: 생성된 알림 수
     """
@@ -1132,10 +1160,10 @@ async def save_in_app_notifications(
         title = f"⚠️ {cluster_title}"
         base_body = "공식 확인된 이슈입니다 / Verified issue"
     else:
+        # v7: Fast alert → 모든 관심국가 구독자 (notify_fast 무관)
         area_filter = (
             UserArea.country_code == country_code,
             UserArea.is_active == True,
-            UserArea.notify_fast == True,
         )
         title = f"🚨 {cluster_title}"
         base_body = "속보 알림 / Breaking alert"
@@ -1159,7 +1187,7 @@ async def save_in_app_notifications(
     notifications = []
     for uid, home_country, language in rows:
         # 유저별 개인화된 컨텍스트 생성
-        context = generate_spike_context(
+        context = generate_alert_context(
             home_country=home_country or "KR",
             event_country=country_code,
             topic=cluster_topic or "unknown",

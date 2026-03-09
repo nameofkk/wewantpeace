@@ -24,7 +24,7 @@
    - 4.1 Formula
    - 4.2 Personalization
 5. [Tension Index](#5-tension-index)
-6. [Spike Detection](#6-spike-detection)
+6. [KScore Alert System](#6-kscore-alert-system)
 7. [Limitations and Known Biases](#7-limitations-and-known-biases)
 8. [Changelog](#8-changelog)
 
@@ -64,7 +64,7 @@ Clustering  --  Filtered Jaccard similarity + AI boundary judgment
 Scoring  --  KScore (per cluster) + Tension Index (per country)
     |
     v
-Alerting  --  Spike detection -> push notifications + SNS auto-posting
+Alerting  --  KScore-based alerts -> push notifications + SNS auto-posting
 ```
 
 ---
@@ -378,12 +378,12 @@ KScore = raw * 10 * decay
 **Velocity (weight: 0.30)** -- event accumulation speed:
 
 ```
-velocity_raw = min(6.0, event_count^0.7 * spike_factor)
+velocity_raw = min(6.0, event_count^0.7 * alert_factor)
 velocity_norm = velocity_raw / 6.0
 ```
 
 - `event_count` is the number of events in the cluster
-- `spike_factor` = 1.5 if the cluster is flagged as a spike, 1.0 otherwise
+- `alert_factor` = 1.5 if the cluster has triggered a KScore alert, 1.0 otherwise
 - The exponent 0.7 provides diminishing returns: small clusters (1--10 events)
   show strong differentiation, while large clusters converge toward the cap
 
@@ -442,7 +442,7 @@ even after 48 hours.
 | Extreme | >= 8.0 | Critical events: mass casualties, active wars, nuclear threats |
 
 Events with KScore below **1.5** (`KSCORE_MIN`) are excluded from the trending
-list, unless the cluster is flagged as a spike.
+list, unless the cluster has triggered a KScore alert.
 
 The top **30** clusters by KScore are stored in the `trending_keywords` table
 each cycle.
@@ -656,12 +656,12 @@ level 1.
 
 ---
 
-## 6. Spike Detection
+## 6. KScore Alert System
 
-Spikes identify clusters that represent rapidly developing, high-impact events
-requiring immediate attention. Spike detection operates on **accumulated
-cluster state** rather than real-time event rate, reflecting the batch
-collection model (5-minute polling cycles).
+KScore-based alerts identify clusters that represent rapidly developing,
+high-impact events requiring immediate attention. The alert system operates on
+**accumulated cluster state** rather than real-time event rate, reflecting the
+batch collection model (5-minute polling cycles).
 
 ### 6.1 Trigger Conditions
 
@@ -684,10 +684,10 @@ enforced per cluster via Redis:
 | Critical (severity >= 90) | 3 hours |
 | Normal | 6 hours |
 
-### 6.3 Spike Effects
+### 6.3 Alert Effects
 
-When a spike is triggered:
-1. A `SpikeEvent` record is created in the database
+When a KScore alert is triggered:
+1. An alert event record is created in the database
 2. The cluster's `is_spike` flag is set to `True`
 3. The cluster appears in trending results regardless of `KSCORE_MIN` threshold
 4. Push notifications are dispatched to users watching the affected country
@@ -765,7 +765,7 @@ but events with very similar descriptions may still be merged.
 | Version | Date | Changes |
 |---------|------|---------|
 | v6 | 2026-03-07 | KScore weight rebalance: severity 40% -> 30%, velocity 25% -> 30%, spread 20% -> 30%. Decay softened: lambda 0.04 -> 0.025, floor 0.15 -> 0.30. Filtered Jaccard introduced. Clustering window 12h -> 24h. |
-| v5 | 2026-03-07 | Source expansion 37 -> 58 channels. Spread saturation 8 -> 12. Spike thresholds tightened: event_count 5 -> 8, sources 2 -> 3. |
+| v5 | 2026-03-07 | Source expansion 37 -> 58 channels. Spread saturation 8 -> 12. KScore alert thresholds tightened: event_count 5 -> 8, sources 2 -> 3. |
 | v4 | 2026-02-27 | KScore normalized to 0--10 scale. Velocity normalized to 0--1 (fixed 63% dominance bug). KSCORE_MIN recalibrated to 1.5. |
 | v3 | 2026-02-27 | Rolling baseline normalization for Tension Index. Automatic adaptation to source volume changes. |
 | v2 | 2026-02-25 | Scaled from 10 to 37 channels. VOLUME_SATURATION 20 -> 100. TRENDING_LIMIT 20 -> 30. |
@@ -782,7 +782,7 @@ but events with very similar descriptions may still be merged.
 | Topic classification & severity | `worker/processor/normalizer.py` |
 | Clustering algorithm | `worker/processor/clusterer.py` |
 | Tension Index | `worker/processor/tension_calculator.py` |
-| Spike detection | `worker/processor/spike_detector.py` |
+| KScore alert system | `worker/processor/spike_detector.py` |
 | Convergence detection | `worker/processor/convergence_detector.py` |
 | Anomaly detection | `worker/processor/anomaly_detector.py` |
 | Impact factors | `worker/processor/calibration.py` (IMPACT_FACTORS) |

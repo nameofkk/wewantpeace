@@ -13,7 +13,7 @@ interface Viewport {
 interface FilterState {
   topics: string[];
   severityMin: number;
-  showSpikesOnly: boolean;
+  showHighKScoreOnly: boolean;
 }
 
 const FREE_COUNTRY_LIMIT = 2;
@@ -43,10 +43,10 @@ interface AppStore {
   // 내 국가 (KScore 개인화)
   homeCountry: string;
 
-  // 스파이크 알림 카운트 (구독 전환 유도)
-  spikeAlertCount: number;
-  spikeAlertDismissedAt: number | null; // timestamp
-  incrementSpikeAlertCount: () => void;
+  // 놓친 알림 카운트 (구독 전환 유도)
+  missedAlertCount: number;
+  missedAlertDismissedAt: number | null; // timestamp
+  incrementMissedAlertCount: () => void;
   dismissUpgradeNudge: () => void;
 
   // 가이드 투어
@@ -80,7 +80,7 @@ export const useAppStore = create<AppStore>()(
       activeFilters: {
         topics: ["conflict", "terror", "coup", "sanctions", "cyber", "protest"],
         severityMin: 35,
-        showSpikesOnly: false,
+        showHighKScoreOnly: false,
       },
       userPlan: "free",
       trendingTab: "global",
@@ -88,12 +88,12 @@ export const useAppStore = create<AppStore>()(
       lang: "ko",
       theme: "dark",
       homeCountry: "KR",
-      spikeAlertCount: 0,
-      spikeAlertDismissedAt: null,
-      incrementSpikeAlertCount: () =>
-        set((state) => ({ spikeAlertCount: state.spikeAlertCount + 1 })),
+      missedAlertCount: 0,
+      missedAlertDismissedAt: null,
+      incrementMissedAlertCount: () =>
+        set((state) => ({ missedAlertCount: state.missedAlertCount + 1 })),
       dismissUpgradeNudge: () =>
-        set({ spikeAlertDismissedAt: Date.now() }),
+        set({ missedAlertDismissedAt: Date.now() }),
 
       completedTours: [],
       markTourComplete: (tour) =>
@@ -141,7 +141,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: "wwp-store",
-      version: 7, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry, v6: completedTours, v7: spikeAlertCount
+      version: 8, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry, v6: completedTours, v7: spikeAlertCount, v8: missedAlertCount
       migrate: (old: unknown, version: number) => {
         const s = old as Record<string, unknown>;
         if (version < 2) {
@@ -162,6 +162,14 @@ export const useAppStore = create<AppStore>()(
         if (version < 7) {
           return { ...s, spikeAlertCount: 0, spikeAlertDismissedAt: null };
         }
+        if (version < 8) {
+          // Migrate spikeAlertCount → missedAlertCount
+          return {
+            ...s,
+            missedAlertCount: (s as Record<string, unknown>).spikeAlertCount ?? 0,
+            missedAlertDismissedAt: (s as Record<string, unknown>).spikeAlertDismissedAt ?? null,
+          };
+        }
         return s;
       },
       partialize: (state) => ({
@@ -172,8 +180,8 @@ export const useAppStore = create<AppStore>()(
         theme: state.theme,
         homeCountry: state.homeCountry,
         completedTours: state.completedTours,
-        spikeAlertCount: state.spikeAlertCount,
-        spikeAlertDismissedAt: state.spikeAlertDismissedAt,
+        missedAlertCount: state.missedAlertCount,
+        missedAlertDismissedAt: state.missedAlertDismissedAt,
       }),
     }
   )

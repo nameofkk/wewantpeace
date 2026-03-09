@@ -30,6 +30,12 @@ def is_configured() -> bool:
 
 # content_type별 맥락적 대화 유도 (generic 질문은 bait로 분류될 수 있음)
 _ENGAGE_BY_TYPE = {
+    "kscore_alert": [
+        ("How will this affect the region?", "이 지역에 어떤 영향을 미칠까요?"),
+        ("Is de-escalation still possible here?", "아직 상황 완화가 가능할까요?"),
+        ("What's the bigger picture behind this?", "이 사건의 더 큰 맥락은 뭘까요?"),
+    ],
+    # 하위호환
     "spike_alert": [
         ("How will this affect the region?", "이 지역에 어떤 영향을 미칠까요?"),
         ("Is de-escalation still possible here?", "아직 상황 완화가 가능할까요?"),
@@ -68,7 +74,7 @@ def _build_text(post: SocialPost) -> str:
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
     # content_type에 맞는 맥락적 대화 유도 문구 (generic → 콘텐츠 연관)
-    engage_list = _ENGAGE_BY_TYPE.get(post.content_type, _ENGAGE_BY_TYPE["spike_alert"])
+    engage_list = _ENGAGE_BY_TYPE.get(post.content_type, _ENGAGE_BY_TYPE["kscore_alert"])
     idx = int(hashlib.md5(str(post.id).encode()).hexdigest(), 16) % len(engage_list)
     en_q, ko_q = engage_list[idx]
     engage = f"\n\n💬 {en_q}\n{ko_q}"
@@ -151,9 +157,60 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
 
             thread_id = publish_resp.json().get("id")
             logger.info("Threads 발행 완료: thread_id=%s, post_id=%s", thread_id, post.id)
+
+            # v7: 댓글(reply) 자동 달기 — 이슈 링크 + 서비스 홍보
+            if thread_id and post.source_cluster_id:
+                try:
+                    _post_reply(client, thread_id, post.source_cluster_id)
+                except Exception as reply_err:
+                    logger.warning("Threads 댓글 실패 (무시): %s", reply_err)
+
             return str(thread_id), None
 
     except Exception as e:
         error_msg = str(e)[:500]
         logger.error("Threads 발행 실패 [post=%s]: %s", post.id, error_msg)
         return None, error_msg
+
+
+def _post_reply(client, parent_thread_id: str, cluster_id) -> None:
+    """v7: 메인 포스트에 링크+홍보 댓글 달기."""
+    reply_text = (
+        f"🔗 Full analysis: https://wewantpeace.live/issues/{cluster_id}\n"
+        f"📊 Real-time conflict tracking · WeWantPeace\n"
+        f"상세 분석 보기 · 실시간 분쟁 모니터링"
+    )
+
+    # Step 1: reply container 생성
+    create_resp = client.post(
+        f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads",
+        params={
+            "media_type": "TEXT",
+            "text": reply_text,
+            "reply_to_id": parent_thread_id,
+            "access_token": THREADS_ACCESS_TOKEN,
+        },
+    )
+    if create_resp.status_code != 200:
+        logger.warning("Reply container 실패: %s", create_resp.text[:200])
+        return
+
+    container_id = create_resp.json().get("id")
+    if not container_id:
+        return
+
+    time.sleep(2)
+
+    # Step 2: publish reply
+    publish_resp = client.post(
+        f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads_publish",
+        params={
+            "creation_id": container_id,
+            "access_token": THREADS_ACCESS_TOKEN,
+        },
+    )
+    if publish_resp.status_code == 200:
+        reply_id = publish_resp.json().get("id")
+        logger.info("Threads 댓글 발행: reply_id=%s, parent=%s", reply_id, parent_thread_id)
+    else:
+        logger.warning("Reply publish 실패: %s", publish_resp.text[:200])

@@ -615,7 +615,7 @@ async def assign_cluster(
         age_hours = (now - cluster.last_event_at).total_seconds() / 3600 if cluster.last_event_at else 0.0
         cluster.kscore, _ = _calc_kscore(
             event_count=cluster.event_count,
-            is_spike=cluster.is_spike,
+            is_spike=False,
             confidence=cluster.confidence,
             severity=cluster.severity,
             independent_sources=cluster.independent_sources or 1,

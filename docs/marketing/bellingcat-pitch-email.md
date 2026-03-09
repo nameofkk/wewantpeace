@@ -55,7 +55,7 @@ The largest single cluster tracked 119 events from 21 independent sources across
 - **Telegram channel monitoring**: Defense and security-focused Telegram channels are included as Tier-C sources -- the Khamenei succession case was first detected via this layer.
 - **Interactive crisis map**: Geolocated events plotted in real-time with severity color-coding and cluster drill-down.
 - **Tension Index**: Per-country risk score (0-100) updated every 5 minutes, with historical trends for pattern analysis.
-- **Spike detection alerts**: Anomaly-based notifications for rapid escalation events.
+- **KScore-based alerts**: Anomaly-based notifications for rapid escalation events.
 - **KScore personalization**: Key Impact Score (0-10) adjusts event importance based on geographic proximity, security alliances, and economic ties to the user's home country.
 - **Bilingual UI**: Full Korean/English toggle.
 
@@ -70,7 +70,7 @@ All scoring formulas (KScore, Tension Index), source tier definitions, classific
 - **Clustering**: Title similarity (40%+ threshold) + country/topic matching
 - **Stack**: FastAPI, PostgreSQL + TimescaleDB, Next.js, Railway
 
-The platform is free to use (trending issues, tension overview, spike alerts). No account required to browse.
+The platform is free to use (trending issues, tension overview, KScore alerts). No account required to browse.
 
 I'd welcome the opportunity to provide a walkthrough, answer technical questions, or discuss how the system could complement existing OSINT investigation workflows.
 
@@ -114,7 +114,7 @@ Across 50 high-severity event clusters, non-traditional sources (regional media 
 
 ### How journalists can use it
 
-1. **Early signal detection**: Monitor a region and get alerts when event counts spike abnormally
+1. **Early signal detection**: Monitor a region and get KScore-based alerts when event counts surge abnormally
 2. **Source corroboration**: See how many independent sources are reporting the same event, with tier labels (A/B/C) for provenance assessment
 3. **Trend analysis**: Country-level Tension Index (0-100) with historical charts for identifying escalation patterns
 4. **Geographic context**: Interactive map with severity-coded clusters and drill-down
@@ -145,7 +145,7 @@ Hi OCCRP team,
 
 I'd like to share WeWantPeace as a potential tool for your investigative network.
 
-WeWantPeace is a free, real-time global conflict monitoring platform that aggregates ~200 open sources (international wire services, regional media, and Telegram OSINT channels) every 3-5 minutes across 195 countries. It automatically clusters related events, scores severity, and provides early warning through anomaly-based spike detection.
+WeWantPeace is a free, real-time global conflict monitoring platform that aggregates ~200 open sources (international wire services, regional media, and Telegram OSINT channels) every 3-5 minutes across 195 countries. It automatically clusters related events, scores severity, and provides early warning through KScore-based alert detection.
 
 **Live platform:** https://www.wewantpeace.live
 **Open methodology:** https://github.com/nameofkk/wewantpeace-methodology
