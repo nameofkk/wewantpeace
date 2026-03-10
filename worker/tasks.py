@@ -590,9 +590,9 @@ def process_raw_event(self, raw_event_id: str):
         if should_alert_fast and cluster_id:
             alert_kind = "combined" if cluster.is_verified else "fast"
             push_alert.delay(cluster_id, alert_kind)
-
-        # 공식확인 전환 시 verified 알림 태스크 체이닝
-        if just_verified and cluster_id:
+            # combined은 이미 verified 레인을 포함하므로 별도 verified 불필요
+        elif just_verified and cluster_id:
+            # fast 트리거 없이 verified만 전환된 경우에만 별도 발송
             push_alert.delay(cluster_id, "verified")
 
         return {

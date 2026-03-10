@@ -125,7 +125,7 @@ class _TokenInfo:
         fcm_token: str,
         platform: str,
         user_id: _uuid.UUID,
-        home_country: str = "KR",
+        home_country: str = "",
         language: str = "ko",
         tz_name: str = "",
     ):
@@ -243,7 +243,7 @@ async def _get_target_tokens_by_platform(
             except (ZoneInfoNotFoundError, Exception):
                 pass  # timezone 파싱 실패 시 조용한 시간 무시
 
-        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason, home_country or "KR", language or "ko", tz_name or ""))
+        user_rows[user_id].append((fcm_token, platform or "web", last_seen_at, suppression_reason, home_country or "", language or "ko", tz_name or ""))
 
     # 2차: 유저당 last_seen_at 최신 1개 토큰만 선택 (PRD 8.5)
     tokens: list[_TokenInfo] = []
@@ -440,12 +440,18 @@ def generate_alert_context(
     """
     from worker.processor.calibration import IMPACT_FACTORS, TOPIC_IMPACT_WEIGHTS
 
+    # BASIC(빈 문자열) 기준국가 → 글로벌 알림
+    if not home_country:
+        if lang == "ko":
+            return "📍 글로벌 긴장도 상승 — 주시 필요"
+        return "📍 Global tension rising — monitor"
+
     factors = IMPACT_FACTORS.get(home_country, {}).get(event_country)
     if not factors:
         # 등록되지 않은 국가쌍: 글로벌 폴백
         if lang == "ko":
-            return "글로벌 긴장도 상승 — 주시 필요"
-        return "Global tension rising — monitor"
+            return "📍 글로벌 긴장도 상승 — 주시 필요"
+        return "📍 Global tension rising — monitor"
 
     # TOPIC_IMPACT_WEIGHTS로 가중 점수 계산, 가장 높은 요인 선택
     weights = TOPIC_IMPACT_WEIGHTS.get(topic, TOPIC_IMPACT_WEIGHTS["unknown"])
@@ -476,7 +482,7 @@ def generate_alert_context(
         else:
             desc = "Global development — FYI"
 
-    return f"{home_label}: {desc}"
+    return f"📍 {home_label} 관점: {desc}"
 
 
 # 하위호환 alias
@@ -1015,6 +1021,7 @@ async def send_alert(
     sent_verified = 0
     sent_fast = 0
     all_invalid: list[str] = []
+    verified_user_ids: set[_uuid.UUID] = set()  # combined 모드에서 fast 레인 중복 제거용
 
     # ── Verified 레인 (combined 또는 verified) ──
     if alert_kind in ("verified", "combined") and is_verified:
@@ -1052,6 +1059,7 @@ async def send_alert(
         await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
         all_invalid.extend(invalid_v)
         await _increment_daily_push_for_tokens(target_v.tokens, redis)
+        verified_user_ids = {t.user_id for t in target_v.tokens}
 
         # Redis 중복방지 설정
         await redis.setex(f"alert:verified:{cluster_id}", 259200, "1")  # 72h
@@ -1062,6 +1070,14 @@ async def send_alert(
             country_code, notify_fast=True, kscore=kscore,
             cluster_topic=cluster_topic, db=db, alert_kind="fast",
         )
+
+        # combined 모드: verified 레인에서 이미 발송한 유저 제외 (중복 알림 방지)
+        if alert_kind == "combined" and verified_user_ids:
+            target_f = _TargetResult(
+                tokens=[t for t in target_f.tokens if t.user_id not in verified_user_ids],
+                suppressed=target_f.suppressed,
+            )
+
         target_f = await _apply_daily_limits(target_f, db, redis, severity=severity)
 
         await _insert_suppressed_logs(
