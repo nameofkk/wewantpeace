@@ -308,6 +308,8 @@ async def update_user(
     if body.plan is not None:
         user.plan = body.plan
         changes["plan"] = body.plan
+        # 어드민 수동 플랜 설정 플래그 (expire_subscriptions 다운그레이드 방지)
+        user.admin_plan_override = body.plan != "free"
         # 플랜 변경 시 관심국가 활성화 동기화
         await sync_area_activation(user.id, body.plan, db)
         # 어드민이 free로 변경 시 활성 구독도 취소 (웹훅이 플랜 복원하는 버그 방지)

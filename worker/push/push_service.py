@@ -62,6 +62,39 @@ DAILY_PUSH_LIMITS = {
     "pro_plus": 100,
 }
 _DAILY_PUSH_KEY_PREFIX = "push:daily:"
+_DAILY_LIMIT_NOTIFIED_PREFIX = "push:daily_limit_notified:"
+
+# 일일 상한 도달 알림 텍스트
+_DAILY_LIMIT_MESSAGES = {
+    "ko": {
+        "free": {
+            "title": "오늘의 알림 상한 도달",
+            "body": "오늘 알림 {limit}건을 모두 받았습니다. Pro로 업그레이드하면 일일 20건까지 받을 수 있습니다.",
+        },
+        "pro": {
+            "title": "오늘의 알림 상한 도달",
+            "body": "오늘 알림 {limit}건을 모두 받았습니다. Pro+로 업그레이드하면 일일 100건까지 받을 수 있습니다.",
+        },
+        "pro_plus": {
+            "title": "오늘의 알림 상한 도달",
+            "body": "오늘 알림 {limit}건을 모두 받았습니다. 내일 자정에 초기화됩니다.",
+        },
+    },
+    "en": {
+        "free": {
+            "title": "Daily alert limit reached",
+            "body": "You've received all {limit} alerts for today. Upgrade to Pro for up to 20 daily alerts.",
+        },
+        "pro": {
+            "title": "Daily alert limit reached",
+            "body": "You've received all {limit} alerts for today. Upgrade to Pro+ for up to 100 daily alerts.",
+        },
+        "pro_plus": {
+            "title": "Daily alert limit reached",
+            "body": "You've received all {limit} alerts for today. Resets at midnight.",
+        },
+    },
+}
 
 
 def _cooldown_key(cluster_id: str) -> str:
@@ -281,6 +314,52 @@ async def _get_target_tokens_by_platform(
     return _TargetResult(tokens, suppressed)
 
 
+async def _send_daily_limit_notification(
+    token_info: _TokenInfo, plan: str, redis,
+) -> None:
+    """일일 상한 도달 시 1회 알림 발송 (Redis 키로 중복 방지)."""
+    uid = str(token_info.user_id)
+    tz_name = token_info.tz_name
+    if tz_name:
+        try:
+            today = datetime.now(ZoneInfo(tz_name)).strftime("%Y-%m-%d")
+        except (ZoneInfoNotFoundError, Exception):
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    notified_key = f"{_DAILY_LIMIT_NOTIFIED_PREFIX}{uid}:{today}"
+    # 이미 보냈으면 스킵
+    already = await redis.get(notified_key)
+    if already:
+        return
+
+    # 중복 방지 마킹
+    await redis.setex(notified_key, 86400, "1")
+
+    lang = token_info.language or "ko"
+    lang_key = lang if lang in _DAILY_LIMIT_MESSAGES else "ko"
+    plan_key = plan if plan in _DAILY_LIMIT_MESSAGES[lang_key] else "free"
+    limit = DAILY_PUSH_LIMITS.get(plan, DAILY_PUSH_LIMITS["free"])
+
+    msgs = _DAILY_LIMIT_MESSAGES[lang_key][plan_key]
+    title = msgs["title"]
+    body = msgs["body"].format(limit=limit)
+    data = {"type": "daily_limit", "plan": plan}
+
+    try:
+        _split_and_send(
+            token_infos=[token_info],
+            title=title,
+            body=body,
+            data=data,
+            severity=0,
+        )
+        logger.info("일일 상한 도달 알림 발송: user=%s plan=%s limit=%d", uid, plan, limit)
+    except Exception as e:
+        logger.warning("일일 상한 알림 발송 실패: user=%s err=%s", uid, e)
+
+
 async def _apply_daily_limits(
     target: _TargetResult, db: AsyncSession, redis,
     severity: int = 0,
@@ -289,6 +368,8 @@ async def _apply_daily_limits(
 
     v7 Critical 바이패스: severity >= CRITICAL_SEVERITY_MIN(80) AND plan in ("pro","pro_plus")
     → 일일 상한 무시.
+
+    상한 첫 도달 시 "오늘 알림 최대치 도달 + 업그레이드 안내" 알림 1회 발송.
     """
     from worker.processor.calibration import CRITICAL_SEVERITY_MIN
     if not target.tokens:
@@ -315,6 +396,8 @@ async def _apply_daily_limits(
         exceeded = await _check_daily_limit(str(t.user_id), plan, redis, tz_name=t.tz_name)
         if exceeded:
             extra_suppressed.append(_SuppressedInfo(t.user_id, t.platform, "daily_limit"))
+            # 상한 첫 도달 시 알림 발송 (1회)
+            await _send_daily_limit_notification(t, plan, redis)
             # v7: Free 유저 놓친 알림 카운터 추적
             if plan == "free":
                 try:

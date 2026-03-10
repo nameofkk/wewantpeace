@@ -42,6 +42,9 @@ class User(Base):
     referred_by_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
     referral_pro_expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
+    # 어드민 수동 플랜 설정 (expire_subscriptions 크론에서 다운그레이드 방지)
+    admin_plan_override: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
+
     # 정지
     suspended_until: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     suspend_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)

@@ -202,6 +202,7 @@ async def start_trial(
     db.add(sub)
 
     current_user.plan = "pro"
+    current_user.admin_plan_override = False
     await sync_area_activation(current_user.id, "pro", db)
     await db.flush()
 
@@ -265,6 +266,7 @@ async def redeem_promo(
     db.add(sub)
 
     current_user.plan = promo["plan"]
+    current_user.admin_plan_override = False
     await sync_area_activation(current_user.id, promo["plan"], db)
     await db.flush()
 

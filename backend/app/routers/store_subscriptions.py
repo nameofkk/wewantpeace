@@ -204,6 +204,7 @@ async def restore_purchase(
             user = user_result.scalar_one_or_none()
             if user:
                 user.plan = sub.plan
+                user.admin_plan_override = False
                 await sync_area_activation(current_user.id, sub.plan, db)
             await db.flush()
             return {"status": "ok", "plan": sub.plan}
@@ -232,6 +233,7 @@ async def restore_purchase(
             user = user_result.scalar_one_or_none()
             if user:
                 user.plan = sub.plan
+                user.admin_plan_override = False
                 await sync_area_activation(current_user.id, sub.plan, db)
             await db.flush()
             return {"status": "ok", "plan": sub.plan}

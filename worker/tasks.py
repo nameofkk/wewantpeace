@@ -1146,6 +1146,10 @@ def expire_subscriptions(self):
 
                 downgraded = 0
                 for user in users:
+                    # 어드민이 수동 설정한 플랜은 다운그레이드하지 않음
+                    if getattr(user, "admin_plan_override", False):
+                        continue
+
                     # 구독 레코드가 아예 없으면 어드민이 수동 부여한 플랜 → 건드리지 않음
                     any_sub_result = await db.execute(
                         select(Subscription).where(

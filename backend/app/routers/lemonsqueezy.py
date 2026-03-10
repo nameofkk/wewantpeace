@@ -352,8 +352,9 @@ async def _handle_subscription_created(
         )
         db.add(sub)
 
-    # user.plan 변경
+    # user.plan 변경 (정상 결제 → admin_plan_override 해제)
     user.plan = plan
+    user.admin_plan_override = False
     await sync_area_activation(user_id, plan, db)
     await db.flush()
 
