@@ -1043,18 +1043,25 @@ async def send_alert(
 
         _title_en = f"⚠️ {cluster_title}"
         _title_ko = f"⚠️ {cluster_title_ko or cluster_title}"
+        # combined 모드: 속보 + 신뢰 동시 충족 표시
+        if alert_kind == "combined":
+            _vbody_ko = f"심각도 {severity} · KScore {kscore:.1f} · 속보 + 신뢰 알림"
+            _vbody_en = f"Severity {severity} · KScore {kscore:.1f} · Fast + Verified"
+        else:
+            _vbody_ko = f"심각도 {severity} · KScore {kscore:.1f} · 신뢰 알림"
+            _vbody_en = f"Severity {severity} · KScore {kscore:.1f} · Verified Alert"
         sent_verified, invalid_v, failures_v = _split_and_send_with_context(
             token_infos=target_v.tokens,
             title=_title_en,
-            base_body=f"Severity {severity} · KScore {kscore:.1f} · Verified",
+            base_body=_vbody_en,
             data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
             event_country=country_code,
             topic=cluster_topic,
             severity=severity,
             collapse_key=collapse_key,
             title_ko=_title_ko,
-            body_ko=f"심각도 {severity} · KScore {kscore:.1f} · 신뢰 알림",
-            body_en=f"Severity {severity} · KScore {kscore:.1f} · Verified Alert",
+            body_ko=_vbody_ko,
+            body_en=_vbody_en,
         )
         await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
         all_invalid.extend(invalid_v)
