@@ -537,6 +537,12 @@ export const translations = {
     privacy_contact: "문의",
     privacy_terms_link: "이용약관",
 
+    refund_title: "환불 정책",
+    refund_date: "시행일: 2026년 3월 10일 · 버전 1.0",
+    refund_contact: "문의",
+    refund_terms_link: "이용약관",
+    refund_privacy_link: "개인정보처리방침",
+
     // notification settings
     notif_verified_title: "확인된 이슈 알림",
     notif_verified_desc: "공식 확인된 이슈 발생 시 알림 수신",
@@ -1837,6 +1843,12 @@ export const translations = {
     privacy_compliance: "WeWantPeace complies with the Personal Information Protection Act and the Act on Promotion of Information and Communications Network Utilization and Information Protection.",
     privacy_contact: "Contact",
     privacy_terms_link: "Terms of Service",
+
+    refund_title: "Refund Policy",
+    refund_date: "Effective: March 10, 2026 · Version 1.0",
+    refund_contact: "Contact",
+    refund_terms_link: "Terms of Service",
+    refund_privacy_link: "Privacy Policy",
 
     // notification settings
     notif_verified_title: "Verified Issue Alerts",

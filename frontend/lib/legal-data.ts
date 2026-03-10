@@ -204,3 +204,57 @@ export const PRIVACY_EN = [
     content: `Personal information may be transferred overseas to provide the Service:\n• Firebase Authentication (Google LLC, USA): member authentication and management\n• Google Play (Google LLC, USA): in-app purchase processing and subscription management\n• Items transferred: Firebase UID, email address, payment information\n• Transfer method: transmission via network\n• Protected under each provider's privacy policies.`,
   },
 ];
+
+export const REFUND_KO = [
+  {
+    title: "1. 환불 정책 개요",
+    content: `wewantpeace는 구독 기반 SaaS 서비스입니다. 본 환불 정책은 유료 구독(Pro, Pro+)에 적용됩니다.\n무료(Free/BASIC) 플랜은 결제가 없으므로 환불 대상이 아닙니다.`,
+  },
+  {
+    title: "2. 구독 취소",
+    content: `① 회원은 언제든지 설정 > 구독 관리에서 구독을 취소할 수 있습니다.\n② 구독 취소 시 현재 결제 기간이 끝날 때까지 Pro/Pro+ 기능을 계속 이용할 수 있습니다.\n③ 결제 기간 만료 후 자동으로 무료 플랜으로 전환됩니다.\n④ 구독 취소는 즉시 처리되며, 다음 결제일부터 요금이 청구되지 않습니다.`,
+  },
+  {
+    title: "3. 환불 요청",
+    content: `① 결제일로부터 7일 이내에 환불을 요청하면 전액 환불해 드립니다.\n② 7일 이후에는 환불이 제공되지 않으며, 구독 취소만 가능합니다.\n③ 환불 요청은 이메일(${CONTACT_EMAIL})로 접수해 주세요.\n④ 환불 처리는 요청일로부터 영업일 기준 7일 이내에 완료됩니다.`,
+  },
+  {
+    title: "4. 환불 불가 사유",
+    content: `다음의 경우 환불이 제공되지 않습니다:\n• 결제일로부터 7일이 경과한 경우\n• 서비스를 상당 부분 이용한 경우\n• 이용약관 위반으로 계정이 정지된 경우\n• 회원의 단순 변심에 의한 요청 (7일 이내 제외)`,
+  },
+  {
+    title: "5. 플랜 변경",
+    content: `① Pro에서 Pro+로 업그레이드 시 차액이 즉시 청구됩니다.\n② Pro+에서 Pro로 다운그레이드 시 현재 결제 기간 만료 후 적용됩니다.\n③ 플랜 변경은 설정 > 구독 관리에서 진행할 수 있습니다.`,
+  },
+  {
+    title: "6. 문의",
+    content: `환불 관련 문의: ${CONTACT_EMAIL}\n처리 시간: 영업일 기준 1~3일 이내 답변`,
+  },
+];
+
+export const REFUND_EN = [
+  {
+    title: "1. Refund Policy Overview",
+    content: `WeWantPeace is a subscription-based SaaS service. This refund policy applies to paid subscriptions (Pro, Pro+).\nThe free (Free/BASIC) plan involves no payment and is not subject to refunds.`,
+  },
+  {
+    title: "2. Subscription Cancellation",
+    content: `① Members may cancel their subscription at any time via Settings > Subscription Management.\n② Upon cancellation, Pro/Pro+ features remain accessible until the end of the current billing period.\n③ After the billing period expires, the account automatically reverts to the free plan.\n④ Cancellations are processed immediately, and no charges will be made from the next billing date.`,
+  },
+  {
+    title: "3. Refund Requests",
+    content: `① Full refunds are available if requested within 7 days of the payment date.\n② After 7 days, refunds are not available; only subscription cancellation is possible.\n③ Refund requests should be submitted via email (${CONTACT_EMAIL}).\n④ Refunds are processed within 7 business days of the request.`,
+  },
+  {
+    title: "4. Non-Refundable Cases",
+    content: `Refunds are not available in the following cases:\n• More than 7 days have passed since the payment date\n• The service has been substantially used\n• The account has been suspended due to Terms of Service violations\n• Simple change of mind (except within the 7-day period)`,
+  },
+  {
+    title: "5. Plan Changes",
+    content: `① Upgrading from Pro to Pro+ will result in an immediate prorated charge.\n② Downgrading from Pro+ to Pro takes effect after the current billing period ends.\n③ Plan changes can be made via Settings > Subscription Management.`,
+  },
+  {
+    title: "6. Contact",
+    content: `Refund inquiries: ${CONTACT_EMAIL}\nResponse time: within 1-3 business days`,
+  },
+];
