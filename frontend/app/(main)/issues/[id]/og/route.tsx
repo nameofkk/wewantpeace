@@ -6,20 +6,17 @@ export const runtime = "edge";
 const size = { width: 1200, height: 630 };
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// ── 커스텀 폰트 (모듈 레벨, 첫 요청 시 1회 fetch) ──
-// 영문 헤드라인: Noto Serif KR Black (900)
+// ── 커스텀 폰트 (빌드 시 번들링, 런타임 외부 fetch 없음) ──
 const notoSerifKrFont = fetch(
-  "https://fonts.gstatic.com/s/notoserifkr/v31/3JnoSDn90Gmq2mr3blnHaTZXbOtLJDvui3JOnchPf852.ttf"
+  new URL("../../_fonts/NotoSerifKR-Black-latin.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-// 한국어 헤드라인: Gothic A1 Black (900)
 const gothicA1Font = fetch(
-  "https://fonts.gstatic.com/s/gothica1/v18/CSR44z5ZnPydRjlCCwlC6OAKSA.ttf"
+  new URL("../../_fonts/GothicA1-Black-subset.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-// 본문: Inter Semi-Bold (600)
 const interFont = fetch(
-  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf"
+  new URL("../../_fonts/Inter-SemiBold.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
 const TOPIC: Record<string, { ko: string; en: string }> = {

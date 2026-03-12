@@ -7,20 +7,17 @@ const size = { width: 1200, height: 630 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-// ── 커스텀 폰트 ──
-// 영문 헤드라인: Noto Serif KR Black (900)
+// ── 커스텀 폰트 (빌드 시 번들링, 런타임 외부 fetch 없음) ──
 const notoSerifKrFont = fetch(
-  "https://fonts.gstatic.com/s/notoserifkr/v31/3JnoSDn90Gmq2mr3blnHaTZXbOtLJDvui3JOnchPf852.ttf"
+  new URL("../../../_fonts/NotoSerifKR-Black-latin.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-// 한국어 헤드라인: Gothic A1 Black (900)
 const gothicA1Font = fetch(
-  "https://fonts.gstatic.com/s/gothica1/v18/CSR44z5ZnPydRjlCCwlC6OAKSA.ttf"
+  new URL("../../../_fonts/GothicA1-Black-subset.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
-// 본문: Inter Semi-Bold (600)
 const interFont = fetch(
-  "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYMZg.ttf"
+  new URL("../../../_fonts/Inter-SemiBold.ttf", import.meta.url)
 ).then((r) => r.arrayBuffer()).catch((): null => null);
 
 const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
@@ -177,15 +174,22 @@ export async function GET(
   for (const imgUrl of candidateUrls) {
     if (bgImageSrc) break;
     try {
-      const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(3000) });
+      // WebP → JPEG 변환: wsrv.nl 프록시 사용 (Satori WebP 미지원)
+      const isWebP = /\.webp(\?|$)/i.test(imgUrl);
+      const fetchUrl = isWebP
+        ? `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&output=jpg&q=80&w=1200`
+        : imgUrl;
+      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
       if (!imgRes.ok) continue;
       const ct = imgRes.headers.get("content-type") || "";
       const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
-      if (!ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t))) continue;
+      const isAllowed = isWebP || ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t));
+      if (!isAllowed) continue;
       if (cl > 0 && cl > MAX_IMAGE_BYTES) continue;
       const buf = await imgRes.arrayBuffer();
       if (buf.byteLength <= MAX_IMAGE_BYTES) {
-        bgImageSrc = `data:${ct};base64,${Buffer.from(buf).toString("base64")}`;
+        const mimeType = isWebP ? "image/jpeg" : ct;
+        bgImageSrc = `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`;
       }
     } catch {}
   }
