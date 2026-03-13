@@ -194,19 +194,13 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
 
         {/* CTA 버튼 */}
         <div className="px-6 pb-4 space-y-3">
-          {isWeb ? (
-            <div className="w-full rounded-xl py-3.5 text-sm font-bold text-center bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-400 border border-blue-500/20">
-              {lang === "ko" ? "앱에서 구독하세요" : "Subscribe in App"}
-            </div>
-          ) : (
-            <button
-              onClick={handleUpgrade}
-              className="w-full rounded-xl py-3.5 text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all active:scale-[0.98]"
-            >
-              <Zap className="inline h-4 w-4 mr-1.5 -mt-0.5" />
-              {lang === "ko" ? "Pro 무료 체험 시작" : "Start Pro Free Trial"}
-            </button>
-          )}
+          <button
+            onClick={handleUpgrade}
+            className="w-full rounded-xl py-3.5 text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all active:scale-[0.98]"
+          >
+            <Zap className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+            {lang === "ko" ? "Pro 시작하기 — $3.90/월" : "Start Pro — $3.90/mo"}
+          </button>
 
           <button
             onClick={handleClose}
