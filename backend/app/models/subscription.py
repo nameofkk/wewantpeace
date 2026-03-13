@@ -24,10 +24,10 @@ class Subscription(Base):
     store_transaction_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     store_original_transaction_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
     auto_renewing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    # LemonSqueezy 필드
-    ls_subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    ls_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    ls_variant_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # DodoPayments 필드
+    dodo_subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dodo_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dodo_product_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # 기간
     started_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)

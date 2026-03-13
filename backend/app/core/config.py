@@ -107,13 +107,12 @@ class Settings(BaseSettings):
     toss_decryption_key: str = ""      # 유저 정보 복호화 키 (AES-256-GCM)
     toss_decryption_aad: str = ""      # 복호화 AAD
 
-    # LemonSqueezy
-    lemonsqueezy_api_key: str = ""
-    lemonsqueezy_webhook_secret: str = ""
-    lemonsqueezy_store_id: str = ""
-    lemonsqueezy_variant_pro: str = ""
-    lemonsqueezy_variant_proplus: str = ""
-    lemonsqueezy_welcome_discount: str = ""  # e.g. "WELCOME30"
+    # DodoPayments
+    dodo_api_key: str = ""           # DODO_API_KEY
+    dodo_webhook_key: str = ""       # DODO_WEBHOOK_KEY
+    dodo_product_pro: str = ""       # DodoPayments Pro 상품 ID
+    dodo_product_proplus: str = ""   # DodoPayments Pro+ 상품 ID
+    dodo_environment: str = "live_mode"  # "test_mode" | "live_mode"
 
     # SMTP (마케팅 메일링)
     smtp_host: str = "smtp.naver.com"

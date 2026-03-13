@@ -2173,7 +2173,7 @@ async def get_kpi(
         ).where(
             Subscription.user_id.in_(
                 select(Subscription.user_id).where(
-                    Subscription.platform == "lemonsqueezy",
+                    Subscription.platform == "dodopayments",
                     Subscription.status == "active",
                 )
             )
@@ -2193,7 +2193,7 @@ async def get_kpi(
 
     discount_converted = (await db.execute(
         select(func.count()).select_from(Subscription).where(
-            Subscription.platform == "lemonsqueezy",
+            Subscription.platform == "dodopayments",
             Subscription.status == "active",
             Subscription.started_at >= cutoff,
             Subscription.user_id.in_(

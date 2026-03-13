@@ -11,7 +11,7 @@ import { detectPlatform, type AppPlatform } from "@/lib/platform-detect";
 import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { API_BASE, useMe, createLemonSqueezyCheckout } from "@/lib/api";
+import { API_BASE, useMe, createDodoCheckout } from "@/lib/api";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
@@ -202,7 +202,7 @@ function UpgradeContent() {
 
     try {
       if (isWeb) {
-        await handleLemonSqueezyCheckout(planId);
+        await handleDodoCheckout(planId);
       } else if (platform === "android-native" || platform === "android-twa") {
         await handleAndroidPurchase(planId);
       } else if (platform === "ios-native" || platform === "ios-app") {
@@ -385,8 +385,8 @@ function UpgradeContent() {
     router.push(`/upgrade/success?plan=${planId}`);
   }
 
-  async function handleLemonSqueezyCheckout(planId: string) {
-    const { checkout_url } = await createLemonSqueezyCheckout(planId);
+  async function handleDodoCheckout(planId: string) {
+    const { checkout_url } = await createDodoCheckout(planId);
     if (checkout_url) {
       window.location.href = checkout_url;
     }
