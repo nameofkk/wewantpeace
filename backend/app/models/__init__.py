@@ -16,6 +16,7 @@ from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
 from backend.app.models.partner import Partner
 from backend.app.models.short_link import ShortLink, LinkClick
 from backend.app.models.social_post import SocialPost, SocialPostPlatform
+from backend.app.models.economic_data import TradeBilateral, EconomicIndicator, ExchangeRate
 
 __all__ = [
     "SourceChannel",
@@ -43,4 +44,7 @@ __all__ = [
     "LinkClick",
     "SocialPost",
     "SocialPostPlatform",
+    "TradeBilateral",
+    "EconomicIndicator",
+    "ExchangeRate",
 ]

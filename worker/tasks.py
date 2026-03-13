@@ -367,6 +367,31 @@ def collect_travel_advisory(self):
 
 
 @app.task(
+    name="worker.tasks.collect_economic_data",
+    queue="collect",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=600,
+)
+def collect_economic_data(self):
+    """경제 데이터 수집 (매일 04:00 UTC) — IMF/World Bank/Frankfurter"""
+    _record_heartbeat("collect_economic_data")
+
+    async def _run():
+        from worker.collector.economic_data_collector import collect_all_economic_data
+        async with AsyncSessionLocal() as db:
+            results = await collect_all_economic_data(db)
+            logger.info("경제 데이터 수집 완료: %s", results)
+            return results
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("경제 데이터 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
     bind=True,

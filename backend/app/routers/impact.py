@@ -24,6 +24,12 @@ from backend.app.models.user import User
 from backend.app.models.issue_cluster import IssueCluster
 from backend.app.models.normalized_event import NormalizedEvent
 
+from worker.processor.calibration import (
+    IMPACT_FACTORS,
+    TOPIC_IMPACT_WEIGHTS,
+    DEFAULT_IMPACT_FACTOR,
+)
+
 import structlog
 
 logger = structlog.get_logger()
@@ -31,6 +37,58 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+
+
+def calc_impact_factor(
+    event_country: str,
+    topic: str,
+    home_country: str = "KR",
+) -> float:
+    """서버사이드 impact factor 계산 (calibration.py 데이터 기반)"""
+    if not home_country:
+        return 1.0
+    country_factors = IMPACT_FACTORS.get(home_country)
+    if not country_factors:
+        return DEFAULT_IMPACT_FACTOR
+    f = country_factors.get(event_country)
+    if not f:
+        return DEFAULT_IMPACT_FACTOR
+    w = TOPIC_IMPACT_WEIGHTS.get(topic, TOPIC_IMPACT_WEIGHTS.get("unknown", {}))
+    return w.get("geo", 0.33) * f.get("geo", 0.5) + \
+           w.get("sec", 0.34) * f.get("sec", 0.5) + \
+           w.get("eco", 0.33) * f.get("eco", 0.5)
+
+
+def calc_personalized_impact_score(
+    severity: int,
+    kscore: float,
+    event_country: str,
+    topic: str,
+    home_country: str,
+) -> int:
+    """개인화된 Impact Score (0-100)
+
+    공식: severity × impact_factor × topic_weight_boost + kscore_contribution
+    - impact_factor: 사용자 홈 국가와 이벤트 국가 간 관계 (0-1)
+    - topic_weight_boost: 토픽별 가중 (conflict/terror = 높음, diplomacy = 낮음)
+    - kscore_contribution: KScore × 2 (트렌드 반영, 기존 3에서 조정)
+    """
+    factor = calc_impact_factor(event_country, topic, home_country)
+
+    # 토픽별 심각도 부스터 (conflict/terror = 1.2, diplomacy/health = 0.8)
+    topic_severity_boost = {
+        "conflict": 1.2, "terror": 1.3, "coup": 1.2,
+        "sanctions": 1.0, "cyber": 0.9, "protest": 0.8,
+        "diplomacy": 0.7, "maritime": 0.9, "disaster": 1.0,
+        "health": 0.8, "unknown": 0.9,
+    }
+    boost = topic_severity_boost.get(topic, 0.9)
+
+    # 최종 계산: severity 기반(70%) + kscore 기반(30%)
+    severity_component = severity * factor * boost * 0.7
+    kscore_component = min(30, kscore * 3)  # KScore max 10 × 3 = 30
+
+    return min(100, max(0, int(severity_component + kscore_component)))
 
 
 # ── Phase 2: Impact Brief ──────────────────────────────────────────────────
@@ -84,24 +142,87 @@ async def _generate_impact_brief(
     cluster_topic = cluster.topic or "unknown"
     country_code = cluster.country_code or "Unknown"
 
+    # Impact factor 계산 (GPT 컨텍스트 강화용)
+    impact_factor = calc_impact_factor(country_code, cluster_topic, home_country)
+    impact_score = calc_personalized_impact_score(
+        cluster.severity or 0, cluster.kscore or 0,
+        country_code, cluster_topic, home_country,
+    )
+
+    # 홈 국가-영향 국가 간 교역 관계 파악
+    sector_data = SECTOR_DATA.get(home_country, {})
+    related_sectors = []
+    for sector, info in sector_data.items():
+        if country_code in info.get("key_partners", []):
+            rank = info["key_partners"].index(country_code) + 1
+            labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+            related_sectors.append(f"{labels.get(sector, sector)} (#{rank} partner, {info['gdp_pct']}% GDP)")
+    trade_context = "\n".join(f"- {s}" for s in related_sectors) if related_sectors else "No major direct trade relationship."
+
+    # Tier 2: DB에서 실 교역 데이터 보강
+    try:
+        from backend.app.models.economic_data import TradeBilateral, EconomicIndicator
+        trade_q = await db.execute(
+            select(TradeBilateral.total_trade_usd, TradeBilateral.period)
+            .where(
+                TradeBilateral.reporter_code == home_country,
+                TradeBilateral.partner_code == country_code,
+                TradeBilateral.period_type == "A",
+            )
+            .order_by(TradeBilateral.period.desc())
+            .limit(1)
+        )
+        trade_row = trade_q.first()
+        if trade_row and trade_row[0]:
+            trade_context += f"\n- Bilateral trade volume: ${trade_row[0]:,.0f}M USD ({trade_row[1]})"
+
+        # GDP 데이터
+        for cc in [home_country, country_code]:
+            gdp_q = await db.execute(
+                select(EconomicIndicator.value, EconomicIndicator.year)
+                .where(
+                    EconomicIndicator.country_code == cc,
+                    EconomicIndicator.indicator_code == "NY.GDP.MKTP.CD",
+                )
+                .order_by(EconomicIndicator.year.desc())
+                .limit(1)
+            )
+            gdp_row = gdp_q.first()
+            if gdp_row and gdp_row[0]:
+                trade_context += f"\n- {cc} GDP: ${gdp_row[0] / 1e9:,.1f}B USD ({gdp_row[1]})"
+    except Exception:
+        pass  # Tier 2 테이블 미생성 시 무시
+
+    # 긴장도 데이터 조회
+    from backend.app.models.tension import TensionIndex
+    tension_q = await db.execute(
+        select(TensionIndex.raw_score)
+        .where(TensionIndex.country_code == country_code)
+        .order_by(TensionIndex.calculated_at.desc())
+        .limit(1)
+    )
+    tension_score = tension_q.scalar_one_or_none() or 0
+
     if OPENAI_KEY:
         try:
             from openai import OpenAI
             client = OpenAI(api_key=OPENAI_KEY)
 
-            system_prompt = """You are an expert geopolitical risk analyst.
-Analyze how a global conflict/crisis affects a specific country across three dimensions:
-1. Economy: GDP, inflation, supply chain, energy prices
-2. Trade: imports/exports, sanctions, shipping routes
-3. Travel: safety advisories, flight disruptions, visa restrictions
+            system_prompt = """You are an expert geopolitical risk analyst providing impact assessments for a conflict monitoring platform.
 
-IMPORTANT RULES:
-- NEVER give investment advice or mention stocks/securities
-- Use phrases like "potential impact" not "will cause"
-- Always note this is an AI estimate based on public data
-- Cite data sources (World Bank, UN, OECD, etc.)
-- Keep each section 2-3 sentences max
-- Provide an overall impact score 0-100
+Analyze how a global conflict/crisis affects a specific country across three dimensions:
+1. Economy: GDP growth, inflation, supply chain disruption, energy/commodity prices, currency stability
+2. Trade: bilateral trade volumes, import/export disruption, sanctions impact, shipping routes, supply chain alternatives
+3. Travel: safety advisories, flight availability, visa restrictions, insurance coverage
+
+CRITICAL RULES:
+- NEVER give investment advice, mention stocks/securities, or recommend financial actions
+- Use hedging language: "potential impact", "may affect", "likely to influence"
+- Base analysis on the provided data context (trade relationships, severity, tension scores)
+- Cite specific data sources (World Bank, UN Comtrade, IMF, OECD)
+- Each section: 2-3 sentences with specific data points
+- Impact score MUST correlate with severity, trade dependency, and proximity factors
+- If trade dependency is high, score should reflect this proportionally
 - Respond in the requested language"""
 
             user_prompt = f"""Analyze impact on {home_country}:
@@ -109,13 +230,22 @@ IMPORTANT RULES:
 Crisis: {cluster_title}
 Topic: {cluster_topic}
 Affected region: {country_code}
+Region tension index: {tension_score}/100
 Severity: {cluster.severity}/100
+KScore (trend intensity): {cluster.kscore or 0:.1f}/10
+Impact factor ({home_country}→{country_code}): {impact_factor:.2f}
+Calculated impact score: {impact_score}/100
+
+Trade relationship ({home_country} sectors affected by {country_code}):
+{trade_context}
 
 Recent events:
 {events_text}
 
 Respond in {"Korean" if lang == "ko" else "English"} as JSON:
-{{"economy": "...", "trade": "...", "travel": "...", "summary": "one-line summary", "score": 0-100, "data_sources": ["World Bank", ...]}}"""
+{{"economy": "...", "trade": "...", "travel": "...", "summary": "one-line summary", "score": {impact_score}, "data_sources": ["World Bank", ...]}}
+
+Note: The score should be close to {impact_score} (pre-calculated based on trade dependency and severity). You may adjust ±10 based on qualitative factors."""
 
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -140,9 +270,9 @@ Respond in {"Korean" if lang == "ko" else "English"} as JSON:
         except Exception as e:
             logger.error("impact_brief_ai_error", error=str(e), cluster_id=str(cluster.id))
 
-    # Fallback: 규칙 기반 간단 분석
+    # Fallback: 규칙 기반 간단 분석 (개인화된 impact score 사용)
     severity = cluster.severity or 0
-    score = min(100, int(severity * 0.8))
+    score = impact_score
     if lang == "ko":
         return {
             "economy": f"해당 분쟁은 {country_code} 지역의 경제 안정성에 영향을 줄 수 있으며, 에너지 및 원자재 가격 변동 가능성이 있습니다.",
@@ -209,9 +339,9 @@ async def get_impact_brief(
         **brief,
     }
 
-    # 6시간 캐시
+    # 12시간 캐시 (비용 최적화: TTL 6h→12h)
     if redis:
-        await redis.set(cache_key, json.dumps(response_data), ex=6 * 3600)
+        await redis.set(cache_key, json.dumps(response_data), ex=12 * 3600)
 
     return ImpactBriefOut(**response_data)
 
@@ -235,12 +365,13 @@ class SectorAnalysisOut(BaseModel):
     cached: bool = False
 
 
-# 정적 섹터 데이터 (공개 데이터 기반: World Bank, UN Comtrade 참조)
+# 정적 섹터 데이터 (공개 데이터 기반: World Bank, UN Comtrade, OECD 참조)
+# GDP 비중은 해당 국가 2023-2024 기준 근사치
 SECTOR_DATA = {
     "KR": {
         "energy": {"gdp_pct": 3.2, "key_partners": ["SA", "AE", "IQ", "KW", "RU"]},
         "semiconductor": {"gdp_pct": 4.8, "key_partners": ["US", "CN", "JP", "TW", "VN"]},
-        "automotive": {"gdp_pct": 3.5, "key_partners": ["US", "EU", "CN", "IN"]},
+        "automotive": {"gdp_pct": 3.5, "key_partners": ["US", "CN", "IN", "DE"]},
         "agriculture": {"gdp_pct": 1.8, "key_partners": ["US", "AU", "BR", "UA", "RU"]},
         "shipping": {"gdp_pct": 2.1, "key_partners": ["CN", "JP", "US", "SG", "VN"]},
         "tourism": {"gdp_pct": 2.8, "key_partners": ["CN", "JP", "US", "TW", "TH"]},
@@ -249,17 +380,142 @@ SECTOR_DATA = {
         "energy": {"gdp_pct": 5.8, "key_partners": ["CA", "SA", "MX", "RU", "IQ"]},
         "technology": {"gdp_pct": 8.2, "key_partners": ["CN", "TW", "KR", "JP", "IE"]},
         "automotive": {"gdp_pct": 3.0, "key_partners": ["MX", "CA", "JP", "DE", "KR"]},
-        "agriculture": {"gdp_pct": 4.5, "key_partners": ["CN", "CA", "MX", "JP", "EU"]},
+        "agriculture": {"gdp_pct": 4.5, "key_partners": ["CN", "CA", "MX", "JP", "BR"]},
         "defense": {"gdp_pct": 3.4, "key_partners": ["GB", "AU", "JP", "KR", "IL"]},
         "tourism": {"gdp_pct": 2.6, "key_partners": ["MX", "CA", "GB", "JP", "CN"]},
     },
     "JP": {
         "energy": {"gdp_pct": 3.8, "key_partners": ["SA", "AE", "AU", "QA", "RU"]},
-        "automotive": {"gdp_pct": 5.2, "key_partners": ["US", "CN", "EU", "TH", "ID"]},
+        "automotive": {"gdp_pct": 5.2, "key_partners": ["US", "CN", "TH", "ID", "DE"]},
         "electronics": {"gdp_pct": 4.1, "key_partners": ["CN", "US", "KR", "TW", "TH"]},
         "agriculture": {"gdp_pct": 1.1, "key_partners": ["US", "AU", "CA", "BR", "TH"]},
         "shipping": {"gdp_pct": 1.8, "key_partners": ["CN", "US", "KR", "AU", "TW"]},
         "tourism": {"gdp_pct": 1.5, "key_partners": ["CN", "KR", "TW", "US", "TH"]},
+    },
+    "CN": {
+        "energy": {"gdp_pct": 6.5, "key_partners": ["SA", "RU", "IQ", "AE", "IR"]},
+        "technology": {"gdp_pct": 7.5, "key_partners": ["US", "KR", "TW", "JP", "DE"]},
+        "manufacturing": {"gdp_pct": 27.0, "key_partners": ["US", "JP", "KR", "DE", "VN"]},
+        "agriculture": {"gdp_pct": 7.3, "key_partners": ["BR", "US", "AU", "AR", "CA"]},
+        "shipping": {"gdp_pct": 3.5, "key_partners": ["US", "JP", "KR", "SG", "DE"]},
+        "tourism": {"gdp_pct": 2.2, "key_partners": ["TH", "JP", "KR", "US", "SG"]},
+    },
+    "DE": {
+        "energy": {"gdp_pct": 3.5, "key_partners": ["NO", "US", "NL", "RU", "GB"]},
+        "automotive": {"gdp_pct": 5.0, "key_partners": ["US", "CN", "GB", "FR", "IT"]},
+        "manufacturing": {"gdp_pct": 19.7, "key_partners": ["US", "CN", "FR", "NL", "PL"]},
+        "agriculture": {"gdp_pct": 0.8, "key_partners": ["NL", "FR", "PL", "IT", "ES"]},
+        "tourism": {"gdp_pct": 2.5, "key_partners": ["NL", "CH", "AT", "US", "GB"]},
+    },
+    "GB": {
+        "energy": {"gdp_pct": 3.2, "key_partners": ["NO", "US", "NL", "QA", "SA"]},
+        "finance": {"gdp_pct": 8.3, "key_partners": ["US", "DE", "FR", "NL", "JP"]},
+        "technology": {"gdp_pct": 5.5, "key_partners": ["US", "DE", "IE", "NL", "CN"]},
+        "agriculture": {"gdp_pct": 0.6, "key_partners": ["IE", "NL", "FR", "DE", "ES"]},
+        "tourism": {"gdp_pct": 3.0, "key_partners": ["US", "FR", "DE", "IE", "ES"]},
+    },
+    "FR": {
+        "energy": {"gdp_pct": 2.8, "key_partners": ["NO", "SA", "US", "RU", "NE"]},
+        "automotive": {"gdp_pct": 2.5, "key_partners": ["DE", "ES", "IT", "GB", "BE"]},
+        "agriculture": {"gdp_pct": 1.7, "key_partners": ["DE", "BE", "IT", "ES", "NL"]},
+        "tourism": {"gdp_pct": 4.2, "key_partners": ["GB", "DE", "BE", "NL", "US"]},
+        "defense": {"gdp_pct": 1.9, "key_partners": ["US", "GB", "DE", "IN", "SA"]},
+    },
+    "AU": {
+        "energy": {"gdp_pct": 8.5, "key_partners": ["CN", "JP", "KR", "IN", "TW"]},
+        "mining": {"gdp_pct": 10.5, "key_partners": ["CN", "JP", "KR", "IN", "US"]},
+        "agriculture": {"gdp_pct": 2.3, "key_partners": ["CN", "JP", "US", "KR", "ID"]},
+        "tourism": {"gdp_pct": 2.8, "key_partners": ["NZ", "CN", "US", "GB", "JP"]},
+        "technology": {"gdp_pct": 3.5, "key_partners": ["US", "NZ", "SG", "GB", "JP"]},
+    },
+    "IN": {
+        "energy": {"gdp_pct": 4.5, "key_partners": ["SA", "IQ", "AE", "RU", "KW"]},
+        "technology": {"gdp_pct": 8.0, "key_partners": ["US", "GB", "SG", "DE", "JP"]},
+        "agriculture": {"gdp_pct": 17.0, "key_partners": ["US", "AE", "CN", "BD", "NL"]},
+        "manufacturing": {"gdp_pct": 14.0, "key_partners": ["US", "AE", "CN", "HK", "SG"]},
+        "tourism": {"gdp_pct": 2.5, "key_partners": ["BD", "US", "GB", "SG", "AE"]},
+    },
+    "BR": {
+        "energy": {"gdp_pct": 4.0, "key_partners": ["US", "CN", "AR", "NL", "CL"]},
+        "agriculture": {"gdp_pct": 7.5, "key_partners": ["CN", "US", "NL", "JP", "DE"]},
+        "mining": {"gdp_pct": 4.5, "key_partners": ["CN", "US", "JP", "AR", "NL"]},
+        "manufacturing": {"gdp_pct": 11.0, "key_partners": ["US", "AR", "CN", "MX", "DE"]},
+        "tourism": {"gdp_pct": 2.0, "key_partners": ["AR", "US", "CL", "PY", "UY"]},
+    },
+    "SA": {
+        "energy": {"gdp_pct": 40.0, "key_partners": ["CN", "IN", "JP", "KR", "US"]},
+        "construction": {"gdp_pct": 5.5, "key_partners": ["CN", "US", "GB", "DE", "FR"]},
+        "tourism": {"gdp_pct": 3.5, "key_partners": ["EG", "PK", "IN", "ID", "BD"]},
+        "manufacturing": {"gdp_pct": 12.0, "key_partners": ["CN", "US", "DE", "JP", "IT"]},
+    },
+    "AE": {
+        "energy": {"gdp_pct": 30.0, "key_partners": ["JP", "IN", "CN", "KR", "TH"]},
+        "finance": {"gdp_pct": 9.0, "key_partners": ["US", "GB", "IN", "SA", "CN"]},
+        "tourism": {"gdp_pct": 5.5, "key_partners": ["IN", "GB", "SA", "RU", "CN"]},
+        "shipping": {"gdp_pct": 4.0, "key_partners": ["CN", "IN", "US", "SA", "JP"]},
+    },
+    "IL": {
+        "technology": {"gdp_pct": 12.0, "key_partners": ["US", "CN", "GB", "DE", "IN"]},
+        "defense": {"gdp_pct": 5.2, "key_partners": ["US", "DE", "IN", "IT", "GB"]},
+        "agriculture": {"gdp_pct": 1.1, "key_partners": ["NL", "GB", "FR", "DE", "US"]},
+        "tourism": {"gdp_pct": 2.8, "key_partners": ["US", "FR", "DE", "GB", "RU"]},
+    },
+    "TR": {
+        "manufacturing": {"gdp_pct": 20.0, "key_partners": ["DE", "US", "GB", "IT", "IQ"]},
+        "agriculture": {"gdp_pct": 6.5, "key_partners": ["IQ", "DE", "RU", "US", "GB"]},
+        "energy": {"gdp_pct": 3.0, "key_partners": ["RU", "IR", "IQ", "AZ", "SA"]},
+        "tourism": {"gdp_pct": 4.5, "key_partners": ["DE", "RU", "GB", "BG", "GE"]},
+        "automotive": {"gdp_pct": 3.5, "key_partners": ["DE", "GB", "FR", "IT", "US"]},
+    },
+    "TW": {
+        "semiconductor": {"gdp_pct": 15.0, "key_partners": ["US", "CN", "JP", "KR", "SG"]},
+        "electronics": {"gdp_pct": 8.0, "key_partners": ["CN", "US", "JP", "KR", "HK"]},
+        "manufacturing": {"gdp_pct": 30.0, "key_partners": ["CN", "US", "JP", "HK", "KR"]},
+        "agriculture": {"gdp_pct": 1.5, "key_partners": ["US", "BR", "AU", "NZ", "JP"]},
+        "tourism": {"gdp_pct": 1.8, "key_partners": ["JP", "KR", "CN", "US", "HK"]},
+    },
+    "TH": {
+        "tourism": {"gdp_pct": 11.5, "key_partners": ["CN", "MY", "KR", "IN", "JP"]},
+        "automotive": {"gdp_pct": 5.5, "key_partners": ["US", "AU", "JP", "CN", "MY"]},
+        "agriculture": {"gdp_pct": 8.5, "key_partners": ["CN", "US", "JP", "VN", "MY"]},
+        "electronics": {"gdp_pct": 6.0, "key_partners": ["US", "CN", "JP", "HK", "SG"]},
+        "energy": {"gdp_pct": 3.5, "key_partners": ["SA", "AE", "QA", "MY", "KW"]},
+    },
+    "VN": {
+        "manufacturing": {"gdp_pct": 25.0, "key_partners": ["US", "CN", "KR", "JP", "NL"]},
+        "electronics": {"gdp_pct": 8.0, "key_partners": ["US", "CN", "KR", "JP", "HK"]},
+        "agriculture": {"gdp_pct": 12.0, "key_partners": ["US", "CN", "JP", "KR", "PH"]},
+        "tourism": {"gdp_pct": 3.0, "key_partners": ["KR", "CN", "JP", "TW", "US"]},
+        "energy": {"gdp_pct": 3.0, "key_partners": ["CN", "JP", "KR", "MY", "SG"]},
+    },
+    "SG": {
+        "finance": {"gdp_pct": 13.5, "key_partners": ["US", "CN", "GB", "HK", "JP"]},
+        "shipping": {"gdp_pct": 7.0, "key_partners": ["CN", "MY", "US", "ID", "JP"]},
+        "technology": {"gdp_pct": 9.0, "key_partners": ["US", "CN", "MY", "JP", "KR"]},
+        "tourism": {"gdp_pct": 4.0, "key_partners": ["ID", "CN", "IN", "MY", "AU"]},
+        "manufacturing": {"gdp_pct": 20.0, "key_partners": ["CN", "MY", "US", "HK", "JP"]},
+    },
+    "CA": {
+        "energy": {"gdp_pct": 10.0, "key_partners": ["US", "CN", "GB", "JP", "KR"]},
+        "mining": {"gdp_pct": 5.0, "key_partners": ["US", "CN", "GB", "JP", "DE"]},
+        "agriculture": {"gdp_pct": 1.8, "key_partners": ["US", "CN", "JP", "MX", "GB"]},
+        "automotive": {"gdp_pct": 2.5, "key_partners": ["US", "MX", "JP", "DE", "KR"]},
+        "technology": {"gdp_pct": 5.0, "key_partners": ["US", "GB", "DE", "FR", "CN"]},
+        "tourism": {"gdp_pct": 2.0, "key_partners": ["US", "GB", "FR", "MX", "DE"]},
+    },
+    "MX": {
+        "manufacturing": {"gdp_pct": 18.0, "key_partners": ["US", "CN", "CA", "DE", "JP"]},
+        "energy": {"gdp_pct": 5.5, "key_partners": ["US", "ES", "NL", "CN", "IN"]},
+        "automotive": {"gdp_pct": 4.0, "key_partners": ["US", "CA", "DE", "JP", "BR"]},
+        "agriculture": {"gdp_pct": 3.5, "key_partners": ["US", "JP", "CA", "CN", "GT"]},
+        "tourism": {"gdp_pct": 3.5, "key_partners": ["US", "CA", "GB", "CO", "AR"]},
+    },
+    "RU": {
+        "energy": {"gdp_pct": 25.0, "key_partners": ["CN", "IN", "TR", "DE", "NL"]},
+        "mining": {"gdp_pct": 8.0, "key_partners": ["CN", "NL", "DE", "TR", "KR"]},
+        "agriculture": {"gdp_pct": 4.0, "key_partners": ["TR", "CN", "EG", "KZ", "BY"]},
+        "defense": {"gdp_pct": 3.9, "key_partners": ["IN", "CN", "EG", "DZ", "VN"]},
+        "manufacturing": {"gdp_pct": 13.0, "key_partners": ["CN", "BY", "KZ", "TR", "DE"]},
     },
 }
 
@@ -278,25 +534,78 @@ SECTOR_LABELS = {
         "agriculture": "농업", "shipping": "해운/물류", "tourism": "관광",
         "technology": "기술", "defense": "방위", "electronics": "전자",
         "manufacturing": "제조업", "services": "서비스업",
+        "finance": "금융", "mining": "광업", "construction": "건설",
     },
     "en": {
         "energy": "Energy", "semiconductor": "Semiconductors", "automotive": "Automotive",
         "agriculture": "Agriculture", "shipping": "Shipping & Logistics", "tourism": "Tourism",
         "technology": "Technology", "defense": "Defense", "electronics": "Electronics",
         "manufacturing": "Manufacturing", "services": "Services",
+        "finance": "Finance", "mining": "Mining", "construction": "Construction",
     },
 }
 
 
-def _calc_sector_exposure(
+async def _get_real_trade_dependency(
+    home_country: str,
+    affected_country: str,
+    db: AsyncSession,
+) -> float | None:
+    """DB에서 실제 양자간 교역 비중 조회 (Tier 2)
+
+    Returns: 0-1 사이 교역 의존도 (데이터 없으면 None)
+    """
+    from backend.app.models.economic_data import TradeBilateral
+
+    # 1) reporter→partner 교역액 (최신 연도)
+    pair_q = await db.execute(
+        select(TradeBilateral.total_trade_usd)
+        .where(
+            TradeBilateral.reporter_code == home_country,
+            TradeBilateral.partner_code == affected_country,
+            TradeBilateral.period_type == "A",
+        )
+        .order_by(TradeBilateral.period.desc())
+        .limit(1)
+    )
+    pair_trade = pair_q.scalar_one_or_none()
+    if pair_trade is None:
+        return None
+
+    # 2) reporter 전체 교역액 (같은 연도) — 가용한 파트너 합계로 근사
+    total_q = await db.execute(
+        select(func.sum(TradeBilateral.total_trade_usd))
+        .where(
+            TradeBilateral.reporter_code == home_country,
+            TradeBilateral.period_type == "A",
+        )
+    )
+    total_trade = total_q.scalar_one_or_none()
+    if not total_trade or total_trade <= 0:
+        return None
+
+    # 교역 의존도 = 해당 파트너와의 교역 / 전체 교역 합계
+    # 이 값은 0-1 범위의 상대적 비중 (실제 전체 교역의 일부만 DB에 있으므로 근사치)
+    dep = min(1.0, pair_trade / total_trade)
+    return round(dep, 3)
+
+
+async def _calc_sector_exposure(
     home_country: str,
     affected_country: str,
     severity: int,
     lang: str = "ko",
+    db: AsyncSession | None = None,
 ) -> list[dict]:
-    """정적 데이터 기반 섹터 노출도 계산"""
+    """섹터 노출도 계산 (실 데이터 있으면 보정, 없으면 하드코딩 fallback)"""
     sectors_data = SECTOR_DATA.get(home_country, DEFAULT_SECTORS)
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+
+    # Tier 2: DB에서 실제 교역 의존도 조회 (옵셔널 보정)
+    real_trade_dep = None
+    if db:
+        real_trade_dep = await _get_real_trade_dependency(home_country, affected_country, db)
+
     result = []
 
     for sector, info in sectors_data.items():
@@ -307,8 +616,12 @@ def _calc_sector_exposure(
         is_partner = affected_country in partners
         partner_rank = partners.index(affected_country) + 1 if is_partner else 0
 
-        # 교역 의존도 계산 (파트너 순위 기반)
-        if partner_rank == 1:
+        # 교역 의존도 계산: 실 데이터 > 순위 기반 fallback
+        if real_trade_dep is not None and is_partner:
+            # 실 데이터 보정: 실제 교역 비중 × 파트너 순위 가중
+            rank_weight = max(0.3, 1.0 - (partner_rank - 1) * 0.15)
+            trade_dep = min(0.95, real_trade_dep * rank_weight * 3)  # ×3: 교역 비중을 의존도 스케일로 확대
+        elif partner_rank == 1:
             trade_dep = 0.85
         elif partner_rank == 2:
             trade_dep = 0.6
@@ -317,7 +630,7 @@ def _calc_sector_exposure(
         elif is_partner:
             trade_dep = 0.2
         else:
-            trade_dep = 0.05
+            trade_dep = 0.05 if real_trade_dep is None else min(0.15, real_trade_dep * 2)
 
         # 리스크 레벨
         risk_score = trade_dep * (severity / 100)
@@ -331,16 +644,23 @@ def _calc_sector_exposure(
             risk_level = "low"
 
         sector_label = labels.get(sector, sector)
+
+        # 설명 생성 (실 데이터 유무에 따라 다른 문구)
+        data_source = " (IMF)" if real_trade_dep is not None else ""
         if lang == "ko":
             desc = f"GDP 대비 {gdp_pct}% 비중. "
             if is_partner:
                 desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
+                if real_trade_dep is not None:
+                    desc += f" 실제 교역 비중 {real_trade_dep * 100:.1f}%{data_source}."
             else:
                 desc += f"해당 지역과 직접 교역 비중은 낮음."
         else:
             desc = f"{gdp_pct}% of GDP. "
             if is_partner:
                 desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
+                if real_trade_dep is not None:
+                    desc += f" Actual trade share: {real_trade_dep * 100:.1f}%{data_source}."
             else:
                 desc += f"Low direct trade exposure with the affected region."
 
@@ -395,7 +715,7 @@ async def get_sector_analysis(
     if pref_lang:
         lang = pref_lang
 
-    sectors = _calc_sector_exposure(home, affected, cluster.severity or 0, lang)
+    sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db)
     critical_count = sum(1 for s in sectors if s["risk_level"] == "critical")
     high_count = sum(1 for s in sectors if s["risk_level"] == "high")
 
@@ -465,7 +785,7 @@ async def get_weekly_report(
     if pref_lang:
         lang = pref_lang
 
-    # 주간 상위 이슈 (KScore 기준)
+    # 주간 상위 이슈 (personalizedKScore 기준)
     clusters_q = await db.execute(
         select(IssueCluster)
         .where(
@@ -475,13 +795,26 @@ async def get_weekly_report(
             IssueCluster.kscore > 0,
         )
         .order_by(IssueCluster.kscore.desc())
-        .limit(10)
+        .limit(50)  # 더 많이 가져와서 personalized 정렬
     )
     clusters = clusters_q.scalars().all()
 
-    top_issues = []
+    # personalizedKScore로 재정렬
+    scored_clusters = []
     for c in clusters:
-        impact = min(100, int((c.severity or 0) * 0.7 + (c.kscore or 0) * 3))
+        cc = c.country_code or ""
+        topic = c.topic or "unknown"
+        factor = calc_impact_factor(cc, topic, home)
+        personalized_ks = (c.kscore or 0) * factor
+        impact = calc_personalized_impact_score(
+            c.severity or 0, c.kscore or 0, cc, topic, home,
+        )
+        scored_clusters.append((c, personalized_ks, impact))
+
+    scored_clusters.sort(key=lambda x: x[1], reverse=True)
+
+    top_issues = []
+    for c, _, impact in scored_clusters[:10]:
         top_issues.append(WeeklyReportIssue(
             cluster_id=str(c.id),
             title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
@@ -534,15 +867,25 @@ async def get_weekly_report(
         "trend": "up" if delta > 0 else ("down" if delta < 0 else "stable"),
     }
 
-    # 하이라이트
+    # 하이라이트 — 최고 영향 이슈 포함
+    top_title = top_issues[0].title if top_issues else ""
+    top_impact = top_issues[0].impact_score if top_issues else 0
+    critical_count = sum(1 for i in top_issues if i.impact_score >= 70)
+
     if lang == "ko":
         if len(top_issues) > 0:
-            highlight = f"이번 주 {len(top_issues)}건의 주요 이슈가 감지되었습니다. {home} 긴장도는 {current_score}/100 ({'+' if delta > 0 else ''}{delta})입니다."
+            highlight = f"이번 주 {len(top_issues)}건의 주요 이슈가 감지되었습니다. "
+            if critical_count > 0:
+                highlight += f"영향도 높은 이슈 {critical_count}건. "
+            highlight += f"{home} 긴장도 {current_score}/100 ({'+' if delta > 0 else ''}{delta})."
         else:
             highlight = f"이번 주 특별한 위기 이슈가 없었습니다. {home} 긴장도 {current_score}/100."
     else:
         if len(top_issues) > 0:
-            highlight = f"{len(top_issues)} major issues detected this week. {home} tension: {current_score}/100 ({'+' if delta > 0 else ''}{delta})."
+            highlight = f"{len(top_issues)} major issues detected this week. "
+            if critical_count > 0:
+                highlight += f"{critical_count} high-impact issue(s). "
+            highlight += f"{home} tension: {current_score}/100 ({'+' if delta > 0 else ''}{delta})."
         else:
             highlight = f"No significant crisis this week. {home} tension: {current_score}/100."
 
