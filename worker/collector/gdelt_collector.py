@@ -68,6 +68,26 @@ class GDELTCollector:
                     return topic
         return "unknown"
 
+    def _topic_from_title(self, title: str) -> str:
+        """제목 텍스트에서 topic 추론 (themes 미제공 시 폴백)."""
+        t = title.lower()
+        _TITLE_KEYWORDS = {
+            "conflict": ["war", "conflict", "battle", "fighting", "combat", "airstrike", "bombing", "shelling"],
+            "terror": ["terror", "terrorist", "isis", "al-qaeda", "suicide bomb", "extremist"],
+            "protest": ["protest", "demonstration", "rally", "uprising", "riot", "strike"],
+            "coup": ["coup", "overthrow", "military takeover", "junta"],
+            "sanctions": ["sanction", "embargo", "trade ban", "tariff"],
+            "cyber": ["cyber", "hack", "ransomware", "data breach"],
+            "diplomacy": ["summit", "treaty", "diplomatic", "peace talk", "negotiation", "election"],
+            "maritime": ["naval", "maritime", "piracy", "shipping", "port"],
+            "disaster": ["earthquake", "flood", "hurricane", "typhoon", "tsunami", "wildfire", "volcano"],
+            "health": ["pandemic", "epidemic", "outbreak", "virus", "disease"],
+        }
+        for topic, keywords in _TITLE_KEYWORDS.items():
+            if any(kw in t for kw in keywords):
+                return topic
+        return "unknown"
+
     def _calc_severity(self, tone: float, topic: str) -> int:
         """GDELT tone + topic → severity (0-100)."""
         from worker.processor.normalizer import TOPIC_BASE_SEVERITY
@@ -91,10 +111,20 @@ class GDELTCollector:
             result.errors.append("api_endpoint 없음")
             return result
 
-        # 분쟁/시위 관련 쿼리 — GDELT는 query 파라미터 필수
+        # GDELT theme 기반 쿼리 (키워드 대신 theme 연산자 사용 → 정밀도 향상)
+        default_query = (
+            "theme:TERROR OR theme:KILL OR theme:ARMED_CONFLICT "
+            "OR theme:MILITARY OR theme:PROTEST OR theme:COUP "
+            "OR theme:CRISISLEX OR theme:CYBER_ATTACK"
+        )
         params = {
+            "mode": "artlist",
+            "format": "json",
+            "maxrecords": "250",
+            "timespan": "15min",
+            "sort": "datedesc",
             **api_params,
-            "query": "conflict OR protest OR military OR attack OR sanctions",
+            "query": api_params.get("query", default_query),
         }
 
         try:
@@ -137,6 +167,7 @@ class GDELTCollector:
                 continue
 
             # GDELT 구조화 데이터 추출
+            # 참고: DOC API artlist 모드는 tone/themes를 반환하지 않을 수 있음
             tone = article.get("tone", 0.0)
             if isinstance(tone, str):
                 try:
@@ -151,7 +182,8 @@ class GDELTCollector:
                 elif isinstance(article["themes"], list):
                     themes = article["themes"]
 
-            topic = self._map_topic(themes)
+            # themes가 없으면 제목에서 topic 추론 (normalizer가 나중에 정밀 분류)
+            topic = self._map_topic(themes) if themes else self._topic_from_title(title)
             severity = self._calc_severity(tone, topic)
 
             # geo 추출

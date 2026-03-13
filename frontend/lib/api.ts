@@ -557,3 +557,48 @@ export function useTrackBehavior() {
       }),
   });
 }
+
+// --- Trade Flow (Sankey) ---
+export interface TradeFlowNode {
+  id: string;
+  label: string;
+}
+
+export interface TradeFlowLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface TradeFlow {
+  nodes: TradeFlowNode[];
+  links: TradeFlowLink[];
+  home_country: string;
+  generated_at: string;
+  cached: boolean;
+}
+
+export function useTradeFlow() {
+  return useQuery({
+    queryKey: ["impact", "trade-flow"],
+    queryFn: () => apiFetch<TradeFlow>("/impact/trade-flow"),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
+// --- Weekly PDF ---
+export interface WeeklyPdf {
+  url: string | null;
+  week: string;
+  available: boolean;
+}
+
+export function useWeeklyPdf() {
+  return useQuery({
+    queryKey: ["impact", "weekly-pdf"],
+    queryFn: () => apiFetch<WeeklyPdf>("/impact/weekly-pdf"),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}

@@ -125,6 +125,11 @@ app.conf.beat_schedule = {
         "options": {"queue": "process"},
     },
     # ── 주간 리포트 ──
+    "generate-weekly-pdf": {
+        "task": "worker.tasks.generate_weekly_pdf",
+        "schedule": crontab(minute=50, hour=8, day_of_week=1),  # 월요일 08:50 UTC (이메일 발송 10분 전)
+        "options": {"queue": "process"},
+    },
     "send-weekly-report": {
         "task": "worker.tasks.send_weekly_report",
         "schedule": crontab(minute=0, hour=9, day_of_week=1),  # 매주 월요일 09:00 UTC = KST 18:00
@@ -227,6 +232,12 @@ app.conf.beat_schedule = {
         "task": "worker.tasks.collect_economic_data",
         "schedule": crontab(minute=0, hour=4),  # 매일 04:00 UTC = KST 13:00
         "options": {"queue": "collect"},
+    },
+    # ── Tier 3: Impact Brief 사전 생성 (비용 최적화) ──
+    "pregenerate-impact-briefs": {
+        "task": "worker.tasks.pregenerate_impact_briefs",
+        "schedule": crontab(minute=30, hour="*/12"),  # 12시간마다 (캐시 TTL 맞춤)
+        "options": {"queue": "process"},
     },
     # ── Beat heartbeat ──
     "beat-heartbeat": {

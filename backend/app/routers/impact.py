@@ -982,3 +982,158 @@ async def get_recommendations(
         recommended_topics=top_topics,
         based_on=based_on,
     )
+
+
+# ── Phase 6: Trade Flow (Sankey) ─────────────────────────────────────────
+
+class TradeFlowNode(BaseModel):
+    id: str
+    label: str
+
+
+class TradeFlowLink(BaseModel):
+    source: str
+    target: str
+    value: float
+
+
+class TradeFlowOut(BaseModel):
+    nodes: list[TradeFlowNode]
+    links: list[TradeFlowLink]
+    home_country: str
+    generated_at: str
+    cached: bool = False
+
+
+@router.get("/trade-flow", response_model=TradeFlowOut)
+async def get_trade_flow(
+    user: User = Depends(plan_required("pro_plus")),
+    db: AsyncSession = Depends(get_db),
+):
+    """국가간 교역 흐름 Sankey 데이터 (Pro+ 이상)
+
+    DB에 실제 교역 데이터가 있으면 사용, 없으면 SECTOR_DATA 기반 추정.
+    """
+    home = user.home_country or "KR"
+    redis = await get_redis()
+    cache_key = f"impact:trade-flow:{home}"
+
+    if redis:
+        cached = await redis.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            data["cached"] = True
+            return TradeFlowOut(**data)
+
+    nodes_map: dict[str, str] = {}  # code -> label
+    links: list[dict] = []
+
+    # 1) DB에서 실제 교역 데이터 조회 (최신 연도)
+    real_data_found = False
+    try:
+        from backend.app.models.economic_data import TradeBilateral
+        trade_q = await db.execute(
+            select(
+                TradeBilateral.partner_code,
+                TradeBilateral.export_value_usd,
+                TradeBilateral.import_value_usd,
+            )
+            .where(
+                TradeBilateral.reporter_code == home,
+                TradeBilateral.period_type == "A",
+            )
+            .order_by(TradeBilateral.period.desc())
+            .limit(20)
+        )
+        trade_rows = trade_q.fetchall()
+        if trade_rows:
+            real_data_found = True
+    except Exception:
+        pass
+
+    if real_data_found and trade_rows:
+        for row in trade_rows:
+            partner = row[0]
+            export_val = row[1] or 0
+            import_val = row[2] or 0
+            if export_val <= 0 and import_val <= 0:
+                continue
+            nodes_map[home] = home
+            nodes_map[partner] = partner
+            if export_val > 0:
+                links.append({
+                    "source": home,
+                    "target": partner,
+                    "value": round(export_val, 1),
+                })
+            if import_val > 0:
+                links.append({
+                    "source": partner,
+                    "target": home,
+                    "value": round(import_val, 1),
+                })
+    else:
+        # Fallback: SECTOR_DATA 기반 추정
+        sectors = SECTOR_DATA.get(home, DEFAULT_SECTORS)
+        partner_totals: dict[str, float] = {}
+
+        for sector, info in sectors.items():
+            gdp_pct = info["gdp_pct"]
+            partners = info.get("key_partners", [])
+            for i, partner in enumerate(partners[:5]):
+                # 순위별 가중치: 1위=40%, 2위=25%, 3위=15%, 4위=12%, 5위=8%
+                weights = [0.40, 0.25, 0.15, 0.12, 0.08]
+                weight = weights[i] if i < len(weights) else 0.05
+                val = gdp_pct * weight
+                partner_totals[partner] = partner_totals.get(partner, 0) + val
+
+        # 상위 10개 파트너
+        sorted_partners = sorted(partner_totals.items(), key=lambda x: x[1], reverse=True)[:10]
+        nodes_map[home] = home
+        for partner, val in sorted_partners:
+            nodes_map[partner] = partner
+            links.append({
+                "source": home,
+                "target": partner,
+                "value": round(val, 2),
+            })
+
+    nodes = [{"id": code, "label": code} for code in nodes_map]
+
+    response_data = {
+        "nodes": nodes,
+        "links": links,
+        "home_country": home,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cached": False,
+    }
+
+    if redis:
+        await redis.set(cache_key, json.dumps(response_data), ex=24 * 3600)
+
+    return TradeFlowOut(**response_data)
+
+
+# ── Phase 7: Weekly Report PDF ──────────────────────────────────────────
+
+
+class WeeklyPdfOut(BaseModel):
+    url: str | None
+    week: str
+    available: bool
+
+
+@router.get("/weekly-pdf", response_model=WeeklyPdfOut)
+async def get_weekly_pdf(
+    user: User = Depends(plan_required("pro_plus")),
+):
+    """최신 주간 리포트 PDF URL (Pro+ 이상)."""
+    import os
+    now = datetime.now(timezone.utc)
+    week_label = now.strftime("%Y-W%V")
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    if not supabase_url:
+        return WeeklyPdfOut(url=None, week=week_label, available=False)
+
+    pdf_url = f"{supabase_url}/storage/v1/object/public/weekly-reports/reports/{week_label}.pdf"
+    return WeeklyPdfOut(url=pdf_url, week=week_label, available=True)

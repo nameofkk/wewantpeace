@@ -10,6 +10,7 @@ import { WatchlistQuickStatus } from "@/components/dashboard/WatchlistQuickStatu
 import { TopIssuesAffectingMe } from "@/components/dashboard/TopIssuesAffectingMe";
 import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
+import { TradeFlowSankey } from "@/components/dashboard/TradeFlowSankey";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { Disclaimer } from "@/components/ui/Disclaimer";
@@ -135,10 +136,13 @@ function DashboardContent() {
           <SectorImpactCard clusterId={topClusterId} />
         )}
 
-        {/* 6. Weekly Report (Phase 4 - Pro+) */}
+        {/* 6. Trade Flow Sankey (Phase 6 - Pro+) */}
+        <TradeFlowSankey />
+
+        {/* 7. Weekly Report (Phase 4 - Pro+) */}
         <WeeklyReportCard />
 
-        {/* 7. Disclaimer */}
+        {/* 8. Disclaimer */}
         <Disclaimer />
       </div>
     </div>

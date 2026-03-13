@@ -338,7 +338,9 @@ export default function MapPage() {
   const { data: me, isLoading: meLoading } = useMe();
   const { loading: authLoading } = useAuth();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
-  const isLocked = !meLoading && !authLoading && plan === "free";
+  // Free 플랜: 지도 열람 가능 (읽기 전용), 클러스터 상세 클릭 시 paywall
+  const isFree = !meLoading && !authLoading && plan === "free";
+  const isLocked = false; // 지도 자체는 항상 접근 가능
   const [showPreview, setShowPreview] = useState(false);
   const showPreviewRef = useRef(false);  // 클릭 핸들러에서 최신 값 참조
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -748,13 +750,13 @@ export default function MapPage() {
           <ClusterPopup
             cluster={selectedCluster}
             onClose={() => setSelectedCluster(null)}
-            isPreview={isLocked && showPreview}
+            isPreview={false}
           />
         </div>
       )}
 
       {isMapReady && clusters.length > 0 && !selectedCluster && (
-        <NewsTicker clusters={clusters} isPreview={isLocked && showPreview} />
+        <NewsTicker clusters={clusters} isPreview={false} />
       )}
 
       {isLoading && isMapReady && (

@@ -4,7 +4,9 @@
 1. IMF IMTS (International Merchandise Trade Statistics)
    - 양자간 교역 데이터 (월간/연간)
    - 무료, 인증 불필요
-   - API: https://data.imf.org/api/v1/data/DOT/
+   - SDMX 2.1 API: https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IMTS,1.0.0/
+   - 국가 코드: ISO alpha-3 (KOR, USA, JPN 등)
+   - 지표: XG_FOB_USD (수출), MG_CIF_USD (수입)
 
 2. World Bank Indicators
    - GDP, GDP per capita, 교역 의존도 등
@@ -14,13 +16,14 @@
 3. Frankfurter Exchange Rates
    - ECB 기반 환율 (USD 기준)
    - 무료, 무제한, 인증 불필요
-   - API: https://api.frankfurter.dev/
+   - API: https://api.frankfurter.app/
 
 수집 주기: 1일 1회 (Worker cron)
 """
 
 import asyncio
 import logging
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 import aiohttp
@@ -36,15 +39,17 @@ TARGET_COUNTRIES = [
     "RU", "UA", "IR", "IQ", "PK", "ID", "PH", "MY", "NL", "IT",
 ]
 
-# IMF DOTS country code 매핑 (ISO alpha-2 → IMF numeric)
-# IMF uses ISO 3166-1 alpha-2 for most, but some need mapping
+# IMF IMTS SDMX 국가 코드 매핑 (ISO alpha-2 → ISO alpha-3)
+# IMF IMTS API는 ISO 3166-1 alpha-3 코드 사용
 IMF_COUNTRY_MAP = {
-    "KR": "542", "US": "111", "JP": "158", "CN": "924", "DE": "134",
-    "GB": "112", "FR": "132", "AU": "193", "IN": "534", "BR": "223",
-    "SA": "456", "AE": "466", "IL": "436", "TR": "186", "TW": "528",
-    "TH": "578", "VN": "582", "SG": "576", "CA": "156", "MX": "273",
-    "RU": "922", "UA": "926", "IR": "429", "IQ": "433", "PK": "564",
-    "ID": "536", "PH": "566", "MY": "548", "NL": "138", "IT": "136",
+    "KR": "KOR", "US": "USA", "JP": "JPN", "CN": "CHN", "DE": "DEU",
+    "GB": "GBR", "FR": "FRA", "AU": "AUS", "IN": "IND", "BR": "BRA",
+    "SA": "SAU", "AE": "ARE", "IL": "ISR", "TR": "TUR", "TW": "TWN",
+    "TH": "THA", "VN": "VNM", "SG": "SGP", "CA": "CAN", "MX": "MEX",
+    "RU": "RUS", "UA": "UKR", "IR": "IRN", "IQ": "IRQ", "PK": "PAK",
+    "ID": "IDN", "PH": "PHL", "MY": "MYS", "NL": "NLD", "IT": "ITA",
+    "ES": "ESP", "BE": "BEL", "AR": "ARG", "NZ": "NZL", "QA": "QAT",
+    "KW": "KWT", "NO": "NOR", "PL": "POL", "IE": "IRL", "HK": "HKG",
 }
 
 # World Bank 경제 지표 코드
@@ -97,62 +102,106 @@ async def _fetch_json(session: aiohttp.ClientSession, url: str, params: dict | N
 
 # ── 1. IMF IMTS 양자간 교역 수집 ─────────────────────────────────────────
 
-async def collect_imf_trade(db: AsyncSession) -> int:
-    """IMF DOTS API로 양자간 교역 데이터 수집 (연간, 최근 3년)
+async def _fetch_xml(session: aiohttp.ClientSession, url: str) -> str | None:
+    """HTTP GET + XML 텍스트 반환 (에러 시 None)"""
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=45)) as resp:
+            if resp.status != 200:
+                logger.warning("HTTP %d from %s", resp.status, url)
+                return None
+            return await resp.text()
+    except Exception as e:
+        logger.error("fetch_xml_error url=%s err=%s", url, str(e))
+        return None
 
-    API 형식: https://data.imf.org/api/v1/data/DOT/A.{reporter}.TXG_FOB_USD.{partner}
+
+def _parse_imf_sdmx_xml(xml_text: str) -> dict[str, float]:
+    """IMF SDMX 2.1 XML 응답에서 {year: value_usd} 딕셔너리 추출.
+
+    응답 형식: <Series ...><Obs TIME_PERIOD="2023" OBS_VALUE="12345678"/></Series>
+    """
+    result = {}
+    if not xml_text:
+        return result
+    try:
+        root = ET.fromstring(xml_text)
+        # 네임스페이스 무시하고 모든 Obs 태그 검색
+        for elem in root.iter():
+            if elem.tag.endswith("}Obs") or elem.tag == "Obs":
+                period = elem.get("TIME_PERIOD", "")
+                value_str = elem.get("OBS_VALUE", "")
+                if period and value_str:
+                    try:
+                        result[period] = float(value_str)
+                    except ValueError:
+                        pass
+    except ET.ParseError as e:
+        logger.error("imf_xml_parse_error: %s", str(e))
+    except Exception as e:
+        logger.error("imf_parse_error: %s", str(e))
+    return result
+
+
+async def collect_imf_trade(db: AsyncSession) -> int:
+    """IMF IMTS SDMX 2.1 API로 양자간 교역 데이터 수집 (연간, 최근 3년)
+
+    API: https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IMTS,1.0.0/{reporter}.{indicator}.{partner}.A
+    지표: XG_FOB_USD (수출 FOB), MG_CIF_USD (수입 CIF)
+    국가 코드: ISO alpha-3 (KOR, USA 등)
     Returns: 저장된 레코드 수
     """
     from backend.app.models.economic_data import TradeBilateral
 
+    IMF_BASE = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IMTS,1.0.0"
     saved = 0
     current_year = datetime.now(timezone.utc).year
-    years = [str(y) for y in range(current_year - 3, current_year)]
+    start_year = current_year - 3
+    end_year = current_year - 1  # 당해는 보통 미완성
 
     async with aiohttp.ClientSession() as session:
         for reporter, partners in TRADE_PAIRS.items():
-            reporter_imf = IMF_COUNTRY_MAP.get(reporter)
-            if not reporter_imf:
+            reporter_a3 = IMF_COUNTRY_MAP.get(reporter)
+            if not reporter_a3:
                 continue
 
             for partner in partners:
-                partner_imf = IMF_COUNTRY_MAP.get(partner)
-                if not partner_imf:
+                partner_a3 = IMF_COUNTRY_MAP.get(partner)
+                if not partner_a3:
                     continue
 
-                # 이미 있는지 확인 (중복 방지)
+                # 이미 최신 데이터가 있는지 확인 (중복 방지)
                 existing = await db.execute(
                     select(TradeBilateral.id).where(
                         and_(
                             TradeBilateral.reporter_code == reporter,
                             TradeBilateral.partner_code == partner,
-                            TradeBilateral.period == years[-1],
+                            TradeBilateral.period == str(end_year),
                         )
                     ).limit(1)
                 )
                 if existing.scalar_one_or_none():
                     continue
 
-                # Export (FOB)
-                export_url = f"https://data.imf.org/api/v1/data/DOT/A.{reporter_imf}.TXG_FOB_USD.{partner_imf}"
-                export_data = await _fetch_json(session, export_url, {
-                    "startPeriod": years[0],
-                    "endPeriod": years[-1],
-                })
+                # Export (FOB) — XML 응답
+                export_url = (
+                    f"{IMF_BASE}/{reporter_a3}.XG_FOB_USD.{partner_a3}.A"
+                    f"?startPeriod={start_year}&endPeriod={end_year}"
+                )
+                export_xml = await _fetch_xml(session, export_url)
+                export_by_year = _parse_imf_sdmx_xml(export_xml)
 
                 # Import (CIF)
-                import_url = f"https://data.imf.org/api/v1/data/DOT/A.{reporter_imf}.TMG_CIF_USD.{partner_imf}"
-                import_data = await _fetch_json(session, import_url, {
-                    "startPeriod": years[0],
-                    "endPeriod": years[-1],
-                })
+                import_url = (
+                    f"{IMF_BASE}/{reporter_a3}.MG_CIF_USD.{partner_a3}.A"
+                    f"?startPeriod={start_year}&endPeriod={end_year}"
+                )
+                import_xml = await _fetch_xml(session, import_url)
+                import_by_year = _parse_imf_sdmx_xml(import_xml)
 
-                export_by_year = _parse_imf_series(export_data)
-                import_by_year = _parse_imf_series(import_data)
-
-                for year in years:
-                    exp_val = export_by_year.get(year)
-                    imp_val = import_by_year.get(year)
+                for year in range(start_year, end_year + 1):
+                    y = str(year)
+                    exp_val = export_by_year.get(y)
+                    imp_val = import_by_year.get(y)
                     if exp_val is None and imp_val is None:
                         continue
 
@@ -160,7 +209,7 @@ async def collect_imf_trade(db: AsyncSession) -> int:
                     record = TradeBilateral(
                         reporter_code=reporter,
                         partner_code=partner,
-                        period=year,
+                        period=y,
                         period_type="A",
                         export_value_usd=exp_val,
                         import_value_usd=imp_val,
@@ -177,36 +226,6 @@ async def collect_imf_trade(db: AsyncSession) -> int:
 
     logger.info("imf_trade_collected count=%d", saved)
     return saved
-
-
-def _parse_imf_series(data: dict | None) -> dict[str, float]:
-    """IMF JSON-stat 응답에서 {year: value_millions} 딕셔너리 추출"""
-    result = {}
-    if not data:
-        return result
-    try:
-        # IMF SDMX-JSON 형식
-        datasets = data.get("dataSets", [{}])
-        if not datasets:
-            return result
-        series = datasets[0].get("series", {})
-        # time dimensions
-        structure = data.get("structure", {}).get("dimensions", {}).get("observation", [])
-        time_periods = []
-        for dim in structure:
-            if dim.get("id") == "TIME_PERIOD":
-                time_periods = [v.get("id", "") for v in dim.get("values", [])]
-                break
-
-        for _, s in series.items():
-            obs = s.get("observations", {})
-            for idx_str, values in obs.items():
-                idx = int(idx_str)
-                if idx < len(time_periods) and values and values[0] is not None:
-                    result[time_periods[idx]] = values[0]  # already in millions USD
-    except Exception as e:
-        logger.error("imf_parse_error: %s", str(e))
-    return result
 
 
 # ── 2. World Bank 경제 지표 수집 ──────────────────────────────────────────
@@ -310,7 +329,7 @@ TARGET_CURRENCIES = [
 async def collect_exchange_rates(db: AsyncSession) -> int:
     """Frankfurter API로 USD 기준 환율 수집
 
-    API: https://api.frankfurter.dev/latest?base=USD&symbols=KRW,JPY,...
+    API: https://api.frankfurter.app/latest?base=USD&symbols=KRW,JPY,...
     Returns: 저장된 레코드 수
     """
     from backend.app.models.economic_data import ExchangeRate

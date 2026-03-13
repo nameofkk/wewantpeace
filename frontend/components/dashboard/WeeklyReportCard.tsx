@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getFlag } from "@/lib/countries";
 import { useAppStore } from "@/lib/store";
-import { useWeeklyReport } from "@/lib/api";
+import { useWeeklyReport, useWeeklyPdf } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FileText, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Loader2, Lock, Calendar } from "lucide-react";
+import { FileText, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Loader2, Lock, Calendar, Download } from "lucide-react";
 
 export function WeeklyReportCard() {
   const lang = useAppStore((s) => s.lang);
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const { data, isLoading, isError, error } = useWeeklyReport();
+  const { data: pdfData } = useWeeklyPdf();
 
   const is403 = (error as any)?.status === 403;
 
@@ -129,9 +130,20 @@ export function WeeklyReportCard() {
                 </div>
               )}
 
-              {/* Stats */}
-              <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1 border-t border-border/30">
+              {/* Stats + PDF Download */}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/30">
                 <span>{lang === "ko" ? `총 ${data.total_events}건 이벤트` : `${data.total_events} events total`}</span>
+                {pdfData?.available && pdfData.url && (
+                  <a
+                    href={pdfData.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span className="font-medium">PDF</span>
+                  </a>
+                )}
               </div>
             </div>
           )}

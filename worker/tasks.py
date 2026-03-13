@@ -392,6 +392,104 @@ def collect_economic_data(self):
 
 
 @app.task(
+    name="worker.tasks.pregenerate_impact_briefs",
+    queue="process",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=300,
+)
+def pregenerate_impact_briefs(self):
+    """Impact Brief 사전 생성 — 상위 이슈 × 주요 홈 국가 조합을 미리 캐싱.
+
+    Batch API 대신 일반 API를 사용하되, 스케줄러로 오프피크 시간에 실행하여
+    사용자 요청 시 캐시 히트율을 극대화합니다.
+    캐시 TTL 12시간 → 12시간마다 실행.
+    """
+    _record_heartbeat("pregenerate_impact_briefs")
+
+    async def _run():
+        import json
+        from sqlalchemy import select
+        from backend.app.models.issue_cluster import IssueCluster
+        from backend.app.routers.impact import (
+            _generate_impact_brief,
+            _brief_cache_key,
+        )
+        from backend.app.core.redis import get_redis
+
+        HOME_COUNTRIES = ["KR", "US", "JP", "CN", "DE", "GB", "AU", "IN", "BR", "TW"]
+        generated = 0
+        skipped = 0
+
+        async with AsyncSessionLocal() as db:
+            # 상위 30개 활성 클러스터 (severity × kscore 순)
+            clusters_q = await db.execute(
+                select(IssueCluster)
+                .where(
+                    IssueCluster.is_active == True,
+                    IssueCluster.severity > 20,
+                    IssueCluster.kscore > 1.0,
+                )
+                .order_by(
+                    (IssueCluster.severity * IssueCluster.kscore).desc()
+                )
+                .limit(30)
+            )
+            clusters = clusters_q.scalars().all()
+
+            redis = await get_redis()
+            if not redis:
+                logger.warning("pregenerate: Redis 미연결, 스킵")
+                return {"generated": 0, "skipped": 0}
+
+            for cluster in clusters:
+                for home in HOME_COUNTRIES:
+                    cache_key = _brief_cache_key(str(cluster.id), home)
+                    # 이미 캐시에 있으면 스킵
+                    existing = await redis.get(cache_key)
+                    if existing:
+                        skipped += 1
+                        continue
+
+                    try:
+                        brief = await _generate_impact_brief(cluster, home, "ko", db)
+                        response_data = {
+                            "cluster_id": str(cluster.id),
+                            "title": cluster.title or "",
+                            "title_ko": cluster.title_ko,
+                            "generated_at": datetime.now(timezone.utc).isoformat(),
+                            "cached": False,
+                            **brief,
+                        }
+                        await redis.set(
+                            cache_key,
+                            json.dumps(response_data),
+                            ex=12 * 3600,
+                        )
+                        generated += 1
+                    except Exception as e:
+                        logger.warning(
+                            "pregenerate_brief_error cluster=%s home=%s: %s",
+                            cluster.id, home, e,
+                        )
+
+                    # Rate limiting: OpenAI API 보호
+                    await asyncio.sleep(0.3)
+
+        logger.info(
+            "pregenerate_impact_briefs 완료: generated=%d skipped=%d",
+            generated, skipped,
+        )
+        return {"generated": generated, "skipped": skipped}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("pregenerate_impact_briefs 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
     bind=True,
@@ -1943,6 +2041,117 @@ def send_expired_trial_offers(self):
         return run_async(_run())
     except Exception as exc:
         logger.error("send_expired_trial_offers 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+# ── 주간 리포트 PDF 생성 ─────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.generate_weekly_pdf",
+    queue="process",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=300,
+)
+def generate_weekly_pdf(self):
+    """주간 리포트 PDF 생성 → Supabase 업로드."""
+    async def _run():
+        from sqlalchemy import text
+        from worker.report.pdf_generator import build_pdf, WeeklyReportData
+        from worker.report.pdf_uploader import upload_pdf
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=7)
+
+        async with AsyncSessionLocal() as db:
+            # 이벤트 수
+            r = await db.execute(text(
+                "SELECT COUNT(*) FROM normalized_events"
+                " WHERE event_time >= :cutoff AND is_duplicate = FALSE"
+            ), {"cutoff": cutoff})
+            total_events = r.scalar() or 0
+
+            # 신규 클러스터
+            r = await db.execute(text(
+                "SELECT COUNT(*) FROM issue_clusters"
+                " WHERE first_seen >= :cutoff AND is_active = TRUE"
+            ), {"cutoff": cutoff})
+            new_clusters = r.scalar() or 0
+
+            # 위기 국가 (severity >= 60)
+            r = await db.execute(text(
+                "SELECT COUNT(DISTINCT country_code) FROM issue_clusters"
+                " WHERE is_active = TRUE AND severity >= 60"
+            ))
+            crisis_countries = r.scalar() or 0
+
+            # TOP 10 이슈
+            r = await db.execute(text(
+                "SELECT title, title_ko, country_code, severity, topic"
+                " FROM issue_clusters"
+                " WHERE is_active = TRUE AND severity > 0"
+                " ORDER BY severity DESC, kscore DESC"
+                " LIMIT 10"
+            ))
+            top_issues = [
+                {"title": row[0], "title_ko": row[1], "country_code": row[2],
+                 "severity": row[3], "topic": row[4]}
+                for row in r.fetchall()
+            ]
+
+            # 긴장도 추이 (상위 5개국)
+            r = await db.execute(text(
+                "SELECT country_code, calculated_at, raw_score"
+                " FROM tension_indices"
+                " WHERE calculated_at >= :cutoff"
+                " AND country_code IN ("
+                "   SELECT country_code FROM tension_indices"
+                "   WHERE calculated_at >= :cutoff"
+                "   GROUP BY country_code"
+                "   ORDER BY MAX(raw_score) DESC"
+                "   LIMIT 5"
+                " )"
+                " ORDER BY calculated_at"
+            ), {"cutoff": cutoff})
+            tension_series = [
+                {"country_code": row[0], "time": row[1], "raw_score": row[2]}
+                for row in r.fetchall()
+            ]
+
+            # 토픽별 분포
+            r = await db.execute(text(
+                "SELECT topic, COUNT(*) cnt FROM normalized_events"
+                " WHERE event_time >= :cutoff AND is_duplicate = FALSE"
+                "   AND topic IS NOT NULL AND topic != 'unknown'"
+                " GROUP BY topic ORDER BY cnt DESC LIMIT 8"
+            ), {"cutoff": cutoff})
+            topic_distribution = {row[0]: row[1] for row in r.fetchall()}
+
+        data = WeeklyReportData(
+            week_start=cutoff,
+            week_end=now,
+            total_events=total_events,
+            new_clusters=new_clusters,
+            crisis_countries=crisis_countries,
+            top_issues=top_issues,
+            tension_series=tension_series,
+            topic_distribution=topic_distribution,
+            lang="ko",
+        )
+
+        pdf_buffer = build_pdf(data)
+        week_label = now.strftime("%Y-W%V")
+        filename = f"reports/{week_label}.pdf"
+        url = upload_pdf(pdf_buffer.read(), filename)
+
+        logger.info("generate_weekly_pdf 완료: url=%s", url)
+        return {"url": url, "week": week_label}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("generate_weekly_pdf 오류: %s", exc)
         raise self.retry(exc=exc)
 
 

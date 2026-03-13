@@ -42,6 +42,9 @@ python-telegram-bot>=21.0
 tweepy>=4.14.0
 Pillow>=10.0.0
 pilmoji>=2.0.5
+# PDF 주간 리포트
+reportlab>=4.1.0
+matplotlib>=3.8.0
 # 유틸
 geohash2==1.1
 tenacity==8.3.0
