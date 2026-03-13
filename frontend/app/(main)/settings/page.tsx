@@ -1468,6 +1468,13 @@ export default function SettingsPage() {
                 <span className="text-muted-foreground text-xs">→</span>
               </button>
             )}
+            <Link href="/community" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
+              <div>
+                <span>{t(lang, "settings_community")}</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{t(lang, "settings_community_desc")}</p>
+              </div>
+              <span className="text-muted-foreground text-xs">→</span>
+            </Link>
             <Link href="/community/my" className="flex items-center justify-between px-4 py-3 text-sm hover:bg-secondary/50">
               <span>{t(lang, "settings_my_posts")}</span>
               <span className="text-muted-foreground text-xs">→</span>

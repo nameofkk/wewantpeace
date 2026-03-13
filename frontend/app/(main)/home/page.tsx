@@ -13,6 +13,7 @@ import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { TradeFlowSankey } from "@/components/dashboard/TradeFlowSankey";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { NoticeTicker } from "@/components/dashboard/NoticeTicker";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
@@ -109,8 +110,11 @@ function DashboardContent() {
         </div>
       </div>
 
+      {/* Notice Ticker */}
+      <NoticeTicker />
+
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
         {/* 1. Risk Summary */}
         <div data-tour="dash-risk">
           <RiskSummaryHeader />

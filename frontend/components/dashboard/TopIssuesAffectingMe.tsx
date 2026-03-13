@@ -16,7 +16,8 @@ import {
   getKScoreBadge,
   type TrendingItem,
 } from "@/lib/kscore-utils";
-import { ChevronRight, Newspaper } from "lucide-react";
+import { ChevronRight, Newspaper, AlertTriangle } from "lucide-react";
+import { SectionHeader } from "./SectionHeader";
 
 export function TopIssuesAffectingMe() {
   const router = useRouter();
@@ -50,35 +51,48 @@ export function TopIssuesAffectingMe() {
 
   if (isLoading) {
     return (
-      <div className="space-y-2 fade-in-up">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-16 rounded-lg bg-card border border-border animate-pulse" />
-        ))}
+      <div>
+        <SectionHeader
+          icon={<AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />}
+          titleKey="dash_top_issues"
+          subtitleKey="dash_top_issues_sub"
+          descKey="dash_top_issues_desc"
+        />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-[68px] rounded-xl bg-card border border-border overflow-hidden">
+              <div className="h-full w-full animate-pulse bg-gradient-to-r from-transparent via-muted/30 to-transparent" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (topItems.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-card/50 p-5 text-center fade-in-up">
-        <Newspaper className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">{t(lang, "dash_no_issues")}</p>
+      <div>
+        <SectionHeader
+          icon={<AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />}
+          titleKey="dash_top_issues"
+          descKey="dash_top_issues_desc"
+        />
+        <div className="rounded-xl border border-border bg-card/50 p-5 text-center fade-in-up">
+          <Newspaper className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">{t(lang, "dash_no_issues")}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="fade-in-up">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            {t(lang, "dash_top_issues")}
-          </h3>
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-            {t(lang, "dash_top_issues_sub")}
-          </p>
-        </div>
-      </div>
+    <div>
+      <SectionHeader
+        icon={<AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />}
+        titleKey="dash_top_issues"
+        subtitleKey="dash_top_issues_sub"
+        descKey="dash_top_issues_desc"
+      />
 
       <div className="space-y-2">
         {topItems.map((item, idx) => {
@@ -99,15 +113,15 @@ export function TopIssuesAffectingMe() {
               key={item.id}
               onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg border border-border bg-card p-3 cursor-pointer",
-                "hover:bg-card/80 transition-all border-l-4",
+                "flex items-center gap-3 rounded-xl border border-border bg-card p-3 cursor-pointer",
+                "hover:bg-card/80 transition-all border-l-4 fade-in-up",
                 kscoreAccent(pKScore),
               )}
               style={{ animationDelay: `${idx * 60}ms` }}
             >
               {/* Rank */}
               <div className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] font-bold",
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold",
                 idx === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
               )}>
                 {idx + 1}
@@ -127,6 +141,11 @@ export function TopIssuesAffectingMe() {
                   )}>
                     {topicLabel}
                   </span>
+                  {(item.independent_sources ?? 0) >= 3 && (
+                    <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+                      {lang === "ko" ? "검증됨" : "Verified"}
+                    </span>
+                  )}
                 </div>
                 <h4 className="text-[12px] font-semibold leading-snug line-clamp-1">{displayTitle}</h4>
               </div>
@@ -148,7 +167,7 @@ export function TopIssuesAffectingMe() {
       {/* View All CTA */}
       <Link
         href="/feed"
-        className="flex items-center justify-center gap-1.5 mt-3 rounded-lg border border-border bg-card/50 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
+        className="flex items-center justify-center gap-1.5 mt-3 rounded-xl border border-border bg-card/50 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
       >
         <Newspaper className="h-3.5 w-3.5" />
         {t(lang, "dash_view_all_issues")}
