@@ -7,28 +7,27 @@ Revises: 0043
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 
 revision = "0044"
 down_revision = "0043"
 
 
 def upgrade():
-    # LemonSqueezy 필드 제거
-    op.drop_column("subscriptions", "ls_subscription_id")
-    op.drop_column("subscriptions", "ls_customer_id")
-    op.drop_column("subscriptions", "ls_variant_id")
+    conn = op.get_bind()
+    # LemonSqueezy 필드 제거 (IF EXISTS)
+    for col in ("ls_subscription_id", "ls_customer_id", "ls_variant_id"):
+        conn.execute(text(f"ALTER TABLE subscriptions DROP COLUMN IF EXISTS {col}"))
 
-    # DodoPayments 필드 추가
-    op.add_column("subscriptions", sa.Column("dodo_subscription_id", sa.String(64), nullable=True))
-    op.add_column("subscriptions", sa.Column("dodo_customer_id", sa.String(64), nullable=True))
-    op.add_column("subscriptions", sa.Column("dodo_product_id", sa.String(64), nullable=True))
+    # DodoPayments 필드 추가 (IF NOT EXISTS)
+    for col in ("dodo_subscription_id", "dodo_customer_id", "dodo_product_id"):
+        conn.execute(text(f"ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS {col} VARCHAR(64)"))
 
 
 def downgrade():
-    op.drop_column("subscriptions", "dodo_subscription_id")
-    op.drop_column("subscriptions", "dodo_customer_id")
-    op.drop_column("subscriptions", "dodo_product_id")
+    conn = op.get_bind()
+    for col in ("dodo_subscription_id", "dodo_customer_id", "dodo_product_id"):
+        conn.execute(text(f"ALTER TABLE subscriptions DROP COLUMN IF EXISTS {col}"))
 
-    op.add_column("subscriptions", sa.Column("ls_subscription_id", sa.String(64), nullable=True))
-    op.add_column("subscriptions", sa.Column("ls_customer_id", sa.String(64), nullable=True))
-    op.add_column("subscriptions", sa.Column("ls_variant_id", sa.String(64), nullable=True))
+    for col in ("ls_subscription_id", "ls_customer_id", "ls_variant_id"):
+        conn.execute(text(f"ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS {col} VARCHAR(64)"))
