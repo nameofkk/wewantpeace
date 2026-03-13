@@ -364,7 +364,7 @@ export default function IssueDetailClient({ initialData }: Props) {
             </h2>
             <div className="space-y-3">
               {[...issue.events]
-                .sort((a, b) => b.severity - a.severity)
+                .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime())
                 .map((event, idx, arr) => {
                 const tier = event.source_tier ?? "C";
                 const eventNew = isNew(event.event_time);

@@ -66,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={IS_TOSS ? "light" : "dark"} suppressHydrationWarning>
+    <html lang="ko" className={IS_TOSS ? "light" : ""} suppressHydrationWarning>
       <head>
         {/* 테마/언어 깜빡임 방지: localStorage → 브라우저 언어 감지 순으로 즉시 적용 */}
         <script dangerouslySetInnerHTML={{ __html: IS_TOSS

@@ -212,7 +212,7 @@ logger.info("CORS allowed_origins: %s", settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_origin_regex=r"https://.*\.toss\.(im|dev)",
+    allow_origin_regex=r"https://.*\.toss\.im",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-UID", "X-Requested-With"],

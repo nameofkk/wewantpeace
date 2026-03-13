@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3 } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -808,16 +808,12 @@ function HomePageContent() {
         independent_sources: c.independent_sources ?? 1,
       }))
       .sort((a, b) => {
-        const aK = personalizedKScore(a, homeCountry);
-        const bK = personalizedKScore(b, homeCountry);
-        const kDiff = bK - aK;
-        // KScore 차이가 0.5 미만이면 최근 업데이트된 클러스터 우선
-        if (Math.abs(kDiff) < 0.5) {
-          const aTime = a.calculated_at ? new Date(a.calculated_at).getTime() : 0;
-          const bTime = b.calculated_at ? new Date(b.calculated_at).getTime() : 0;
-          if (bTime !== aTime) return bTime - aTime;
-        }
-        return kDiff || (b.severity ?? 0) - (a.severity ?? 0);
+        const kDiff = personalizedKScore(b, homeCountry) - personalizedKScore(a, homeCountry);
+        if (kDiff !== 0) return kDiff;
+        // KScore 동일 시 최신순
+        const aTime = a.calculated_at ? new Date(a.calculated_at).getTime() : 0;
+        const bTime = b.calculated_at ? new Date(b.calculated_at).getTime() : 0;
+        return bTime - aTime;
       }) as TrendingItem[];
   }, [clusterData, homeCountry]);
   // 급상승 데이터: 6시간 이내 생성 + raw KScore >= 3 (글로벌 탭 전용)
@@ -845,8 +841,23 @@ function HomePageContent() {
   const [spinning, setSpinning] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [sortMode, setSortMode] = useState<"kscore" | "latest" | "severity">("kscore");
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
 
-  const items    = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
+  const rawItems = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
+  const items = useMemo(() => {
+    if (!rawItems) return undefined;
+    if (sortMode === "kscore") return rawItems; // 이미 KScore순 정렬됨
+    return [...rawItems].sort((a, b) => {
+      if (sortMode === "latest") {
+        const aTime = a.calculated_at ? new Date(a.calculated_at).getTime() : 0;
+        const bTime = b.calculated_at ? new Date(b.calculated_at).getTime() : 0;
+        return bTime - aTime;
+      }
+      // severity
+      return (b.severity ?? 0) - (a.severity ?? 0);
+    });
+  }, [rawItems, sortMode]);
   const isLoading = trendingTab === "global" ? globalLoading : mineLoading;
   const isFetching = trendingTab === "global" ? globalFetching : mineFetching;
   const isError  = trendingTab === "global" ? globalError  : mineError;
@@ -926,8 +937,8 @@ function HomePageContent() {
           {t(lang, "home_subtitle")}
         </p>
 
-        {/* 탭 */}
-        <div className="flex gap-0" data-tour="home-tabs">
+        {/* 탭 + 정렬 */}
+        <div className="flex items-end gap-0" data-tour="home-tabs">
           {(["global", "mine"] as const).map((tab) => (
             <button
               key={tab}
@@ -944,6 +955,35 @@ function HomePageContent() {
               )}
             </button>
           ))}
+          {/* 정렬 드롭다운 */}
+          <div className="relative shrink-0 border-b-2 border-transparent">
+            <button
+              onClick={() => setSortDropdownOpen((v) => !v)}
+              className="flex items-center gap-1 px-2 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t(lang, `sort_${sortMode}` as "sort_kscore")}</span>
+            </button>
+            {sortDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setSortDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-lg border border-border bg-card shadow-lg py-1">
+                  {(["kscore", "latest", "severity"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => { setSortMode(mode); setSortDropdownOpen(false); setVisibleCount(30); }}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-xs transition-colors",
+                        sortMode === mode ? "text-primary font-medium bg-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      )}
+                    >
+                      {t(lang, `sort_${mode}` as "sort_kscore")}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

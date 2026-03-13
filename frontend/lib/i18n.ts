@@ -21,6 +21,9 @@ export const translations = {
     home_login_required: "로그인하면 관심 국가 이슈를 볼 수 있어요",
     home_updated: "갱신",
     home_refresh_interval: "15분마다 갱신",
+    sort_kscore: "KScore순",
+    sort_latest: "최신순",
+    sort_severity: "심각도순",
 
     // 긴장도 기본
     tension_title: "긴장도 지수",
@@ -1328,6 +1331,9 @@ export const translations = {
     home_login_required: "Log in to see issues from your watched countries",
     home_updated: "updated",
     home_refresh_interval: "Refreshes every 15 min",
+    sort_kscore: "KScore",
+    sort_latest: "Latest",
+    sort_severity: "Severity",
 
     // tension
     tension_title: "Tension",
