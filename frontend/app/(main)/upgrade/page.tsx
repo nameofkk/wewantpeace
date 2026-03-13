@@ -12,6 +12,7 @@ import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { API_BASE, useMe, createDodoCheckout } from "@/lib/api";
+import { DodoPayments } from "dodopayments-checkout";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
@@ -186,6 +187,16 @@ function UpgradeContent() {
 
   useEffect(() => {
     setPlatform(detectPlatform());
+    // DodoPayments Overlay SDK 초기화
+    DodoPayments.Initialize({
+      mode: "live",
+      displayType: "overlay",
+      onEvent: (event: { event_type: string }) => {
+        if (event.event_type === "checkout.closed") {
+          setLoading(null);
+        }
+      },
+    });
   }, []);
 
   // 현재 플랜에 따라 기본 선택 변경
@@ -388,7 +399,7 @@ function UpgradeContent() {
   async function handleDodoCheckout(planId: string) {
     const { checkout_url } = await createDodoCheckout(planId);
     if (checkout_url) {
-      window.location.href = checkout_url;
+      await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
     }
   }
 
@@ -616,7 +627,7 @@ function UpgradeContent() {
                       selected === "pro" && "shimmer-text"
                     )}>3.90</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
+                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월 · 세금 별도" : "/mo · excl. tax"}</p>
                 </div>
               </div>
 
@@ -786,7 +797,7 @@ function UpgradeContent() {
                       selected === "pro_plus" && "shimmer-text"
                     )}>6.90</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
+                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월 · 세금 별도" : "/mo · excl. tax"}</p>
                 </div>
               </div>
 

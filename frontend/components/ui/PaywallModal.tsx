@@ -199,7 +199,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
             className="w-full rounded-xl py-3.5 text-sm font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all active:scale-[0.98]"
           >
             <Zap className="inline h-4 w-4 mr-1.5 -mt-0.5" />
-            {lang === "ko" ? "Pro 시작하기 — $3.90/월" : "Start Pro — $3.90/mo"}
+            {lang === "ko" ? "Pro 시작하기 — $3.90/월 (세금 별도)" : "Start Pro — $3.90/mo (excl. tax)"}
           </button>
 
           <button
