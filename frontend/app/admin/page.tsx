@@ -121,7 +121,7 @@ export default function AdminDashboard() {
     {
       label: t(lang, "admin_active_subs"),
       value: stats?.subscribers ?? 0,
-      sub: `₩${(stats?.monthly_revenue ?? 0).toLocaleString()} ${t(lang, "admin_monthly_revenue")}`,
+      sub: `$${(stats?.monthly_revenue ?? 0).toLocaleString()} ${t(lang, "admin_monthly_revenue")}`,
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",

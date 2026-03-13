@@ -610,11 +610,11 @@ function UpgradeContent() {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-xs text-blue-400 font-medium">₩</span>
+                    <span className="text-xs text-blue-400 font-medium">$</span>
                     <span className={cn(
                       "text-2xl font-black text-blue-400",
                       selected === "pro" && "shimmer-text"
-                    )}>4,900</span>
+                    )}>3.90</span>
                   </div>
                   <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
                 </div>
@@ -780,11 +780,11 @@ function UpgradeContent() {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-xs text-purple-400 font-medium">₩</span>
+                    <span className="text-xs text-purple-400 font-medium">$</span>
                     <span className={cn(
                       "text-2xl font-black text-purple-400",
                       selected === "pro_plus" && "shimmer-text"
-                    )}>9,900</span>
+                    )}>6.90</span>
                   </div>
                   <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월" : "/mo"}</p>
                 </div>

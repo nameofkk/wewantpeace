@@ -45,8 +45,8 @@ export default function AdminSettingsPage() {
     maintenance_mode: false,
     allow_signup: true,
     notice_banner: "",
-    pro_price: 4900,
-    pro_plus_price: 9900,
+    pro_price: 390,
+    pro_plus_price: 690,
   });
 
   const { data, isLoading } = useQuery<ServiceSettings>({
