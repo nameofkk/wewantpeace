@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     default: "WeWantPeace",
     template: "%s | WeWantPeace",
   },
-  description: "195개국 분쟁·안보 실시간 모니터링 플랫폼",
+  description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
   manifest: "/manifest.json",
   metadataBase: new URL(SITE_URL),
   openGraph: {
@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: "WeWantPeace",
     title: "WeWantPeace",
-    description: "195개국 분쟁·안보 실시간 모니터링 플랫폼",
+    description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "WeWantPeace",
-    description: "195개국 분쟁·안보 실시간 모니터링 플랫폼",
+    description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
   appleWebApp: {
@@ -134,7 +134,7 @@ export default function RootLayout({
                   "operatingSystem": "Web, Android (TWA)",
                   "browserRequirements": "Requires JavaScript. Requires HTML5.",
                   "description":
-                    "Monitor real-time global conflicts, security threats, and geopolitical tensions across 195 countries. Features AI-powered KScore impact scoring, Tension Index per country, KScore-based real-time alerts, and interactive crisis maps.",
+                    "Monitor how global conflicts affect you in real time. Personalized impact dashboard with AI-powered KScore scoring across 195 countries, Tension Index, real-time alerts, and interactive crisis maps.",
                   "offers": [
                     {
                       "@type": "Offer",

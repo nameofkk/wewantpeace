@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Map, Activity, MessageSquare, Settings } from "lucide-react";
+import { Home, Newspaper, Map, Activity, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -16,15 +16,15 @@ export function BottomNav() {
 
   const NAV_ITEMS = [
     { href: "/home", icon: Home, label: t(lang, "nav_home") },
+    { href: "/feed", icon: Newspaper, label: t(lang, "nav_feed") },
     { href: "/map", icon: Map, label: t(lang, "nav_map") },
     { href: "/tension", icon: Activity, label: t(lang, "nav_tension") },
-    { href: "/community", icon: MessageSquare, label: t(lang, "nav_community") },
     { href: "/settings", icon: Settings, label: t(lang, "nav_settings") },
   ];
 
   // 모든 탭 라우트를 미리 프리페치 (첫 진입 지연 제거)
   useEffect(() => {
-    ["/home", "/map", "/tension", "/community", "/settings"].forEach((href) => {
+    ["/home", "/feed", "/map", "/tension", "/settings"].forEach((href) => {
       router.prefetch(href);
     });
   }, [router]);
@@ -49,9 +49,9 @@ export function BottomNav() {
         toss ? "h-[56px] px-3" : "h-[60px] px-2"
       )}>
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-          // /issues/*, /notifications/* 등은 /home의 하위 플로우로 간주
+          // /issues/*, /notifications/*, /upgrade/* 는 /feed의 하위 플로우로 간주
           const isActive = pathname.startsWith(href) ||
-            (href === "/home" && (pathname.startsWith("/issues") || pathname.startsWith("/notifications") || pathname.startsWith("/upgrade")));
+            (href === "/feed" && (pathname.startsWith("/issues") || pathname.startsWith("/notifications") || pathname.startsWith("/upgrade")));
           return (
             <Link
               key={href}

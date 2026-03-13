@@ -1,7 +1,7 @@
 {
   "name": "WeWantPeace",
   "short_name": "WWPeace",
-  "description": "실시간 글로벌 분쟁 모니터링 · 긴장도 지수 · 이슈 알림",
+  "description": "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁 모니터링 & 개인화 영향 분석",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1729",

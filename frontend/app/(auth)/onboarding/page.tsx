@@ -183,7 +183,7 @@ export default function OnboardingPage() {
     localStorage.setItem("wwp_welcome_seen", String(Date.now()));
     const returnUrl = sessionStorage.getItem("wwp_return_url");
     sessionStorage.removeItem("wwp_return_url");
-    router.push(returnUrl || "/home?tour=1");
+    router.push(returnUrl || "/home");
   }
 
   // --- 국가 선택/해제 ---

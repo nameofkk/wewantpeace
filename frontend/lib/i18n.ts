@@ -9,6 +9,7 @@ export const translations = {
     nav_map: "지도",
     nav_tension: "긴장도",
     nav_community: "커뮤니티",
+    nav_feed: "이슈",
     nav_settings: "설정",
 
     // 홈 페이지
@@ -27,6 +28,30 @@ export const translations = {
     sort_score: "점수순",
     sort_change: "변동순",
     sort_name: "이름순",
+
+    // 대시보드
+    dash_title: "내 대시보드",
+    dash_subtitle: "분쟁이 나에게 미치는 영향, 실시간으로",
+    dash_home_tension: "홈 국가 긴장도",
+    dash_global_overview: "글로벌 현황",
+    dash_extreme_count: "극심 {n}개국",
+    dash_severe_count: "심각 {n}개국",
+    dash_alert_count: "경계 {n}개국",
+    dash_watchlist: "관심 국가",
+    dash_watchlist_empty: "관심 국가를 추가하세요",
+    dash_watchlist_add: "국가 추가",
+    dash_top_issues: "주요 이슈",
+    dash_top_issues_sub: "나에게 영향이 큰 이슈 TOP 5",
+    dash_view_all_issues: "전체 이슈 보기",
+    dash_no_issues: "현재 표시할 이슈가 없습니다",
+    dash_impact_brief: "Impact Brief",
+    dash_sector_impact: "Sector Impact Analysis",
+    dash_coming_soon: "곧 출시 예정입니다",
+    dash_unlock_pro: "Pro로 업그레이드",
+    dash_unlock_pro_plus: "Pro+로 업그레이드",
+    dash_disclaimer: "본 서비스는 정보 제공 목적이며, 투자 자문이 아닙니다. 분석 결과는 공개 데이터(세계은행, UN 등)를 기반으로 하며, 정확성을 보장하지 않습니다.",
+    dash_ai_estimate: "AI 분석 기반 추정치 · 의사결정 전 전문가 상담을 권장합니다",
+    dash_impact_score: "영향도",
 
     // 긴장도 기본
     tension_title: "긴장도 지수",
@@ -1322,6 +1347,7 @@ export const translations = {
     nav_map: "Map",
     nav_tension: "Tension",
     nav_community: "Community",
+    nav_feed: "Issues",
     nav_settings: "Settings",
 
     // home page
@@ -1340,6 +1366,30 @@ export const translations = {
     sort_score: "Score",
     sort_change: "Change",
     sort_name: "Name",
+
+    // dashboard
+    dash_title: "My Dashboard",
+    dash_subtitle: "How global conflicts affect you — in real time",
+    dash_home_tension: "Home Country Tension",
+    dash_global_overview: "Global Overview",
+    dash_extreme_count: "Extreme {n}",
+    dash_severe_count: "Severe {n}",
+    dash_alert_count: "Alert {n}",
+    dash_watchlist: "Watchlist",
+    dash_watchlist_empty: "Add countries to your watchlist",
+    dash_watchlist_add: "Add Countries",
+    dash_top_issues: "Top Issues",
+    dash_top_issues_sub: "Top 5 issues with the highest impact on you",
+    dash_view_all_issues: "View All Issues",
+    dash_no_issues: "No issues to display right now",
+    dash_impact_brief: "Impact Brief",
+    dash_sector_impact: "Sector Impact Analysis",
+    dash_coming_soon: "Coming Soon",
+    dash_unlock_pro: "Upgrade to Pro",
+    dash_unlock_pro_plus: "Upgrade to Pro+",
+    dash_disclaimer: "This service is for informational purposes only and does not constitute investment advice. Analysis is based on publicly available data (World Bank, UN, etc.) and accuracy is not guaranteed.",
+    dash_ai_estimate: "AI-powered estimate · Consult experts before making decisions",
+    dash_impact_score: "Impact",
 
     // tension
     tension_title: "Tension",
