@@ -604,7 +604,10 @@ async def _calc_sector_exposure(
     # Tier 2: DB에서 실제 교역 의존도 조회 (옵셔널 보정)
     real_trade_dep = None
     if db:
-        real_trade_dep = await _get_real_trade_dependency(home_country, affected_country, db)
+        try:
+            real_trade_dep = await _get_real_trade_dependency(home_country, affected_country, db)
+        except Exception:
+            pass  # 테이블 미생성 시 무시
 
     result = []
 

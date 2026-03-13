@@ -524,10 +524,11 @@ export interface WeeklyReport {
   generated_at: string;
 }
 
-export function useWeeklyReport() {
+export function useWeeklyReport(enabled = true) {
   return useQuery({
     queryKey: ["impact", "weekly-report"],
     queryFn: () => apiFetch<WeeklyReport>("/impact/weekly-report"),
+    enabled,
     staleTime: 60 * 60 * 1000,
     retry: false,
   });
@@ -578,10 +579,11 @@ export interface TradeFlow {
   cached: boolean;
 }
 
-export function useTradeFlow() {
+export function useTradeFlow(enabled = true) {
   return useQuery({
     queryKey: ["impact", "trade-flow"],
     queryFn: () => apiFetch<TradeFlow>("/impact/trade-flow"),
+    enabled,
     staleTime: 60 * 60 * 1000,
     retry: false,
   });
@@ -594,10 +596,11 @@ export interface WeeklyPdf {
   available: boolean;
 }
 
-export function useWeeklyPdf() {
+export function useWeeklyPdf(enabled = true) {
   return useQuery({
     queryKey: ["impact", "weekly-pdf"],
     queryFn: () => apiFetch<WeeklyPdf>("/impact/weekly-pdf"),
+    enabled,
     staleTime: 60 * 60 * 1000,
     retry: false,
   });

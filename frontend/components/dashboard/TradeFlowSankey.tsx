@@ -24,7 +24,7 @@ const FLOW_COLORS = [
 export function TradeFlowSankey() {
   const lang = useAppStore((s) => s.lang);
   const [expanded, setExpanded] = useState(false);
-  const { data, isLoading, isError, error } = useTradeFlow();
+  const { data, isLoading, isError, error } = useTradeFlow(expanded);
 
   const is403 = (error as any)?.status === 403;
 

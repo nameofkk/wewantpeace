@@ -14,8 +14,8 @@ export function WeeklyReportCard() {
   const lang = useAppStore((s) => s.lang);
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const { data, isLoading, isError, error } = useWeeklyReport();
-  const { data: pdfData } = useWeeklyPdf();
+  const { data, isLoading, isError, error } = useWeeklyReport(expanded);
+  const { data: pdfData } = useWeeklyPdf(expanded);
 
   const is403 = (error as any)?.status === 403;
 
