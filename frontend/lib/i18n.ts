@@ -24,6 +24,9 @@ export const translations = {
     sort_kscore: "KScore순",
     sort_latest: "최신순",
     sort_severity: "심각도순",
+    sort_score: "점수순",
+    sort_change: "변동순",
+    sort_name: "이름순",
 
     // 긴장도 기본
     tension_title: "긴장도 지수",
@@ -1334,6 +1337,9 @@ export const translations = {
     sort_kscore: "KScore",
     sort_latest: "Latest",
     sort_severity: "Severity",
+    sort_score: "Score",
+    sort_change: "Change",
+    sort_name: "Name",
 
     // tension
     tension_title: "Tension",

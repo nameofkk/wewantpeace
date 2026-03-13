@@ -588,10 +588,34 @@ export default function TensionPage() {
   );
   const { data: me } = useMe();
   const tensionsRaw = data as TensionData[] | undefined;
-  const tensions = useMemo(
-    () => tensionsRaw ? [...tensionsRaw].sort((a, b) => b.raw_score - a.raw_score) : undefined,
-    [tensionsRaw]
-  );
+  const [tensionSortMode, setTensionSortMode] = useState<"score" | "change" | "name">("score");
+  const [tensionSortDir, setTensionSortDir] = useState<"desc" | "asc">("desc");
+  const [tensionSortOpen, setTensionSortOpen] = useState(false);
+
+  const handleTensionSort = useCallback((mode: "score" | "change" | "name") => {
+    if (mode === tensionSortMode) {
+      setTensionSortDir((d) => d === "desc" ? "asc" : "desc");
+    } else {
+      setTensionSortMode(mode);
+      setTensionSortDir("desc");
+    }
+    setTensionSortOpen(false);
+    setVisibleCount(30);
+  }, [tensionSortMode]);
+
+  const tensions = useMemo(() => {
+    if (!tensionsRaw) return undefined;
+    const dir = tensionSortDir === "desc" ? 1 : -1;
+    return [...tensionsRaw].sort((a, b) => {
+      if (tensionSortMode === "score") return dir * (b.raw_score - a.raw_score);
+      if (tensionSortMode === "change") return dir * (Math.abs(b.delta_24h ?? 0) - Math.abs(a.delta_24h ?? 0));
+      // name
+      const aName = getCountryName(a.country_code, lang);
+      const bName = getCountryName(b.country_code, lang);
+      return dir * aName.localeCompare(bName, lang === "ko" ? "ko" : "en");
+    });
+  }, [tensionsRaw, tensionSortMode, tensionSortDir, lang]);
+
   const userPlan = (me as { plan?: string } | undefined)?.plan ?? "free";
   const [spinning, setSpinning] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
@@ -696,8 +720,8 @@ export default function TensionPage() {
           </p>
         </div>
 
-        {/* 글로벌 / 관심지역 토글 탭 (홈과 동일 구조) */}
-        <div className="flex gap-0">
+        {/* 글로벌 / 관심지역 토글 탭 + 정렬 */}
+        <div className="flex items-end gap-0">
           {(["all", "mine"] as const).map((mode) => (
             <button
               key={mode}
@@ -716,6 +740,38 @@ export default function TensionPage() {
               )}
             </button>
           ))}
+          {/* 정렬 드롭다운 */}
+          <div className="relative shrink-0 border-b-2 border-transparent">
+            <button
+              onClick={() => setTensionSortOpen((v) => !v)}
+              className="flex items-center gap-1 px-2 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {tensionSortDir === "desc" ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{t(lang, `sort_${tensionSortMode}` as "sort_score")}</span>
+            </button>
+            {tensionSortOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setTensionSortOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[130px] rounded-lg border border-border bg-card shadow-lg py-1">
+                  {(["score", "change", "name"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => handleTensionSort(mode)}
+                      className={cn(
+                        "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors",
+                        tensionSortMode === mode ? "text-primary font-medium bg-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      )}
+                    >
+                      {t(lang, `sort_${mode}` as "sort_score")}
+                      {tensionSortMode === mode && (
+                        tensionSortDir === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

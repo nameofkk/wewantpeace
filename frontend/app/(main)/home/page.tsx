@@ -842,22 +842,37 @@ function HomePageContent() {
   const [visibleCount, setVisibleCount] = useState(30);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sortMode, setSortMode] = useState<"kscore" | "latest" | "severity">("kscore");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  const handleSortSelect = useCallback((mode: "kscore" | "latest" | "severity") => {
+    if (mode === sortMode) {
+      setSortDir((d) => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortMode(mode);
+      setSortDir("desc");
+    }
+    setSortDropdownOpen(false);
+    setVisibleCount(30);
+  }, [sortMode]);
 
   const rawItems = (trendingTab === "global" ? globalData : mineData) as TrendingItem[] | undefined;
   const items = useMemo(() => {
     if (!rawItems) return undefined;
-    if (sortMode === "kscore") return rawItems; // 이미 KScore순 정렬됨
+    const dir = sortDir === "desc" ? 1 : -1;
+    if (sortMode === "kscore" && sortDir === "desc") return rawItems;
     return [...rawItems].sort((a, b) => {
+      if (sortMode === "kscore") {
+        return dir * (personalizedKScore(b, homeCountry) - personalizedKScore(a, homeCountry));
+      }
       if (sortMode === "latest") {
         const aTime = a.calculated_at ? new Date(a.calculated_at).getTime() : 0;
         const bTime = b.calculated_at ? new Date(b.calculated_at).getTime() : 0;
-        return bTime - aTime;
+        return dir * (bTime - aTime);
       }
-      // severity
-      return (b.severity ?? 0) - (a.severity ?? 0);
+      return dir * ((b.severity ?? 0) - (a.severity ?? 0));
     });
-  }, [rawItems, sortMode]);
+  }, [rawItems, sortMode, sortDir, homeCountry]);
   const isLoading = trendingTab === "global" ? globalLoading : mineLoading;
   const isFetching = trendingTab === "global" ? globalFetching : mineFetching;
   const isError  = trendingTab === "global" ? globalError  : mineError;
@@ -961,23 +976,26 @@ function HomePageContent() {
               onClick={() => setSortDropdownOpen((v) => !v)}
               className="flex items-center gap-1 px-2 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <ArrowUpDown className="h-3.5 w-3.5" />
+              {sortDir === "desc" ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{t(lang, `sort_${sortMode}` as "sort_kscore")}</span>
             </button>
             {sortDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setSortDropdownOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-lg border border-border bg-card shadow-lg py-1">
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[130px] rounded-lg border border-border bg-card shadow-lg py-1">
                   {(["kscore", "latest", "severity"] as const).map((mode) => (
                     <button
                       key={mode}
-                      onClick={() => { setSortMode(mode); setSortDropdownOpen(false); setVisibleCount(30); }}
+                      onClick={() => handleSortSelect(mode)}
                       className={cn(
-                        "w-full text-left px-3 py-2 text-xs transition-colors",
+                        "w-full flex items-center justify-between px-3 py-2 text-xs transition-colors",
                         sortMode === mode ? "text-primary font-medium bg-primary/5" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                       )}
                     >
                       {t(lang, `sort_${mode}` as "sort_kscore")}
+                      {sortMode === mode && (
+                        sortDir === "desc" ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />
+                      )}
                     </button>
                   ))}
                 </div>
