@@ -122,7 +122,7 @@ function UpgradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const source = searchParams.get("source");
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { lang } = useAppStore();
   const { data: me } = useMe();
   const currentPlan = (me as { plan?: string })?.plan ?? "free";
@@ -206,6 +206,7 @@ function UpgradeContent() {
 
   async function handleSubscribe(planId: string) {
     if (planId === "free") return;
+    if (authLoading) return;
     if (!user) { window.location.href = "/login?returnUrl=/upgrade"; return; }
 
     setLoading(planId);

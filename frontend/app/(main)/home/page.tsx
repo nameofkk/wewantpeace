@@ -736,14 +736,6 @@ function HomePageContent() {
       target: "[data-tour='home-tabs']",
       content: t(lang, "tour_home_tabs"),
     },
-    {
-      target: "[data-tour='home-rising']",
-      content: t(lang, "tour_home_rising"),
-    },
-    {
-      target: "[data-tour='home-kscore-history']",
-      content: t(lang, "tour_home_kscore_history"),
-    },
   ], [lang]);
   const { data: me } = useMe();
   const meObj = me as { plan?: string; role?: string } | undefined;
