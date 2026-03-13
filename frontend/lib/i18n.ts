@@ -1271,10 +1271,16 @@ export const translations = {
     tension_percentile_detail: "이 수치는 최근 30일 대비 현재 긴장도의 상대적 위치입니다",
 
     // 가이드 투어 — Home
-    tour_home_page_role: "이 화면은 전 세계 주요 위기를 실시간으로 추적하는 메인 대시보드입니다.",
+    tour_home_page_role: "이 화면은 전 세계 주요 위기를 실시간으로 추적하는 이슈 피드입니다.",
     tour_home_tabs: "Global은 전체 이슈, 관심 국가는 내가 설정한 국가의 이슈만 보여줍니다.",
     tour_home_rising: "최근 6시간 내 새로 등장하여 빠르게 확산 중인 이슈입니다.",
     tour_home_kscore_history: "시간대별 KScore 변화를 추적합니다. Pro에서 30일/90일 히스토리를 확인할 수 있습니다.",
+
+    // 가이드 투어 — Dashboard
+    tour_dash_page_role: "내 대시보드입니다. 글로벌 분쟁이 나에게 미치는 영향을 한눈에 볼 수 있습니다.",
+    tour_dash_risk: "홈 국가의 현재 긴장도와 전 세계 위기 현황을 보여줍니다.",
+    tour_dash_watchlist: "관심 국가의 긴장도를 카드로 빠르게 확인합니다. 탭하면 상세 페이지로 이동합니다.",
+    tour_dash_top_issues: "나에게 영향이 가장 큰 이슈 TOP 5입니다. KScore 기반으로 개인화됩니다.",
 
     // 가이드 투어 — Tension
     tour_tension_page_role: "국가별 긴장도를 수치화하여 위험 수준을 모니터링하는 페이지입니다.",
@@ -2615,10 +2621,16 @@ export const translations = {
     error_retry: "Try again",
 
     // Guide Tour — Home
-    tour_home_page_role: "This is the main dashboard that tracks major crises worldwide in real time.",
+    tour_home_page_role: "This is the issues feed that tracks major crises worldwide in real time.",
     tour_home_tabs: "Global shows all issues, My Countries shows issues from your watched countries only.",
     tour_home_rising: "Issues that have emerged within the last 6 hours and are spreading rapidly.",
     tour_home_kscore_history: "Track KScore changes over time. Pro unlocks 30-day and 90-day history.",
+
+    // Guide Tour — Dashboard
+    tour_dash_page_role: "Your personalized dashboard. See how global conflicts affect you at a glance.",
+    tour_dash_risk: "Shows your home country's current tension level and the global crisis overview.",
+    tour_dash_watchlist: "Quick view of tension levels for your watched countries. Tap a card for details.",
+    tour_dash_top_issues: "Top 5 issues with the highest impact on you, personalized by KScore.",
 
     // Guide Tour — Tension
     tour_tension_page_role: "This page quantifies country-level tension to monitor risk levels.",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText } from "lucide-react";
 import {
   LineChart as RCLineChart,
@@ -14,7 +14,9 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
-import { useClusterDetail, useKScoreHistory, type KScoreHistoryPoint } from "@/lib/api";
+import { useClusterDetail, useKScoreHistory, useTrackBehavior, type KScoreHistoryPoint } from "@/lib/api";
+import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
+import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { SourceBadge } from "@/components/issue/SourceBadge";
 import { KScoreBar } from "@/components/issue/KScoreBar";
 import { ShareButton } from "@/components/issue/ShareButton";
@@ -179,6 +181,22 @@ export default function IssueDetailClient({ initialData }: Props) {
   const [showHistory, setShowHistory] = useState(false);
   const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
   const [expandedFullBodies, setExpandedFullBodies] = useState<Record<string, boolean>>({});
+
+  // Phase 5: 이슈 열람 행동 트래킹
+  const trackBehavior = useTrackBehavior();
+  React.useEffect(() => {
+    if (issue) {
+      trackBehavior.mutate({
+        event_name: "issue_view",
+        props: {
+          cluster_id: id,
+          country_code: issue.country_code || "",
+          topic: issue.topic || "",
+        },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   if (!initialData && isPending) {
     return (
@@ -473,6 +491,12 @@ export default function IssueDetailClient({ initialData }: Props) {
             </div>
           </div>
         )}
+
+        {/* Phase 2-3: Impact Analysis */}
+        <div className="space-y-3 mt-4">
+          <ImpactBriefCard clusterId={id} />
+          <SectorImpactCard clusterId={id} />
+        </div>
       </div>
     </div>
   );

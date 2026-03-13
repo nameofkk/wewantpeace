@@ -18,6 +18,7 @@ from backend.app.routers import store_subscriptions
 from backend.app.routers import dodopayments as dodopayments_router
 from backend.app.routers import links as links_router
 from backend.app.routers import public as public_router
+from backend.app.routers import impact as impact_router
 import structlog
 
 logger = structlog.get_logger()
@@ -236,6 +237,7 @@ app.include_router(dodopayments_router.router)
 app.include_router(terms_router.router)
 app.include_router(links_router.router)
 app.include_router(public_router.router)
+app.include_router(impact_router.router)
 
 
 @app.get("/health")

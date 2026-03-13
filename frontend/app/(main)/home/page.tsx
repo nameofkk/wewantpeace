@@ -1,16 +1,22 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useState, useMemo, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import { useMe } from "@/lib/api";
+import { useMe, useClusters, useTrackBehavior } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { RiskSummaryHeader } from "@/components/dashboard/RiskSummaryHeader";
 import { WatchlistQuickStatus } from "@/components/dashboard/WatchlistQuickStatus";
 import { TopIssuesAffectingMe } from "@/components/dashboard/TopIssuesAffectingMe";
-import { ProTeaser } from "@/components/dashboard/ProTeaser";
+import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
+import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
+import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { Disclaimer } from "@/components/ui/Disclaimer";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import { personalizedKScore, type TrendingItem } from "@/lib/kscore-utils";
+import type { Step } from "react-joyride";
 
 export default function HomePage() {
   return (
@@ -22,9 +28,59 @@ export default function HomePage() {
 
 function DashboardContent() {
   const lang = useAppStore((s) => s.lang);
+  const homeCountry = useAppStore((s) => s.homeCountry);
   const { data: me, isLoading } = useMe();
   const meObj = me as { plan?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
+  const [tourRun, setTourRun] = useState(false);
+
+  // Phase 5: 대시보드 방문 이벤트 트래킹
+  const trackBehavior = useTrackBehavior();
+  useEffect(() => {
+    trackBehavior.mutate({ event_name: "dashboard_view", props: { plan: userPlan } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Top 1 클러스터 ID 가져오기 (Impact Brief / Sector Analysis 용)
+  const { data: clusterData } = useClusters({ limit: "2000" });
+  const topClusterId = useMemo(() => {
+    if (!clusterData || !Array.isArray(clusterData)) return undefined;
+    const sorted = (clusterData as any[])
+      .filter((c) => c.severity > 0 && c.kscore > 0)
+      .map((c) => ({
+        id: c.id,
+        kscore: c.kscore,
+        topic: c.topic,
+        country_codes: c.country_code ? [c.country_code] : [],
+      } as { id: string } & Pick<TrendingItem, "kscore" | "topic" | "country_codes">))
+      .sort((a, b) => {
+        const aItem = { ...a, keyword: "", keyword_ko: null, cluster_ids: [a.id] } as unknown as TrendingItem;
+        const bItem = { ...b, keyword: "", keyword_ko: null, cluster_ids: [b.id] } as unknown as TrendingItem;
+        return personalizedKScore(bItem, homeCountry) - personalizedKScore(aItem, homeCountry);
+      });
+    return sorted[0]?.id;
+  }, [clusterData, homeCountry]);
+
+  const dashTourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='dash-page']",
+      content: t(lang, "tour_dash_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='dash-risk']",
+      content: t(lang, "tour_dash_risk"),
+    },
+    {
+      target: "[data-tour='dash-watchlist']",
+      content: t(lang, "tour_dash_watchlist"),
+    },
+    {
+      target: "[data-tour='dash-top-issues']",
+      content: t(lang, "tour_dash_top_issues"),
+    },
+  ], [lang]);
 
   if (isLoading) {
     return (
@@ -35,7 +91,10 @@ function DashboardContent() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
+    <div className="flex flex-col" data-tour="dash-page" style={{ height: "calc(100dvh - 60px)" }}>
+      <AppTour tourId="dashboard" steps={dashTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
+      <TourHelpButton tourId="dashboard" onStartTour={() => setTourRun(true)} />
+
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-3">
         <div className="flex items-center justify-between mb-1">
@@ -52,18 +111,34 @@ function DashboardContent() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         {/* 1. Risk Summary */}
-        <RiskSummaryHeader />
+        <div data-tour="dash-risk">
+          <RiskSummaryHeader />
+        </div>
 
         {/* 2. Watchlist Quick Status */}
-        <WatchlistQuickStatus />
+        <div data-tour="dash-watchlist">
+          <WatchlistQuickStatus />
+        </div>
 
         {/* 3. Top Issues Affecting Me */}
-        <TopIssuesAffectingMe />
+        <div data-tour="dash-top-issues">
+          <TopIssuesAffectingMe />
+        </div>
 
-        {/* 4. Pro Feature Teaser */}
-        <ProTeaser />
+        {/* 4. Impact Brief (Phase 2 - Pro) */}
+        {topClusterId && (
+          <ImpactBriefCard clusterId={topClusterId} />
+        )}
 
-        {/* 5. Disclaimer */}
+        {/* 5. Sector Impact Analysis (Phase 3 - Pro+) */}
+        {topClusterId && (
+          <SectorImpactCard clusterId={topClusterId} />
+        )}
+
+        {/* 6. Weekly Report (Phase 4 - Pro+) */}
+        <WeeklyReportCard />
+
+        {/* 7. Disclaimer */}
         <Disclaimer />
       </div>
     </div>

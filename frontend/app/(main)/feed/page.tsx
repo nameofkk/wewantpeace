@@ -137,7 +137,7 @@ function KScoreHistorySection({
   ];
 
   return (
-    <div className="mt-4 pt-4 border-t border-border" data-tour="home-kscore-history">
+    <div className="mt-4 pt-4 border-t border-border" data-tour="feed-kscore-history">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-muted-foreground">
           KScore {lang === "ko" ? "히스토리" : "History"}
@@ -452,7 +452,7 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
   const hasDelta = tickerItems.some((item) => item.kscore_delta_24h != null && item.kscore_delta_24h !== 0);
 
   return (
-    <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3" data-tour="home-rising">
+    <div className="fade-in-up rounded-xl border border-border bg-card/50 overflow-hidden mb-3" data-tour="feed-rising">
       {/* 헤더 */}
       <div className="flex items-center gap-1.5 px-3.5 pt-3 pb-2">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -595,21 +595,21 @@ function FeedPageContent() {
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작
   useEffect(() => {
-    if (searchParams.get("tour") === "1" && !completedTours.includes("home")) {
+    if (searchParams.get("tour") === "1" && !completedTours.includes("feed")) {
       setTourRun(true);
       window.history.replaceState({}, "", "/feed");
     }
   }, [searchParams, completedTours]);
 
-  const homeTourSteps: Step[] = useMemo(() => [
+  const feedTourSteps: Step[] = useMemo(() => [
     {
-      target: "[data-tour='home-page']",
+      target: "[data-tour='feed-page']",
       content: t(lang, "tour_home_page_role"),
       placement: "center" as const,
       disableBeacon: true,
     },
     {
-      target: "[data-tour='home-tabs']",
+      target: "[data-tour='feed-tabs']",
       content: t(lang, "tour_home_tabs"),
     },
   ], [lang]);
@@ -773,9 +773,9 @@ function FeedPageContent() {
   }, [refetch]);
 
   return (
-    <div className="flex flex-col" data-tour="home-page" style={{ height: "calc(100dvh - 60px)" }}>
-      <AppTour tourId="home" steps={homeTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
-      <TourHelpButton tourId="home" onStartTour={() => setTourRun(true)} />
+    <div className="flex flex-col" data-tour="feed-page" style={{ height: "calc(100dvh - 60px)" }}>
+      <AppTour tourId="feed" steps={feedTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
+      <TourHelpButton tourId="feed" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
         <div className="grid grid-cols-3 items-center mb-3">
@@ -829,7 +829,7 @@ function FeedPageContent() {
         </p>
 
         {/* 탭 + 정렬 */}
-        <div className="flex items-end gap-0" data-tour="home-tabs">
+        <div className="flex items-end gap-0" data-tour="feed-tabs">
           {(["global", "mine"] as const).map((tab) => (
             <button
               key={tab}

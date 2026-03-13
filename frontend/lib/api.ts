@@ -451,3 +451,109 @@ export function useMySubscription() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+// --- Impact Dashboard hooks (Phase 2-5) ---
+export interface ImpactBrief {
+  cluster_id: string;
+  title: string;
+  title_ko?: string | null;
+  economy: string;
+  trade: string;
+  travel: string;
+  summary: string;
+  score: number;
+  data_sources: string[];
+  generated_at: string;
+  cached: boolean;
+}
+
+export function useImpactBrief(clusterId?: string) {
+  return useQuery({
+    queryKey: ["impact", "brief", clusterId],
+    queryFn: () => apiFetch<ImpactBrief>(`/impact/brief/${clusterId}`),
+    enabled: !!clusterId,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export interface SectorExposure {
+  sector: string;
+  exposure_pct: number;
+  trade_dependency: number;
+  risk_level: string;
+  description: string;
+}
+
+export interface SectorAnalysis {
+  home_country: string;
+  affected_country: string;
+  sectors: SectorExposure[];
+  overall_risk: string;
+  generated_at: string;
+  cached: boolean;
+}
+
+export function useSectorAnalysis(clusterId?: string) {
+  return useQuery({
+    queryKey: ["impact", "sector", clusterId],
+    queryFn: () => apiFetch<SectorAnalysis>(`/impact/sector/${clusterId}`),
+    enabled: !!clusterId,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export interface WeeklyReportIssue {
+  cluster_id: string;
+  title: string;
+  kscore: number;
+  impact_score: number;
+  country_codes: string[];
+  topic: string;
+}
+
+export interface WeeklyReport {
+  week_start: string;
+  week_end: string;
+  home_country: string;
+  top_issues: WeeklyReportIssue[];
+  tension_summary: { current: number; previous: number; delta: number; trend: string };
+  total_events: number;
+  highlight: string;
+  generated_at: string;
+}
+
+export function useWeeklyReport() {
+  return useQuery({
+    queryKey: ["impact", "weekly-report"],
+    queryFn: () => apiFetch<WeeklyReport>("/impact/weekly-report"),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export interface Recommendations {
+  recommended_countries: string[];
+  recommended_topics: string[];
+  based_on: string;
+}
+
+export function useRecommendations() {
+  return useQuery({
+    queryKey: ["impact", "recommendations"],
+    queryFn: () => apiFetch<Recommendations>("/impact/recommendations"),
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useTrackBehavior() {
+  return useMutation({
+    mutationFn: (data: { event_name: string; props: Record<string, any> }) =>
+      apiFetch("/impact/track", undefined, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  });
+}
