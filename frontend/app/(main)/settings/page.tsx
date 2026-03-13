@@ -18,6 +18,7 @@ import { ExternalLink } from "lucide-react";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
+import { isTossMiniApp } from "@/lib/platform";
 import type { Step } from "react-joyride";
 
 // ── 국가 선택 패널 ─────────────────────────────────────────────────────────
@@ -840,7 +841,8 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* ── 테마 설정 ─────────────────────────────────────────────── */}
+        {/* ── 테마 설정 (토스 미니앱에서는 라이트 모드 고정) ───────── */}
+        {!isTossMiniApp() && (
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             {t(lang, "settings_theme")}
@@ -863,6 +865,7 @@ export default function SettingsPage() {
             ))}
           </div>
         </section>
+        )}
 
         {/* ── 알림 설정 ─────────────────────────────────────────────── */}
         <section data-tour="settings-notifications">
