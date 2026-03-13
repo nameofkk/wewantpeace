@@ -194,11 +194,11 @@ async def _generate_impact_brief(
         pass  # Tier 2 테이블 미생성 시 무시
 
     # 긴장도 데이터 조회
-    from backend.app.models.tension import TensionIndex
+    from backend.app.models.tension_index import TensionIndex
     tension_q = await db.execute(
         select(TensionIndex.raw_score)
         .where(TensionIndex.country_code == country_code)
-        .order_by(TensionIndex.calculated_at.desc())
+        .order_by(TensionIndex.time.desc())
         .limit(1)
     )
     tension_score = tension_q.scalar_one_or_none() or 0
@@ -835,14 +835,14 @@ async def get_weekly_report(
     total_events = event_count_q.scalar() or 0
 
     # 긴장도 변화 요약
-    from backend.app.models.tension import TensionIndex
+    from backend.app.models.tension_index import TensionIndex
     tension_q = await db.execute(
         select(TensionIndex)
         .where(
             TensionIndex.country_code == home,
-            TensionIndex.calculated_at >= week_start,
+            TensionIndex.time >= week_start,
         )
-        .order_by(TensionIndex.calculated_at.desc())
+        .order_by(TensionIndex.time.desc())
         .limit(1)
     )
     latest_tension = tension_q.scalar_one_or_none()
@@ -851,10 +851,10 @@ async def get_weekly_report(
         select(TensionIndex)
         .where(
             TensionIndex.country_code == home,
-            TensionIndex.calculated_at >= week_start - timedelta(hours=6),
-            TensionIndex.calculated_at <= week_start + timedelta(hours=6),
+            TensionIndex.time >= week_start - timedelta(hours=6),
+            TensionIndex.time <= week_start + timedelta(hours=6),
         )
-        .order_by(TensionIndex.calculated_at.asc())
+        .order_by(TensionIndex.time.asc())
         .limit(1)
     )
     week_ago_tension = tension_week_ago_q.scalar_one_or_none()
