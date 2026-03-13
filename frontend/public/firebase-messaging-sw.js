@@ -7,7 +7,7 @@ importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-comp
 
 firebase.initializeApp({
   apiKey: "AIzaSyBlJf58F_C9hkIry1eEV185-S1EQZmt2ps",
-  authDomain: "wewantpeace-14660.firebaseapp.com",
+  authDomain: "auth.wewantpeace.live",
   projectId: "wewantpeace-14660",
   storageBucket: "wewantpeace-14660.firebasestorage.app",
   messagingSenderId: "736999139205",

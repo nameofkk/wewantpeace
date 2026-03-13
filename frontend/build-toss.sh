@@ -8,7 +8,7 @@ export NEXT_PUBLIC_SITE_URL=https://www.wewantpeace.live
 
 # Firebase (railway-frontend.json과 동일)
 export NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyBlJf58F_C9hkIry1eEV185-S1EQZmt2ps
-export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=wewantpeace-14660.firebaseapp.com
+export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=auth.wewantpeace.live
 export NEXT_PUBLIC_FIREBASE_PROJECT_ID=wewantpeace-14660
 export NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=wewantpeace-14660.firebasestorage.app
 export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=736999139205
