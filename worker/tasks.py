@@ -2448,30 +2448,10 @@ def generate_kscore_social(self):
         from worker.social.telegram_bot import send_review_message
 
         created = 0
-        DAILY_KSCORE_CAP = 5  # 하루 최대 kscore_alert 개수
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                from sqlalchemy import func as sa_func
-
                 cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-                # 일일 캡 체크: 오늘 이미 생성된 kscore_alert 수
-                today_count_result = await db.execute(
-                    select(sa_func.count())
-                    .select_from(SocialPost)
-                    .where(SocialPost.dedup_key.like(f"kscore_alert%{today}"))
-                )
-                today_count = today_count_result.scalar() or 0
-                if today_count >= DAILY_KSCORE_CAP:
-                    logger.info(
-                        "kscore_alert 일일 캡 도달: %d/%d, 건너뜀",
-                        today_count, DAILY_KSCORE_CAP,
-                    )
-                    return {"status": "daily_cap", "count": today_count}
-
-                remaining = DAILY_KSCORE_CAP - today_count
 
                 # 최근 24시간 내 포스팅된 클러스터 제외 (날짜 전환 폭발 방지)
                 dedup_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -2493,7 +2473,7 @@ def generate_kscore_social(self):
                         IssueCluster.last_event_at >= cutoff,
                     )
                     .order_by(IssueCluster.kscore.desc())
-                    .limit(remaining)
+                    .limit(10)
                 )
                 if already_posted:
                     query = query.where(IssueCluster.id.notin_(already_posted))
