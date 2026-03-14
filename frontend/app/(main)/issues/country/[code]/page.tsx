@@ -50,14 +50,24 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og${langSuffix}`;
   const pageUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}${langSuffix}`;
 
+  const canonicalUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`;
+
   return {
     title,
     description: siteDesc,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        ko: canonicalUrl,
+        en: `${canonicalUrl}?lang=en`,
+        "x-default": canonicalUrl,
+      },
+    },
     openGraph: {
       title: `${title} | WeWantPeace`,
       description: siteDesc,
       type: "website",
-      url: pageUrl,
+      url: canonicalUrl,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],
     },

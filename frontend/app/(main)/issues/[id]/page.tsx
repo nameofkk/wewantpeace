@@ -60,14 +60,24 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     ? `Severity ${severity} | ${eventCount} reports — Real-time conflict monitoring`
     : `위기지수 ${severity} | ${eventCount}건 보도 — 실시간 분쟁 모니터링`;
 
+  const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
+
   return {
     title,
     description: desc,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        ko: canonicalUrl,
+        en: `${canonicalUrl}?lang=en`,
+        "x-default": canonicalUrl,
+      },
+    },
     openGraph: {
       title: ogTitle,
       description: desc,
       type: "website",
-      url: pageUrl,
+      url: canonicalUrl,
       siteName: "WeWantPeace",
       images: [{ url: ogImage }],
     },
