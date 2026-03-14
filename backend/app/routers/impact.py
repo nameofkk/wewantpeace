@@ -318,10 +318,11 @@ async def get_impact_summary(
     # 배치 3: kscore_delta — 최근 24h 이벤트 수 배치
     day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
     delta_q = await db.execute(
-        select(ClusterEvent.cluster_id, func.count(ClusterEvent.id))
+        select(ClusterEvent.cluster_id, func.count(ClusterEvent.event_id))
+        .join(NormalizedEvent, NormalizedEvent.id == ClusterEvent.event_id)
         .where(
             ClusterEvent.cluster_id.in_(top5_cluster_ids),
-            ClusterEvent.created_at >= day_ago,
+            NormalizedEvent.created_at >= day_ago,
         )
         .group_by(ClusterEvent.cluster_id)
     )
