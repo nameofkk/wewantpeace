@@ -27,6 +27,7 @@ import { SmartSummaryCardFull, SmartSummaryCompact } from "@/components/dashboar
 import { RiskRadar } from "@/components/dashboard/RiskRadar";
 import { ImpactFlowSankey } from "@/components/dashboard/ImpactFlowSankey";
 import { ProDemoWrapper } from "@/components/dashboard/ProDemoWrapper";
+import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
   MapPin,
@@ -41,6 +42,7 @@ import {
   Fuel,
   BarChart3,
   Globe2,
+  Sparkles,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
@@ -737,6 +739,20 @@ function ReportContent() {
                         )}
                       </div>
                     </ProDemoWrapper>
+
+                    {/* Sector Impact — embedded in detail tab */}
+                    <div className="mt-4 pt-3 border-t border-border/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="text-[10px] font-bold text-purple-400">
+                          {lang === "ko" ? "산업별 리스크" : "Sector Risk"}
+                        </span>
+                        <span className="text-[8px] px-1 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold">
+                          Pro+
+                        </span>
+                      </div>
+                      <SectorImpactCard embedded />
+                    </div>
                   </div>
                 )}
               </m.div>

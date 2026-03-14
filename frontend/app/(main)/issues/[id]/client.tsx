@@ -334,6 +334,10 @@ export default function IssueDetailClient({ initialData }: Props) {
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
 
+        {/* Impact Analysis — 요약 바로 아래 배치 */}
+        <ImpactBriefCard clusterId={id} />
+        <SectorImpactCard clusterId={id} />
+
         {/* T15: 정정/업데이트 이력 */}
         {issue.change_logs && issue.change_logs.length > 0 && (
           <div className="rounded-xl border border-amber-500/20 bg-card p-4">
@@ -492,11 +496,6 @@ export default function IssueDetailClient({ initialData }: Props) {
           </div>
         )}
 
-        {/* Phase 2-3: Impact Analysis */}
-        <div className="space-y-3 mt-4">
-          <ImpactBriefCard clusterId={id} />
-          <SectorImpactCard clusterId={id} />
-        </div>
       </div>
     </div>
   );
