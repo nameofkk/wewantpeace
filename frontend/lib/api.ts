@@ -581,14 +581,15 @@ export interface ImpactFlowOut {
   links: ImpactFlowLink[];
 }
 
-export function useImpactSummary(homeCountry?: string, enabled = true) {
+export function useImpactSummary(homeCountry?: string, lang?: string, enabled = true) {
   return useQuery({
-    queryKey: ["impact", "summary", homeCountry ?? "db"],
-    queryFn: () =>
-      apiFetch<ImpactSummary>(
-        "/impact/summary",
-        homeCountry !== undefined ? { home_country: homeCountry } : undefined
-      ),
+    queryKey: ["impact", "summary", homeCountry ?? "db", lang ?? "ko"],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (homeCountry !== undefined) params.home_country = homeCountry;
+      if (lang) params.lang = lang;
+      return apiFetch<ImpactSummary>("/impact/summary", params);
+    },
     enabled,
     staleTime: 30 * 60 * 1000,
     retry: false,
@@ -610,10 +611,14 @@ export interface ImpactBrief {
   cached: boolean;
 }
 
-export function useImpactBrief(clusterId?: string) {
+export function useImpactBrief(clusterId?: string, lang?: string) {
   return useQuery({
-    queryKey: ["impact", "brief", clusterId],
-    queryFn: () => apiFetch<ImpactBrief>(`/impact/brief/${clusterId}`),
+    queryKey: ["impact", "brief", clusterId, lang ?? "ko"],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (lang) params.lang = lang;
+      return apiFetch<ImpactBrief>(`/impact/brief/${clusterId}`, params);
+    },
     enabled: !!clusterId,
     staleTime: 30 * 60 * 1000,
     retry: false,
@@ -637,10 +642,14 @@ export interface SectorAnalysis {
   cached: boolean;
 }
 
-export function useSectorAnalysis(clusterId?: string) {
+export function useSectorAnalysis(clusterId?: string, lang?: string) {
   return useQuery({
-    queryKey: ["impact", "sector", clusterId],
-    queryFn: () => apiFetch<SectorAnalysis>(`/impact/sector/${clusterId}`),
+    queryKey: ["impact", "sector", clusterId, lang ?? "ko"],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (lang) params.lang = lang;
+      return apiFetch<SectorAnalysis>(`/impact/sector/${clusterId}`, params);
+    },
     enabled: !!clusterId,
     staleTime: 60 * 60 * 1000,
     retry: false,

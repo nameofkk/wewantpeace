@@ -239,6 +239,7 @@ async def get_impact_summary(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     home_country: str | None = Query(None, description="홈 국가 코드 (빈 문자열=글로벌)"),
+    lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
 ):
     """홀리스틱 종합 영향도 (모든 플랜).
 
@@ -255,9 +256,20 @@ async def get_impact_summary(
     is_global = not home
     user_plan = user.plan or "free"
 
-    # 캐시 확인 (plan별로 — Pro가 상세 정보 포함하므로)
+    # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
+    resolved_lang = lang  # 쿼리 파라미터
+    if not resolved_lang:
+        from backend.app.models.user import UserPreference
+        pref_q = await db.execute(
+            select(UserPreference.language).where(UserPreference.user_id == user.id)
+        )
+        pref_lang = pref_q.scalar_one_or_none()
+        resolved_lang = pref_lang or "ko"
+    lang = resolved_lang
+
+    # 캐시 확인 (plan + lang별)
     redis = get_redis()
-    cache_key = f"impact:summary:{_CACHE_VERSION}:{home or 'global'}:{user_plan}"
+    cache_key = f"impact:summary:{_CACHE_VERSION}:{home or 'global'}:{user_plan}:{lang}"
     if redis:
         cached = await redis.get(cache_key)
         if cached:
@@ -268,16 +280,6 @@ async def get_impact_summary(
                 return ImpactSummaryOut(**data)
             else:
                 await redis.delete(cache_key)
-
-    # 사용자 언어
-    lang = "ko"
-    from backend.app.models.user import UserPreference
-    pref_q = await db.execute(
-        select(UserPreference.language).where(UserPreference.user_id == user.id)
-    )
-    pref_lang = pref_q.scalar_one_or_none()
-    if pref_lang:
-        lang = pref_lang
 
     # 최근 7일 활성 클러스터 가져오기
     since = datetime.now(timezone.utc) - timedelta(days=7)
@@ -821,8 +823,8 @@ class ImpactBriefOut(BaseModel):
     cached: bool = False
 
 
-def _brief_cache_key(cluster_id: str, home_country: str) -> str:
-    return f"impact:brief:{cluster_id}:{home_country}"
+def _brief_cache_key(cluster_id: str, home_country: str, lang: str = "ko") -> str:
+    return f"impact:brief:{cluster_id}:{home_country}:{lang}"
 
 
 async def _generate_impact_brief(
@@ -1085,11 +1087,23 @@ async def get_impact_brief(
     cluster_id: str,
     user: User = Depends(plan_required("pro")),
     db: AsyncSession = Depends(get_db),
+    lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
 ):
     """이슈의 경제/무역/여행 영향 분석 (Pro 이상)"""
+    # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
+    resolved_lang = lang
+    if not resolved_lang:
+        from backend.app.models.user import UserPreference
+        pref_q = await db.execute(
+            select(UserPreference.language).where(UserPreference.user_id == user.id)
+        )
+        pref_lang = pref_q.scalar_one_or_none()
+        resolved_lang = pref_lang or "ko"
+    lang = resolved_lang
+
     # 캐시 확인
     redis = get_redis()
-    cache_key = _brief_cache_key(cluster_id, user.home_country or "KR")
+    cache_key = _brief_cache_key(cluster_id, user.home_country or "KR", lang)
     if redis:
         cached = await redis.get(cache_key)
         if cached:
@@ -1104,16 +1118,6 @@ async def get_impact_brief(
     cluster = result.scalar_one_or_none()
     if not cluster:
         raise HTTPException(404, detail="Cluster not found")
-
-    # 사용자 언어 감지
-    lang = "ko"  # default
-    from backend.app.models.user import UserPreference
-    pref_q = await db.execute(
-        select(UserPreference.language).where(UserPreference.user_id == user.id)
-    )
-    pref_lang = pref_q.scalar_one_or_none()
-    if pref_lang:
-        lang = pref_lang
 
     # AI 분석 생성
     brief = await _generate_impact_brief(cluster, user.home_country or "KR", lang, db)
@@ -2146,11 +2150,23 @@ async def get_sector_analysis(
     cluster_id: str,
     user: User = Depends(plan_required("pro_plus")),
     db: AsyncSession = Depends(get_db),
+    lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
 ):
     """섹터별 영향도 분석 (Pro+ 이상)"""
+    # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
+    resolved_lang = lang
+    if not resolved_lang:
+        from backend.app.models.user import UserPreference
+        pref_q = await db.execute(
+            select(UserPreference.language).where(UserPreference.user_id == user.id)
+        )
+        pref_lang = pref_q.scalar_one_or_none()
+        resolved_lang = pref_lang or "ko"
+    lang = resolved_lang
+
     redis = get_redis()
     home = user.home_country or "KR"
-    cache_key = f"impact:sector:{cluster_id}:{home}"
+    cache_key = f"impact:sector:{cluster_id}:{home}:{lang}"
 
     if redis:
         cached = await redis.get(cache_key)
@@ -2167,16 +2183,6 @@ async def get_sector_analysis(
         raise HTTPException(404, detail="Cluster not found")
 
     affected = cluster.country_code or "Unknown"
-
-    # 사용자 언어
-    lang = "ko"
-    from backend.app.models.user import UserPreference
-    pref_q = await db.execute(
-        select(UserPreference.language).where(UserPreference.user_id == user.id)
-    )
-    pref_lang = pref_q.scalar_one_or_none()
-    if pref_lang:
-        lang = pref_lang
 
     sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db)
     critical_count = sum(1 for s in sectors if s["risk_level"] == "critical")

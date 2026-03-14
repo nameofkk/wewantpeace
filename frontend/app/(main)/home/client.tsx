@@ -142,7 +142,7 @@ function ReportContent() {
   const userPlan = meObj?.plan ?? "free";
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
-  const { data: summary, isLoading: summaryLoading } = useImpactSummary(homeCountry ?? "");
+  const { data: summary, isLoading: summaryLoading } = useImpactSummary(homeCountry ?? "", lang);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);

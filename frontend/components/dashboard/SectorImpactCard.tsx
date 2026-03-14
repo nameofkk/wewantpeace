@@ -78,11 +78,12 @@ export function SectorImpactCard({ clusterId }: { clusterId?: string } = {}) {
   const [expanded, setExpanded] = useState(false);
 
   // clusterId가 있으면 직접 사용, 없으면 Impact Summary에서 top issue 가져오기
-  const { data: summaryData } = useImpactSummary(undefined, !clusterId && expanded);
+  const { data: summaryData } = useImpactSummary(undefined, lang, !clusterId && expanded);
   const effectiveClusterId = clusterId || summaryData?.top_issues?.[0]?.cluster_id;
 
   const { data, isLoading, isError, error } = useSectorAnalysis(
     expanded && effectiveClusterId ? effectiveClusterId : undefined,
+    lang,
   );
 
   const is403 = (error as any)?.status === 403;

@@ -68,8 +68,8 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
   const [expanded, setExpanded] = useState(false);
 
   // clusterId가 있으면 per-cluster 분석, 없으면 홀리스틱 summary
-  const summaryQuery = useImpactSummary(undefined, !clusterId && expanded);
-  const briefQuery = useImpactBrief(clusterId && expanded ? clusterId : undefined);
+  const summaryQuery = useImpactSummary(undefined, lang, !clusterId && expanded);
+  const briefQuery = useImpactBrief(clusterId && expanded ? clusterId : undefined, lang);
 
   const isPerCluster = !!clusterId;
   const activeQuery = isPerCluster ? briefQuery : summaryQuery;
