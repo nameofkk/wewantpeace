@@ -155,11 +155,21 @@ function ReportContent() {
   }, []);
 
   // 파생 데이터
+  const isGlobalMode = !homeCountry;
+
   const homeData = Array.isArray(homeTension) ? homeTension[0] : null;
-  const homeScore = (homeData as TensionAllItem | null)?.raw_score ?? 0;
-  const animatedHomeScore = useCountUp(homeScore, 1000);
+  const singleCountryScore = (homeData as TensionAllItem | null)?.raw_score ?? 0;
 
   const allItems = (allTension as TensionAllItem[] | undefined) ?? [];
+
+  // 글로벌 모드: allTension 평균 사용
+  const globalAvgScore = useMemo(() => {
+    if (!isGlobalMode || !allItems.length) return 0;
+    return Math.round(allItems.reduce((s, i) => s + i.raw_score, 0) / allItems.length);
+  }, [isGlobalMode, allItems]);
+
+  const homeScore = isGlobalMode ? globalAvgScore : singleCountryScore;
+  const animatedHomeScore = useCountUp(homeScore, 1000);
   const extremeCount = allItems.filter((i) => i.raw_score >= 80).length;
   const severeCount = allItems.filter((i) => i.raw_score >= 60 && i.raw_score < 80).length;
   const alertCount = allItems.filter((i) => i.raw_score >= 40 && i.raw_score < 60).length;
@@ -267,7 +277,9 @@ function ReportContent() {
                     {t(lang, levelKey)}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {t(lang, "dash_impact_score")} · {t(lang, "dash_impact_score_desc" as any)}
+                    {t(lang, "dash_impact_score")} · {isGlobalMode
+                      ? t(lang, "dash_global_impact_desc" as any)
+                      : t(lang, "dash_impact_score_desc" as any)}
                   </span>
                 </div>
               </div>
@@ -294,9 +306,13 @@ function ReportContent() {
             <div className="flex items-center gap-2 text-[11px] mb-3">
               <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className="font-medium">
-                {t(lang, "dash_compact_tension" as Parameters<typeof t>[1])}
+                {isGlobalMode
+                  ? t(lang, "dash_global_tension" as any)
+                  : t(lang, "dash_compact_tension" as Parameters<typeof t>[1])}
                 <span className="font-normal text-muted-foreground/50 text-[9px] ml-1">
-                  ({t(lang, "dash_tension_desc" as any)})
+                  ({isGlobalMode
+                    ? t(lang, "dash_global_tension_desc" as any)
+                    : t(lang, "dash_tension_desc" as any)})
                 </span>
               </span>
               <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>

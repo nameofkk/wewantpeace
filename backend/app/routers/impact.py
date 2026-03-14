@@ -180,12 +180,13 @@ async def get_impact_summary(
     - Free: score + summary + top_issues_count
     - Pro/Pro+: economy/trade/travel 상세 분석 포함
     """
-    home = user.home_country or "KR"
+    home = user.home_country or ""
+    is_global = not home
     user_plan = user.plan or "free"
 
     # 캐시 확인 (plan별로 — Pro가 상세 정보 포함하므로)
     redis = get_redis()
-    cache_key = f"impact:summary:{_CACHE_VERSION}:{home}:{user_plan}"
+    cache_key = f"impact:summary:{_CACHE_VERSION}:{home or 'global'}:{user_plan}"
     if redis:
         cached = await redis.get(cache_key)
         if cached:
@@ -330,7 +331,7 @@ async def get_impact_summary(
 
     if lang == "ko":
         top1 = top_issues[0] if top_issues else None
-        parts = [f"종합 영향도 {overall_score}점 ({level_ko.get(level, level)})"]
+        parts = [f"{'글로벌 종합' if is_global else '종합'} 영향도 {overall_score}점 ({level_ko.get(level, level)})"]
         if top1:
             parts.append(f"'{top1.title[:30]}' 이슈가 가장 큰 영향")
         if critical_count > 0:
@@ -339,7 +340,7 @@ async def get_impact_summary(
         summary = ". ".join(parts) + "."
     else:
         top1_en = top_issues[0] if top_issues else None
-        parts_en = [f"Overall impact {overall_score} ({level_en.get(level, level)})"]
+        parts_en = [f"{'Global impact' if is_global else 'Overall impact'} {overall_score} ({level_en.get(level, level)})"]
         if top1_en:
             parts_en.append(f"'{top1_en.title[:30]}' has the highest impact")
         if critical_count > 0:
