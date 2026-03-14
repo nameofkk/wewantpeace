@@ -453,6 +453,43 @@ export function useMySubscription() {
 }
 
 // --- Impact Dashboard hooks (Phase 2-5) ---
+
+// 홀리스틱 종합 영향도 (모든 플랜)
+export interface ImpactSummaryTopIssue {
+  cluster_id: string;
+  title: string;
+  impact_score: number;
+  country_codes: string[];
+  topic: string;
+}
+
+export interface ImpactSummary {
+  score: number;
+  level: string;
+  summary: string;
+  economy?: string | null;
+  trade?: string | null;
+  travel?: string | null;
+  top_issues: ImpactSummaryTopIssue[];
+  affected_sectors_count: number;
+  critical_issues_count: number;
+  total_active_issues: number;
+  data_sources: string[];
+  generated_at: string;
+  cached: boolean;
+}
+
+export function useImpactSummary(enabled = true) {
+  return useQuery({
+    queryKey: ["impact", "summary"],
+    queryFn: () => apiFetch<ImpactSummary>("/impact/summary"),
+    enabled,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+}
+
+// Per-cluster impact brief (legacy, Pro)
 export interface ImpactBrief {
   cluster_id: string;
   title: string;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useSectorAnalysis } from "@/lib/api";
+import { useSectorAnalysis, useImpactSummary } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import {
   Sparkles,
@@ -73,11 +73,16 @@ const RISK_LABELS: Record<string, Record<string, string>> = {
   en: { critical: "Critical", high: "High", medium: "Medium", low: "Low" },
 };
 
-export function SectorImpactCard({ clusterId }: { clusterId: string }) {
+export function SectorImpactCard({ clusterId }: { clusterId?: string } = {}) {
   const lang = useAppStore((s) => s.lang);
   const [expanded, setExpanded] = useState(false);
+
+  // clusterId가 있으면 직접 사용, 없으면 Impact Summary에서 top issue 가져오기
+  const { data: summaryData } = useImpactSummary(!clusterId && expanded);
+  const effectiveClusterId = clusterId || summaryData?.top_issues?.[0]?.cluster_id;
+
   const { data, isLoading, isError, error } = useSectorAnalysis(
-    expanded ? clusterId : undefined,
+    expanded && effectiveClusterId ? effectiveClusterId : undefined,
   );
 
   const is403 = (error as any)?.status === 403;
@@ -121,7 +126,7 @@ export function SectorImpactCard({ clusterId }: { clusterId: string }) {
 
         {expanded && (
           <div className="px-4 pb-4 border-t border-border/40">
-            {isLoading && (
+            {(isLoading || (expanded && !effectiveClusterId && !is403 && !isError)) && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
               </div>

@@ -91,7 +91,276 @@ def calc_personalized_impact_score(
     return min(100, max(0, int(severity_component + kscore_component)))
 
 
-# ── Phase 2: Impact Brief ──────────────────────────────────────────────────
+# ── Impact Summary (홀리스틱 종합 영향도) ──────────────────────────────────
+
+class ImpactSummaryTopIssue(BaseModel):
+    cluster_id: str
+    title: str
+    impact_score: int
+    country_codes: list[str]
+    topic: str
+
+
+class ImpactSummaryOut(BaseModel):
+    score: int = Field(ge=0, le=100, description="종합 영향도 0-100")
+    level: str = Field(description="low|guarded|elevated|high")
+    summary: str
+    economy: Optional[str] = None
+    trade: Optional[str] = None
+    travel: Optional[str] = None
+    top_issues: list[ImpactSummaryTopIssue] = []
+    affected_sectors_count: int = 0
+    critical_issues_count: int = 0
+    total_active_issues: int = 0
+    data_sources: list[str] = []
+    generated_at: str
+    cached: bool = False
+
+
+@router.get("/summary", response_model=ImpactSummaryOut)
+async def get_impact_summary(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """홀리스틱 종합 영향도 (모든 플랜).
+
+    사용자 홈 국가에 영향을 미치는 모든 활성 클러스터를 종합하여
+    안정적인 영향도 점수와 요약을 반환합니다.
+    - Free: score + summary + top_issues_count
+    - Pro/Pro+: economy/trade/travel 상세 분석 포함
+    """
+    home = user.home_country or "KR"
+    user_plan = user.plan or "free"
+
+    # 캐시 확인 (plan별로 — Pro가 상세 정보 포함하므로)
+    redis = await get_redis()
+    cache_key = f"impact:summary:{home}:{user_plan}"
+    if redis:
+        cached = await redis.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            data["cached"] = True
+            return ImpactSummaryOut(**data)
+
+    # 사용자 언어
+    lang = "ko"
+    from backend.app.models.user import UserPreference
+    pref_q = await db.execute(
+        select(UserPreference.language).where(UserPreference.user_id == user.id)
+    )
+    pref_lang = pref_q.scalar_one_or_none()
+    if pref_lang:
+        lang = pref_lang
+
+    # 최근 7일 활성 클러스터 가져오기
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    clusters_q = await db.execute(
+        select(IssueCluster)
+        .where(
+            IssueCluster.is_active == True,
+            IssueCluster.severity > 0,
+            IssueCluster.kscore > 0,
+            IssueCluster.last_event_at >= since,
+        )
+        .order_by(IssueCluster.kscore.desc())
+        .limit(100)
+    )
+    clusters = clusters_q.scalars().all()
+
+    # 각 클러스터에 대해 personalized impact score 계산
+    scored = []
+    for c in clusters:
+        cc = c.country_code or ""
+        topic = c.topic or "unknown"
+        impact = calc_personalized_impact_score(
+            c.severity or 0, c.kscore or 0, cc, topic, home,
+        )
+        scored.append((c, impact))
+
+    # impact score 기준 정렬 (안정적 — 같은 데이터면 같은 결과)
+    scored.sort(key=lambda x: (-x[1], str(x[0].id)))
+
+    total_active = len(scored)
+    critical_count = sum(1 for _, s in scored if s >= 70)
+
+    # 종합 점수: 상위 10개 가중 평균 (1위: 30%, 2위: 20%, 3~5위: 10%, 6~10위: 6%)
+    weights = [0.30, 0.20, 0.10, 0.10, 0.10, 0.06, 0.06, 0.04, 0.02, 0.02]
+    top_10 = scored[:10]
+    if top_10:
+        total_weight = sum(weights[:len(top_10)])
+        weighted_sum = sum(
+            s * (weights[i] if i < len(weights) else 0.02)
+            for i, (_, s) in enumerate(top_10)
+        )
+        overall_score = min(100, max(0, int(weighted_sum / total_weight)))
+    else:
+        overall_score = 0
+
+    # 레벨
+    if overall_score >= 75:
+        level = "high"
+    elif overall_score >= 50:
+        level = "elevated"
+    elif overall_score >= 25:
+        level = "guarded"
+    else:
+        level = "low"
+
+    # 영향받는 섹터 수 계산
+    sectors_data = SECTOR_DATA.get(home, DEFAULT_SECTORS)
+    affected_sectors = set()
+    for c, _ in top_10:
+        cc = c.country_code or ""
+        for sector, info in sectors_data.items():
+            if cc in info.get("key_partners", []):
+                affected_sectors.add(sector)
+
+    # Top 5 이슈
+    top_issues = []
+    for c, impact in scored[:5]:
+        top_issues.append(ImpactSummaryTopIssue(
+            cluster_id=str(c.id),
+            title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
+            impact_score=impact,
+            country_codes=[c.country_code] if c.country_code else [],
+            topic=c.topic or "unknown",
+        ))
+
+    # 홈 국가 긴장도 조회
+    from backend.app.models.tension_index import TensionIndex
+    tension_q = await db.execute(
+        select(TensionIndex.raw_score)
+        .where(TensionIndex.country_code == home)
+        .order_by(TensionIndex.time.desc())
+        .limit(1)
+    )
+    home_tension = tension_q.scalar_one_or_none() or 0
+
+    # 요약 생성 (모든 플랜)
+    level_ko = {"high": "높음", "elevated": "경계", "guarded": "주의", "low": "안정"}
+    level_en = {"high": "High", "elevated": "Elevated", "guarded": "Guarded", "low": "Low"}
+
+    if lang == "ko":
+        summary = f"현재 {home} 영향도 {overall_score}/100 ({level_ko.get(level, level)}). "
+        if critical_count > 0:
+            summary += f"고영향 이슈 {critical_count}건 감지. "
+        if total_active > 0:
+            summary += f"최근 7일간 {total_active}건의 활성 이슈가 모니터링 중."
+        else:
+            summary += "현재 주요 위기 이슈 없음."
+    else:
+        summary = f"{home} impact: {overall_score}/100 ({level_en.get(level, level)}). "
+        if critical_count > 0:
+            summary += f"{critical_count} high-impact issue(s) detected. "
+        if total_active > 0:
+            summary += f"{total_active} active issues monitored in the last 7 days."
+        else:
+            summary += "No major crisis issues at this time."
+
+    # Pro 이상: 상세 분석 (economy/trade/travel)
+    economy = None
+    trade = None
+    travel = None
+
+    is_pro = user_plan in ("pro", "pro_plus") or getattr(user, "admin_plan_override", False)
+
+    if is_pro and top_10:
+        # 상위 이슈들의 국가/토픽 분석
+        top_countries = {}
+        top_topics = {}
+        for c, impact in top_10:
+            cc = c.country_code or ""
+            topic = c.topic or "unknown"
+            if cc:
+                top_countries[cc] = max(top_countries.get(cc, 0), impact)
+            top_topics[topic] = max(top_topics.get(topic, 0), impact)
+
+        high_impact_countries = [cc for cc, s in sorted(top_countries.items(), key=lambda x: -x[1]) if s >= 50][:3]
+        labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+
+        # 영향받는 섹터 상세
+        sector_details = []
+        for sector in affected_sectors:
+            sector_details.append(labels.get(sector, sector))
+
+        if lang == "ko":
+            economy = f"{home} 긴장도 {home_tension:.0f}/100. "
+            if high_impact_countries:
+                from backend.app.models.tension_index import TensionIndex as TI2
+                for hc in high_impact_countries[:2]:
+                    t_q = await db.execute(
+                        select(TI2.raw_score).where(TI2.country_code == hc)
+                        .order_by(TI2.time.desc()).limit(1)
+                    )
+                    t_score = t_q.scalar_one_or_none() or 0
+                    economy += f"{hc} 지역 긴장도 {t_score:.0f}/100. "
+            if sector_details:
+                economy += f"영향 가능 산업: {', '.join(sector_details[:4])}."
+
+            trade_text = ""
+            if sector_details:
+                trade_text = f"{home}의 {', '.join(sector_details[:3])} 분야 영향 모니터링 필요. "
+            if high_impact_countries:
+                trade_text += f"고위험 교역 상대국: {', '.join(high_impact_countries)}. "
+            trade_text += "공급망 차질 가능성 주시."
+            trade = trade_text
+
+            if critical_count > 0:
+                travel = f"고영향 이슈 {critical_count}건으로 여행 주의. "
+            else:
+                travel = "현재 주요 여행 제한 요소 없음. "
+            travel += "해당 지역 방문 시 현지 안전 공지 확인 권장."
+        else:
+            economy = f"{home} tension at {home_tension:.0f}/100. "
+            if high_impact_countries:
+                for hc in high_impact_countries[:2]:
+                    t_q = await db.execute(
+                        select(TensionIndex.raw_score).where(TensionIndex.country_code == hc)
+                        .order_by(TensionIndex.time.desc()).limit(1)
+                    )
+                    t_score = t_q.scalar_one_or_none() or 0
+                    economy += f"{hc} tension at {t_score:.0f}/100. "
+            if sector_details:
+                economy += f"Sectors potentially affected: {', '.join(sector_details[:4])}."
+
+            trade_text = ""
+            if sector_details:
+                trade_text = f"Monitor {home}'s {', '.join(sector_details[:3])} sectors. "
+            if high_impact_countries:
+                trade_text += f"High-risk trade partners: {', '.join(high_impact_countries)}. "
+            trade_text += "Watch for supply chain disruptions."
+            trade = trade_text
+
+            if critical_count > 0:
+                travel = f"{critical_count} high-impact issue(s) warrant travel caution. "
+            else:
+                travel = "No major travel restrictions at this time. "
+            travel += "Check local advisories before traveling to affected regions."
+
+    response_data = {
+        "score": overall_score,
+        "level": level,
+        "summary": summary,
+        "economy": economy,
+        "trade": trade,
+        "travel": travel,
+        "top_issues": [ti.model_dump() for ti in top_issues],
+        "affected_sectors_count": len(affected_sectors),
+        "critical_issues_count": critical_count,
+        "total_active_issues": total_active,
+        "data_sources": ["World Bank", "UN Comtrade", "IMF IMTS"],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cached": False,
+    }
+
+    # 6시간 캐시
+    if redis:
+        await redis.set(cache_key, json.dumps(response_data), ex=6 * 3600)
+
+    return ImpactSummaryOut(**response_data)
+
+
+# ── Phase 2: Impact Brief (per-cluster, legacy) ─────────────────────────
 
 class ImpactBriefOut(BaseModel):
     cluster_id: str

@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState, useMemo, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
-import { useMe, useClusters, useTrackBehavior } from "@/lib/api";
+import { useMe, useTrackBehavior } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { RiskSummaryHeader } from "@/components/dashboard/RiskSummaryHeader";
@@ -17,7 +17,6 @@ import { NoticeTicker } from "@/components/dashboard/NoticeTicker";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
-import { personalizedKScore, type TrendingItem } from "@/lib/kscore-utils";
 import type { Step } from "react-joyride";
 
 export default function HomePage() {
@@ -30,7 +29,6 @@ export default function HomePage() {
 
 function DashboardContent() {
   const lang = useAppStore((s) => s.lang);
-  const homeCountry = useAppStore((s) => s.homeCountry);
   const { data: me, isLoading } = useMe();
   const meObj = me as { plan?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
@@ -42,26 +40,6 @@ function DashboardContent() {
     trackBehavior.mutate({ event_name: "dashboard_view", props: { plan: userPlan } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Top 1 클러스터 ID 가져오기 (Impact Brief / Sector Analysis 용)
-  const { data: clusterData } = useClusters({ limit: "2000" });
-  const topClusterId = useMemo(() => {
-    if (!clusterData || !Array.isArray(clusterData)) return undefined;
-    const sorted = (clusterData as any[])
-      .filter((c) => c.severity > 0 && c.kscore > 0)
-      .map((c) => ({
-        id: c.id,
-        kscore: c.kscore,
-        topic: c.topic,
-        country_codes: c.country_code ? [c.country_code] : [],
-      } as { id: string } & Pick<TrendingItem, "kscore" | "topic" | "country_codes">))
-      .sort((a, b) => {
-        const aItem = { ...a, keyword: "", keyword_ko: null, cluster_ids: [a.id] } as unknown as TrendingItem;
-        const bItem = { ...b, keyword: "", keyword_ko: null, cluster_ids: [b.id] } as unknown as TrendingItem;
-        return personalizedKScore(bItem, homeCountry) - personalizedKScore(aItem, homeCountry);
-      });
-    return sorted[0]?.id;
-  }, [clusterData, homeCountry]);
 
   const dashTourSteps: Step[] = useMemo(() => [
     {
@@ -130,15 +108,11 @@ function DashboardContent() {
           <TopIssuesAffectingMe />
         </div>
 
-        {/* 4. Impact Brief (Phase 2 - Pro) */}
-        {topClusterId && (
-          <ImpactBriefCard clusterId={topClusterId} />
-        )}
+        {/* 4. Impact Brief (Phase 2 - 모든 플랜) */}
+        <ImpactBriefCard />
 
         {/* 5. Sector Impact Analysis (Phase 3 - Pro+) */}
-        {topClusterId && (
-          <SectorImpactCard clusterId={topClusterId} />
-        )}
+        <SectorImpactCard />
 
         {/* 6. Trade Flow Sankey (Phase 6 - Pro+) */}
         <TradeFlowSankey />
