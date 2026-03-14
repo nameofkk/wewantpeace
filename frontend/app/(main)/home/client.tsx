@@ -41,8 +41,8 @@ import {
   Fuel,
   BarChart3,
   Globe2,
-  Info,
 } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 export default function HomePage() {
   return (
@@ -99,36 +99,22 @@ function formatTradeVolume(usd: number) {
   return `$${usd.toLocaleString()}`;
 }
 
-/* ───────────────────────── Section Header with info tooltip ───────────────────────── */
+/* ───────────────────────── Section Header with InfoTooltip ───────────────────────── */
 
-function SectionHeader({ icon: Icon, title, desc, tooltip, lang }: {
+function SectionHeader({ icon: Icon, title, desc, tooltip }: {
   icon: React.ElementType;
   title: string;
   desc: string;
   tooltip: string;
-  lang: "ko" | "en";
+  lang?: "ko" | "en";
 }) {
-  const [showInfo, setShowInfo] = React.useState(false);
   return (
-    <div className="mb-2.5">
-      <div className="flex items-center gap-1.5 min-w-0">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <h2 className="text-[11px] font-bold text-foreground shrink-0">{title}</h2>
-        <span className="text-[9px] text-muted-foreground/50 shrink-0">·</span>
-        <span className="text-[9px] text-muted-foreground/50 truncate min-w-0">{desc}</span>
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo); }}
-          className="shrink-0 p-0.5 rounded-full hover:bg-muted/20 transition-colors ml-auto"
-          aria-label="Info"
-        >
-          <Info className="h-3 w-3 text-muted-foreground/40" />
-        </button>
-      </div>
-      {showInfo && (
-        <div className="mt-1.5 ml-5 rounded-lg bg-muted/10 border border-border/30 px-3 py-2">
-          <p className="text-[10px] text-muted-foreground leading-relaxed">{tooltip}</p>
-        </div>
-      )}
+    <div className="flex items-center gap-1.5 min-w-0 mb-2.5">
+      <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <h2 className="text-[11px] font-bold text-foreground shrink-0">{title}</h2>
+      <span className="text-[9px] text-muted-foreground/50 shrink-0">·</span>
+      <span className="text-[9px] text-muted-foreground/50 truncate min-w-0">{desc}</span>
+      <InfoTooltip text={tooltip} direction="down" />
     </div>
   );
 }
@@ -248,7 +234,6 @@ function ReportContent() {
               title={t(lang, "dash_section_hero_title" as any)}
               desc={t(lang, "dash_section_hero_desc" as any)}
               tooltip={t(lang, "dash_section_hero_tooltip" as any)}
-              lang={lang}
             />
             {/* Impact Score + Risk Radar */}
             <div className="flex items-start gap-3">
@@ -383,17 +368,18 @@ function ReportContent() {
           <m.section custom={1} initial="hidden" animate="visible" variants={sectionVariants}>
             {/* Impact Flow Sankey */}
             {summary?.impact_flow && (
-              <div className="rounded-xl border border-border bg-card overflow-hidden mb-5">
+              <div className="rounded-xl border border-border bg-card mb-5">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={Activity}
                     title={t(lang, "dash_flow_title" as any)}
                     desc={t(lang, "dash_flow_desc" as any)}
                     tooltip={t(lang, "dash_section_flow_tooltip" as any)}
-                    lang={lang}
                   />
                 </div>
-                <ImpactFlowSankey data={summary.impact_flow} isPro={isPro} lang={lang} />
+                <div className="overflow-x-auto">
+                  <ImpactFlowSankey data={summary.impact_flow} isPro={isPro} lang={lang} />
+                </div>
               </div>
             )}
 
@@ -418,7 +404,6 @@ function ReportContent() {
                     title={t(lang, "dash_section_stories_title" as any)}
                     desc={t(lang, "dash_section_stories_desc" as any)}
                     tooltip={t(lang, "dash_section_stories_tooltip" as any)}
-                    lang={lang}
                   />
                 </div>
                 <div className="px-4 pb-3">
@@ -465,7 +450,6 @@ function ReportContent() {
               title={t(lang, "dash_section_dashboard_title" as any)}
               desc={t(lang, "dash_section_dashboard_desc" as any)}
               tooltip={t(lang, `dash_tab_${activeTab}_desc` as any)}
-              lang={lang}
             />
             {/* Tab buttons — 4 tabs */}
             <div className="flex gap-1 mb-3">
