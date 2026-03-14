@@ -433,39 +433,49 @@ async def get_impact_summary(
         energy_partners = set(sectors_data.get("energy", {}).get("key_partners", []))
         energy_risk = bool(energy_partners & set(top_countries.keys()))
 
+        # 교역 의존도 비율 계산 (분쟁국 vs 전체)
+        total_conflict_trade = sum(trade_vols.values()) if trade_vols else 0
+
         if lang == "ko":
-            # ── Economy: 시장 데이터 + 섹터 영향 ──
+            display_home = "글로벌" if is_global else home
+            # ── Economy: 구체적 수치 + 비자명적 분석 ──
             econ_parts = []
-            if energy_risk and oil_str:
-                econ_parts.append(f"중동 분쟁 심화로 유가 {oil_str} 급등, {home} 에너지 수입비용 상승 압력")
+            if energy_risk and oil_row:
+                price, chg = oil_row
+                if chg > 0:
+                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%) — 배럴당 $80+ 지속 시 정유·항공·물류 마진 압박 예상")
+                else:
+                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%) — 하락세지만 중동 리스크 프리미엄 상존")
             elif oil_str:
                 econ_parts.append(f"유가 {oil_str}")
             if gold_row and gold_row[1] > 1.0:
-                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 안전자산 수요 증가")
+                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 안전자산 선호 확대 — 리스크오프 심리 강화 신호")
+            elif gold_row and gold_row[1] < -1.0:
+                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 하락 — 리스크 완화 또는 달러 강세 영향")
             if idx_str:
                 econ_parts.append(idx_str)
-            if sector_details and not energy_risk:
-                econ_parts.append(f"{', '.join(sector_details[:3])} 분야 공급망 리스크 주시")
-            economy = ". ".join(econ_parts) + "." if econ_parts else f"{home} 경제 영향 모니터링 중."
-            if energy_risk:
-                economy += " 에너지 수입비용 상승은 전기요금·교통비 등 생활물가에 영향을 줄 수 있습니다."
+            if sector_details:
+                econ_parts.append(f"영향 섹터: {', '.join(sector_details[:3])} — 관련주 변동성 확대 구간")
+            economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} 경제 직접 영향 제한적, 간접 파급 모니터링 중."
 
-            # ── Trade: 교역 데이터 기반 ──
+            # ── Trade: 의존도 비율 + 공급망 시사점 ──
             trade_parts = []
             if trade_vols:
                 sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
                 top_tv = sorted_tv[0]
-                trade_parts.append(f"{home}-{top_tv[0]} 교역 {_fmt_usd(top_tv[1])}이 최대 노출 지점")
+                trade_parts.append(f"{display_home}↔{top_tv[0]} 교역 {_fmt_usd(top_tv[1])} — 분쟁국 중 최대 노출 지점")
                 if len(sorted_tv) > 1:
-                    others = ", ".join(f"{c}({_fmt_usd(v)})" for c, v in sorted_tv[1:3])
-                    trade_parts.append(f"{others} 교역도 분쟁 영향권")
-            if energy_risk:
-                trade_parts.append("에너지 수입 의존국 불안정으로 원유 공급 리스크")
+                    for c, v in sorted_tv[1:3]:
+                        trade_parts.append(f"{display_home}↔{c} {_fmt_usd(v)} 교역 분쟁 영향권 내")
+                if energy_risk and total_conflict_trade > 0:
+                    trade_parts.append(f"에너지 수입선 다변화 불가 시 공급 차질 리스크 — 대체 조달 소요 최소 2-4주")
+            elif energy_risk:
+                trade_parts.append("에너지 수입 의존국 불안정 — 유가·가스 가격 연동 리스크 확대")
             if not trade_parts:
-                trade_parts.append(f"{home} 관련 직접 교역 리스크는 제한적이나 간접 파급 주시")
+                trade_parts.append(f"{display_home} 직접 교역 리스크 제한적이나 글로벌 공급망 간접 파급 주시 필요")
             trade = ". ".join(trade_parts) + "."
 
-            # ── Travel: 여행 경보 데이터 기반 ──
+            # ── Travel: 여행 경보 + 인접국 영향 ──
             travel_parts = []
             if lv4_count > 0:
                 lv4_names_q = await db.execute(
@@ -474,51 +484,58 @@ async def get_impact_summary(
                 )
                 lv4_in_issues = [r[0] for r in lv4_names_q.all()]
                 if lv4_in_issues:
-                    travel_parts.append(f"이슈 관련 {len(lv4_in_issues)}개국 여행금지(Lv.4): {', '.join(lv4_in_issues[:4])}")
-                travel_parts.append(f"전 세계 {lv4_count}개국이 여행금지 상태")
+                    travel_parts.append(f"이슈 관련 {len(lv4_in_issues)}개국 여행금지(Lv.4): {', '.join(lv4_in_issues[:4])} — 인접국 경유편 취소·감편 가능성")
+                travel_parts.append(f"전 세계 {lv4_count}개국 여행금지 상태 — 분쟁 확산 시 인접국 경보 상향 가능")
             if critical_count > 0:
-                travel_parts.append(f"고영향 이슈 {critical_count}건 관련 지역 항공편 변동 주의")
+                travel_parts.append(f"고영향 이슈 {critical_count}건 관련 항공편 변동·보험료 할증 주의")
             if not travel_parts:
-                travel_parts.append("현재 관심 지역 주요 여행 제한 없음")
+                travel_parts.append("현재 주요 여행 제한 없음. 분쟁 지역 주변 경보 단계 변동 모니터링 중")
             travel = ". ".join(travel_parts) + "."
         else:
-            # ── English ──
+            display_home = "Global" if is_global else home
+            # ── English: specific data + non-obvious insights ──
             econ_parts = []
-            if energy_risk and oil_str:
-                econ_parts.append(f"Oil {oil_str} surging amid Middle East tensions, raising {home} energy import costs")
+            if energy_risk and oil_row:
+                price, chg = oil_row
+                if chg > 0:
+                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%) — sustained above $80/bbl pressures refinery, airline & logistics margins")
+                else:
+                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%) — declining, but geopolitical risk premium persists")
             elif oil_str:
                 econ_parts.append(f"Oil {oil_str}")
             if gold_row and gold_row[1] > 1.0:
-                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) on safe-haven demand")
+                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) rising — risk-off sentiment strengthening")
+            elif gold_row and gold_row[1] < -1.0:
+                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) falling — risk easing or dollar strength")
             if idx_str:
                 econ_parts.append(idx_str)
-            if sector_details and not energy_risk:
-                econ_parts.append(f"{', '.join(sector_details[:3])} supply chain risk to monitor")
-            economy = ". ".join(econ_parts) + "." if econ_parts else f"Monitoring economic impact on {home}."
-            if energy_risk:
-                economy += " Rising energy import costs may affect electricity bills and transportation expenses."
+            if sector_details:
+                econ_parts.append(f"Exposed sectors: {', '.join(sector_details[:3])} — elevated volatility expected")
+            economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} economy: limited direct impact, monitoring indirect spillover."
 
             trade_parts = []
             if trade_vols:
                 sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
                 top_tv = sorted_tv[0]
-                trade_parts.append(f"{home}-{top_tv[0]} trade at {_fmt_usd(top_tv[1])} is primary exposure")
+                trade_parts.append(f"{display_home}↔{top_tv[0]} trade at {_fmt_usd(top_tv[1])} — primary conflict exposure")
                 if len(sorted_tv) > 1:
-                    others = ", ".join(f"{c} ({_fmt_usd(v)})" for c, v in sorted_tv[1:3])
-                    trade_parts.append(f"{others} trade also in conflict zone")
-            if energy_risk:
-                trade_parts.append("Energy import dependencies at risk from regional instability")
+                    for c, v in sorted_tv[1:3]:
+                        trade_parts.append(f"{display_home}↔{c} {_fmt_usd(v)} within conflict zone")
+                if energy_risk and total_conflict_trade > 0:
+                    trade_parts.append("Energy supply diversification lag 2-4 weeks if disrupted")
+            elif energy_risk:
+                trade_parts.append("Energy import dependency at risk — oil & gas price pass-through likely")
             if not trade_parts:
-                trade_parts.append(f"Direct trade exposure for {home} is limited; watch indirect spillover")
+                trade_parts.append(f"Direct trade exposure for {display_home} limited; global supply chain spillover possible")
             trade = ". ".join(trade_parts) + "."
 
             travel_parts = []
             if lv4_count > 0:
-                travel_parts.append(f"{lv4_count} countries at Do Not Travel (Lv.4) globally")
+                travel_parts.append(f"{lv4_count} countries at Do Not Travel (Lv.4) — adjacent transit routes may face cancellations")
             if critical_count > 0:
-                travel_parts.append(f"{critical_count} high-impact issues may affect flights and transit")
+                travel_parts.append(f"{critical_count} high-impact issues — flight disruptions & insurance surcharges possible")
             if not travel_parts:
-                travel_parts.append("No major travel restrictions for areas of interest")
+                travel_parts.append("No major travel restrictions. Monitoring advisory escalation near conflict zones")
             travel = ". ".join(travel_parts) + "."
 
     # ── 시장 동향 (market_snapshot) — 모든 플랜 ──
