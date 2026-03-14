@@ -1421,6 +1421,15 @@ export const translations = {
     fomo_banner_title: "체험 기간 동안 {n}건의 알림을 받으셨습니다. Pro에서 계속 받아보세요",
     fomo_banner_discount: "첫 달 30% 할인 · {n}일 남음",
     free_benefit_already_used: "무료 혜택은 1회만 사용할 수 있습니다",
+    dash_badge_anomaly: "급변",
+    dash_badge_convergence: "다중위기",
+    dash_badge_spike: "급등",
+    dash_badge_verified: "검증됨",
+    dash_trade_surplus: "순수출",
+    dash_trade_deficit: "순수입",
+    ob_home_country_title: "나의 국가",
+    ob_home_country_desc: "글로벌 이슈가 내 나라에 미치는 영향을 확인하세요",
+    ob_home_country_other: "다른 국가 선택",
   },
   en: {
     // bottom nav
@@ -2840,6 +2849,15 @@ export const translations = {
     fomo_banner_title: "You received {n} alert(s) during your trial. Keep them with Pro",
     fomo_banner_discount: "30% off first month · {n} day(s) left",
     free_benefit_already_used: "Free benefits can only be used once",
+    dash_badge_anomaly: "Surge",
+    dash_badge_convergence: "Multi-crisis",
+    dash_badge_spike: "Spike",
+    dash_badge_verified: "Verified",
+    dash_trade_surplus: "Surplus",
+    dash_trade_deficit: "Deficit",
+    ob_home_country_title: "My Country",
+    ob_home_country_desc: "See how global issues impact your country",
+    ob_home_country_other: "Choose another country",
   },
 } as const;
 

@@ -137,6 +137,8 @@ export interface TensionAllItem {
   country_code: string;
   raw_score: number;
   tension_level: number;
+  anomaly_z?: number | null;
+  convergence_bonus?: number;
 }
 
 export function useTensionAll() {
@@ -458,11 +460,20 @@ export function useMySubscription() {
 export interface ImpactSummaryTopIssue {
   cluster_id: string;
   title: string;
+  title_en?: string;
   impact_score: number;
   country_codes: string[];
   topic: string;
   reason?: string;
   kscore_delta?: number | null;
+  event_count: number;
+  severity: number;
+  kscore: number;
+  independent_sources: number;
+  is_spike: boolean;
+  confidence: number;
+  first_event_at?: string | null;
+  last_event_at?: string | null;
 }
 
 export interface CommoditySnapshot {
@@ -496,6 +507,9 @@ export interface TradePartner {
   country_code: string;
   trade_volume_usd: number;
   dependency_pct: number;
+  export_usd?: number | null;
+  import_usd?: number | null;
+  trade_balance?: string | null;  // "surplus" | "deficit"
 }
 
 export interface TradeExposure {

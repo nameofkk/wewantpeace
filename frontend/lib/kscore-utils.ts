@@ -18,6 +18,8 @@ export interface TrendingItem {
   first_event_at?: string | null;
   independent_sources?: number;
   kscore_delta_24h?: number | null;
+  is_spike?: boolean;
+  confidence?: number;
 }
 
 // ── 토픽 컬러 ─────────────────────────────────────────────────────────────

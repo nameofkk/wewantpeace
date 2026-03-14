@@ -470,6 +470,8 @@ class TensionAllItem(BaseModel):
     country_code: str
     raw_score: float
     tension_level: int
+    anomaly_z: Optional[float] = None
+    convergence_bonus: float = 0.0
 
 
 @router.get("/all", response_model=list[TensionAllItem])
@@ -507,6 +509,8 @@ async def tension_all(
             country_code=r.country_code,
             raw_score=round(r.raw_score, 1),
             tension_level=r.tension_level,
+            anomaly_z=round(r.anomaly_z, 2) if r.anomaly_z is not None else None,
+            convergence_bonus=round(r.convergence_bonus or 0.0, 2),
         )
         for r in rows
     ]

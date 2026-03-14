@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v3"
+_CACHE_VERSION = "v4"
 
 
 def calc_impact_factor(
@@ -97,11 +97,20 @@ def calc_personalized_impact_score(
 class ImpactSummaryTopIssue(BaseModel):
     cluster_id: str
     title: str
+    title_en: Optional[str] = None
     impact_score: int
     country_codes: list[str]
     topic: str
     reason: Optional[str] = None
     kscore_delta: Optional[float] = None
+    event_count: int = 0
+    severity: int = 0
+    kscore: float = 0.0
+    independent_sources: int = 0
+    is_spike: bool = False
+    confidence: float = 0.0
+    first_event_at: Optional[str] = None
+    last_event_at: Optional[str] = None
 
 
 class CommoditySnapshotOut(BaseModel):
@@ -135,6 +144,9 @@ class TradePartnerOut(BaseModel):
     country_code: str
     trade_volume_usd: float
     dependency_pct: float
+    export_usd: Optional[float] = None
+    import_usd: Optional[float] = None
+    trade_balance: Optional[str] = None  # "surplus" | "deficit"
 
 
 class TradeExposureOut(BaseModel):
@@ -271,48 +283,78 @@ async def get_impact_summary(
             if cc in info.get("key_partners", []):
                 affected_sectors.add(sector)
 
-    # Top 5 이슈 + reason + kscore_delta
+    # Top 5 이슈 + reason + kscore_delta (배치 조회)
+    from backend.app.models.economic_data import TradeBilateral, CommodityPrice
+    from backend.app.models.issue_cluster import ClusterEvent
+
+    top5_countries = list({c.country_code for c, _ in scored[:5] if c.country_code})
+    top5_cluster_ids = [c.id for c, _ in scored[:5]]
+
+    # 배치 1: TradeBilateral (Top5 국가 교역액)
+    trade_map: dict[str, float] = {}
+    if top5_countries and home:
+        trade_q = await db.execute(
+            select(TradeBilateral.partner_code, TradeBilateral.total_trade_usd)
+            .where(
+                TradeBilateral.reporter_code == home,
+                TradeBilateral.partner_code.in_(top5_countries),
+                TradeBilateral.period_type == "A",
+            )
+            .order_by(TradeBilateral.period.desc())
+        )
+        for row in trade_q.fetchall():
+            if row[0] not in trade_map:
+                trade_map[row[0]] = row[1]
+
+    # 배치 2: WTI 유가 (공유)
+    oil_q = await db.execute(
+        select(CommodityPrice.price_usd, CommodityPrice.change_pct)
+        .where(CommodityPrice.symbol == "WTI")
+        .order_by(CommodityPrice.price_date.desc())
+        .limit(1)
+    )
+    oil_row = oil_q.first()
+
+    # 배치 3: kscore_delta — 최근 24h 이벤트 수 배치
+    day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    delta_q = await db.execute(
+        select(ClusterEvent.cluster_id, func.count(ClusterEvent.id))
+        .where(
+            ClusterEvent.cluster_id.in_(top5_cluster_ids),
+            ClusterEvent.created_at >= day_ago,
+        )
+        .group_by(ClusterEvent.cluster_id)
+    )
+    recent_counts = {row[0]: row[1] for row in delta_q.fetchall()}
+
     top_issues = []
     for c, impact in scored[:5]:
-        # reason 생성 (교역 데이터 + 시장 가격 기반)
-        reason = await _generate_issue_reason(c, home, lang, sectors_data, db)
+        reason = _build_reason_sync(c, home, lang, sectors_data, trade_map, oil_row)
 
-        # kscore_delta: 24시간 변화량 (클러스터 kscore 기반)
-        kscore_delta = None
-        try:
-            from backend.app.models.issue_cluster import ClusterEvent
-            day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-            # 24시간 전 kscore와 비교 (간단히: 현재 kscore - 24h전 kscore)
-            old_cluster_q = await db.execute(
-                select(IssueCluster.kscore)
-                .where(IssueCluster.id == c.id)
-                .limit(1)
-            )
-            current_kscore = c.kscore or 0
-            # kscore 변화를 근사: 최근 24h 이벤트 수 기반
-            recent_events_q = await db.execute(
-                select(func.count(ClusterEvent.id))
-                .where(
-                    ClusterEvent.cluster_id == c.id,
-                    ClusterEvent.created_at >= day_ago,
-                )
-            )
-            recent_count = recent_events_q.scalar() or 0
-            if recent_count > 0:
-                kscore_delta = round(min(5.0, recent_count * 0.5), 1)
-            else:
-                kscore_delta = round(-min(1.0, current_kscore * 0.1), 1) if current_kscore > 1 else 0
-        except Exception:
-            pass
+        recent_count = recent_counts.get(c.id, 0)
+        current_kscore = c.kscore or 0
+        if recent_count > 0:
+            kscore_delta = round(min(5.0, recent_count * 0.5), 1)
+        else:
+            kscore_delta = round(-min(1.0, current_kscore * 0.1), 1) if current_kscore > 1 else 0
 
         top_issues.append(ImpactSummaryTopIssue(
             cluster_id=str(c.id),
             title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
+            title_en=c.title or "",
             impact_score=impact,
             country_codes=[c.country_code] if c.country_code else [],
             topic=c.topic or "unknown",
             reason=reason,
             kscore_delta=kscore_delta,
+            event_count=c.event_count or 0,
+            severity=c.severity or 0,
+            kscore=round(c.kscore or 0.0, 2),
+            independent_sources=c.independent_sources or 0,
+            is_spike=c.is_spike or False,
+            confidence=round(c.confidence or 0.0, 3),
+            first_event_at=c.first_event_at.isoformat() if c.first_event_at else None,
+            last_event_at=c.last_event_at.isoformat() if c.last_event_at else None,
         ))
 
     # 홈 국가 긴장도 조회
@@ -356,7 +398,7 @@ async def get_impact_summary(
     is_pro = user_plan in ("pro", "pro_plus") or getattr(user, "admin_plan_override", False)
 
     if is_pro and top_10:
-        from backend.app.models.economic_data import CommodityPrice, MarketIndex, TradeBilateral, TravelAdvisory
+        from backend.app.models.economic_data import CommodityPrice as CP2, MarketIndex as MI2, TradeBilateral as TB2, TravelAdvisory
         from backend.app.models.tension_index import TensionIndex as TI2
 
         # 상위 이슈들의 국가/토픽 분석
@@ -373,49 +415,48 @@ async def get_impact_summary(
         labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
         sector_details = [labels.get(s, s) for s in affected_sectors]
 
-        # ── 실제 데이터 조회 (분석에 활용) ──
-        # 유가
-        oil_q = await db.execute(
-            select(CommodityPrice.price_usd, CommodityPrice.change_pct)
-            .where(CommodityPrice.symbol == "WTI")
-            .order_by(CommodityPrice.price_date.desc()).limit(1)
-        )
-        oil_row = oil_q.first()
+        # ── 실제 데이터 조회 (배치 — oil_row는 위에서 이미 조회됨) ──
+        # oil_row는 top_issues 배치에서 이미 조회 완료
         oil_str = f"${oil_row[0]:,.0f}({oil_row[1]:+.1f}%)" if oil_row else None
 
-        # 금
+        # 금 (1 쿼리)
         gold_q = await db.execute(
-            select(CommodityPrice.price_usd, CommodityPrice.change_pct)
-            .where(CommodityPrice.symbol == "GOLD")
-            .order_by(CommodityPrice.price_date.desc()).limit(1)
+            select(CP2.price_usd, CP2.change_pct)
+            .where(CP2.symbol == "GOLD")
+            .order_by(CP2.price_date.desc()).limit(1)
         )
         gold_row = gold_q.first()
 
-        # 홈 국가 주가지수
+        # 홈 국가 주가지수 (1 쿼리)
         home_idx_map = {"KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE"}
         home_idx_sym = home_idx_map.get(home)
         idx_str = None
         if home_idx_sym:
             idx_q = await db.execute(
-                select(MarketIndex.name, MarketIndex.change_pct)
-                .where(MarketIndex.symbol == home_idx_sym)
-                .order_by(MarketIndex.index_date.desc()).limit(1)
+                select(MI2.name, MI2.change_pct)
+                .where(MI2.symbol == home_idx_sym)
+                .order_by(MI2.index_date.desc()).limit(1)
             )
             idx_row = idx_q.first()
             if idx_row:
                 idx_str = f"{idx_row[0]} {idx_row[1]:+.1f}%"
 
-        # 주요 교역 파트너별 교역액 (상위 3개국)
-        trade_vols = {}
-        for hc in list(top_countries.keys())[:5]:
+        # 주요 교역 파트너별 교역액 — 배치 조회 (1 쿼리)
+        top_country_codes = list(top_countries.keys())[:5]
+        trade_vols: dict[str, float] = {}
+        if top_country_codes and home:
             tv_q = await db.execute(
-                select(TradeBilateral.total_trade_usd)
-                .where(TradeBilateral.reporter_code == home, TradeBilateral.partner_code == hc, TradeBilateral.period_type == "A")
-                .order_by(TradeBilateral.period.desc()).limit(1)
+                select(TB2.partner_code, TB2.total_trade_usd)
+                .where(
+                    TB2.reporter_code == home,
+                    TB2.partner_code.in_(top_country_codes),
+                    TB2.period_type == "A",
+                )
+                .order_by(TB2.period.desc())
             )
-            tv = tv_q.scalar_one_or_none()
-            if tv and tv > 0:
-                trade_vols[hc] = tv
+            for row in tv_q.fetchall():
+                if row[0] not in trade_vols and row[1] and row[1] > 0:
+                    trade_vols[row[0]] = row[1]
 
         def _fmt_usd(v):
             if v >= 1e9: return f"${v/1e9:.1f}B"
@@ -435,6 +476,26 @@ async def get_impact_summary(
 
         # 교역 의존도 비율 계산 (분쟁국 vs 전체)
         total_conflict_trade = sum(trade_vols.values()) if trade_vols else 0
+
+        # 경제 지표 조회 (인플레이션, 교역비중, 경상수지)
+        from backend.app.models.economic_data import EconomicIndicator
+        econ_extras: dict[str, float | None] = {}
+        if home:
+            for ind_code, key in [
+                ("FP.CPI.TOTL.ZG", "inflation"),
+                ("NE.TRD.GNFS.ZS", "trade_openness"),
+                ("BN.CAB.XOKA.CD", "current_account"),
+            ]:
+                eq = await db.execute(
+                    select(EconomicIndicator.value)
+                    .where(
+                        EconomicIndicator.country_code == home,
+                        EconomicIndicator.indicator_code == ind_code,
+                    )
+                    .order_by(EconomicIndicator.year.desc())
+                    .limit(1)
+                )
+                econ_extras[key] = eq.scalar_one_or_none()
 
         if lang == "ko":
             display_home = "글로벌" if is_global else home
@@ -456,6 +517,16 @@ async def get_impact_summary(
                 econ_parts.append(idx_str)
             if sector_details:
                 econ_parts.append(f"영향 섹터: {', '.join(sector_details[:3])} — 관련주 변동성 확대 구간")
+            # 경제 지표 추가 인사이트
+            inflation_val = econ_extras.get("inflation")
+            trade_open_val = econ_extras.get("trade_openness")
+            ca_val = econ_extras.get("current_account")
+            if inflation_val and inflation_val > 5:
+                econ_parts.append(f"인플레이션 {inflation_val:.1f}% — 원자재 상승 시 추가 물가 압력")
+            if trade_open_val and trade_open_val > 80:
+                econ_parts.append(f"교역/GDP {trade_open_val:.0f}% — 글로벌 공급망 교란에 높은 노출")
+            if ca_val and ca_val < 0:
+                econ_parts.append("경상수지 적자 — 외환 유출 리스크")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} 경제 직접 영향 제한적, 간접 파급 모니터링 중."
 
             # ── Trade: 의존도 비율 + 공급망 시사점 ──
@@ -511,6 +582,13 @@ async def get_impact_summary(
                 econ_parts.append(idx_str)
             if sector_details:
                 econ_parts.append(f"Exposed sectors: {', '.join(sector_details[:3])} — elevated volatility expected")
+            # Economic indicator insights
+            if inflation_val and inflation_val > 5:
+                econ_parts.append(f"Inflation {inflation_val:.1f}% — commodity spikes add further price pressure")
+            if trade_open_val and trade_open_val > 80:
+                econ_parts.append(f"Trade/GDP {trade_open_val:.0f}% — high exposure to global supply chain disruptions")
+            if ca_val and ca_val < 0:
+                econ_parts.append("Current account deficit — forex outflow risk")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} economy: limited direct impact, monitoring indirect spillover."
 
             trade_parts = []
@@ -587,7 +665,7 @@ async def get_impact_summary(
 
     # 6시간 캐시
     if redis:
-        await redis.set(cache_key, json.dumps(response_data), ex=6 * 3600)
+        await redis.set(cache_key, json.dumps(response_data), ex=30 * 60)
 
     return ImpactSummaryOut(**response_data)
 
@@ -1134,6 +1212,94 @@ _HOME_CURRENCIES = {
 }
 
 
+def _build_reason_sync(
+    cluster,
+    home_country: str,
+    lang: str,
+    sectors_data: dict,
+    trade_map: dict[str, float],
+    oil_row,
+) -> str:
+    """동기 함수: 배치 조회 결과로 reason 생성 (DB 호출 없음)."""
+    cc = cluster.country_code or ""
+    topic = cluster.topic or "unknown"
+    severity = cluster.severity or 0
+    labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+
+    affected_sectors = []
+    for sector, info in sectors_data.items():
+        if cc in info.get("key_partners", []):
+            affected_sectors.append((labels.get(sector, sector), info.get("gdp_pct", 0)))
+    affected_sectors.sort(key=lambda x: -x[1])
+
+    trade_vol = trade_map.get(cc)
+    trade_str = ""
+    if trade_vol and trade_vol > 0:
+        if trade_vol >= 1e9:
+            trade_str = f"${trade_vol / 1e9:.1f}B"
+        elif trade_vol >= 1e6:
+            trade_str = f"${trade_vol / 1e6:.0f}M"
+
+    oil_price = None
+    if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
+        if oil_row:
+            oil_price = (oil_row[0], oil_row[1])
+
+    if lang == "ko":
+        if affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            reason = f"{home_country}-{cc} 교역 {trade_str}, {top_sector}(GDP {gdp}%) 공급망에 직접 영향"
+            if oil_price:
+                reason = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), {home_country} {top_sector} 비용 직접 상승 압력"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            if oil_price:
+                reason = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), {home_country} 에너지(GDP {gdp}%) 비용 상승"
+            elif len(affected_sectors) >= 2:
+                reason = f"{home_country} {affected_sectors[0][0]}(GDP {affected_sectors[0][1]}%)·{affected_sectors[1][0]} 분야 공급망 리스크"
+            else:
+                reason = f"{home_country} {top_sector}(GDP {gdp}%) 분야에 직접 영향"
+        elif trade_str:
+            reason = f"{home_country}-{cc} 교역 {trade_str}, 교역 관계 통한 간접 파급"
+        elif severity >= 70:
+            if topic in ("conflict", "terror"):
+                reason = "고강도 군사 충돌로 글로벌 공급망·금융시장 불안정"
+            else:
+                reason = "심각도 높은 이슈로 국제 경제 전반에 파급 우려"
+        elif topic == "sanctions":
+            reason = "경제 제재 확대 시 원자재·부품 수급 차질 가능"
+        elif topic == "disaster":
+            reason = "자연재해로 인한 물류·제조 공급망 차질 우려"
+        else:
+            reason = "국제 정세 변동에 따른 시장 불확실성 증가"
+    else:
+        if affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            reason = f"{home_country}-{cc} trade {trade_str}, direct {top_sector} (GDP {gdp}%) supply chain exposure"
+            if oil_price:
+                reason = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), rising {top_sector} costs for {home_country}"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            if oil_price:
+                reason = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), {home_country} energy (GDP {gdp}%) cost pressure"
+            elif len(affected_sectors) >= 2:
+                reason = f"{home_country} {affected_sectors[0][0]} (GDP {affected_sectors[0][1]}%) & {affected_sectors[1][0]} supply chain risk"
+            else:
+                reason = f"Direct impact on {home_country}'s {top_sector} sector (GDP {gdp}%)"
+        elif trade_str:
+            reason = f"{home_country}-{cc} trade {trade_str}, indirect spillover via trade links"
+        elif severity >= 70:
+            reason = "High-intensity crisis causing global supply chain and market instability"
+        elif topic == "sanctions":
+            reason = "Sanctions expansion may disrupt raw material and component supply"
+        elif topic == "disaster":
+            reason = "Natural disaster causing logistics and manufacturing disruptions"
+        else:
+            reason = "Increased market uncertainty from geopolitical developments"
+
+    return reason
+
+
 async def _generate_issue_reason(
     cluster,
     home_country: str,
@@ -1261,68 +1427,66 @@ async def _get_market_snapshot(
     home_country: str,
     db: AsyncSession,
 ) -> dict | None:
-    """시장 동향 스냅샷: 원자재 + 환율 + 주가지수"""
+    """시장 동향 스냅샷: 원자재 + 환율 + 주가지수 (배치 조회)"""
     from backend.app.models.economic_data import CommodityPrice, MarketIndex, ExchangeRate
 
     commodities = []
     indices = []
     exchange_rates = []
 
-    # 원자재 최신 가격
-    for symbol in ["WTI", "BRENT", "GOLD"]:
-        q = await db.execute(
-            select(CommodityPrice)
-            .where(CommodityPrice.symbol == symbol)
-            .order_by(CommodityPrice.price_date.desc())
-            .limit(1)
-        )
-        row = q.scalar_one_or_none()
-        if row:
-            commodities.append({
-                "symbol": row.symbol,
-                "name": row.name,
-                "price_usd": row.price_usd,
-                "change_pct": row.change_pct,
-            })
+    # 1) 원자재: 1 배치 쿼리 (DISTINCT ON)
+    commodity_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(["WTI", "BRENT", "GOLD"]))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    for row in commodity_q.scalars().all():
+        commodities.append({
+            "symbol": row.symbol,
+            "name": row.name,
+            "price_usd": row.price_usd,
+            "change_pct": row.change_pct,
+        })
 
-    # 주가지수 최신
-    for symbol in ["KOSPI", "SPX", "NKY", "DAX", "FTSE", "SSE"]:
-        q = await db.execute(
-            select(MarketIndex)
-            .where(MarketIndex.symbol == symbol)
-            .order_by(MarketIndex.index_date.desc())
-            .limit(1)
-        )
-        row = q.scalar_one_or_none()
-        if row:
-            indices.append({
-                "symbol": row.symbol,
-                "name": row.name,
-                "value": row.value,
-                "change_pct": row.change_pct,
-                "currency": row.currency,
-            })
+    # 2) 주가지수: 1 배치 쿼리
+    index_q = await db.execute(
+        select(MarketIndex)
+        .distinct(MarketIndex.symbol)
+        .where(MarketIndex.symbol.in_(["KOSPI", "SPX", "NKY", "DAX", "FTSE", "SSE"]))
+        .order_by(MarketIndex.symbol, MarketIndex.index_date.desc())
+    )
+    for row in index_q.scalars().all():
+        indices.append({
+            "symbol": row.symbol,
+            "name": row.name,
+            "value": row.value,
+            "change_pct": row.change_pct,
+            "currency": row.currency,
+        })
 
-    # 환율 (홈 국가 기준 주요 통화)
+    # 3) 환율: 1 배치 쿼리 (최신만)
     target_currencies = _HOME_CURRENCIES.get(home_country, ["EUR", "JPY", "GBP", "CNY"])
-    for tc in target_currencies:
-        q = await db.execute(
-            select(ExchangeRate)
-            .where(
-                ExchangeRate.base_currency == "USD",
-                ExchangeRate.target_currency == tc,
-            )
-            .order_by(ExchangeRate.rate_date.desc())
-            .limit(1)
+    rate_q = await db.execute(
+        select(ExchangeRate)
+        .distinct(ExchangeRate.target_currency)
+        .where(
+            ExchangeRate.base_currency == "USD",
+            ExchangeRate.target_currency.in_(target_currencies),
         )
-        row = q.scalar_one_or_none()
-        if row:
-            # 전일 대비 변동률 계산
+        .order_by(ExchangeRate.target_currency, ExchangeRate.rate_date.desc())
+    )
+    latest_rates = rate_q.scalars().all()
+
+    # 전일 대비를 위한 2번째 최신 배치 조회
+    if latest_rates:
+        # 각 통화의 최신 날짜를 모아서 이전 데이터 조회
+        for row in latest_rates:
             prev_q = await db.execute(
                 select(ExchangeRate.rate)
                 .where(
                     ExchangeRate.base_currency == "USD",
-                    ExchangeRate.target_currency == tc,
+                    ExchangeRate.target_currency == row.target_currency,
                     ExchangeRate.rate_date < row.rate_date,
                 )
                 .order_by(ExchangeRate.rate_date.desc())
@@ -1356,11 +1520,13 @@ async def _get_trade_exposure(
     """교역 노출도: 상위 5개 교역국 + 의존도%"""
     from backend.app.models.economic_data import TradeBilateral
 
-    # 상위 교역 파트너 (최신 연도)
+    # 상위 교역 파트너 (최신 연도) — export/import 포함
     q = await db.execute(
         select(
             TradeBilateral.partner_code,
             TradeBilateral.total_trade_usd,
+            TradeBilateral.export_value_usd,
+            TradeBilateral.import_value_usd,
         )
         .where(
             TradeBilateral.reporter_code == home_country,
@@ -1372,30 +1538,33 @@ async def _get_trade_exposure(
     if not rows:
         return None
 
-    # 최신 연도의 데이터만 (같은 period)
-    # rows는 이미 period desc + trade desc로 정렬
-    # 같은 파트너 중복 제거 (최신 연도 우선)
     seen = set()
     partners = []
-    for partner_code, trade_usd in rows:
+    for partner_code, trade_usd, exp_usd, imp_usd in rows:
         if partner_code in seen or trade_usd is None:
             continue
         seen.add(partner_code)
-        partners.append((partner_code, trade_usd))
+        partners.append((partner_code, trade_usd, exp_usd, imp_usd))
         if len(partners) >= 5:
             break
 
-    total_trade = sum(t for _, t in partners)
+    total_trade = sum(t for _, t, _, _ in partners)
     if total_trade <= 0:
         return None
 
     top_partners = []
-    for pc, tv in partners:
+    for pc, tv, exp_v, imp_v in partners:
         dep = round((tv / total_trade) * 100, 1)
+        balance = None
+        if exp_v is not None and imp_v is not None:
+            balance = "surplus" if exp_v >= imp_v else "deficit"
         top_partners.append({
             "country_code": pc,
             "trade_volume_usd": tv,
             "dependency_pct": dep,
+            "export_usd": exp_v,
+            "import_usd": imp_v,
+            "trade_balance": balance,
         })
 
     return {

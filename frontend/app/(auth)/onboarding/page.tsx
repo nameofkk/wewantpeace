@@ -92,11 +92,12 @@ function useScanCounter() {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { lang, setMyCountries } = useAppStore();
+  const { lang, setMyCountries, setHomeCountry } = useAppStore();
   const { refetch: refetchMe } = useMe();
 
   const [step, setStep] = useState<Step>(0);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [homeCountryLocal, setHomeCountryLocal] = useState("KR");
   const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
   const [search, setSearch] = useState("");
   const [proBannerHighlight, setProBannerHighlight] = useState(false);
@@ -157,8 +158,9 @@ export default function OnboardingPage() {
       trackEvent("onboarding_hero_start");
       setStep(1);
     } else if (step === 1) {
+      setHomeCountry(homeCountryLocal);
       setMyCountries(selectedCountries);
-      trackEvent("onboarding_countries_done", { count: selectedCountries.length });
+      trackEvent("onboarding_countries_done", { count: selectedCountries.length, home: homeCountryLocal });
       setStep(2);
     }
   }
@@ -432,6 +434,28 @@ export default function OnboardingPage() {
           {/* === Step 1: 국가 선택 + 알림 === */}
           {step === 1 && (
             <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
+              {/* 나의 국가 선택 */}
+              <div className="mb-4 pb-3 border-b border-border/30">
+                <h3 className="text-sm font-bold text-center mb-1">{t(lang, "ob_home_country_title" as any)}</h3>
+                <p className="text-xs text-muted-foreground text-center mb-3">{t(lang, "ob_home_country_desc" as any)}</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {["KR", "US", "JP", "CN", "GB", "DE"].map((code) => (
+                    <button
+                      key={code}
+                      onClick={() => setHomeCountryLocal(code)}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
+                        homeCountryLocal === code
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/30 hover:bg-muted/50"
+                      }`}
+                    >
+                      <span>{getFlag(code)}</span>
+                      <span>{getCountryName(code, lang)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="text-center mb-3">
                 <h2 className="text-xl font-bold mb-1">{t(lang, "ob_step_countries")}</h2>
                 <p className="text-sm text-muted-foreground">{t(lang, "ob_countries_desc")}</p>

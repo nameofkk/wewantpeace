@@ -12,7 +12,6 @@ import {
   useImpactSummary,
   useTensionMine,
   useTensionAll,
-  useClusters,
   type TensionAllItem,
   type MarketSnapshot,
   type TravelAlert,
@@ -85,6 +84,14 @@ function tensionLabel(score: number, lang: "ko" | "en") {
   return lang === "ko" ? "안정" : "Stable";
 }
 
+function tensionLabelShort(score: number, lang: "ko" | "en") {
+  if (score >= 80) return lang === "ko" ? "극심" : "Ext.";
+  if (score >= 60) return lang === "ko" ? "심각" : "Sev.";
+  if (score >= 40) return lang === "ko" ? "경계" : "Alt.";
+  if (score >= 20) return lang === "ko" ? "주의" : "Cau.";
+  return lang === "ko" ? "안정" : "OK";
+}
+
 function travelLevelColor(level: number) {
   if (level >= 4) return { bg: "bg-red-500/15", text: "text-red-600 dark:text-red-400", border: "border-red-500/30" };
   if (level >= 3) return { bg: "bg-orange-500/15", text: "text-orange-600 dark:text-orange-300", border: "border-orange-500/30" };
@@ -142,7 +149,7 @@ function ReportContent() {
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
-  const { data: clusterData } = useClusters({ limit: "2000" });
+  // useClusters 제거 — top_issues에서 직접 사용
 
   // Insight Tabs state
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel">("market");
@@ -181,6 +188,8 @@ function ReportContent() {
   // 관심국가 텐션 매핑
   const watchlistItems = (watchlistTension as TensionAllItem[] | undefined) ?? [];
   const tensionMap = new Map(watchlistItems.map((t: any) => [t.country_code, t]));
+  // allTension 매핑 (anomaly_z, convergence_bonus 뱃지용)
+  const allTensionMap = new Map(allItems.map((t) => [t.country_code, t]));
 
   // Impact Summary 파생
   const impactScore = summary?.score ?? 0;
@@ -190,38 +199,27 @@ function ReportContent() {
   const hasPro = !!(summary?.economy || summary?.trade || summary?.travel);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
-  // summary.top_issues의 reason을 cluster_id로 매핑
-  const reasonMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (summary?.top_issues ?? []).forEach((ti: any) => {
-      if (ti.cluster_id && ti.reason) m.set(String(ti.cluster_id), ti.reason);
-    });
-    return m;
-  }, [summary]);
-
-  // Top Issues (클러스터 기반, personalizedKScore 정렬)
+  // Top Issues (summary.top_issues 기반 — useClusters 제거)
   const topItems = useMemo(() => {
-    if (!clusterData || !Array.isArray(clusterData)) return [];
-    return (clusterData as any[])
-      .filter((c) => c.severity > 0 && c.kscore > 0)
-      .map((c, i) => ({
-        id: i,
-        keyword: c.title,
-        keyword_ko: c.title_ko,
-        kscore: c.kscore,
-        topic: c.topic,
-        country_codes: c.country_code ? [c.country_code] : [],
-        cluster_ids: [c.id],
-        event_count: c.event_count,
-        severity: c.severity,
-        reason: reasonMap.get(String(c.id)) || "",
-        calculated_at: c.last_event_at,
-        first_event_at: c.first_event_at,
-        independent_sources: c.independent_sources ?? 1,
-      } as TrendingItem))
-      .sort((a, b) => personalizedKScore(b, homeCountry) - personalizedKScore(a, homeCountry))
-      .slice(0, 5);
-  }, [clusterData, homeCountry]);
+    if (!summary?.top_issues?.length) return [];
+    return summary.top_issues.map((ti: any, i: number) => ({
+      id: i,
+      keyword: lang === "en" && ti.title_en ? ti.title_en : ti.title,
+      keyword_ko: ti.title,
+      kscore: ti.kscore ?? 0,
+      topic: ti.topic,
+      country_codes: ti.country_codes,
+      cluster_ids: [ti.cluster_id],
+      event_count: ti.event_count ?? 0,
+      severity: ti.severity ?? 0,
+      reason: ti.reason || "",
+      calculated_at: ti.last_event_at,
+      first_event_at: ti.first_event_at,
+      independent_sources: ti.independent_sources ?? 1,
+      is_spike: ti.is_spike ?? false,
+      confidence: ti.confidence ?? 0,
+    } as TrendingItem));
+  }, [summary, lang]);
 
   if (meLoading || summaryLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
@@ -276,19 +274,9 @@ function ReportContent() {
               {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
             </p>
 
-            {/* 홈 긴장도 인라인 + Stats */}
-            <div className="flex items-center gap-2 text-[11px] mb-3">
+            {/* Row 4a: 홈 긴장도 + 글로벌 현황 (통합) */}
+            <div className="flex items-center gap-2 text-[11px] mb-1.5 flex-wrap">
               <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
-              <span className="font-medium">
-                {isGlobalMode
-                  ? t(lang, "dash_global_tension" as any)
-                  : t(lang, "dash_compact_tension" as Parameters<typeof t>[1])}
-                <span className="font-normal text-muted-foreground/50 text-[9px] ml-1">
-                  ({isGlobalMode
-                    ? t(lang, "dash_global_tension_desc" as any)
-                    : t(lang, "dash_tension_desc" as any)})
-                </span>
-              </span>
               <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
                 {Math.round(animatedHomeScore)}
               </span>
@@ -298,51 +286,40 @@ function ReportContent() {
                   style={{ width: `${Math.min(homeScore, 100)}%` }}
                 />
               </div>
-              <span className={cn("text-[9px] font-medium", tensionColor(homeScore).text)}>
-                {tensionLabel(homeScore, lang)}
+              <span className={cn("text-[9px]", tensionColor(homeScore).text)}>
+                {tensionLabelShort(homeScore, lang)}
               </span>
-              <span className="text-muted-foreground/40 mx-1">|</span>
-              <span className="text-muted-foreground">
-                {lang === "ko" ? "이슈" : "Issues"} <strong>{summary?.total_active_issues ?? 0}</strong>
-              </span>
-              <span className="text-muted-foreground/40">|</span>
-              <span className="text-red-400">
-                {t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong>
-              </span>
-            </div>
-
-            {/* 글로벌 현황 한 줄 */}
-            <div className="flex items-center gap-2 text-[10px] flex-wrap mb-3">
-              <span className="text-muted-foreground">🌐</span>
+              <span className="text-muted-foreground/30">|</span>
               {extremeCount > 0 && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-900 animate-pulse" />
-                  <span className="text-red-700 dark:text-red-300 font-medium">
-                    {t(lang, "dash_extreme_count", { n: extremeCount })}
-                  </span>
+                  <span className="text-[9px] text-red-300 font-medium">{extremeCount}</span>
                 </span>
               )}
               {severeCount > 0 && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  <span className="text-red-600 dark:text-red-400 font-medium">
-                    {t(lang, "dash_severe_count", { n: severeCount })}
-                  </span>
+                  <span className="text-[9px] text-red-400 font-medium">{severeCount}</span>
                 </span>
               )}
               {alertCount > 0 && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                  <span className="text-orange-600 dark:text-orange-300 font-medium">
-                    {t(lang, "dash_alert_count", { n: alertCount })}
-                  </span>
+                  <span className="text-[9px] text-orange-300 font-medium">{alertCount}</span>
                 </span>
               )}
               {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="text-[9px] text-emerald-400 font-medium">
                   {t(lang, "dash_global_stable")}
                 </span>
               )}
+            </div>
+
+            {/* Row 4b: 이슈 통계 + 업데이트 시간 */}
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-3">
+              <span>{lang === "ko" ? "이슈" : "Issues"} <strong>{summary?.total_active_issues ?? 0}</strong></span>
+              <span className="text-red-400">{t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong></span>
+              {updatedTime && <span className="ml-auto">{updatedTime}</span>}
             </div>
 
             {/* 관심국가 칩 */}
@@ -350,8 +327,11 @@ function ReportContent() {
               <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
                 {myCountries.map((code) => {
                   const data = tensionMap.get(code) as TensionAllItem | undefined;
-                  const score = data?.raw_score ?? 0;
+                  const allData = allTensionMap.get(code);
+                  const score = data?.raw_score ?? allData?.raw_score ?? 0;
                   const tc = tensionColor(score);
+                  const isAnomaly = (allData?.anomaly_z ?? 0) >= 2.0;
+                  const isConverging = (allData?.convergence_bonus ?? 0) >= 5.0;
                   return (
                     <div
                       key={code}
@@ -360,6 +340,8 @@ function ReportContent() {
                     >
                       <span className="text-xs">{getFlag(code)}</span>
                       <span className={cn("text-[10px] font-bold tabular-nums", tc.text)}>{score}</span>
+                      {isAnomaly && <span className="text-[7px] px-1 rounded bg-red-500/20 text-red-400 font-bold">{t(lang, "dash_badge_anomaly" as any)}</span>}
+                      {isConverging && <span className="text-[7px] px-1 rounded bg-purple-500/20 text-purple-400 font-bold">{t(lang, "dash_badge_convergence" as any)}</span>}
                     </div>
                   );
                 })}
@@ -420,9 +402,14 @@ function ReportContent() {
                     )}>
                       {topicLabel}
                     </span>
-                    {(topIssue.independent_sources ?? 0) >= 3 && (
+                    {topIssue.is_spike && (
+                      <span className="text-[8px] px-1 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">
+                        {t(lang, "dash_badge_spike" as any)}
+                      </span>
+                    )}
+                    {(topIssue.confidence ?? 0) >= 0.7 && (
                       <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
-                        {lang === "ko" ? "검증됨" : "Verified"}
+                        {t(lang, "dash_badge_verified" as any)}
                       </span>
                     )}
                   </div>
@@ -683,12 +670,17 @@ function ReportContent() {
                         </p>
                       </div>
                     )}
-                    {summary.trade_exposure.top_partners.map((p) => (
+                    {summary.trade_exposure.top_partners.map((p: any) => (
                       <div key={p.country_code} className="flex items-center gap-2">
                         <span className="text-sm">{getFlag(p.country_code)}</span>
                         <span className="text-[11px] font-medium w-16 truncate">
                           {getCountryName(p.country_code, lang)}
                         </span>
+                        {p.trade_balance && (
+                          <span className={cn("text-[8px] font-bold px-1 rounded", p.trade_balance === "surplus" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400")}>
+                            {t(lang, p.trade_balance === "surplus" ? "dash_trade_surplus" as any : "dash_trade_deficit" as any)}
+                          </span>
+                        )}
                         <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                           <div
                             className="h-full rounded-full bg-orange-400 transition-all duration-700"
