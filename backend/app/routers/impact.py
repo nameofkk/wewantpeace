@@ -189,8 +189,12 @@ async def get_impact_summary(
         cached = await redis.get(cache_key)
         if cached:
             data = json.loads(cached)
-            data["cached"] = True
-            return ImpactSummaryOut(**data)
+            # Phase 2 필드가 없는 구버전 캐시는 무시
+            if "market_snapshot" in data:
+                data["cached"] = True
+                return ImpactSummaryOut(**data)
+            else:
+                await redis.delete(cache_key)
 
     # 사용자 언어
     lang = "ko"
