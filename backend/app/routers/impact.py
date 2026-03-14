@@ -37,6 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+_CACHE_VERSION = "v2"
 
 
 def calc_impact_factor(
@@ -184,7 +185,7 @@ async def get_impact_summary(
 
     # 캐시 확인 (plan별로 — Pro가 상세 정보 포함하므로)
     redis = get_redis()
-    cache_key = f"impact:summary:{home}:{user_plan}"
+    cache_key = f"impact:summary:{_CACHE_VERSION}:{home}:{user_plan}"
     if redis:
         cached = await redis.get(cache_key)
         if cached:
@@ -328,21 +329,23 @@ async def get_impact_summary(
     level_en = {"high": "High", "elevated": "Elevated", "guarded": "Guarded", "low": "Low"}
 
     if lang == "ko":
-        summary = f"현재 {home} 영향도 {overall_score}/100 ({level_ko.get(level, level)}). "
+        top1 = top_issues[0] if top_issues else None
+        parts = [f"종합 영향도 {overall_score}점 ({level_ko.get(level, level)})"]
+        if top1:
+            parts.append(f"'{top1.title[:30]}' 이슈가 가장 큰 영향")
         if critical_count > 0:
-            summary += f"고영향 이슈 {critical_count}건 감지. "
-        if total_active > 0:
-            summary += f"최근 7일간 {total_active}건의 활성 이슈가 모니터링 중."
-        else:
-            summary += "현재 주요 위기 이슈 없음."
+            parts.append(f"고영향 이슈 {critical_count}건")
+        parts.append(f"최근 7일 활성 이슈 {total_active}건 모니터링 중" if total_active else "현재 주요 위기 이슈 없음")
+        summary = ". ".join(parts) + "."
     else:
-        summary = f"{home} impact: {overall_score}/100 ({level_en.get(level, level)}). "
+        top1_en = top_issues[0] if top_issues else None
+        parts_en = [f"Overall impact {overall_score} ({level_en.get(level, level)})"]
+        if top1_en:
+            parts_en.append(f"'{top1_en.title[:30]}' has the highest impact")
         if critical_count > 0:
-            summary += f"{critical_count} high-impact issue(s) detected. "
-        if total_active > 0:
-            summary += f"{total_active} active issues monitored in the last 7 days."
-        else:
-            summary += "No major crisis issues at this time."
+            parts_en.append(f"{critical_count} high-impact issue(s)")
+        parts_en.append(f"{total_active} active issues monitored over 7 days" if total_active else "No major crisis issues at this time")
+        summary = ". ".join(parts_en) + "."
 
     # Pro 이상: 상세 분석 (economy/trade/travel)
     economy = None
@@ -443,6 +446,8 @@ async def get_impact_summary(
             if sector_details and not energy_risk:
                 econ_parts.append(f"{', '.join(sector_details[:3])} 분야 공급망 리스크 주시")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"{home} 경제 영향 모니터링 중."
+            if energy_risk:
+                economy += " 에너지 수입비용 상승은 전기요금·교통비 등 생활물가에 영향을 줄 수 있습니다."
 
             # ── Trade: 교역 데이터 기반 ──
             trade_parts = []
@@ -489,6 +494,8 @@ async def get_impact_summary(
             if sector_details and not energy_risk:
                 econ_parts.append(f"{', '.join(sector_details[:3])} supply chain risk to monitor")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"Monitoring economic impact on {home}."
+            if energy_risk:
+                economy += " Rising energy import costs may affect electricity bills and transportation expenses."
 
             trade_parts = []
             if trade_vols:

@@ -1549,6 +1549,17 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"(in memory of|pay respects|laying wreaths?|wreath.laying)",
 ]]
 
+_RESPONSE_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+    r"정부[의가이]?\s*(대응|발표|입장|조치|방안|성명)",
+    r"대응\s*(방안|책|조치|계획|전략)",
+    r"외교[부적]\s*(노력|대응|발표|성명)",
+    r"(정부|외교부|국방부|대통령실)[이가은는]\s.{0,30}(대응|발표|성명|입장|우려|규탄|촉구)",
+    r"government\s+(response|statement|condemn|urge|react|address)",
+    r"official\s+(response|statement|position|reaction)",
+    r"diplomatic\s+(response|effort|initiative|push)",
+    r"(respond|reaction|response)\s+to\s+(crisis|conflict|attack|war|threat)",
+]]
+
 
 # ── 다국어 토픽 키워드 (번역 실패 시 fallback) ─────────────────────────────
 _TOPIC_KEYWORDS_MULTILANG: dict[str, dict[str, list[str]]] = {
@@ -1719,7 +1730,7 @@ def _classify_topic(text: str) -> str:
     return max(scores, key=lambda t: scores[t]) if scores else "unknown"
 
 
-def _calculate_severity(text: str, topic: str) -> int:
+def _calculate_severity(text: str, topic: str, title: str | None = None) -> int:
     """
     심각도 산정 (0~100).
 
@@ -1735,6 +1746,13 @@ def _calculate_severity(text: str, topic: str) -> int:
 
     # 사상자 수 기반 추가 보정 (별도 상한, _casualty_bonus 내부에서 max 30)
     modifier = keyword_delta + _casualty_bonus(text_lower)
+
+    # response article severity 감소
+    if title:
+        for p in _RESPONSE_PATTERNS:
+            if p.search(title):
+                modifier -= 15
+                break
 
     return max(0, min(100, base + modifier))
 
@@ -1755,14 +1773,24 @@ def _extract_geo(
 
     sorted_kws = sorted(COUNTRY_MAP.keys(), key=len, reverse=True)
 
-    # title 매칭 (3배 가중치)
+    # response pattern 감지 — 대응/성명 기사는 title 가중치 낮춤
+    is_response = False
+    if title:
+        for p in _RESPONSE_PATTERNS:
+            if p.search(title):
+                is_response = True
+                break
+
+    title_multiplier = 1 if is_response else 3
+
+    # title 매칭 (조건부 가중치)
     if title:
         title_lower = title.lower()
         for kw in sorted_kws:
             if _kw_in_text(kw, title_lower):
                 code, lat, lon = COUNTRY_MAP[kw]
                 count = title_lower.count(kw)
-                weight = count * len(kw) * 3  # 제목 3배 가중치
+                weight = count * len(kw) * title_multiplier
                 country_hits[code].append((weight, lat, lon))
 
     # body(전체 텍스트) 매칭
@@ -1876,7 +1904,7 @@ def normalize(
             multilang_topic = _classify_topic_multilang(raw_text, lang)
             if multilang_topic:
                 topic = multilang_topic
-        severity = _calculate_severity(text_for_analysis, topic)
+        severity = _calculate_severity(text_for_analysis, topic, title=source_title)
         logger.debug("규칙 폴백: topic=%s, severity=%d (제목: %s)", topic, severity, _title_for_ai[:60])
     # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None

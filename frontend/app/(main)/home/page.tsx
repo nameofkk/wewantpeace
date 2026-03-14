@@ -180,6 +180,15 @@ function ReportContent() {
   const hasPro = !!(summary?.economy || summary?.trade || summary?.travel);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
+  // summary.top_issues의 reason을 cluster_id로 매핑
+  const reasonMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (summary?.top_issues ?? []).forEach((ti: any) => {
+      if (ti.cluster_id && ti.reason) m.set(String(ti.cluster_id), ti.reason);
+    });
+    return m;
+  }, [summary]);
+
   // Top Issues (클러스터 기반, personalizedKScore 정렬)
   const topItems = useMemo(() => {
     if (!clusterData || !Array.isArray(clusterData)) return [];
@@ -195,7 +204,7 @@ function ReportContent() {
         cluster_ids: [c.id],
         event_count: c.event_count,
         severity: c.severity,
-        reason: "",
+        reason: reasonMap.get(String(c.id)) || "",
         calculated_at: c.last_event_at,
         first_event_at: c.first_event_at,
         independent_sources: c.independent_sources ?? 1,
@@ -258,7 +267,7 @@ function ReportContent() {
                     {t(lang, levelKey)}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {t(lang, "dash_impact_score")}
+                    {t(lang, "dash_impact_score")} · {t(lang, "dash_impact_score_desc" as any)}
                   </span>
                 </div>
               </div>
@@ -286,6 +295,9 @@ function ReportContent() {
               <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className="font-medium">
                 {t(lang, "dash_compact_tension" as Parameters<typeof t>[1])}
+                <span className="font-normal text-muted-foreground/50 text-[9px] ml-1">
+                  ({t(lang, "dash_tension_desc" as any)})
+                </span>
               </span>
               <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
                 {Math.round(animatedHomeScore)}
@@ -434,7 +446,8 @@ function ReportContent() {
                       <h3 className="text-[13px] font-bold leading-snug line-clamp-1">{displayTitle}</h3>
                     </div>
                     <div className="shrink-0 ml-2 text-right">
-                      <span className={cn("text-lg font-bold tabular-nums", badge.text)}>
+                      <span className={cn("text-[9px]", badge.text)}>KScore</span>
+                      <span className={cn("text-lg font-bold tabular-nums leading-none", badge.text)}>
                         {k.toFixed(1)}
                       </span>
                     </div>
@@ -540,10 +553,20 @@ function ReportContent() {
                           {item.country_codes.map((code: string) => getFlag(code)).join("")}
                         </span>
                       )}
-                      <span className="text-[11px] font-medium flex-1 truncate">{displayTitle}</span>
-                      <span className={cn("text-sm font-bold tabular-nums", badge.text)}>
-                        {k.toFixed(1)}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[11px] font-medium truncate block">{displayTitle}</span>
+                        {item.reason && (
+                          <span className="text-[9px] text-muted-foreground/70 truncate block mt-0.5">
+                            {item.reason}
+                          </span>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-0.5">
+                        <span className="text-[8px] text-muted-foreground">K</span>
+                        <span className={cn("text-sm font-bold tabular-nums", badge.text)}>
+                          {k.toFixed(1)}
+                        </span>
+                      </div>
                       <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
                     </div>
                   );
@@ -591,6 +614,15 @@ function ReportContent() {
               <div>
                 {summary?.market_snapshot && (summary.market_snapshot.commodities.length > 0 || summary.market_snapshot.indices.length > 0) ? (
                   <>
+                    {summary?.market_snapshot && (
+                      <div className="mb-2 rounded-lg bg-blue-500/5 px-3 py-1.5">
+                        <p className="text-[10px] text-foreground/60 leading-relaxed">
+                          {isPro && summary?.economy
+                            ? summary.economy.split(". ").slice(0, 1).join(". ")
+                            : t(lang, "dash_market_free_comment" as any)}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                       {summary.market_snapshot.commodities.map((c) => (
                         <div key={c.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
@@ -631,13 +663,6 @@ function ReportContent() {
                         </div>
                       ))}
                     </div>
-                    {isPro && summary?.economy && (
-                      <div className="mt-2 rounded-lg bg-blue-500/8 px-3 py-2">
-                        <p className="text-[10px] text-foreground/60 leading-relaxed">
-                          {summary.economy.split(". ").slice(0, 1).join(". ")}
-                        </p>
-                      </div>
-                    )}
                     <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
                       {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
                     </p>
@@ -655,6 +680,13 @@ function ReportContent() {
               <div>
                 {summary?.trade_exposure && isPro ? (
                   <div className="space-y-2">
+                    {isPro && summary?.trade && (
+                      <div className="mb-2 rounded-lg bg-orange-500/5 px-3 py-1.5">
+                        <p className="text-[10px] text-foreground/60 leading-relaxed">
+                          {summary.trade.split(". ").slice(0, 1).join(". ")}
+                        </p>
+                      </div>
+                    )}
                     {summary.trade_exposure.top_partners.map((p) => (
                       <div key={p.country_code} className="flex items-center gap-2">
                         <span className="text-sm">{getFlag(p.country_code)}</span>
@@ -712,6 +744,20 @@ function ReportContent() {
               <div>
                 {summary?.travel_advisories && summary.travel_advisories.length > 0 ? (
                   <>
+                    {(() => {
+                      const sorted = [...summary.travel_advisories].sort((a, b) => b.level - a.level);
+                      const worst = sorted[0];
+                      return (
+                        <div className="mb-2 rounded-lg bg-amber-500/5 px-3 py-1.5">
+                          <p className="text-[10px] text-foreground/60">
+                            {t(lang, "dash_travel_comment" as any, { n: sorted.length })}
+                            {worst && ` · ${t(lang, "dash_travel_comment_severe" as any, {
+                              country: getCountryName(worst.country_code, lang), level: worst.level
+                            })}`}
+                          </p>
+                        </div>
+                      );
+                    })()}
                     <div className="space-y-1.5">
                       {summary.travel_advisories
                         .sort((a, b) => b.level - a.level)
