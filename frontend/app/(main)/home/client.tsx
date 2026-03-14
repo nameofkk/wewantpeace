@@ -41,6 +41,7 @@ import {
   Fuel,
   BarChart3,
   Globe2,
+  Info,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -96,6 +97,40 @@ function formatTradeVolume(usd: number) {
   if (usd >= 1e6) return `$${(usd / 1e6).toFixed(0)}M`;
   if (usd >= 1e3) return `$${(usd / 1e3).toFixed(0)}K`;
   return `$${usd.toLocaleString()}`;
+}
+
+/* ───────────────────────── Section Header with info tooltip ───────────────────────── */
+
+function SectionHeader({ icon: Icon, title, desc, tooltip, lang }: {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+  tooltip: string;
+  lang: "ko" | "en";
+}) {
+  const [showInfo, setShowInfo] = React.useState(false);
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <h2 className="text-xs font-bold text-foreground tracking-wide">{title}</h2>
+        <span className="text-[9px] text-muted-foreground/60">·</span>
+        <span className="text-[9px] text-muted-foreground/60 flex-1 truncate">{desc}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo); }}
+          className="shrink-0 p-0.5 rounded-full hover:bg-muted/20 transition-colors"
+          aria-label="Info"
+        >
+          <Info className="h-3 w-3 text-muted-foreground/40" />
+        </button>
+      </div>
+      {showInfo && (
+        <div className="mt-1.5 ml-5.5 rounded-lg bg-muted/10 border border-border/30 px-3 py-2">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">{tooltip}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ───────────────────────── Section stagger variants ───────────────────────── */
@@ -208,6 +243,13 @@ function ReportContent() {
             variants={sectionVariants}
             className="rounded-xl border border-border bg-card p-4"
           >
+            <SectionHeader
+              icon={BarChart3}
+              title={t(lang, "dash_section_hero_title" as any)}
+              desc={t(lang, "dash_section_hero_desc" as any)}
+              tooltip={t(lang, "dash_section_hero_tooltip" as any)}
+              lang={lang}
+            />
             {/* Impact Score (left) + Risk Radar (right) */}
             <div className="flex items-start gap-4">
               {/* Left: Impact Score */}
@@ -224,11 +266,6 @@ function ReportContent() {
                       >
                         {t(lang, levelKey)}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {t(lang, "dash_impact_score")} · {isGlobalMode
-                          ? t(lang, "dash_global_impact_desc" as any)
-                          : t(lang, "dash_impact_score_desc" as any)}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -240,7 +277,7 @@ function ReportContent() {
                   />
                 </div>
 
-                <p className="text-[11px] text-foreground/80 leading-relaxed line-clamp-2 mb-3">
+                <p className="text-[10px] text-foreground/60 leading-relaxed line-clamp-3 mb-3">
                   {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
                 </p>
               </div>
@@ -352,15 +389,13 @@ function ReportContent() {
             {summary?.impact_flow && (
               <div className="rounded-xl border border-border bg-card overflow-hidden mb-5">
                 <div className="px-4 pt-3 pb-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                    <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      {t(lang, "dash_flow_title" as any)}
-                    </h2>
-                  </div>
-                  <p className="text-[9px] text-muted-foreground/50 ml-5.5">
-                    {t(lang, "dash_flow_desc" as any)}
-                  </p>
+                  <SectionHeader
+                    icon={Activity}
+                    title={t(lang, "dash_flow_title" as any)}
+                    desc={t(lang, "dash_flow_desc" as any)}
+                    tooltip={t(lang, "dash_section_flow_tooltip" as any)}
+                    lang={lang}
+                  />
                 </div>
                 <ImpactFlowSankey data={summary.impact_flow} isPro={isPro} lang={lang} />
               </div>
@@ -382,12 +417,13 @@ function ReportContent() {
             {restIssues.length > 0 && (
               <div className="rounded-xl border border-border bg-card mt-5">
                 <div className="px-4 pt-3 pb-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-                    <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      {t(lang, "dash_top_issues", { name: nickname })}
-                    </h2>
-                  </div>
+                  <SectionHeader
+                    icon={AlertTriangle}
+                    title={t(lang, "dash_section_stories_title" as any)}
+                    desc={t(lang, "dash_section_stories_desc" as any)}
+                    tooltip={t(lang, "dash_section_stories_tooltip" as any)}
+                    lang={lang}
+                  />
                 </div>
                 <div className="px-4 pb-3">
                   {restIssues.map((item, idx) => (
@@ -428,6 +464,13 @@ function ReportContent() {
             variants={sectionVariants}
             className="rounded-xl border border-border bg-card p-4"
           >
+            <SectionHeader
+              icon={BarChart3}
+              title={t(lang, "dash_section_dashboard_title" as any)}
+              desc={t(lang, "dash_section_dashboard_desc" as any)}
+              tooltip={t(lang, `dash_tab_${activeTab}_desc` as any)}
+              lang={lang}
+            />
             {/* Tab buttons — 4 tabs */}
             <div className="flex gap-1 mb-3">
               {(["market", "trade", "travel", "detail"] as const).map((tab) => (
