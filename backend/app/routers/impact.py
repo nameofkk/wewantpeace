@@ -352,6 +352,9 @@ async def get_impact_summary(
     is_pro = user_plan in ("pro", "pro_plus") or getattr(user, "admin_plan_override", False)
 
     if is_pro and top_10:
+        from backend.app.models.economic_data import CommodityPrice, MarketIndex, TradeBilateral, TravelAdvisory
+        from backend.app.models.tension_index import TensionIndex as TI2
+
         # 상위 이슈들의 국가/토픽 분석
         top_countries = {}
         top_topics = {}
@@ -364,65 +367,151 @@ async def get_impact_summary(
 
         high_impact_countries = [cc for cc, s in sorted(top_countries.items(), key=lambda x: -x[1]) if s >= 50][:3]
         labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+        sector_details = [labels.get(s, s) for s in affected_sectors]
 
-        # 영향받는 섹터 상세
-        sector_details = []
-        for sector in affected_sectors:
-            sector_details.append(labels.get(sector, sector))
+        # ── 실제 데이터 조회 (분석에 활용) ──
+        # 유가
+        oil_q = await db.execute(
+            select(CommodityPrice.price_usd, CommodityPrice.change_pct)
+            .where(CommodityPrice.symbol == "WTI")
+            .order_by(CommodityPrice.price_date.desc()).limit(1)
+        )
+        oil_row = oil_q.first()
+        oil_str = f"${oil_row[0]:,.0f}({oil_row[1]:+.1f}%)" if oil_row else None
+
+        # 금
+        gold_q = await db.execute(
+            select(CommodityPrice.price_usd, CommodityPrice.change_pct)
+            .where(CommodityPrice.symbol == "GOLD")
+            .order_by(CommodityPrice.price_date.desc()).limit(1)
+        )
+        gold_row = gold_q.first()
+
+        # 홈 국가 주가지수
+        home_idx_map = {"KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE"}
+        home_idx_sym = home_idx_map.get(home)
+        idx_str = None
+        if home_idx_sym:
+            idx_q = await db.execute(
+                select(MarketIndex.name, MarketIndex.change_pct)
+                .where(MarketIndex.symbol == home_idx_sym)
+                .order_by(MarketIndex.index_date.desc()).limit(1)
+            )
+            idx_row = idx_q.first()
+            if idx_row:
+                idx_str = f"{idx_row[0]} {idx_row[1]:+.1f}%"
+
+        # 주요 교역 파트너별 교역액 (상위 3개국)
+        trade_vols = {}
+        for hc in list(top_countries.keys())[:5]:
+            tv_q = await db.execute(
+                select(TradeBilateral.total_trade_usd)
+                .where(TradeBilateral.reporter_code == home, TradeBilateral.partner_code == hc, TradeBilateral.period_type == "A")
+                .order_by(TradeBilateral.period.desc()).limit(1)
+            )
+            tv = tv_q.scalar_one_or_none()
+            if tv and tv > 0:
+                trade_vols[hc] = tv
+
+        def _fmt_usd(v):
+            if v >= 1e9: return f"${v/1e9:.1f}B"
+            if v >= 1e6: return f"${v/1e6:.0f}M"
+            return f"${v:,.0f}"
+
+        # 여행 경보 Lv.4 국가 수
+        lv4_q = await db.execute(
+            select(func.count(TravelAdvisory.id))
+            .where(TravelAdvisory.level == 4)
+        )
+        lv4_count = lv4_q.scalar() or 0
+
+        # 에너지 관련 국가 이슈 여부
+        energy_partners = set(sectors_data.get("energy", {}).get("key_partners", []))
+        energy_risk = bool(energy_partners & set(top_countries.keys()))
 
         if lang == "ko":
-            economy = f"{home} 긴장도 {home_tension:.0f}/100. "
-            if high_impact_countries:
-                from backend.app.models.tension_index import TensionIndex as TI2
-                for hc in high_impact_countries[:2]:
-                    t_q = await db.execute(
-                        select(TI2.raw_score).where(TI2.country_code == hc)
-                        .order_by(TI2.time.desc()).limit(1)
-                    )
-                    t_score = t_q.scalar_one_or_none() or 0
-                    economy += f"{hc} 지역 긴장도 {t_score:.0f}/100. "
-            if sector_details:
-                economy += f"영향 가능 산업: {', '.join(sector_details[:4])}."
+            # ── Economy: 시장 데이터 + 섹터 영향 ──
+            econ_parts = []
+            if energy_risk and oil_str:
+                econ_parts.append(f"중동 분쟁 심화로 유가 {oil_str} 급등, {home} 에너지 수입비용 상승 압력")
+            elif oil_str:
+                econ_parts.append(f"유가 {oil_str}")
+            if gold_row and gold_row[1] > 1.0:
+                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 안전자산 수요 증가")
+            if idx_str:
+                econ_parts.append(idx_str)
+            if sector_details and not energy_risk:
+                econ_parts.append(f"{', '.join(sector_details[:3])} 분야 공급망 리스크 주시")
+            economy = ". ".join(econ_parts) + "." if econ_parts else f"{home} 경제 영향 모니터링 중."
 
-            trade_text = ""
-            if sector_details:
-                trade_text = f"{home}의 {', '.join(sector_details[:3])} 분야 영향 모니터링 필요. "
-            if high_impact_countries:
-                trade_text += f"고위험 교역 상대국: {', '.join(high_impact_countries)}. "
-            trade_text += "공급망 차질 가능성 주시."
-            trade = trade_text
+            # ── Trade: 교역 데이터 기반 ──
+            trade_parts = []
+            if trade_vols:
+                sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
+                top_tv = sorted_tv[0]
+                trade_parts.append(f"{home}-{top_tv[0]} 교역 {_fmt_usd(top_tv[1])}이 최대 노출 지점")
+                if len(sorted_tv) > 1:
+                    others = ", ".join(f"{c}({_fmt_usd(v)})" for c, v in sorted_tv[1:3])
+                    trade_parts.append(f"{others} 교역도 분쟁 영향권")
+            if energy_risk:
+                trade_parts.append("에너지 수입 의존국 불안정으로 원유 공급 리스크")
+            if not trade_parts:
+                trade_parts.append(f"{home} 관련 직접 교역 리스크는 제한적이나 간접 파급 주시")
+            trade = ". ".join(trade_parts) + "."
 
+            # ── Travel: 여행 경보 데이터 기반 ──
+            travel_parts = []
+            if lv4_count > 0:
+                lv4_names_q = await db.execute(
+                    select(TravelAdvisory.country_code)
+                    .where(TravelAdvisory.level == 4, TravelAdvisory.country_code.in_(list(top_countries.keys())))
+                )
+                lv4_in_issues = [r[0] for r in lv4_names_q.all()]
+                if lv4_in_issues:
+                    travel_parts.append(f"이슈 관련 {len(lv4_in_issues)}개국 여행금지(Lv.4): {', '.join(lv4_in_issues[:4])}")
+                travel_parts.append(f"전 세계 {lv4_count}개국이 여행금지 상태")
             if critical_count > 0:
-                travel = f"고영향 이슈 {critical_count}건으로 여행 주의. "
-            else:
-                travel = "현재 주요 여행 제한 요소 없음. "
-            travel += "해당 지역 방문 시 현지 안전 공지 확인 권장."
+                travel_parts.append(f"고영향 이슈 {critical_count}건 관련 지역 항공편 변동 주의")
+            if not travel_parts:
+                travel_parts.append("현재 관심 지역 주요 여행 제한 없음")
+            travel = ". ".join(travel_parts) + "."
         else:
-            economy = f"{home} tension at {home_tension:.0f}/100. "
-            if high_impact_countries:
-                for hc in high_impact_countries[:2]:
-                    t_q = await db.execute(
-                        select(TensionIndex.raw_score).where(TensionIndex.country_code == hc)
-                        .order_by(TensionIndex.time.desc()).limit(1)
-                    )
-                    t_score = t_q.scalar_one_or_none() or 0
-                    economy += f"{hc} tension at {t_score:.0f}/100. "
-            if sector_details:
-                economy += f"Sectors potentially affected: {', '.join(sector_details[:4])}."
+            # ── English ──
+            econ_parts = []
+            if energy_risk and oil_str:
+                econ_parts.append(f"Oil {oil_str} surging amid Middle East tensions, raising {home} energy import costs")
+            elif oil_str:
+                econ_parts.append(f"Oil {oil_str}")
+            if gold_row and gold_row[1] > 1.0:
+                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) on safe-haven demand")
+            if idx_str:
+                econ_parts.append(idx_str)
+            if sector_details and not energy_risk:
+                econ_parts.append(f"{', '.join(sector_details[:3])} supply chain risk to monitor")
+            economy = ". ".join(econ_parts) + "." if econ_parts else f"Monitoring economic impact on {home}."
 
-            trade_text = ""
-            if sector_details:
-                trade_text = f"Monitor {home}'s {', '.join(sector_details[:3])} sectors. "
-            if high_impact_countries:
-                trade_text += f"High-risk trade partners: {', '.join(high_impact_countries)}. "
-            trade_text += "Watch for supply chain disruptions."
-            trade = trade_text
+            trade_parts = []
+            if trade_vols:
+                sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
+                top_tv = sorted_tv[0]
+                trade_parts.append(f"{home}-{top_tv[0]} trade at {_fmt_usd(top_tv[1])} is primary exposure")
+                if len(sorted_tv) > 1:
+                    others = ", ".join(f"{c} ({_fmt_usd(v)})" for c, v in sorted_tv[1:3])
+                    trade_parts.append(f"{others} trade also in conflict zone")
+            if energy_risk:
+                trade_parts.append("Energy import dependencies at risk from regional instability")
+            if not trade_parts:
+                trade_parts.append(f"Direct trade exposure for {home} is limited; watch indirect spillover")
+            trade = ". ".join(trade_parts) + "."
 
+            travel_parts = []
+            if lv4_count > 0:
+                travel_parts.append(f"{lv4_count} countries at Do Not Travel (Lv.4) globally")
             if critical_count > 0:
-                travel = f"{critical_count} high-impact issue(s) warrant travel caution. "
-            else:
-                travel = "No major travel restrictions at this time. "
-            travel += "Check local advisories before traveling to affected regions."
+                travel_parts.append(f"{critical_count} high-impact issues may affect flights and transit")
+            if not travel_parts:
+                travel_parts.append("No major travel restrictions for areas of interest")
+            travel = ". ".join(travel_parts) + "."
 
     # ── 시장 동향 (market_snapshot) — 모든 플랜 ──
     market_snapshot = None

@@ -97,6 +97,13 @@ function changePctColor(pct: number) {
   return "text-muted-foreground";
 }
 
+function formatTradeVolume(usd: number) {
+  if (usd >= 1e9) return `$${(usd / 1e9).toFixed(1)}B`;
+  if (usd >= 1e6) return `$${(usd / 1e6).toFixed(0)}M`;
+  if (usd >= 1e3) return `$${(usd / 1e3).toFixed(0)}K`;
+  return `$${usd.toLocaleString()}`;
+}
+
 /* ───────────────────────── 메인 리포트 ───────────────────────── */
 
 function ReportContent() {
@@ -662,7 +669,7 @@ function ReportContent() {
                       {p.dependency_pct.toFixed(1)}%
                     </span>
                     <span className="text-[9px] text-muted-foreground tabular-nums w-16 text-right">
-                      ${(p.trade_volume_usd / 1e3).toFixed(1)}B
+                      {formatTradeVolume(p.trade_volume_usd)}
                     </span>
                   </div>
                 ))}
