@@ -375,6 +375,257 @@ async def collect_exchange_rates(db: AsyncSession) -> int:
     return saved
 
 
+# ── 4. yfinance 원자재 가격 수집 ─────────────────────────────────────────
+
+COMMODITY_TICKERS = {
+    "WTI": ("CL=F", "WTI Crude Oil"),
+    "BRENT": ("BZ=F", "Brent Crude Oil"),
+    "GOLD": ("GC=F", "Gold"),
+}
+
+
+async def collect_commodity_prices(db: AsyncSession) -> int:
+    """yfinance로 원자재 가격 수집 (WTI, Brent, Gold).
+
+    yfinance는 동기 라이브러리이므로 asyncio.to_thread로 실행.
+    Returns: 저장된 레코드 수
+    """
+    from backend.app.models.economic_data import CommodityPrice
+
+    saved = 0
+
+    def _fetch_yf():
+        """동기 yfinance 호출 (스레드에서 실행)"""
+        import yfinance as yf
+        results = {}
+        for symbol, (ticker, name) in COMMODITY_TICKERS.items():
+            try:
+                t = yf.Ticker(ticker)
+                hist = t.history(period="2d")
+                if hist.empty or len(hist) < 1:
+                    continue
+                close_today = float(hist["Close"].iloc[-1])
+                if len(hist) >= 2:
+                    close_prev = float(hist["Close"].iloc[-2])
+                    change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
+                else:
+                    change_pct = 0
+                price_date = hist.index[-1].strftime("%Y-%m-%d")
+                results[symbol] = {
+                    "name": name,
+                    "price_usd": round(close_today, 2),
+                    "change_pct": round(change_pct, 2),
+                    "price_date": price_date,
+                }
+            except Exception as e:
+                logger.warning("yfinance_commodity_error symbol=%s err=%s", symbol, str(e))
+        return results
+
+    try:
+        data = await asyncio.to_thread(_fetch_yf)
+    except Exception as e:
+        logger.error("yfinance_thread_error: %s", str(e))
+        return 0
+
+    for symbol, info in data.items():
+        # 중복 확인
+        existing = await db.execute(
+            select(CommodityPrice.id).where(
+                and_(
+                    CommodityPrice.symbol == symbol,
+                    CommodityPrice.price_date == info["price_date"],
+                )
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        db.add(CommodityPrice(
+            symbol=symbol,
+            name=info["name"],
+            price_usd=info["price_usd"],
+            change_pct=info["change_pct"],
+            price_date=info["price_date"],
+        ))
+        saved += 1
+
+    await db.flush()
+    logger.info("commodity_prices_collected count=%d", saved)
+    return saved
+
+
+# ── 5. yfinance 주요 주가지수 수집 ────────────────────────────────────────
+
+MARKET_INDEX_TICKERS = {
+    "KOSPI": ("^KS11", "KOSPI", "KRW"),
+    "SPX": ("^GSPC", "S&P 500", "USD"),
+    "NKY": ("^N225", "Nikkei 225", "JPY"),
+    "DAX": ("^GDAXI", "DAX", "EUR"),
+    "FTSE": ("^FTSE", "FTSE 100", "GBP"),
+    "SSE": ("000001.SS", "SSE Composite", "CNY"),
+}
+
+
+async def collect_market_indices(db: AsyncSession) -> int:
+    """yfinance로 주요 주가지수 수집.
+
+    Returns: 저장된 레코드 수
+    """
+    from backend.app.models.economic_data import MarketIndex
+
+    saved = 0
+
+    def _fetch_yf():
+        import yfinance as yf
+        results = {}
+        for symbol, (ticker, name, currency) in MARKET_INDEX_TICKERS.items():
+            try:
+                t = yf.Ticker(ticker)
+                hist = t.history(period="2d")
+                if hist.empty or len(hist) < 1:
+                    continue
+                close_today = float(hist["Close"].iloc[-1])
+                if len(hist) >= 2:
+                    close_prev = float(hist["Close"].iloc[-2])
+                    change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
+                else:
+                    change_pct = 0
+                index_date = hist.index[-1].strftime("%Y-%m-%d")
+                results[symbol] = {
+                    "name": name,
+                    "value": round(close_today, 2),
+                    "change_pct": round(change_pct, 2),
+                    "index_date": index_date,
+                    "currency": currency,
+                }
+            except Exception as e:
+                logger.warning("yfinance_index_error symbol=%s err=%s", symbol, str(e))
+        return results
+
+    try:
+        data = await asyncio.to_thread(_fetch_yf)
+    except Exception as e:
+        logger.error("yfinance_index_thread_error: %s", str(e))
+        return 0
+
+    for symbol, info in data.items():
+        existing = await db.execute(
+            select(MarketIndex.id).where(
+                and_(
+                    MarketIndex.symbol == symbol,
+                    MarketIndex.index_date == info["index_date"],
+                )
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        db.add(MarketIndex(
+            symbol=symbol,
+            name=info["name"],
+            value=info["value"],
+            change_pct=info["change_pct"],
+            index_date=info["index_date"],
+            currency=info["currency"],
+        ))
+        saved += 1
+
+    await db.flush()
+    logger.info("market_indices_collected count=%d", saved)
+    return saved
+
+
+# ── 6. 구조화된 여행 경보 수집 (US State Dept) ────────────────────────────
+
+# US Advisory Level names
+_US_LEVEL_NAMES = {
+    1: "Exercise Normal Precautions",
+    2: "Exercise Increased Caution",
+    3: "Reconsider Travel",
+    4: "Do Not Travel",
+}
+
+
+async def collect_travel_advisories_structured(db: AsyncSession) -> int:
+    """US State Department Travel Advisory를 구조화된 형태로 저장.
+
+    기존 travel_advisory.py는 RawEvent로 저장하지만,
+    이 함수는 TravelAdvisory 테이블에 country_code + level로 직접 저장.
+    Returns: upsert된 레코드 수
+    """
+    from backend.app.models.economic_data import TravelAdvisory
+    import re
+
+    saved = 0
+    url = "https://cadataapi.state.gov/api/TravelAdvisories"
+
+    async with aiohttp.ClientSession() as session:
+        data = await _fetch_json(session, url)
+        if not data:
+            logger.error("travel_advisory_structured: no data")
+            return 0
+
+        # API 응답 형식: list of advisories
+        advisories = data if isinstance(data, list) else data.get("value", data.get("data", []))
+        if not isinstance(advisories, list):
+            logger.error("travel_advisory_structured: unexpected format")
+            return 0
+
+        for adv in advisories:
+            # 국가 코드 추출
+            cc = adv.get("iso_code") or adv.get("country_iso") or adv.get("CountryCode", "")
+            if not cc or len(cc) != 2:
+                # Title에서 추출 시도는 건너뛰고 다음으로
+                continue
+
+            cc = cc.upper()
+
+            # Level 추출
+            level = adv.get("advisory_level") or adv.get("AdvisoryLevel")
+            if level is None:
+                title_text = adv.get("advisory_text") or adv.get("Title") or ""
+                m = re.search(r"Level\s+(\d)", title_text)
+                if m:
+                    level = int(m.group(1))
+                else:
+                    continue
+            level = int(level)
+            if level < 1 or level > 4:
+                continue
+
+            title = _US_LEVEL_NAMES.get(level, f"Level {level}")
+
+            # UPSERT: 같은 (country_code, source) 있으면 업데이트
+            existing_q = await db.execute(
+                select(TravelAdvisory).where(
+                    and_(
+                        TravelAdvisory.country_code == cc,
+                        TravelAdvisory.source == "us_state_dept",
+                    )
+                ).limit(1)
+            )
+            existing = existing_q.scalar_one_or_none()
+            if existing:
+                if existing.level != level:
+                    existing.level = level
+                    existing.title = title
+                    existing.fetched_at = datetime.now(timezone.utc)
+                    saved += 1
+            else:
+                db.add(TravelAdvisory(
+                    country_code=cc,
+                    level=level,
+                    title=title,
+                    source="us_state_dept",
+                ))
+                saved += 1
+
+        await db.flush()
+
+    logger.info("travel_advisories_structured count=%d", saved)
+    return saved
+
+
 # ── 통합 수집 함수 ────────────────────────────────────────────────────────
 
 async def collect_all_economic_data(db: AsyncSession) -> dict:
@@ -401,4 +652,31 @@ async def collect_all_economic_data(db: AsyncSession) -> dict:
 
     await db.commit()
     logger.info("economic_data_collection_complete results=%s", results)
+    return results
+
+
+async def collect_market_data(db: AsyncSession) -> dict:
+    """시장 데이터 수집 — 원자재 + 지수 + 구조화 여행 경보 (6시간마다)"""
+    results = {}
+
+    try:
+        results["commodities"] = await collect_commodity_prices(db)
+    except Exception as e:
+        logger.error("commodity_collection_failed: %s", str(e))
+        results["commodities"] = -1
+
+    try:
+        results["indices"] = await collect_market_indices(db)
+    except Exception as e:
+        logger.error("index_collection_failed: %s", str(e))
+        results["indices"] = -1
+
+    try:
+        results["travel_advisories"] = await collect_travel_advisories_structured(db)
+    except Exception as e:
+        logger.error("travel_advisory_structured_failed: %s", str(e))
+        results["travel_advisories"] = -1
+
+    await db.commit()
+    logger.info("market_data_collection_complete results=%s", results)
     return results

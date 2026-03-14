@@ -14,6 +14,9 @@ import {
   useTensionAll,
   useClusters,
   type TensionAllItem,
+  type MarketSnapshot,
+  type TravelAlert,
+  type TradeExposure,
 } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import {
@@ -42,6 +45,9 @@ import {
   AlertTriangle,
   TrendingUp,
   ExternalLink,
+  Fuel,
+  BarChart3,
+  Globe2,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -75,6 +81,20 @@ function tensionLabel(score: number, lang: "ko" | "en") {
   if (score >= 40) return lang === "ko" ? "경계" : "Alert";
   if (score >= 20) return lang === "ko" ? "주의" : "Caution";
   return lang === "ko" ? "안정" : "Stable";
+}
+
+function travelLevelColor(level: number) {
+  if (level >= 4) return { bg: "bg-red-500/15", text: "text-red-600 dark:text-red-400", border: "border-red-500/30" };
+  if (level >= 3) return { bg: "bg-orange-500/15", text: "text-orange-600 dark:text-orange-300", border: "border-orange-500/30" };
+  if (level >= 2) return { bg: "bg-amber-500/15", text: "text-amber-600 dark:text-amber-300", border: "border-amber-500/30" };
+  return { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30" };
+}
+
+function changePctColor(pct: number) {
+  // 한국 주식 관례: 양수=빨강, 음수=파랑
+  if (pct > 0) return "text-red-500";
+  if (pct < 0) return "text-blue-500";
+  return "text-muted-foreground";
 }
 
 /* ───────────────────────── 메인 리포트 ───────────────────────── */
@@ -389,6 +409,124 @@ function ReportContent() {
             )}
           </section>
 
+          {/* ═══════════════ SECTION 2.5: 분쟁 영향 시장 동향 ═══════════════ */}
+          {summary?.market_snapshot && (summary.market_snapshot.commodities.length > 0 || summary.market_snapshot.indices.length > 0) && (
+            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "120ms" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  {t(lang, "dash_market_trend" as Parameters<typeof t>[1])}
+                </h2>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 mb-3 ml-6">
+                {t(lang, "dash_market_subtitle" as Parameters<typeof t>[1])}
+              </p>
+
+              {/* 가로 스크롤 카드 */}
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                {/* 원자재 */}
+                {summary.market_snapshot.commodities.map((c) => (
+                  <div key={c.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Fuel className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[9px] text-muted-foreground font-medium">{c.name}</span>
+                    </div>
+                    <p className="text-sm font-bold tabular-nums">${c.price_usd.toLocaleString()}</p>
+                    <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(c.change_pct))}>
+                      {c.change_pct > 0 ? "+" : ""}{c.change_pct.toFixed(2)}%
+                    </span>
+                  </div>
+                ))}
+
+                {/* 환율 */}
+                {summary.market_snapshot.exchange_rates.map((r) => (
+                  <div key={r.target_currency} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[100px]">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Globe2 className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[9px] text-muted-foreground font-medium">USD/{r.target_currency}</span>
+                    </div>
+                    <p className="text-sm font-bold tabular-nums">{r.rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                    {r.change_pct != null && (
+                      <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(r.change_pct))}>
+                        {r.change_pct > 0 ? "+" : ""}{r.change_pct.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                ))}
+
+                {/* 주가지수 */}
+                {summary.market_snapshot.indices.map((i) => (
+                  <div key={i.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
+                    <div className="flex items-center gap-1 mb-1">
+                      <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[9px] text-muted-foreground font-medium">{i.name}</span>
+                    </div>
+                    <p className="text-sm font-bold tabular-nums">{i.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(i.change_pct))}>
+                      {i.change_pct > 0 ? "+" : ""}{i.change_pct.toFixed(2)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* AI 코멘트 (Pro) */}
+              {isPro && summary?.economy && (
+                <div className="mt-2 rounded-lg bg-blue-500/8 px-3 py-2">
+                  <p className="text-[10px] text-foreground/60 leading-relaxed">
+                    💡 {summary.economy.split(". ").slice(0, 1).join(". ")}
+                  </p>
+                </div>
+              )}
+
+              {/* 면책조항 */}
+              <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
+                {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
+              </p>
+            </section>
+          )}
+
+          {/* ═══════════════ SECTION 2.7: 여행 경보 ═══════════════ */}
+          {summary?.travel_advisories && summary.travel_advisories.length > 0 && (
+            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "140ms" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <Plane className="h-3.5 w-3.5 text-muted-foreground" />
+                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  {t(lang, "dash_travel_alert" as Parameters<typeof t>[1])}
+                </h2>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 mb-3 ml-6">
+                {t(lang, "dash_travel_source" as Parameters<typeof t>[1])}
+              </p>
+
+              <div className="space-y-1.5">
+                {summary.travel_advisories
+                  .sort((a, b) => b.level - a.level)
+                  .slice(0, 8)
+                  .map((ta) => {
+                    const tc = travelLevelColor(ta.level);
+                    const levelKey = `dash_travel_level_${ta.level}` as Parameters<typeof t>[1];
+                    return (
+                      <div
+                        key={`${ta.country_code}-${ta.source}`}
+                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 border", tc.bg, tc.border)}
+                      >
+                        <span className="text-sm">{getFlag(ta.country_code)}</span>
+                        <span className="text-[11px] font-medium flex-1 truncate">
+                          {getCountryName(ta.country_code, lang)}
+                        </span>
+                        <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", tc.text, tc.bg)}>
+                          Lv.{ta.level} {t(lang, levelKey)}
+                        </span>
+                        {isPro && ta.title && (
+                          <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{ta.title}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </section>
+          )}
+
           {/* ═══════════════ SECTION 3: 나에게 영향이 큰 이슈 ═══════════════ */}
           <section className="fade-in-up" style={{ animationDelay: "160ms" }}>
             <div className="flex items-center gap-2 mb-2">
@@ -459,6 +597,11 @@ function ReportContent() {
                           )}
                         </div>
                         <h4 className="text-[12px] font-semibold leading-snug line-clamp-1">{displayTitle}</h4>
+                        {summary?.top_issues?.[idx]?.reason && (
+                          <p className="text-[9px] text-muted-foreground/70 line-clamp-1 mt-0.5">
+                            💡 {summary.top_issues[idx].reason}
+                          </p>
+                        )}
                       </div>
 
                       <div className="shrink-0 text-right">
@@ -466,6 +609,14 @@ function ReportContent() {
                           {k.toFixed(1)}
                         </span>
                         <p className="text-[9px] text-muted-foreground">{t(lang, "dash_impact_score")}</p>
+                        {summary?.top_issues?.[idx]?.kscore_delta != null && summary.top_issues[idx].kscore_delta !== 0 && (
+                          <p className={cn("text-[8px] font-medium tabular-nums",
+                            (summary.top_issues[idx].kscore_delta ?? 0) > 0 ? "text-red-400" : "text-blue-400"
+                          )}>
+                            {(summary.top_issues[idx].kscore_delta ?? 0) > 0 ? "▲" : "▼"}
+                            {Math.abs(summary.top_issues[idx].kscore_delta ?? 0).toFixed(1)}
+                          </p>
+                        )}
                       </div>
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     </div>
@@ -482,6 +633,76 @@ function ReportContent() {
               {t(lang, "dash_view_all_issues")}
             </Link>
           </section>
+
+          {/* ═══════════════ SECTION 3.5: 교역 노출도 (Pro) ═══════════════ */}
+          {summary?.trade_exposure && isPro ? (
+            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "200ms" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <ShoppingCart className="h-3.5 w-3.5 text-orange-400" />
+                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  {t(lang, "dash_trade_exposure" as Parameters<typeof t>[1])}
+                </h2>
+                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">Pro</span>
+              </div>
+
+              <div className="space-y-2 mt-3">
+                {summary.trade_exposure.top_partners.map((p, idx) => (
+                  <div key={p.country_code} className="flex items-center gap-2">
+                    <span className="text-sm">{getFlag(p.country_code)}</span>
+                    <span className="text-[11px] font-medium w-16 truncate">
+                      {getCountryName(p.country_code, lang)}
+                    </span>
+                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-orange-400 transition-all duration-700"
+                        style={{ width: `${Math.min(p.dependency_pct, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-bold tabular-nums text-orange-400 w-12 text-right">
+                      {p.dependency_pct.toFixed(1)}%
+                    </span>
+                    <span className="text-[9px] text-muted-foreground tabular-nums w-16 text-right">
+                      ${(p.trade_volume_usd / 1e3).toFixed(1)}B
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : summary?.trade_exposure === undefined && isPro ? null : !isPro ? (
+            <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "200ms" }}>
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <ShoppingCart className="h-3.5 w-3.5 text-orange-400" />
+                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    {t(lang, "dash_trade_exposure" as Parameters<typeof t>[1])}
+                  </h2>
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">Pro</span>
+                </div>
+                <div className="relative mt-3">
+                  <div className="space-y-2 opacity-40 blur-[2px] select-none pointer-events-none">
+                    {[1,2,3,4,5].map((i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded bg-muted/30" />
+                        <div className="h-3 w-16 rounded bg-muted/30" />
+                        <div className="flex-1 h-2 rounded-full bg-muted/20" />
+                        <div className="h-3 w-12 rounded bg-muted/30" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <Lock className="h-4 w-4 text-muted-foreground mb-1.5" />
+                    <Link
+                      href="/upgrade"
+                      className="inline-flex rounded-full px-3 py-1 text-[9px] font-bold text-white"
+                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                    >
+                      {t(lang, "dash_unlock_pro")}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           {/* ═══════════════ SECTION 4: 상세 영향 분석 (Pro) ═══════════════ */}
           <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "240ms" }}>

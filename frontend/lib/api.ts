@@ -461,6 +461,53 @@ export interface ImpactSummaryTopIssue {
   impact_score: number;
   country_codes: string[];
   topic: string;
+  reason?: string;
+  kscore_delta?: number | null;
+}
+
+export interface CommoditySnapshot {
+  symbol: string;
+  name: string;
+  price_usd: number;
+  change_pct: number;
+}
+
+export interface MarketIndexSnapshot {
+  symbol: string;
+  name: string;
+  value: number;
+  change_pct: number;
+  currency: string;
+}
+
+export interface ExchangeRateSnapshot {
+  target_currency: string;
+  rate: number;
+  change_pct?: number;
+}
+
+export interface MarketSnapshot {
+  commodities: CommoditySnapshot[];
+  indices: MarketIndexSnapshot[];
+  exchange_rates: ExchangeRateSnapshot[];
+}
+
+export interface TradePartner {
+  country_code: string;
+  trade_volume_usd: number;
+  dependency_pct: number;
+}
+
+export interface TradeExposure {
+  top_partners: TradePartner[];
+  total_trade_volume: number;
+}
+
+export interface TravelAlert {
+  country_code: string;
+  level: number;
+  title?: string;
+  source: string;
 }
 
 export interface ImpactSummary {
@@ -477,6 +524,9 @@ export interface ImpactSummary {
   data_sources: string[];
   generated_at: string;
   cached: boolean;
+  market_snapshot?: MarketSnapshot | null;
+  trade_exposure?: TradeExposure | null;
+  travel_advisories?: TravelAlert[];
 }
 
 export function useImpactSummary(enabled = true) {

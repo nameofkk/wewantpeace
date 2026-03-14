@@ -233,6 +233,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=4),  # 매일 04:00 UTC = KST 13:00
         "options": {"queue": "collect"},
     },
+    "collect-market-data": {
+        "task": "worker.tasks.collect_market_data",
+        "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
+        "options": {"queue": "collect"},
+    },
     # ── Tier 3: Impact Brief 사전 생성 (비용 최적화) ──
     "pregenerate-impact-briefs": {
         "task": "worker.tasks.pregenerate_impact_briefs",

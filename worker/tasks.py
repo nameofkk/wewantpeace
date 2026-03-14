@@ -392,6 +392,31 @@ def collect_economic_data(self):
 
 
 @app.task(
+    name="worker.tasks.collect_market_data",
+    queue="collect",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=600,
+)
+def collect_market_data(self):
+    """시장 데이터 수집 (6시간마다) — yfinance 원자재/지수 + 구조화 여행경보"""
+    _record_heartbeat("collect_market_data")
+
+    async def _run():
+        from worker.collector.economic_data_collector import collect_market_data
+        async with AsyncSessionLocal() as db:
+            results = await collect_market_data(db)
+            logger.info("시장 데이터 수집 완료: %s", results)
+            return results
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("시장 데이터 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.pregenerate_impact_briefs",
     queue="process",
     bind=True,

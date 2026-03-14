@@ -74,3 +74,64 @@ class ExchangeRate(Base):
         TIMESTAMP(timezone=True), nullable=False,
         server_default="now()",
     )
+
+
+class CommodityPrice(Base):
+    """원자재 가격 (yfinance 수집)"""
+    __tablename__ = "commodity_price"
+    __table_args__ = (
+        Index("ix_commodity_price_symbol_date", "symbol", "price_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)  # "WTI", "BRENT", "GOLD"
+    name: Mapped[str] = mapped_column(String(50), nullable=False)    # "WTI Crude Oil"
+    price_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    change_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)  # 전일 대비 %
+    price_date: Mapped[str] = mapped_column(String(10), nullable=False)  # "2026-03-14"
+    fetched_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False,
+        server_default="now()",
+    )
+
+
+class MarketIndex(Base):
+    """주요 주가 지수 (yfinance 수집)"""
+    __tablename__ = "market_index"
+    __table_args__ = (
+        Index("ix_market_index_symbol_date", "symbol", "index_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)   # "KOSPI", "SPX"
+    name: Mapped[str] = mapped_column(String(50), nullable=False)     # "KOSPI", "S&P 500"
+    value: Mapped[float] = mapped_column(Float, nullable=False)       # 지수 값
+    change_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    index_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)  # "KRW", "USD"
+    fetched_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False,
+        server_default="now()",
+    )
+
+
+class TravelAdvisory(Base):
+    """구조화된 여행 경보 (US State Dept / Korea MOFA / UK FCDO)"""
+    __tablename__ = "travel_advisory"
+    __table_args__ = (
+        Index("ix_travel_advisory_country_source", "country_code", "source"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    country_code: Mapped[str] = mapped_column(String(2), nullable=False)  # ISO 2-letter
+    level: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-4
+    title: Mapped[str] = mapped_column(String(200), nullable=False)  # "Exercise Normal Precautions"
+    source: Mapped[str] = mapped_column(String(20), nullable=False)  # "us_state_dept", "kr_mofa", "uk_fcdo"
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False,
+        server_default="now()",
+    )
+    fetched_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False,
+        server_default="now()",
+    )
