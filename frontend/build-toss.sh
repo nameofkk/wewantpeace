@@ -22,6 +22,12 @@ cp next.config.toss.js next.config.js
 mv "app/(main)/issues/[id]" "app/(main)/issues/_id_bak" 2>/dev/null || true
 mv "app/(main)/issues/country/[code]" "app/(main)/issues/country/_code_bak" 2>/dev/null || true
 mv "app/(main)/community/[postId]" "app/(main)/community/_postId_bak" 2>/dev/null || true
+# searchParams 사용하는 동적 페이지도 비활성화
+mv "app/(main)/feed" "app/(main)/_feed_bak" 2>/dev/null || true
+mv "app/(main)/home" "app/(main)/_home_bak" 2>/dev/null || true
+mv "app/(main)/map" "app/(main)/_map_bak" 2>/dev/null || true
+mv "app/(main)/tension" "app/(main)/_tension_bak" 2>/dev/null || true
+mv "app/(main)/upgrade" "app/(main)/_upgrade_bak" 2>/dev/null || true
 
 # 3) granite build
 npx granite build
@@ -30,6 +36,11 @@ npx granite build
 mv "app/(main)/issues/_id_bak" "app/(main)/issues/[id]" 2>/dev/null || true
 mv "app/(main)/issues/country/_code_bak" "app/(main)/issues/country/[code]" 2>/dev/null || true
 mv "app/(main)/community/_postId_bak" "app/(main)/community/[postId]" 2>/dev/null || true
+mv "app/(main)/_feed_bak" "app/(main)/feed" 2>/dev/null || true
+mv "app/(main)/_home_bak" "app/(main)/home" 2>/dev/null || true
+mv "app/(main)/_map_bak" "app/(main)/map" 2>/dev/null || true
+mv "app/(main)/_tension_bak" "app/(main)/tension" 2>/dev/null || true
+mv "app/(main)/_upgrade_bak" "app/(main)/upgrade" 2>/dev/null || true
 
 # 5) config 복원 (git에서)
 git checkout -- next.config.js
