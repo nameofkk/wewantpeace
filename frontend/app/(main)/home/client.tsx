@@ -110,22 +110,22 @@ function SectionHeader({ icon: Icon, title, desc, tooltip, lang }: {
 }) {
   const [showInfo, setShowInfo] = React.useState(false);
   return (
-    <div className="mb-3">
-      <div className="flex items-center gap-2">
+    <div className="mb-2.5">
+      <div className="flex items-center gap-1.5 min-w-0">
         <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <h2 className="text-xs font-bold text-foreground tracking-wide">{title}</h2>
-        <span className="text-[9px] text-muted-foreground/60">·</span>
-        <span className="text-[9px] text-muted-foreground/60 flex-1 truncate">{desc}</span>
+        <h2 className="text-[11px] font-bold text-foreground shrink-0">{title}</h2>
+        <span className="text-[9px] text-muted-foreground/50 shrink-0">·</span>
+        <span className="text-[9px] text-muted-foreground/50 truncate min-w-0">{desc}</span>
         <button
           onClick={(e) => { e.stopPropagation(); setShowInfo(!showInfo); }}
-          className="shrink-0 p-0.5 rounded-full hover:bg-muted/20 transition-colors"
+          className="shrink-0 p-0.5 rounded-full hover:bg-muted/20 transition-colors ml-auto"
           aria-label="Info"
         >
           <Info className="h-3 w-3 text-muted-foreground/40" />
         </button>
       </div>
       {showInfo && (
-        <div className="mt-1.5 ml-5.5 rounded-lg bg-muted/10 border border-border/30 px-3 py-2">
+        <div className="mt-1.5 ml-5 rounded-lg bg-muted/10 border border-border/30 px-3 py-2">
           <p className="text-[10px] text-muted-foreground leading-relaxed">{tooltip}</p>
         </div>
       )}
@@ -250,39 +250,35 @@ function ReportContent() {
               tooltip={t(lang, "dash_section_hero_tooltip" as any)}
               lang={lang}
             />
-            {/* Impact Score (left) + Risk Radar (right) */}
-            <div className="flex items-start gap-4">
+            {/* Impact Score + Risk Radar */}
+            <div className="flex items-start gap-3">
               {/* Left: Impact Score */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-3xl font-bold tabular-nums leading-none score-reveal" style={{ color }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl font-bold tabular-nums leading-none score-reveal" style={{ color }}>
                     {Math.round(animatedImpact)}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ color, backgroundColor: `${color}15` }}
-                      >
-                        {t(lang, levelKey)}
-                      </span>
-                    </div>
-                  </div>
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                    style={{ color, backgroundColor: `${color}15` }}
+                  >
+                    {t(lang, levelKey)}
+                  </span>
                 </div>
 
-                <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-2">
                   <div
                     className="h-full rounded-full transition-all duration-1000 ease-out"
                     style={{ width: `${Math.min(impactScore, 100)}%`, backgroundColor: color }}
                   />
                 </div>
 
-                <p className="text-[10px] text-foreground/60 leading-relaxed line-clamp-3 mb-3">
+                <p className="text-[10px] text-foreground/60 leading-relaxed line-clamp-2 mb-2">
                   {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
                 </p>
               </div>
 
-              {/* Right: Risk Radar */}
+              {/* Right: Risk Radar (compact) */}
               {summary?.risk_radar && (
                 <div className="shrink-0">
                   <RiskRadar data={summary.risk_radar} lang={lang} />
@@ -291,8 +287,8 @@ function ReportContent() {
             </div>
 
             {/* Home tension + global counts */}
-            <div className="flex items-center gap-2 text-[11px] mb-1.5 flex-wrap">
-              <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+            <div className="flex items-center gap-1.5 text-[10px] mb-1.5 flex-wrap">
+              <span className="text-sm">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
                 {Math.round(animatedHomeScore)}
               </span>
@@ -581,30 +577,34 @@ function ReportContent() {
                           </div>
                         )}
                         {summary.trade_exposure.top_partners.map((p: any) => (
-                          <div key={p.country_code} className="flex items-center gap-2 mb-2">
-                            <span className="text-sm">{getFlag(p.country_code)}</span>
-                            <span className="text-[11px] font-medium w-16 truncate">
-                              {getCountryName(p.country_code, lang)}
-                            </span>
-                            {isPro && p.trade_balance && (
-                              <span className={cn("text-[8px] font-bold px-1 rounded", p.trade_balance === "surplus" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400")}>
-                                {t(lang, p.trade_balance === "surplus" ? "dash_trade_surplus" as any : "dash_trade_deficit" as any)}
+                          <div key={p.country_code} className="mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs shrink-0">{getFlag(p.country_code)}</span>
+                              <span className="text-[10px] font-medium truncate min-w-0 flex-1">
+                                {getCountryName(p.country_code, lang)}
                               </span>
-                            )}
-                            {isPro && p.export_usd != null && p.import_usd != null && (
-                              <span className="text-[8px] text-muted-foreground">
-                                {t(lang, "dash_trade_export" as any)} {formatTradeVolume(p.export_usd)} · {t(lang, "dash_trade_import" as any)} {formatTradeVolume(p.import_usd)}
+                              {isPro && p.trade_balance && (
+                                <span className={cn("text-[7px] font-bold px-1 rounded shrink-0", p.trade_balance === "surplus" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400")}>
+                                  {t(lang, p.trade_balance === "surplus" ? "dash_trade_surplus" as any : "dash_trade_deficit" as any)}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold tabular-nums text-orange-400 shrink-0">
+                                {p.dependency_pct.toFixed(1)}%
                               </span>
-                            )}
-                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-orange-400 transition-all duration-700"
-                                style={{ width: `${Math.min(p.dependency_pct, 100)}%` }}
-                              />
                             </div>
-                            <span className="text-[10px] font-bold tabular-nums text-orange-400 w-12 text-right">
-                              {p.dependency_pct.toFixed(1)}%
-                            </span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-orange-400 transition-all duration-700"
+                                  style={{ width: `${Math.min(p.dependency_pct, 100)}%` }}
+                                />
+                              </div>
+                              {isPro && p.export_usd != null && p.import_usd != null && (
+                                <span className="text-[7px] text-muted-foreground shrink-0">
+                                  ↑{formatTradeVolume(p.export_usd)} ↓{formatTradeVolume(p.import_usd)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </ProDemoWrapper>

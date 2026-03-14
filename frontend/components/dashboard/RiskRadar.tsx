@@ -33,13 +33,13 @@ export function RiskRadar({ data, lang }: Props) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="w-[160px] h-[160px]">
+      <div className="w-[130px] h-[130px]">
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="75%">
+          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
             <PolarGrid stroke="rgba(156,163,175,0.15)" />
             <PolarAngleAxis
               dataKey="axis"
-              tick={{ fontSize: 8, fill: "rgba(156,163,175,0.7)" }}
+              tick={{ fontSize: 7, fill: "rgba(156,163,175,0.7)" }}
             />
             <Radar
               name="prev"
@@ -59,11 +59,11 @@ export function RiskRadar({ data, lang }: Props) {
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center gap-1.5 mt-0.5">
-        <span className="text-[8px] text-muted-foreground/50">
+      <div className="flex items-center gap-1 mt-0.5">
+        <span className="text-[7px] text-muted-foreground/50">
           {t(lang, "dash_radar_vs_prev" as TranslationKey)}
         </span>
-        <span className={`text-[9px] font-bold ${trendColor}`}>
+        <span className={`text-[8px] font-bold ${trendColor}`}>
           {t(lang, trendKey)}
         </span>
       </div>
