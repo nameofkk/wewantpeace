@@ -321,7 +321,7 @@ async def get_impact_brief(
     lang = "ko"  # default
     from backend.app.models.user import UserPreference
     pref_q = await db.execute(
-        select(UserPreference.lang).where(UserPreference.user_id == user.id)
+        select(UserPreference.language).where(UserPreference.user_id == user.id)
     )
     pref_lang = pref_q.scalar_one_or_none()
     if pref_lang:
@@ -712,7 +712,7 @@ async def get_sector_analysis(
     lang = "ko"
     from backend.app.models.user import UserPreference
     pref_q = await db.execute(
-        select(UserPreference.lang).where(UserPreference.user_id == user.id)
+        select(UserPreference.language).where(UserPreference.user_id == user.id)
     )
     pref_lang = pref_q.scalar_one_or_none()
     if pref_lang:
@@ -782,7 +782,7 @@ async def get_weekly_report(
     lang = "ko"
     from backend.app.models.user import UserPreference
     pref_q = await db.execute(
-        select(UserPreference.lang).where(UserPreference.user_id == user.id)
+        select(UserPreference.language).where(UserPreference.user_id == user.id)
     )
     pref_lang = pref_q.scalar_one_or_none()
     if pref_lang:
