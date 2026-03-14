@@ -474,6 +474,11 @@ export interface ImpactSummaryTopIssue {
   confidence: number;
   first_event_at?: string | null;
   last_event_at?: string | null;
+  entity_anchor?: string | null;
+  body_snippet?: string | null;
+  what_line?: string | null;
+  so_what_line?: string | null;
+  when_line?: string | null;
 }
 
 export interface CommoditySnapshot {
@@ -541,6 +546,39 @@ export interface ImpactSummary {
   market_snapshot?: MarketSnapshot | null;
   trade_exposure?: TradeExposure | null;
   travel_advisories?: TravelAlert[];
+  risk_radar?: RiskRadarOut | null;
+  impact_flow?: ImpactFlowOut | null;
+}
+
+export interface RiskRadarAxis {
+  axis: string;
+  value: number;
+  prev_value: number;
+  label_ko: string;
+  label_en: string;
+}
+
+export interface RiskRadarOut {
+  axes: RiskRadarAxis[];
+  overall_trend: string;
+}
+
+export interface ImpactFlowNode {
+  id: string;
+  label: string;
+  color: string;
+  category: string;
+}
+
+export interface ImpactFlowLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface ImpactFlowOut {
+  nodes: ImpactFlowNode[];
+  links: ImpactFlowLink[];
 }
 
 export function useImpactSummary(homeCountry?: string, enabled = true) {

@@ -1427,6 +1427,40 @@ export const translations = {
     dash_badge_verified: "검증됨",
     dash_trade_surplus: "순수출",
     dash_trade_deficit: "순수입",
+
+    // Smart Summary
+    dash_smart_what: "무슨 일?",
+    dash_smart_so_what: "나에게?",
+    dash_smart_when: "언제?",
+    dash_smart_detail: "상세 요약",
+
+    // Risk Radar
+    dash_radar_title: "리스크 레이더",
+    dash_radar_military: "군사",
+    dash_radar_energy: "에너지",
+    dash_radar_trade: "무역",
+    dash_radar_food: "식량",
+    dash_radar_finance: "금융",
+    dash_radar_vs_prev: "vs 지난주",
+    dash_radar_improving: "개선",
+    dash_radar_deteriorating: "악화",
+    dash_radar_stable: "유지",
+
+    // Impact Flow
+    dash_flow_title: "영향 흐름",
+    dash_flow_desc: "분쟁이 내 생활비에 미치는 경로",
+
+    // Pro Demo CTAs
+    dash_pro_demo_trade: "Pro로 교역 파트너 {n}개국 더 보기",
+    dash_pro_demo_analysis: "Pro로 전체 분석 보기",
+    dash_pro_demo_flow: "Pro로 영향 흐름 전체 보기",
+    dash_pro_demo_detail: "Pro로 {n}개 인사이트 더 보기",
+
+    // Data Dashboard
+    dash_tab_detail: "상세분석",
+    dash_trade_export: "수출",
+    dash_trade_import: "수입",
+
     ob_home_country_title: "나의 국가",
     ob_home_country_desc: "글로벌 이슈가 내 나라에 미치는 영향을 확인하세요",
     ob_home_country_other: "다른 국가 선택",
@@ -2855,6 +2889,40 @@ export const translations = {
     dash_badge_verified: "Verified",
     dash_trade_surplus: "Surplus",
     dash_trade_deficit: "Deficit",
+
+    // Smart Summary
+    dash_smart_what: "What happened?",
+    dash_smart_so_what: "Impact on me?",
+    dash_smart_when: "When?",
+    dash_smart_detail: "Details",
+
+    // Risk Radar
+    dash_radar_title: "Risk Radar",
+    dash_radar_military: "Military",
+    dash_radar_energy: "Energy",
+    dash_radar_trade: "Trade",
+    dash_radar_food: "Food",
+    dash_radar_finance: "Finance",
+    dash_radar_vs_prev: "vs last week",
+    dash_radar_improving: "Improving",
+    dash_radar_deteriorating: "Worsening",
+    dash_radar_stable: "Stable",
+
+    // Impact Flow
+    dash_flow_title: "Impact Flow",
+    dash_flow_desc: "How conflicts affect your daily costs",
+
+    // Pro Demo CTAs
+    dash_pro_demo_trade: "See {n} more partners with Pro",
+    dash_pro_demo_analysis: "View full analysis with Pro",
+    dash_pro_demo_flow: "See complete impact flow with Pro",
+    dash_pro_demo_detail: "Unlock {n} more insights with Pro",
+
+    // Data Dashboard
+    dash_tab_detail: "Analysis",
+    dash_trade_export: "Export",
+    dash_trade_import: "Import",
+
     ob_home_country_title: "My Country",
     ob_home_country_desc: "See how global issues impact your country",
     ob_home_country_other: "Choose another country",

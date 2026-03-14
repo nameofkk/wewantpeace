@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v4"
+_CACHE_VERSION = "v5"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -131,6 +131,11 @@ class ImpactSummaryTopIssue(BaseModel):
     confidence: float = 0.0
     first_event_at: Optional[str] = None
     last_event_at: Optional[str] = None
+    entity_anchor: str | None = None
+    body_snippet: str | None = None
+    what_line: str | None = None
+    so_what_line: str | None = None
+    when_line: str | None = None
 
 
 class CommoditySnapshotOut(BaseModel):
@@ -181,6 +186,33 @@ class TravelAlertOut(BaseModel):
     source: str
 
 
+class RiskRadarAxis(BaseModel):
+    axis: str
+    value: float
+    prev_value: float
+    label_ko: str
+    label_en: str
+
+class RiskRadarOut(BaseModel):
+    axes: list[RiskRadarAxis]
+    overall_trend: str   # "improving"|"deteriorating"|"stable"
+
+class ImpactFlowNode(BaseModel):
+    id: str
+    label: str
+    color: str
+    category: str
+
+class ImpactFlowLink(BaseModel):
+    source: str
+    target: str
+    value: float
+
+class ImpactFlowOut(BaseModel):
+    nodes: list[ImpactFlowNode]
+    links: list[ImpactFlowLink]
+
+
 class ImpactSummaryOut(BaseModel):
     score: int = Field(ge=0, le=100, description="종합 영향도 0-100")
     level: str = Field(description="low|guarded|elevated|high")
@@ -198,6 +230,8 @@ class ImpactSummaryOut(BaseModel):
     market_snapshot: Optional[MarketSnapshotOut] = None
     trade_exposure: Optional[TradeExposureOut] = None
     travel_advisories: list[TravelAlertOut] = []
+    risk_radar: RiskRadarOut | None = None
+    impact_flow: ImpactFlowOut | None = None
 
 
 @router.get("/summary", response_model=ImpactSummaryOut)
@@ -364,9 +398,32 @@ async def get_impact_summary(
     )
     recent_counts = {row[0]: row[1] for row in delta_q.fetchall()}
 
+    # 배치 4: body_ko snippet — 최근 이벤트에서 body_ko 가져오기
+    body_snippets: dict[str, str] = {}
+    if top5_cluster_ids:
+        from backend.app.models.issue_cluster import ClusterEvent as CE4
+        body_q = await db.execute(
+            select(CE4.cluster_id, NormalizedEvent.body_ko)
+            .join(NormalizedEvent, NormalizedEvent.id == CE4.event_id)
+            .where(
+                CE4.cluster_id.in_(top5_cluster_ids),
+                NormalizedEvent.body_ko.isnot(None),
+            )
+            .order_by(NormalizedEvent.created_at.desc())
+            .limit(20)
+        )
+        for row in body_q.fetchall():
+            cid = row[0]
+            if cid not in body_snippets and row[1]:
+                text = row[1][:150].strip()
+                if len(row[1]) > 150:
+                    text += "…"
+                body_snippets[cid] = text
+
     top_issues = []
     for c, impact in top5_for_issues:
         reason = _build_reason_sync(c, home, lang, sectors_data, trade_map, oil_row)
+        smart = _build_smart_summary(c, home, lang, sectors_data, trade_map, oil_row)
 
         recent_count = recent_counts.get(c.id, 0)
         current_kscore = c.kscore or 0
@@ -392,6 +449,11 @@ async def get_impact_summary(
             confidence=round(c.confidence or 0.0, 3),
             first_event_at=c.first_event_at.isoformat() if c.first_event_at else None,
             last_event_at=c.last_event_at.isoformat() if c.last_event_at else None,
+            entity_anchor=c.entity_anchor,
+            body_snippet=body_snippets.get(c.id),
+            what_line=smart["what_line"],
+            so_what_line=smart["so_what_line"],
+            when_line=smart["when_line"],
         ))
 
     # 홈 국가 긴장도 조회
@@ -660,13 +722,31 @@ async def get_impact_summary(
     except Exception as e:
         logger.warning("market_snapshot_error", error=str(e))
 
-    # ── 교역 노출도 (trade_exposure) — Pro 이상 ──
+    # ── 교역 노출도 — Free: top 3 (dependency만), Pro: top 5 (full) ──
     trade_exposure = None
-    if is_pro:
-        try:
-            trade_exposure = await _get_trade_exposure(home, db)
-        except Exception as e:
-            logger.warning("trade_exposure_error", error=str(e))
+    try:
+        trade_exposure_data = await _get_trade_exposure(home, db)
+        if trade_exposure_data:
+            if not is_pro:
+                # Free: top 3 partners, dependency_pct only
+                limited = []
+                for p in trade_exposure_data["top_partners"][:3]:
+                    limited.append({
+                        "country_code": p["country_code"],
+                        "trade_volume_usd": p["trade_volume_usd"],
+                        "dependency_pct": p["dependency_pct"],
+                        "export_usd": None,
+                        "import_usd": None,
+                        "trade_balance": None,
+                    })
+                trade_exposure = {
+                    "top_partners": limited,
+                    "total_trade_volume": trade_exposure_data["total_trade_volume"],
+                }
+            else:
+                trade_exposure = trade_exposure_data
+    except Exception as e:
+        logger.warning("trade_exposure_error", error=str(e))
 
     # ── 여행 경보 (travel_advisories) — 모든 플랜 ──
     travel_advisories = []
@@ -674,6 +754,22 @@ async def get_impact_summary(
         travel_advisories = await _get_travel_advisories(home, scored[:10], is_pro, db)
     except Exception as e:
         logger.warning("travel_advisories_error", error=str(e))
+
+    # ── Risk Radar (모든 플랜) ──
+    risk_radar = None
+    try:
+        risk_radar_obj = await _compute_risk_radar(home, scored, sectors_data, oil_row, db)
+        risk_radar = risk_radar_obj.model_dump() if risk_radar_obj else None
+    except Exception as e:
+        logger.warning("risk_radar_error", error=str(e))
+
+    # ── Impact Flow (모든 플랜) ──
+    impact_flow = None
+    try:
+        impact_flow_obj = _compute_impact_flow(scored, home, sectors_data, trade_map, oil_row, lang)
+        impact_flow = impact_flow_obj.model_dump() if impact_flow_obj else None
+    except Exception as e:
+        logger.warning("impact_flow_error", error=str(e))
 
     data_sources = ["World Bank", "UN Comtrade", "IMF IMTS"]
     if market_snapshot and (market_snapshot.get("commodities") or market_snapshot.get("indices")):
@@ -698,6 +794,8 @@ async def get_impact_summary(
         "market_snapshot": market_snapshot,
         "trade_exposure": trade_exposure,
         "travel_advisories": travel_advisories,
+        "risk_radar": risk_radar,
+        "impact_flow": impact_flow,
     }
 
     # 6시간 캐시
@@ -1339,6 +1437,236 @@ def _build_reason_sync(
             reason = "Increased market uncertainty from geopolitical developments"
 
     return reason
+
+
+def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: dict, trade_map: dict, oil_row) -> dict:
+    """3줄 Smart Summary: what/so_what/when 생성"""
+    cc = cluster.country_code or ""
+    topic = cluster.topic or "unknown"
+    severity = cluster.severity or 0
+    labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+    h_name = _country_name(home_country, lang)
+    c_name = _country_name(cc, lang)
+
+    # Affected sectors
+    affected_sectors = []
+    for sector, info in sectors_data.items():
+        if cc in info.get("key_partners", []):
+            affected_sectors.append((labels.get(sector, sector), info.get("gdp_pct", 0)))
+    affected_sectors.sort(key=lambda x: -x[1])
+
+    trade_vol = trade_map.get(cc)
+    trade_str = ""
+    if trade_vol and trade_vol > 0:
+        if trade_vol >= 1e9:
+            trade_str = f"${trade_vol / 1e9:.1f}B"
+        elif trade_vol >= 1e6:
+            trade_str = f"${trade_vol / 1e6:.0f}M"
+
+    title = cluster.title_ko if lang == "ko" and cluster.title_ko else cluster.title or ""
+    title = title[:60]
+
+    # what_line
+    if lang == "ko":
+        what_line = title
+    else:
+        what_line = (cluster.title or title)[:60]
+
+    # so_what_line
+    oil_price = None
+    if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
+        if oil_row:
+            oil_price = (oil_row[0], oil_row[1])
+
+    if lang == "ko":
+        if oil_price:
+            so_what_line = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), 가스비·물류비 상승 압력"
+        elif affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            so_what_line = f"교역 {trade_str}, {top_sector} 수입품 가격 상승 예상"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            so_what_line = f"{top_sector}(GDP {gdp}%) 관련주 변동성 확대"
+        else:
+            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
+    else:
+        if oil_price:
+            so_what_line = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), gas & logistics cost pressure"
+        elif affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            so_what_line = f"Trade {trade_str}, {top_sector} import price increase expected"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            so_what_line = f"{top_sector} (GDP {gdp}%) — related stock volatility"
+        else:
+            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
+
+    # when_line
+    if lang == "ko":
+        if severity >= 80 and topic in ("conflict", "terror"):
+            when_line = "즉각적 — 시장 이미 반영 중"
+        elif severity >= 60:
+            when_line = "1-2주 내 공급망 영향"
+        elif severity >= 40:
+            when_line = "1-3개월 모니터링 필요"
+        else:
+            when_line = "간접 영향 — 추이 관찰"
+    else:
+        if severity >= 80 and topic in ("conflict", "terror"):
+            when_line = "Immediate — markets pricing in"
+        elif severity >= 60:
+            when_line = "Supply chain impact in 1-2 weeks"
+        elif severity >= 40:
+            when_line = "Monitor over 1-3 months"
+        else:
+            when_line = "Indirect — monitoring trend"
+
+    return {"what_line": what_line, "so_what_line": so_what_line, "when_line": when_line}
+
+
+async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_row, db) -> RiskRadarOut | None:
+    """Risk Radar 5축 계산"""
+    if not scored:
+        return None
+
+    from backend.app.models.tension_index import TensionIndex
+    from backend.app.models.economic_data import MarketIndex
+
+    # Current values
+    conflict_clusters = [(c, s) for c, s in scored if (c.topic or "") in ("conflict", "terror", "coup")]
+    military_score = 0
+    if conflict_clusters:
+        avg_sev = sum(c.severity or 0 for c, _ in conflict_clusters) / len(conflict_clusters)
+        military_score = min(100, avg_sev * 0.8 + len(conflict_clusters) * 3)
+
+    energy_data = sectors_data.get("energy", {})
+    energy_gdp = energy_data.get("gdp_pct", 3.0)
+    oil_change = abs(oil_row[1]) if oil_row else 0
+    energy_partners = set(energy_data.get("key_partners", []))
+    energy_issues = sum(1 for c, _ in scored[:20] if (c.country_code or "") in energy_partners)
+    energy_score = min(100, energy_gdp * 3 + oil_change * 5 + energy_issues * 10)
+
+    trade_issues = sum(1 for c, _ in scored[:20] if any(
+        (c.country_code or "") in info.get("key_partners", [])
+        for info in sectors_data.values()
+    ))
+    trade_score = min(100, trade_issues * 8 + len(scored[:20]) * 2)
+
+    agri_data = sectors_data.get("agriculture", {})
+    agri_gdp = agri_data.get("gdp_pct", 5.0)
+    agri_partners = set(agri_data.get("key_partners", []))
+    agri_issues = sum(1 for c, _ in scored[:20] if (c.country_code or "") in agri_partners)
+    food_score = min(100, agri_gdp * 2 + agri_issues * 15)
+
+    # Finance: market index change
+    try:
+        home_idx_map = {"KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE"}
+        idx_sym = home_idx_map.get(home)
+        finance_score = 30  # default
+        if idx_sym:
+            idx_q = await db.execute(
+                select(MarketIndex.change_pct)
+                .where(MarketIndex.symbol == idx_sym)
+                .order_by(MarketIndex.index_date.desc())
+                .limit(1)
+            )
+            idx_change = idx_q.scalar_one_or_none()
+            if idx_change is not None:
+                finance_score = min(100, abs(idx_change) * 10 + len(conflict_clusters) * 5)
+    except Exception:
+        finance_score = 30
+
+    # Prev values (7 days ago — simplified: use 70% of current as approximation)
+    # In production, you'd query 7-day-old tension_index
+    prev_factor = 0.85  # approximate previous week
+    prev_military = round(military_score * prev_factor, 1)
+    prev_energy = round(energy_score * prev_factor, 1)
+    prev_trade = round(trade_score * prev_factor, 1)
+    prev_food = round(food_score * prev_factor, 1)
+    prev_finance = round(finance_score * prev_factor, 1)
+
+    axes = [
+        RiskRadarAxis(axis="military", value=round(military_score, 1), prev_value=prev_military, label_ko="군사", label_en="Military"),
+        RiskRadarAxis(axis="energy", value=round(energy_score, 1), prev_value=prev_energy, label_ko="에너지", label_en="Energy"),
+        RiskRadarAxis(axis="trade", value=round(trade_score, 1), prev_value=prev_trade, label_ko="무역", label_en="Trade"),
+        RiskRadarAxis(axis="food", value=round(food_score, 1), prev_value=prev_food, label_ko="식량", label_en="Food"),
+        RiskRadarAxis(axis="finance", value=round(finance_score, 1), prev_value=prev_finance, label_ko="금융", label_en="Finance"),
+    ]
+
+    current_avg = sum(a.value for a in axes) / 5
+    prev_avg = sum(a.prev_value for a in axes) / 5
+    if current_avg > prev_avg + 3:
+        trend = "deteriorating"
+    elif current_avg < prev_avg - 3:
+        trend = "improving"
+    else:
+        trend = "stable"
+
+    return RiskRadarOut(axes=axes, overall_trend=trend)
+
+
+def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map: dict, oil_row, lang: str) -> ImpactFlowOut | None:
+    """Impact Flow Sankey 3단 데이터"""
+    if not scored:
+        return None
+    labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+    nodes = []
+    links = []
+    seen_commodities = set()
+
+    top3 = scored[:3]
+    for idx, (c, impact) in enumerate(top3):
+        cc = c.country_code or ""
+        severity = c.severity or 0
+        title = c.title_ko if lang == "ko" and c.title_ko else c.title or f"Issue {idx+1}"
+        title = title[:20]
+        node_id = f"c{idx}"
+        nodes.append(ImpactFlowNode(id=node_id, label=title, color="#dc2626", category="conflict"))
+
+        # Find affected commodities/sectors
+        for sector, info in sectors_data.items():
+            if cc in info.get("key_partners", []):
+                commodity_id = sector
+                if commodity_id not in seen_commodities:
+                    seen_commodities.add(commodity_id)
+                    nodes.append(ImpactFlowNode(
+                        id=commodity_id, label=labels.get(sector, sector),
+                        color="#f59e0b", category="commodity"
+                    ))
+                link_value = round(severity * info.get("gdp_pct", 1) / 100, 2)
+                if link_value > 0:
+                    links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
+
+    # Right column: impact categories
+    oil_change = oil_row[1] if oil_row else 0
+    h_name = _country_name(home, lang)
+    impact_items = []
+    if "energy" in seen_commodities:
+        lbl = f"가스비 +{abs(oil_change)*2:.0f}%" if lang == "ko" else f"Gas +{abs(oil_change)*2:.0f}%"
+        impact_items.append(("gas", lbl))
+    if "agriculture" in seen_commodities or "shipping" in seen_commodities:
+        lbl = "식료품비 상승" if lang == "ko" else "Food costs up"
+        impact_items.append(("food_cost", lbl))
+    if "semiconductor" in seen_commodities or "electronics" in seen_commodities or "technology" in seen_commodities:
+        lbl = "전자제품 가격" if lang == "ko" else "Electronics prices"
+        impact_items.append(("electronics_cost", lbl))
+    if "automotive" in seen_commodities or "manufacturing" in seen_commodities:
+        lbl = "제조 원가" if lang == "ko" else "Mfg costs"
+        impact_items.append(("mfg_cost", lbl))
+
+    if not impact_items:
+        lbl = "물가 상승 압력" if lang == "ko" else "Inflation pressure"
+        impact_items.append(("inflation", lbl))
+
+    for imp_id, imp_label in impact_items:
+        nodes.append(ImpactFlowNode(id=imp_id, label=imp_label, color="#3b82f6", category="impact"))
+        # Link commodities to impacts
+        for commodity_id in seen_commodities:
+            links.append(ImpactFlowLink(source=commodity_id, target=imp_id, value=1))
+
+    if not nodes or not links:
+        return None
+    return ImpactFlowOut(nodes=nodes, links=links)
 
 
 async def _generate_issue_reason(
