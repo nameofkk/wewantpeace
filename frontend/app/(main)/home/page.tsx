@@ -815,7 +815,7 @@ function ReportContent() {
 
                   {/* ── 경제 영향 ── */}
                   {summary?.economy && (
-                    <div className="rounded-lg border-l-2 border-blue-400 bg-blue-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "400ms" } as React.CSSProperties>
+                    <div className="rounded-lg border-l-2 border-blue-400 bg-blue-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "400ms" } as React.CSSProperties}>
                       <div className="flex items-center gap-2 mb-2">
                         <Briefcase className="h-3.5 w-3.5 shrink-0 text-blue-400" />
                         <span className="text-[10px] font-bold text-blue-400">{t(lang, "dash_pro_economy")}</span>
@@ -859,7 +859,7 @@ function ReportContent() {
 
                   {/* ── 교역 영향 ── */}
                   {summary?.trade && (
-                    <div className="rounded-lg border-l-2 border-orange-400 bg-orange-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "480ms" } as React.CSSProperties>
+                    <div className="rounded-lg border-l-2 border-orange-400 bg-orange-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "480ms" } as React.CSSProperties}>
                       <div className="flex items-center gap-2 mb-2">
                         <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-orange-400" />
                         <span className="text-[10px] font-bold text-orange-400">{t(lang, "dash_pro_trade")}</span>
@@ -893,7 +893,7 @@ function ReportContent() {
 
                   {/* ── 여행 안전 ── */}
                   {summary?.travel && (
-                    <div className="rounded-lg border-l-2 border-emerald-400 bg-emerald-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "560ms" } as React.CSSProperties>
+                    <div className="rounded-lg border-l-2 border-emerald-400 bg-emerald-500/[0.03] p-3 stagger-item" style={{ "--stagger-delay": "560ms" } as React.CSSProperties}>
                       <div className="flex items-center gap-2 mb-2">
                         <Plane className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                         <span className="text-[10px] font-bold text-emerald-400">{t(lang, "dash_pro_travel")}</span>
