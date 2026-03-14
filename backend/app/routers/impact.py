@@ -183,7 +183,7 @@ async def get_impact_summary(
     user_plan = user.plan or "free"
 
     # 캐시 확인 (plan별로 — Pro가 상세 정보 포함하므로)
-    redis = await get_redis()
+    redis = get_redis()
     cache_key = f"impact:summary:{home}:{user_plan}"
     if redis:
         cached = await redis.get(cache_key)
@@ -761,7 +761,7 @@ async def get_impact_brief(
 ):
     """이슈의 경제/무역/여행 영향 분석 (Pro 이상)"""
     # 캐시 확인
-    redis = await get_redis()
+    redis = get_redis()
     cache_key = _brief_cache_key(cluster_id, user.home_country or "KR")
     if redis:
         cached = await redis.get(cache_key)
@@ -1419,7 +1419,7 @@ async def get_sector_analysis(
     db: AsyncSession = Depends(get_db),
 ):
     """섹터별 영향도 분석 (Pro+ 이상)"""
-    redis = await get_redis()
+    redis = get_redis()
     home = user.home_country or "KR"
     cache_key = f"impact:sector:{cluster_id}:{home}"
 
@@ -1749,7 +1749,7 @@ async def get_trade_flow(
     DB에 실제 교역 데이터가 있으면 사용, 없으면 SECTOR_DATA 기반 추정.
     """
     home = user.home_country or "KR"
-    redis = await get_redis()
+    redis = get_redis()
     cache_key = f"impact:trade-flow:{home}"
 
     if redis:
