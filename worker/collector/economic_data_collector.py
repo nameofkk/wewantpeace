@@ -545,6 +545,34 @@ _US_LEVEL_NAMES = {
     4: "Do Not Travel",
 }
 
+# US State Dept FIPS 10-4 → ISO 3166-1 alpha-2 변환
+# API가 FIPS 코드를 사용하므로 ISO로 변환 필요
+_FIPS_TO_ISO = {
+    "AJ": "AZ", "AS": "AU", "BG": "BD", "BH": "BZ", "BK": "BA",
+    "BL": "BO", "BM": "MM", "BN": "BJ", "BO": "BY", "BP": "SB",
+    "BU": "BG", "BX": "BN", "BY": "BI", "CB": "KH", "CD": "TD",
+    "CE": "LK", "CF": "CG", "CG": "CD", "CH": "CN", "CI": "CL",
+    "CN": "KM", "CS": "CR", "CT": "CF", "DA": "DK", "DR": "DO",
+    "EI": "IE", "EK": "GQ", "EN": "EE", "ES": "SV", "EZ": "CZ",
+    "FP": "PF", "GA": "GM", "GB": "GA", "GG": "GE", "GJ": "GD",
+    "GM": "DE", "GV": "GN", "HA": "HT", "HO": "HN", "IC": "IS",
+    "IV": "CI", "IZ": "IQ", "JA": "JP", "KN": "KP", "KR": "KI",
+    "KS": "KR", "KU": "KW", "KV": "XK", "LE": "LB", "LG": "LV",
+    "LH": "LT", "LI": "LR", "LO": "SK", "LT": "LS", "MA": "MG",
+    "MG": "MN", "MH": "MS", "MI": "MW", "MJ": "ME", "MO": "MA",
+    "MP": "MU", "MU": "OM", "NG": "NE", "NH": "VU", "NI": "NG",
+    "NN": "SX", "NS": "SR", "NU": "NI", "OD": "SS", "PA": "PY",
+    "PM": "PA", "PO": "PT", "PP": "PG", "PS": "PW", "RI": "RS",
+    "RM": "MH", "RP": "PH", "RS": "RU", "SC": "KN", "SE": "SC",
+    "SF": "ZA", "SN": "SG", "SP": "ES", "SR": "CH", "ST": "LC",
+    "SU": "SD", "SW": "SE", "TD": "TT", "TI": "TJ", "TK": "TC",
+    "TN": "TO", "TO": "TG", "TP": "ST", "TS": "TN", "TT": "TL",
+    "TU": "TR", "TX": "TM", "UC": "CW", "UK": "GB", "UP": "UA",
+    "UV": "BF", "VM": "VN", "WA": "NA", "WZ": "SZ", "ZA": "ZM",
+    "ZI": "ZW", "AA": "AW", "AV": "AI", "BD": "BM", "BF": "BS",
+    "CJ": "KY", "DO": "DM", "VI": "VG",
+}
+
 
 async def collect_travel_advisories_structured(db: AsyncSession) -> int:
     """US State Department Travel Advisory를 구조화된 형태로 저장.
@@ -572,18 +600,26 @@ async def collect_travel_advisories_structured(db: AsyncSession) -> int:
             return 0
 
         for adv in advisories:
-            # 국가 코드 추출
+            # 국가 코드 추출 — API 형식: Category: ["SA"] 또는 iso_code/CountryCode
             cc = adv.get("iso_code") or adv.get("country_iso") or adv.get("CountryCode", "")
-            if not cc or len(cc) != 2:
-                # Title에서 추출 시도는 건너뛰고 다음으로
+            if not cc:
+                # Category 배열에서 추출 (US State Dept 실제 API 형식)
+                cats = adv.get("Category") or adv.get("category")
+                if isinstance(cats, list) and cats:
+                    cc = cats[0]
+                elif isinstance(cats, str):
+                    cc = cats
+            if not cc or len(cc) < 2:
                 continue
 
-            cc = cc.upper()
+            cc = cc.upper()[:2]
+            # FIPS 10-4 → ISO 3166-1 alpha-2 변환
+            cc = _FIPS_TO_ISO.get(cc, cc)
 
-            # Level 추출
+            # Level 추출 — API 형식: Title: "Country - Level 3: Reconsider Travel"
             level = adv.get("advisory_level") or adv.get("AdvisoryLevel")
             if level is None:
-                title_text = adv.get("advisory_text") or adv.get("Title") or ""
+                title_text = adv.get("Title") or adv.get("advisory_text") or adv.get("title") or ""
                 m = re.search(r"Level\s+(\d)", title_text)
                 if m:
                     level = int(m.group(1))
