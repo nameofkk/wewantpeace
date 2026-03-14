@@ -270,25 +270,99 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
         except Exception as e:
             logger.error("impact_brief_ai_error", error=str(e), cluster_id=str(cluster.id))
 
-    # Fallback: 규칙 기반 간단 분석 (개인화된 impact score 사용)
+    # Fallback: 규칙 기반 분석 (실제 데이터 포인트 반영)
     severity = cluster.severity or 0
     score = impact_score
+
+    # 실제 교역 데이터 파싱
+    trade_vol_str = ""
+    gdp_str = ""
+    for line in trade_context.split("\n"):
+        if "Bilateral trade" in line:
+            trade_vol_str = line.split(": ")[-1] if ": " in line else ""
+        if f"{home_country} GDP" in line:
+            gdp_str = line.split(": ")[-1] if ": " in line else ""
+
+    sectors_affected = [s.split(" (")[0].strip("- ") for s in related_sectors]
+    sectors_str = ", ".join(sectors_affected[:3]) if sectors_affected else ""
+
+    tension_label = (
+        "극심" if tension_score >= 80 else
+        "심각" if tension_score >= 60 else
+        "경계" if tension_score >= 40 else
+        "주의" if tension_score >= 20 else "안정"
+    )
+    tension_label_en = (
+        "extreme" if tension_score >= 80 else
+        "severe" if tension_score >= 60 else
+        "elevated" if tension_score >= 40 else
+        "guarded" if tension_score >= 20 else "stable"
+    )
+
     if lang == "ko":
+        economy = f"{country_code} 지역 긴장도 {tension_score:.0f}/100({tension_label}). "
+        if trade_vol_str:
+            economy += f"양자 교역 규모 {trade_vol_str}. "
+        economy += f"에너지·원자재 가격 변동 및 환율 영향 가능성."
+
+        trade = ""
+        if sectors_str:
+            trade = f"{home_country}의 {sectors_str} 분야가 영향권. "
+        if trade_vol_str:
+            trade += f"교역 규모 {trade_vol_str}으로 공급망 차질 모니터링 필요."
+        else:
+            trade += f"해당 지역과 직접 교역 비중은 낮으나 간접 파급 주의."
+
+        travel = f"해당 지역 여행 주의 (심각도 {severity}/100). "
+        if tension_score >= 60:
+            travel += "항공편 변동·경유 제한 가능성 높음."
+        else:
+            travel += "현지 안전 공지 확인 권장."
+
+        summary = f"{cluster_title[:50]} — {home_country} 영향도 {score}/100"
+        if sectors_str:
+            summary += f" ({sectors_str} 영향)"
+
         return {
-            "economy": f"해당 분쟁은 {country_code} 지역의 경제 안정성에 영향을 줄 수 있으며, 에너지 및 원자재 가격 변동 가능성이 있습니다.",
-            "trade": f"관련 지역과의 교역에 잠재적 영향이 예상되며, 공급망 차질 가능성을 모니터링해야 합니다.",
-            "travel": f"해당 지역 여행 시 안전 주의가 필요하며, 항공편 변동 가능성이 있습니다.",
-            "summary": f"심각도 {severity}/100 수준의 분쟁으로, 경제·무역·여행 측면에서 주의가 필요합니다.",
+            "economy": economy,
+            "trade": trade,
+            "travel": travel,
+            "summary": summary,
             "score": score,
-            "data_sources": ["World Bank", "UN OCHA"],
+            "data_sources": ["World Bank", "UN Comtrade", "IMF IMTS"],
         }
+
+    # English
+    economy = f"{country_code} tension at {tension_score:.0f}/100 ({tension_label_en}). "
+    if trade_vol_str:
+        economy += f"Bilateral trade volume: {trade_vol_str}. "
+    economy += "Potential impact on energy, commodities and FX."
+
+    trade = ""
+    if sectors_str:
+        trade = f"{home_country}'s {sectors_str} sectors exposed. "
+    if trade_vol_str:
+        trade += f"Trade volume {trade_vol_str} — monitor supply chain disruptions."
+    else:
+        trade += "Low direct trade exposure; watch for indirect spillover."
+
+    travel = f"Exercise caution (severity {severity}/100). "
+    if tension_score >= 60:
+        travel += "High likelihood of flight disruptions and transit restrictions."
+    else:
+        travel += "Check local advisories before traveling."
+
+    summary = f"{cluster_title[:50]} — Impact on {home_country}: {score}/100"
+    if sectors_str:
+        summary += f" ({sectors_str} exposed)"
+
     return {
-        "economy": f"This conflict may affect economic stability in the {country_code} region, with potential energy and commodity price volatility.",
-        "trade": f"Potential impact on trade with the affected region. Supply chain disruptions should be monitored.",
-        "travel": f"Exercise caution when traveling to the area. Flight disruptions possible.",
-        "summary": f"Severity {severity}/100 conflict requiring attention across economy, trade, and travel.",
+        "economy": economy,
+        "trade": trade,
+        "travel": travel,
+        "summary": summary,
         "score": score,
-        "data_sources": ["World Bank", "UN OCHA"],
+        "data_sources": ["World Bank", "UN Comtrade", "IMF IMTS"],
     }
 
 
@@ -1055,28 +1129,36 @@ async def get_trade_flow(
         pass
 
     if real_data_found and trade_rows:
+        # 수출(home→partner)과 수입(partner→home)을 3-column Sankey로 표현
+        # 왼쪽: home_export / 가운데: partners / 오른쪽: home_import
+        export_node = f"{home}_EXP"
+        import_node = f"{home}_IMP"
+        nodes_map[export_node] = export_node
+        nodes_map[import_node] = import_node
+
         for row in trade_rows:
             partner = row[0]
             export_val = row[1] or 0
             import_val = row[2] or 0
             if export_val <= 0 and import_val <= 0:
                 continue
-            nodes_map[home] = home
+            export_m = round(export_val / 1e6, 1)
+            import_m = round(import_val / 1e6, 1)
             nodes_map[partner] = partner
-            if export_val > 0:
+            if export_m > 0:
                 links.append({
-                    "source": home,
+                    "source": export_node,
                     "target": partner,
-                    "value": round(export_val, 1),
+                    "value": export_m,
                 })
-            if import_val > 0:
+            if import_m > 0:
                 links.append({
                     "source": partner,
-                    "target": home,
-                    "value": round(import_val, 1),
+                    "target": import_node,
+                    "value": import_m,
                 })
     else:
-        # Fallback: SECTOR_DATA 기반 추정
+        # Fallback: SECTOR_DATA 기반 추정 (백만달러 환산)
         sectors = SECTOR_DATA.get(home, DEFAULT_SECTORS)
         partner_totals: dict[str, float] = {}
 
@@ -1084,13 +1166,11 @@ async def get_trade_flow(
             gdp_pct = info["gdp_pct"]
             partners = info.get("key_partners", [])
             for i, partner in enumerate(partners[:5]):
-                # 순위별 가중치: 1위=40%, 2위=25%, 3위=15%, 4위=12%, 5위=8%
                 weights = [0.40, 0.25, 0.15, 0.12, 0.08]
                 weight = weights[i] if i < len(weights) else 0.05
                 val = gdp_pct * weight
                 partner_totals[partner] = partner_totals.get(partner, 0) + val
 
-        # 상위 10개 파트너
         sorted_partners = sorted(partner_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         nodes_map[home] = home
         for partner, val in sorted_partners:
