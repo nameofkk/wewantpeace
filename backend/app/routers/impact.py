@@ -204,6 +204,7 @@ class ImpactSummaryOut(BaseModel):
 async def get_impact_summary(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    home_country: str | None = Query(None, description="홈 국가 코드 (빈 문자열=글로벌)"),
 ):
     """홀리스틱 종합 영향도 (모든 플랜).
 
@@ -212,7 +213,11 @@ async def get_impact_summary(
     - Free: score + summary + top_issues_count
     - Pro/Pro+: economy/trade/travel 상세 분석 포함
     """
-    home = user.home_country or ""
+    # 프론트엔드에서 home_country 파라미터를 보내면 우선 사용
+    if home_country is not None:
+        home = home_country  # 빈 문자열 = 글로벌 모드
+    else:
+        home = user.home_country or ""
     is_global = not home
     user_plan = user.plan or "free"
 

@@ -543,10 +543,14 @@ export interface ImpactSummary {
   travel_advisories?: TravelAlert[];
 }
 
-export function useImpactSummary(enabled = true) {
+export function useImpactSummary(homeCountry?: string, enabled = true) {
   return useQuery({
-    queryKey: ["impact", "summary"],
-    queryFn: () => apiFetch<ImpactSummary>("/impact/summary"),
+    queryKey: ["impact", "summary", homeCountry ?? "db"],
+    queryFn: () =>
+      apiFetch<ImpactSummary>(
+        "/impact/summary",
+        homeCountry !== undefined ? { home_country: homeCountry } : undefined
+      ),
     enabled,
     staleTime: 30 * 60 * 1000,
     retry: false,

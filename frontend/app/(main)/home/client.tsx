@@ -145,7 +145,7 @@ function ReportContent() {
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
   // 데이터 훅 — 모두 병렬 실행
-  const { data: summary, isLoading: summaryLoading } = useImpactSummary();
+  const { data: summary, isLoading: summaryLoading } = useImpactSummary(homeCountry ?? "");
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
