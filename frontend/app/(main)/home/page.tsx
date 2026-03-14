@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useMemo, useEffect } from "react";
+import React, { Suspense, useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -48,6 +48,8 @@ import {
   Fuel,
   BarChart3,
   Globe2,
+  Zap,
+  ArrowRight,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -104,6 +106,24 @@ function formatTradeVolume(usd: number) {
   return `$${usd.toLocaleString()}`;
 }
 
+/* ───────────────────────── Impact Chain 유틸 ───────────────────────── */
+
+function getRelevantMarketData(issue: TrendingItem, market: MarketSnapshot | null | undefined) {
+  if (!market) return [];
+  const cc = issue.country_codes?.[0] ?? "";
+  if (["IL", "IR", "IQ", "SA", "SY", "LB", "YE"].includes(cc))
+    return market.commodities.filter((c) => ["WTI", "BRENT"].includes(c.symbol));
+  if (["CN", "TW", "JP", "KP", "KR"].includes(cc))
+    return market.indices.filter((i) => ["KOSPI", "NKY"].includes(i.symbol)).map((i) => ({
+      symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
+    }));
+  if (["UA", "RU", "DE", "FR", "GB"].includes(cc))
+    return market.indices.filter((i) => ["DAX", "FTSE"].includes(i.symbol)).map((i) => ({
+      symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
+    }));
+  return market.commodities.slice(0, 1);
+}
+
 /* ───────────────────────── 메인 리포트 ───────────────────────── */
 
 function ReportContent() {
@@ -123,6 +143,9 @@ function ReportContent() {
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
   const { data: clusterData } = useClusters({ limit: "2000" });
+
+  // Insight Tabs state
+  const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel">("market");
 
   // 트래킹
   const trackBehavior = useTrackBehavior();
@@ -185,6 +208,10 @@ function ReportContent() {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
+  // #1 이슈 데이터
+  const topIssue = topItems[0];
+  const restIssues = topItems.slice(1);
+
   return (
     <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
       {/* ──── Header ──── */}
@@ -215,42 +242,15 @@ function ReportContent() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-4 space-y-5">
 
-          {/* ═══════════════ SECTION 1: 종합 영향도 Hero ═══════════════ */}
+          {/* ═══════════════ SECTION 1: Compact Hero (영향도 + 긴장도 통합) ═══════════════ */}
           <section className="rounded-xl border border-border bg-card p-4 fade-in-up">
-            {/* 개인화 라벨 */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                {t(lang, "dash_personalized_for", { name: nickname })}
+            {/* Impact Score + Level + LIVE */}
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-3xl font-bold tabular-nums leading-none" style={{ color }}>
+                {Math.round(animatedImpact)}
               </span>
-              <span className="text-[9px] text-muted-foreground">
-                {t(lang, "dash_monitoring_worldwide")}
-              </span>
-            </div>
-
-            {/* Big Number + Gauge */}
-            <div className="flex items-center gap-4">
-              <div className="relative shrink-0">
-                {/* 원형 게이지 (SVG) */}
-                <svg width="80" height="80" viewBox="0 0 80 80" className="transform -rotate-90">
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="hsl(var(--muted) / 0.2)" strokeWidth="6" />
-                  <circle
-                    cx="40" cy="40" r="34" fill="none"
-                    stroke={color} strokeWidth="6"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(impactScore / 100) * 213.6} 213.6`}
-                    className="transition-all duration-1000 ease-out"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>
-                    {Math.round(animatedImpact)}
-                  </span>
-                  <span className="text-[8px] text-muted-foreground mt-0.5">/100</span>
-                </div>
-              </div>
-
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2">
                   <span
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{ color, backgroundColor: `${color}15` }}
@@ -261,75 +261,60 @@ function ReportContent() {
                     {t(lang, "dash_impact_score")}
                   </span>
                 </div>
-                <p className="text-[11px] text-foreground/80 leading-relaxed line-clamp-3">
-                  {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
-                </p>
               </div>
+              <span className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
+                <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                <span>LIVE</span>
+              </span>
             </div>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-2 mt-4">
-              <div className="rounded-lg bg-muted/15 px-3 py-2 text-center">
-                <p className="text-lg font-bold tabular-nums">{summary?.total_active_issues ?? 0}</p>
-                <p className="text-[9px] text-muted-foreground">{t(lang, "dash_active_issues")}</p>
-              </div>
-              <div className="rounded-lg bg-muted/15 px-3 py-2 text-center">
-                <p className="text-lg font-bold tabular-nums text-red-400">{summary?.critical_issues_count ?? 0}</p>
-                <p className="text-[9px] text-muted-foreground">{t(lang, "dash_high_impact")}</p>
-              </div>
-              <div className="rounded-lg bg-muted/15 px-3 py-2 text-center">
-                <p className="text-lg font-bold tabular-nums text-orange-400">{summary?.affected_sectors_count ?? 0}</p>
-                <p className="text-[9px] text-muted-foreground">{t(lang, "dash_affected_sectors")}</p>
-              </div>
-            </div>
-          </section>
-
-          {/* ═══════════════ SECTION 2: 홈 국가 + 글로벌 현황 ═══════════════ */}
-          <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "80ms" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-              <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {t(lang, "dash_home_tension")}
-              </h2>
-            </div>
-
-            {/* Home Country */}
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-semibold block truncate">
-                  {homeCountry ? getCountryName(homeCountry, lang) : (lang === "ko" ? "홈 국가 미설정" : "No home country")}
-                </span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", tensionColor(homeScore).text)}
-                    style={{ backgroundColor: `${homeScore >= 60 ? "#ef4444" : homeScore >= 40 ? "#f97316" : homeScore >= 20 ? "#f59e0b" : "#10b981"}15` }}
-                  >
-                    {tensionLabel(homeScore, lang)}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={cn("text-2xl font-bold tabular-nums leading-none", tensionColor(homeScore).text)}>
-                  {Math.round(animatedHomeScore)}
-                </span>
-                <span className="text-[10px] text-muted-foreground block">/100</span>
-              </div>
-            </div>
-
-            {/* Gauge */}
-            <div className="h-2 rounded-full bg-muted overflow-hidden mb-3">
+            {/* Horizontal bar gauge */}
+            <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
               <div
-                className={cn("h-full rounded-full transition-all duration-1000 ease-out", tensionColor(homeScore).bar)}
-                style={{ width: `${Math.min(homeScore, 100)}%` }}
+                className="h-full rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${Math.min(impactScore, 100)}%`, backgroundColor: color }}
               />
             </div>
 
-            {/* Global Overview */}
-            <div className="flex items-center gap-3 text-[11px] flex-wrap">
+            {/* 1줄 요약 */}
+            <p className="text-[11px] text-foreground/80 leading-relaxed line-clamp-2 mb-3">
+              {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
+            </p>
+
+            {/* 홈 긴장도 인라인 + Stats */}
+            <div className="flex items-center gap-2 text-[11px] mb-3">
+              <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+              <span className="font-medium">
+                {t(lang, "dash_compact_tension" as Parameters<typeof t>[1])}
+              </span>
+              <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
+                {Math.round(animatedHomeScore)}
+              </span>
+              <div className="h-1.5 w-12 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full transition-all duration-1000 ease-out", tensionColor(homeScore).bar)}
+                  style={{ width: `${Math.min(homeScore, 100)}%` }}
+                />
+              </div>
+              <span className={cn("text-[9px] font-medium", tensionColor(homeScore).text)}>
+                {tensionLabel(homeScore, lang)}
+              </span>
+              <span className="text-muted-foreground/40 mx-1">|</span>
+              <span className="text-muted-foreground">
+                {lang === "ko" ? "이슈" : "Issues"} <strong>{summary?.total_active_issues ?? 0}</strong>
+              </span>
+              <span className="text-muted-foreground/40">|</span>
+              <span className="text-red-400">
+                {t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong>
+              </span>
+            </div>
+
+            {/* 글로벌 현황 한 줄 */}
+            <div className="flex items-center gap-2 text-[10px] flex-wrap mb-3">
               <span className="text-muted-foreground">🌐</span>
               {extremeCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-red-900 animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-900 animate-pulse" />
                   <span className="text-red-700 dark:text-red-300 font-medium">
                     {t(lang, "dash_extreme_count", { n: extremeCount })}
                   </span>
@@ -337,7 +322,7 @@ function ReportContent() {
               )}
               {severeCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                   <span className="text-red-600 dark:text-red-400 font-medium">
                     {t(lang, "dash_severe_count", { n: severeCount })}
                   </span>
@@ -345,7 +330,7 @@ function ReportContent() {
               )}
               {alertCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-orange-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                   <span className="text-orange-600 dark:text-orange-300 font-medium">
                     {t(lang, "dash_alert_count", { n: alertCount })}
                   </span>
@@ -358,202 +343,176 @@ function ReportContent() {
               )}
             </div>
 
-            {/* Watchlist (인라인 — 별도 섹션 아님) */}
-            {myCountries.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-border/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    {t(lang, "dash_watchlist")}
-                  </span>
-                  <Link href="/settings?section=countries" className="text-[9px] text-primary hover:underline">
-                    {lang === "ko" ? "편집" : "Edit"}
-                  </Link>
-                </div>
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                  {myCountries.map((code, idx) => {
-                    const data = tensionMap.get(code) as TensionAllItem | undefined;
-                    const score = data?.raw_score ?? 0;
-                    const tc = tensionColor(score);
-                    return (
-                      <div
-                        key={code}
-                        onClick={() => router.push(`/tension?country=${code}`)}
-                        className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 cursor-pointer hover:bg-muted/25 transition-colors fade-in-up"
-                        style={{ animationDelay: `${idx * 40}ms` }}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-sm">{getFlag(code)}</span>
-                          <span className="text-[10px] font-medium">{getCountryName(code, lang)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn("text-sm font-bold tabular-nums", tc.text)}>{score}</span>
-                          <span className={cn("h-1.5 w-1.5 rounded-full", tc.dot)} />
-                          <span className={cn("text-[9px] font-medium", tc.text)}>
-                            {tensionLabel(score, lang)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+            {/* 관심국가 칩 */}
+            {myCountries.length > 0 ? (
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                {myCountries.map((code) => {
+                  const data = tensionMap.get(code) as TensionAllItem | undefined;
+                  const score = data?.raw_score ?? 0;
+                  const tc = tensionColor(score);
+                  return (
+                    <div
+                      key={code}
+                      onClick={() => router.push(`/tension?country=${code}`)}
+                      className="shrink-0 flex items-center gap-1 rounded-full bg-muted/15 px-2 py-1 cursor-pointer hover:bg-muted/25 transition-colors"
+                    >
+                      <span className="text-xs">{getFlag(code)}</span>
+                      <span className={cn("text-[10px] font-bold tabular-nums", tc.text)}>{score}</span>
+                    </div>
+                  );
+                })}
+                <Link
+                  href="/settings?section=countries"
+                  className="shrink-0 flex items-center gap-0.5 rounded-full bg-muted/10 px-2 py-1 text-[9px] text-muted-foreground hover:bg-muted/20"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </Link>
               </div>
-            )}
-
-            {myCountries.length === 0 && (
-              <div className="mt-4 pt-3 border-t border-border/30">
-                <div className="flex items-center gap-2 justify-center py-2">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[11px] text-muted-foreground">{t(lang, "dash_watchlist_empty")}</span>
-                  <Link
-                    href="/settings?section=countries"
-                    className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground"
-                  >
-                    <Plus className="h-2.5 w-2.5" />
-                    {t(lang, "dash_watchlist_add")}
-                  </Link>
-                </div>
+            ) : (
+              <div className="flex items-center gap-2 justify-center py-1">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">{t(lang, "dash_watchlist_empty")}</span>
+                <Link
+                  href="/settings?section=countries"
+                  className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground"
+                >
+                  <Plus className="h-2 w-2" />
+                  {t(lang, "dash_watchlist_add")}
+                </Link>
               </div>
             )}
           </section>
 
-          {/* ═══════════════ SECTION 2.5: 분쟁 영향 시장 동향 ═══════════════ */}
-          {summary?.market_snapshot && (summary.market_snapshot.commodities.length > 0 || summary.market_snapshot.indices.length > 0) && (
-            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "120ms" }}>
-              <div className="flex items-center gap-2 mb-1">
-                <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  {t(lang, "dash_market_trend" as Parameters<typeof t>[1])}
-                </h2>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 mb-3 ml-6">
-                {t(lang, "dash_market_subtitle" as Parameters<typeof t>[1])}
-              </p>
+          {/* ═══════════════ SECTION 2: Impact Chain Card (#1 이슈) ═══════════════ */}
+          {topIssue && (() => {
+            const topic = topIssue.topic ?? "unknown";
+            const pKScore = personalizedKScore(topIssue, homeCountry);
+            const k = roundKScore(pKScore);
+            const badge = getKScoreBadge(pKScore, lang);
+            const clusterId = topIssue.cluster_ids?.[0];
+            const rawTitle = lang === "en" ? topIssue.keyword : (topIssue.keyword_ko ?? topIssue.keyword);
+            const topicKey = `topic_${topic}` as Parameters<typeof t>[1];
+            const topicLabel = t(lang, topicKey) || topic;
+            const displayTitle = isJunkTitle(rawTitle)
+              ? buildSmartTitle(topIssue.keyword, topic, lang, getCountryName, topIssue.country_codes[0])
+              : (stripTitlePrefix(rawTitle) || topicLabel);
 
-              {/* 가로 스크롤 카드 */}
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {/* 원자재 */}
-                {summary.market_snapshot.commodities.map((c) => (
-                  <div key={c.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
-                    <div className="flex items-center gap-1 mb-1">
-                      <Fuel className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[9px] text-muted-foreground font-medium">{c.name}</span>
-                    </div>
-                    <p className="text-sm font-bold tabular-nums">${c.price_usd.toLocaleString()}</p>
-                    <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(c.change_pct))}>
-                      {c.change_pct > 0 ? "+" : ""}{c.change_pct.toFixed(2)}%
+            const relevantMarket = getRelevantMarketData(topIssue, summary?.market_snapshot);
+            const reason = summary?.top_issues?.[0]?.reason;
+
+            return (
+              <section
+                className="rounded-xl border border-border bg-card overflow-hidden fade-in-up cursor-pointer hover:bg-card/80 transition-colors"
+                style={{ animationDelay: "80ms" }}
+                onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+              >
+                {/* Header */}
+                <div className={cn("px-4 pt-3 pb-2 border-b border-border/30", kscoreAccent(pKScore))}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                      {t(lang, "dash_top_issue_label" as Parameters<typeof t>[1])}
                     </span>
-                  </div>
-                ))}
-
-                {/* 환율 */}
-                {summary.market_snapshot.exchange_rates.map((r) => (
-                  <div key={r.target_currency} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[100px]">
-                    <div className="flex items-center gap-1 mb-1">
-                      <Globe2 className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[9px] text-muted-foreground font-medium">USD/{r.target_currency}</span>
-                    </div>
-                    <p className="text-sm font-bold tabular-nums">{r.rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
-                    {r.change_pct != null && (
-                      <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(r.change_pct))}>
-                        {r.change_pct > 0 ? "+" : ""}{r.change_pct.toFixed(2)}%
+                    <span className={cn(
+                      "inline-flex items-center h-4 rounded-full px-1.5 text-[9px] font-medium leading-none",
+                      TOPIC_COLORS[topic]
+                    )}>
+                      {topicLabel}
+                    </span>
+                    {(topIssue.independent_sources ?? 0) >= 3 && (
+                      <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+                        {lang === "ko" ? "검증됨" : "Verified"}
                       </span>
                     )}
                   </div>
-                ))}
-
-                {/* 주가지수 */}
-                {summary.market_snapshot.indices.map((i) => (
-                  <div key={i.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
-                    <div className="flex items-center gap-1 mb-1">
-                      <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[9px] text-muted-foreground font-medium">{i.name}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {topIssue.country_codes.length > 0 && (
+                        <span className="text-base">
+                          {topIssue.country_codes.map((code: string) => getFlag(code)).join(" ")}
+                        </span>
+                      )}
+                      <h3 className="text-[13px] font-bold leading-snug line-clamp-1">{displayTitle}</h3>
                     </div>
-                    <p className="text-sm font-bold tabular-nums">{i.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                    <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(i.change_pct))}>
-                      {i.change_pct > 0 ? "+" : ""}{i.change_pct.toFixed(2)}%
-                    </span>
+                    <div className="shrink-0 ml-2 text-right">
+                      <span className={cn("text-lg font-bold tabular-nums", badge.text)}>
+                        {k.toFixed(1)}
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-
-              {/* AI 코멘트 (Pro) */}
-              {isPro && summary?.economy && (
-                <div className="mt-2 rounded-lg bg-blue-500/8 px-3 py-2">
-                  <p className="text-[10px] text-foreground/60 leading-relaxed">
-                    💡 {summary.economy.split(". ").slice(0, 1).join(". ")}
-                  </p>
                 </div>
-              )}
 
-              {/* 면책조항 */}
-              <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
-                {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
-              </p>
-            </section>
-          )}
+                {/* Impact Chain */}
+                <div className="px-4 py-3 space-y-2">
+                  {/* Chain: 분쟁 → 지표 → 내 영향 */}
+                  <div className="flex items-start gap-2">
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-[10px]">&#9876;&#65039;</span>
+                      <div className="w-px h-3 bg-border" />
+                    </div>
+                    <div className="text-[11px]">
+                      <span className="font-bold text-red-500">{t(lang, "dash_chain_conflict" as Parameters<typeof t>[1])}</span>
+                      <span className="text-foreground/70 ml-1">{displayTitle}</span>
+                    </div>
+                  </div>
 
-          {/* ═══════════════ SECTION 2.7: 여행 경보 ═══════════════ */}
-          {summary?.travel_advisories && summary.travel_advisories.length > 0 && (
-            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "140ms" }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Plane className="h-3.5 w-3.5 text-muted-foreground" />
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  {t(lang, "dash_travel_alert" as Parameters<typeof t>[1])}
-                </h2>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 mb-3 ml-6">
-                {t(lang, "dash_travel_source" as Parameters<typeof t>[1])}
-              </p>
-
-              <div className="space-y-1.5">
-                {summary.travel_advisories
-                  .sort((a, b) => b.level - a.level)
-                  .slice(0, 8)
-                  .map((ta) => {
-                    const tc = travelLevelColor(ta.level);
-                    const levelKey = `dash_travel_level_${ta.level}` as Parameters<typeof t>[1];
-                    return (
-                      <div
-                        key={`${ta.country_code}-${ta.source}`}
-                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 border", tc.bg, tc.border)}
-                      >
-                        <span className="text-sm">{getFlag(ta.country_code)}</span>
-                        <span className="text-[11px] font-medium flex-1 truncate">
-                          {getCountryName(ta.country_code, lang)}
-                        </span>
-                        <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", tc.text, tc.bg)}>
-                          Lv.{ta.level} {t(lang, levelKey)}
-                        </span>
-                        {isPro && ta.title && (
-                          <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{ta.title}</span>
-                        )}
+                  {relevantMarket.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <div className="flex flex-col items-center shrink-0">
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                        <div className="w-px h-3 bg-border" />
                       </div>
-                    );
-                  })}
-              </div>
-            </section>
-          )}
+                      <div className="text-[11px] flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-orange-500">{t(lang, "dash_chain_indicator" as Parameters<typeof t>[1])}</span>
+                        {relevantMarket.map((m) => (
+                          <span key={m.symbol} className="inline-flex items-center gap-1 rounded bg-muted/20 px-1.5 py-0.5">
+                            <span className="font-medium">{m.name}</span>
+                            <span className="tabular-nums">${m.price_usd.toLocaleString()}</span>
+                            <span className={cn("font-medium tabular-nums", changePctColor(m.change_pct))}>
+                              {m.change_pct > 0 ? "+" : ""}{m.change_pct.toFixed(1)}%
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-          {/* ═══════════════ SECTION 3: 나에게 영향이 큰 이슈 ═══════════════ */}
-          <section className="fade-in-up" style={{ animationDelay: "160ms" }}>
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
-              <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {t(lang, "dash_top_issues", { name: nickname })}
-              </h2>
-            </div>
-            <p className="text-[10px] text-muted-foreground/70 mb-2 ml-6">
-              {t(lang, "dash_top_issues_sub")}
-            </p>
+                  {reason && (
+                    <div className="flex items-start gap-2">
+                      <div className="flex flex-col items-center shrink-0">
+                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <div className="text-[11px]">
+                        <span className="font-bold text-blue-500">{t(lang, "dash_chain_your_impact" as Parameters<typeof t>[1])}</span>
+                        <span className="text-foreground/70 ml-1">{reason}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-            {topItems.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card/50 p-5 text-center">
-                <Activity className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <p className="text-[11px] text-muted-foreground">{t(lang, "dash_no_issues")}</p>
+                {/* Footer */}
+                <div className="px-4 pb-3 flex justify-end">
+                  <span className="text-[10px] text-primary font-medium flex items-center gap-1">
+                    {t(lang, "dash_chain_detail" as Parameters<typeof t>[1])}
+                    <ChevronRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </section>
+            );
+          })()}
+
+          {/* ═══════════════ SECTION 3: Top Issues #2-#5 (콤팩트) ═══════════════ */}
+          {restIssues.length > 0 && (
+            <section className="rounded-xl border border-border bg-card fade-in-up" style={{ animationDelay: "120ms" }}>
+              <div className="px-4 pt-3 pb-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />
+                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    {t(lang, "dash_top_issues", { name: nickname })}
+                  </h2>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {topItems.map((item, idx) => {
+              <div className="px-4 pb-3">
+                {restIssues.map((item, idx) => {
                   const topic = item.topic ?? "unknown";
                   const pKScore = personalizedKScore(item, homeCountry);
                   const k = roundKScore(pKScore);
@@ -571,148 +530,229 @@ function ReportContent() {
                       key={item.id}
                       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
                       className={cn(
-                        "flex items-center gap-3 rounded-xl border border-border bg-card p-3 cursor-pointer",
-                        "hover:bg-card/80 transition-all border-l-4 fade-in-up",
-                        kscoreAccent(pKScore),
+                        "flex items-center gap-2 py-2.5 cursor-pointer hover:bg-muted/10 transition-colors rounded-lg px-1 -mx-1",
+                        idx < restIssues.length - 1 && "border-b border-border/30",
                       )}
-                      style={{ animationDelay: `${(idx + 4) * 60}ms` }}
                     >
-                      <div className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold",
-                        idx === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
-                      )}>
-                        {idx + 1}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          {item.country_codes.length > 0 && (
-                            <span className="text-[11px]">
-                              {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
-                            </span>
-                          )}
-                          <span className={cn(
-                            "inline-flex items-center h-4 rounded-full px-1.5 text-[9px] font-medium leading-none",
-                            TOPIC_COLORS[topic]
-                          )}>
-                            {topicLabel}
-                          </span>
-                          {(item.independent_sources ?? 0) >= 3 && (
-                            <span className="text-[8px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
-                              {lang === "ko" ? "검증됨" : "Verified"}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="text-[12px] font-semibold leading-snug line-clamp-1">{displayTitle}</h4>
-                        {summary?.top_issues?.[idx]?.reason && (
-                          <p className="text-[9px] text-muted-foreground/70 line-clamp-1 mt-0.5">
-                            💡 {summary.top_issues[idx].reason}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <span className={cn("text-sm font-bold tabular-nums", badge.text)}>
-                          {k.toFixed(1)}
+                      <span className="text-[10px] font-bold text-muted-foreground w-5 text-center">#{idx + 2}</span>
+                      {item.country_codes.length > 0 && (
+                        <span className="text-[11px]">
+                          {item.country_codes.map((code: string) => getFlag(code)).join("")}
                         </span>
-                        <p className="text-[9px] text-muted-foreground">{t(lang, "dash_impact_score")}</p>
-                        {summary?.top_issues?.[idx]?.kscore_delta != null && summary.top_issues[idx].kscore_delta !== 0 && (
-                          <p className={cn("text-[8px] font-medium tabular-nums",
-                            (summary.top_issues[idx].kscore_delta ?? 0) > 0 ? "text-red-400" : "text-blue-400"
-                          )}>
-                            {(summary.top_issues[idx].kscore_delta ?? 0) > 0 ? "▲" : "▼"}
-                            {Math.abs(summary.top_issues[idx].kscore_delta ?? 0).toFixed(1)}
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className="text-[11px] font-medium flex-1 truncate">{displayTitle}</span>
+                      <span className={cn("text-sm font-bold tabular-nums", badge.text)}>
+                        {k.toFixed(1)}
+                      </span>
+                      <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
                     </div>
                   );
                 })}
               </div>
+              <Link
+                href="/feed"
+                className="flex items-center justify-center gap-1.5 border-t border-border/30 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors rounded-b-xl"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t(lang, "dash_view_all_issues")}
+              </Link>
+            </section>
+          )}
+
+          {topItems.length === 0 && (
+            <section className="rounded-xl border border-border bg-card/50 p-5 text-center fade-in-up" style={{ animationDelay: "120ms" }}>
+              <Activity className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+              <p className="text-[11px] text-muted-foreground">{t(lang, "dash_no_issues")}</p>
+            </section>
+          )}
+
+          {/* ═══════════════ SECTION 4: Insight Tabs (시장/교역/여행 통합) ═══════════════ */}
+          <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "160ms" }}>
+            {/* 탭 버튼 */}
+            <div className="flex gap-1 mb-3">
+              {(["market", "trade", "travel"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    "flex-1 text-[10px] font-bold py-1.5 rounded-lg transition-colors",
+                    activeTab === tab
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/15 text-muted-foreground hover:bg-muted/25"
+                  )}
+                >
+                  {t(lang, `dash_tab_${tab}` as Parameters<typeof t>[1])}
+                </button>
+              ))}
+            </div>
+
+            {/* 시장 동향 탭 */}
+            {activeTab === "market" && (
+              <div>
+                {summary?.market_snapshot && (summary.market_snapshot.commodities.length > 0 || summary.market_snapshot.indices.length > 0) ? (
+                  <>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                      {summary.market_snapshot.commodities.map((c) => (
+                        <div key={c.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Fuel className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[9px] text-muted-foreground font-medium">{c.name}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">${c.price_usd.toLocaleString()}</p>
+                          <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(c.change_pct))}>
+                            {c.change_pct > 0 ? "+" : ""}{c.change_pct.toFixed(2)}%
+                          </span>
+                        </div>
+                      ))}
+                      {summary.market_snapshot.exchange_rates.map((r) => (
+                        <div key={r.target_currency} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[100px]">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Globe2 className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[9px] text-muted-foreground font-medium">USD/{r.target_currency}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">{r.rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                          {r.change_pct != null && (
+                            <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(r.change_pct))}>
+                              {r.change_pct > 0 ? "+" : ""}{r.change_pct.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {summary.market_snapshot.indices.map((i) => (
+                        <div key={i.symbol} className="shrink-0 rounded-lg bg-muted/15 px-3 py-2 min-w-[110px]">
+                          <div className="flex items-center gap-1 mb-1">
+                            <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[9px] text-muted-foreground font-medium">{i.name}</span>
+                          </div>
+                          <p className="text-sm font-bold tabular-nums">{i.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          <span className={cn("text-[10px] font-medium tabular-nums", changePctColor(i.change_pct))}>
+                            {i.change_pct > 0 ? "+" : ""}{i.change_pct.toFixed(2)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {isPro && summary?.economy && (
+                      <div className="mt-2 rounded-lg bg-blue-500/8 px-3 py-2">
+                        <p className="text-[10px] text-foreground/60 leading-relaxed">
+                          {summary.economy.split(". ").slice(0, 1).join(". ")}
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
+                      {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground text-center py-4">
+                    {lang === "ko" ? "시장 데이터를 불러오는 중..." : "Loading market data..."}
+                  </p>
+                )}
+              </div>
             )}
 
-            <Link
-              href="/feed"
-              className="flex items-center justify-center gap-1.5 mt-3 rounded-xl border border-border bg-card/50 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              {t(lang, "dash_view_all_issues")}
-            </Link>
-          </section>
-
-          {/* ═══════════════ SECTION 3.5: 교역 노출도 (Pro) ═══════════════ */}
-          {summary?.trade_exposure && isPro ? (
-            <section className="rounded-xl border border-border bg-card p-4 fade-in-up" style={{ animationDelay: "200ms" }}>
-              <div className="flex items-center gap-2 mb-1">
-                <ShoppingCart className="h-3.5 w-3.5 text-orange-400" />
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  {t(lang, "dash_trade_exposure" as Parameters<typeof t>[1])}
-                </h2>
-                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">Pro</span>
-              </div>
-
-              <div className="space-y-2 mt-3">
-                {summary.trade_exposure.top_partners.map((p, idx) => (
-                  <div key={p.country_code} className="flex items-center gap-2">
-                    <span className="text-sm">{getFlag(p.country_code)}</span>
-                    <span className="text-[11px] font-medium w-16 truncate">
-                      {getCountryName(p.country_code, lang)}
-                    </span>
-                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-orange-400 transition-all duration-700"
-                        style={{ width: `${Math.min(p.dependency_pct, 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-bold tabular-nums text-orange-400 w-12 text-right">
-                      {p.dependency_pct.toFixed(1)}%
-                    </span>
-                    <span className="text-[9px] text-muted-foreground tabular-nums w-16 text-right">
-                      {formatTradeVolume(p.trade_volume_usd)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : summary?.trade_exposure === undefined && isPro ? null : !isPro ? (
-            <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "200ms" }}>
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <ShoppingCart className="h-3.5 w-3.5 text-orange-400" />
-                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    {t(lang, "dash_trade_exposure" as Parameters<typeof t>[1])}
-                  </h2>
-                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">Pro</span>
-                </div>
-                <div className="relative mt-3">
-                  <div className="space-y-2 opacity-40 blur-[2px] select-none pointer-events-none">
-                    {[1,2,3,4,5].map((i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded bg-muted/30" />
-                        <div className="h-3 w-16 rounded bg-muted/30" />
-                        <div className="flex-1 h-2 rounded-full bg-muted/20" />
-                        <div className="h-3 w-12 rounded bg-muted/30" />
+            {/* 교역 노출 탭 */}
+            {activeTab === "trade" && (
+              <div>
+                {summary?.trade_exposure && isPro ? (
+                  <div className="space-y-2">
+                    {summary.trade_exposure.top_partners.map((p) => (
+                      <div key={p.country_code} className="flex items-center gap-2">
+                        <span className="text-sm">{getFlag(p.country_code)}</span>
+                        <span className="text-[11px] font-medium w-16 truncate">
+                          {getCountryName(p.country_code, lang)}
+                        </span>
+                        <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-orange-400 transition-all duration-700"
+                            style={{ width: `${Math.min(p.dependency_pct, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold tabular-nums text-orange-400 w-12 text-right">
+                          {p.dependency_pct.toFixed(1)}%
+                        </span>
+                        <span className="text-[9px] text-muted-foreground tabular-nums w-16 text-right">
+                          {formatTradeVolume(p.trade_volume_usd)}
+                        </span>
                       </div>
                     ))}
                   </div>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <Lock className="h-4 w-4 text-muted-foreground mb-1.5" />
-                    <Link
-                      href="/upgrade"
-                      className="inline-flex rounded-full px-3 py-1 text-[9px] font-bold text-white"
-                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
-                    >
-                      {t(lang, "dash_unlock_pro")}
-                    </Link>
+                ) : !isPro ? (
+                  <div className="relative">
+                    <div className="space-y-2 opacity-40 blur-[2px] select-none pointer-events-none">
+                      {[1,2,3,4,5].map((i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className="h-5 w-5 rounded bg-muted/30" />
+                          <div className="h-3 w-16 rounded bg-muted/30" />
+                          <div className="flex-1 h-2 rounded-full bg-muted/20" />
+                          <div className="h-3 w-12 rounded bg-muted/30" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <Lock className="h-4 w-4 text-muted-foreground mb-1.5" />
+                      <Link
+                        href="/upgrade"
+                        className="inline-flex rounded-full px-3 py-1 text-[9px] font-bold text-white"
+                        style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                      >
+                        {t(lang, "dash_unlock_pro")}
+                      </Link>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground text-center py-4">
+                    {lang === "ko" ? "교역 데이터를 불러오는 중..." : "Loading trade data..."}
+                  </p>
+                )}
               </div>
-            </section>
-          ) : null}
+            )}
 
-          {/* ═══════════════ SECTION 4: 상세 영향 분석 (Pro) ═══════════════ */}
-          <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "240ms" }}>
+            {/* 여행 경보 탭 */}
+            {activeTab === "travel" && (
+              <div>
+                {summary?.travel_advisories && summary.travel_advisories.length > 0 ? (
+                  <>
+                    <div className="space-y-1.5">
+                      {summary.travel_advisories
+                        .sort((a, b) => b.level - a.level)
+                        .slice(0, 8)
+                        .map((ta) => {
+                          const tc = travelLevelColor(ta.level);
+                          const lvlKey = `dash_travel_level_${ta.level}` as Parameters<typeof t>[1];
+                          return (
+                            <div
+                              key={`${ta.country_code}-${ta.source}`}
+                              className={cn("flex items-center gap-2 rounded-lg px-3 py-2 border", tc.bg, tc.border)}
+                            >
+                              <span className="text-sm">{getFlag(ta.country_code)}</span>
+                              <span className="text-[11px] font-medium flex-1 truncate">
+                                {getCountryName(ta.country_code, lang)}
+                              </span>
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", tc.text, tc.bg)}>
+                                Lv.{ta.level} {t(lang, lvlKey)}
+                              </span>
+                              {isPro && ta.title && (
+                                <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{ta.title}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                    <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
+                      {t(lang, "dash_travel_source" as Parameters<typeof t>[1])}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground text-center py-4">
+                    {lang === "ko" ? "여행 경보 데이터 없음" : "No travel advisories"}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* ═══════════════ SECTION 5: 상세 영향 분석 (Pro) ═══════════════ */}
+          <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "200ms" }}>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="h-3.5 w-3.5 text-blue-400" />
@@ -726,7 +766,6 @@ function ReportContent() {
               </p>
 
               {hasPro && isPro ? (
-                /* Pro: 실제 분석 표시 */
                 <div className="space-y-2">
                   {[
                     { key: "economy" as const, icon: Briefcase, label: t(lang, "dash_pro_economy"), color: "text-blue-400", bg: "bg-blue-500/8" },
@@ -751,9 +790,7 @@ function ReportContent() {
                   })}
                 </div>
               ) : (
-                /* Free/비Pro: 잠금 상태 */
                 <div className="relative">
-                  {/* 블러 미리보기 */}
                   <div className="space-y-2 opacity-40 blur-[2px] select-none pointer-events-none">
                     {[
                       { icon: Briefcase, color: "text-blue-400", bg: "bg-blue-500/8", label: t(lang, "dash_pro_economy") },
@@ -770,7 +807,6 @@ function ReportContent() {
                       </div>
                     ))}
                   </div>
-                  {/* 잠금 오버레이 */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <Lock className="h-5 w-5 text-muted-foreground mb-2" />
                     <p className="text-[11px] text-muted-foreground mb-3 text-center px-4">
