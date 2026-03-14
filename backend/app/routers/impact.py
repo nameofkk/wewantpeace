@@ -272,8 +272,8 @@ async def get_impact_summary(
     # Top 5 이슈 + reason + kscore_delta
     top_issues = []
     for c, impact in scored[:5]:
-        # reason 생성 (규칙 기반, 비용 0)
-        reason = _generate_issue_reason(c, home, lang, sectors_data)
+        # reason 생성 (교역 데이터 + 시장 가격 기반)
+        reason = await _generate_issue_reason(c, home, lang, sectors_data, db)
 
         # kscore_delta: 24시간 변화량 (클러스터 kscore 기반)
         kscore_delta = None
@@ -1020,50 +1020,125 @@ _HOME_CURRENCIES = {
 }
 
 
-def _generate_issue_reason(
+async def _generate_issue_reason(
     cluster,
     home_country: str,
     lang: str,
     sectors_data: dict,
+    db: AsyncSession,
 ) -> str:
-    """이슈가 나에게 영향이 큰 이유를 1줄로 생성 (규칙 기반, 비용 0)"""
+    """이슈가 나에게 영향이 큰 이유를 구체적으로 1줄 생성.
+
+    교역 데이터, 섹터 GDP 비중, 시장 가격을 활용해 "왜 나에게 위험한지" 명확히 설명.
+    """
+    from backend.app.models.economic_data import TradeBilateral, CommodityPrice
+
     cc = cluster.country_code or ""
     topic = cluster.topic or "unknown"
     severity = cluster.severity or 0
-
-    # 어떤 섹터가 영향을 받는지
-    affected = []
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+
+    # 1) 영향받는 섹터 + GDP 비중
+    affected_sectors = []  # [(label, gdp_pct)]
     for sector, info in sectors_data.items():
         if cc in info.get("key_partners", []):
-            affected.append(labels.get(sector, sector))
+            affected_sectors.append((labels.get(sector, sector), info.get("gdp_pct", 0)))
+    # GDP 비중 높은 순 정렬
+    affected_sectors.sort(key=lambda x: -x[1])
 
+    # 2) 실제 양자간 교역액 조회
+    trade_vol = None
+    try:
+        trade_q = await db.execute(
+            select(TradeBilateral.total_trade_usd)
+            .where(
+                TradeBilateral.reporter_code == home_country,
+                TradeBilateral.partner_code == cc,
+                TradeBilateral.period_type == "A",
+            )
+            .order_by(TradeBilateral.period.desc())
+            .limit(1)
+        )
+        trade_vol = trade_q.scalar_one_or_none()
+    except Exception:
+        pass
+
+    # 3) 에너지 관련 이슈면 유가 데이터 활용
+    oil_price = None
+    if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
+        try:
+            oil_q = await db.execute(
+                select(CommodityPrice.price_usd, CommodityPrice.change_pct)
+                .where(CommodityPrice.symbol == "WTI")
+                .order_by(CommodityPrice.price_date.desc())
+                .limit(1)
+            )
+            row = oil_q.first()
+            if row:
+                oil_price = (row[0], row[1])
+        except Exception:
+            pass
+
+    # 4) 교역액 포맷
+    trade_str = ""
+    if trade_vol and trade_vol > 0:
+        if trade_vol >= 1e9:
+            trade_str = f"${trade_vol / 1e9:.1f}B"
+        elif trade_vol >= 1e6:
+            trade_str = f"${trade_vol / 1e6:.0f}M"
+
+    # 5) 구체적 reason 생성
     if lang == "ko":
-        if affected:
-            reason = f"{home_country}의 {', '.join(affected[:2])} 분야와 밀접한 교역 관계"
+        if affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            reason = f"{home_country}-{cc} 교역 {trade_str}, {top_sector}(GDP {gdp}%) 공급망에 직접 영향"
+            if oil_price:
+                reason = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), {home_country} {top_sector} 비용 직접 상승 압력"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            if oil_price:
+                reason = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), {home_country} 에너지(GDP {gdp}%) 비용 상승"
+            elif len(affected_sectors) >= 2:
+                reason = f"{home_country} {affected_sectors[0][0]}(GDP {affected_sectors[0][1]}%)·{affected_sectors[1][0]} 분야 공급망 리스크"
+            else:
+                reason = f"{home_country} {top_sector}(GDP {gdp}%) 분야에 직접 영향"
+        elif trade_str:
+            reason = f"{home_country}-{cc} 교역 {trade_str}, 교역 관계 통한 간접 파급"
         elif severity >= 70:
-            reason = "글로벌 안보 리스크로 간접 영향 가능"
-        elif topic in ("conflict", "terror", "coup"):
-            reason = "군사적 긴장이 국제 정세에 파급"
+            if topic in ("conflict", "terror"):
+                reason = "고강도 군사 충돌로 글로벌 공급망·금융시장 불안정"
+            else:
+                reason = "심각도 높은 이슈로 국제 경제 전반에 파급 우려"
         elif topic == "sanctions":
-            reason = "경제 제재가 공급망에 영향 가능"
+            reason = "경제 제재 확대 시 원자재·부품 수급 차질 가능"
         elif topic == "disaster":
-            reason = "자연재해로 인한 물류·공급망 차질 우려"
+            reason = "자연재해로 인한 물류·제조 공급망 차질 우려"
         else:
-            reason = "국제 정세 변동에 따른 간접 영향"
+            reason = "국제 정세 변동에 따른 시장 불확실성 증가"
     else:
-        if affected:
-            reason = f"Directly linked to {home_country}'s {', '.join(affected[:2])} sectors"
+        if affected_sectors and trade_str:
+            top_sector, gdp = affected_sectors[0]
+            reason = f"{home_country}-{cc} trade {trade_str}, direct {top_sector} (GDP {gdp}%) supply chain exposure"
+            if oil_price:
+                reason = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), rising {top_sector} costs for {home_country}"
+        elif affected_sectors:
+            top_sector, gdp = affected_sectors[0]
+            if oil_price:
+                reason = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), {home_country} energy (GDP {gdp}%) cost pressure"
+            elif len(affected_sectors) >= 2:
+                reason = f"{home_country} {affected_sectors[0][0]} (GDP {affected_sectors[0][1]}%) & {affected_sectors[1][0]} supply chain risk"
+            else:
+                reason = f"Direct impact on {home_country}'s {top_sector} sector (GDP {gdp}%)"
+        elif trade_str:
+            reason = f"{home_country}-{cc} trade {trade_str}, indirect spillover via trade links"
         elif severity >= 70:
-            reason = "Global security risk with indirect impact"
-        elif topic in ("conflict", "terror", "coup"):
-            reason = "Military tensions affecting international stability"
+            reason = "High-intensity crisis causing global supply chain and market instability"
         elif topic == "sanctions":
-            reason = "Economic sanctions may disrupt supply chains"
+            reason = "Sanctions expansion may disrupt raw material and component supply"
         elif topic == "disaster":
-            reason = "Natural disaster may cause logistics disruptions"
+            reason = "Natural disaster causing logistics and manufacturing disruptions"
         else:
-            reason = "Indirect impact from international developments"
+            reason = "Increased market uncertainty from geopolitical developments"
 
     return reason
 
