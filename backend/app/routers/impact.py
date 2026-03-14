@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v2"
+_CACHE_VERSION = "v3"
 
 
 def calc_impact_factor(
