@@ -45,6 +45,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { LogoIcon } from "@/components/ui/logo-icon";
 
 export default function HomePage() {
   return (
@@ -218,6 +219,30 @@ function ReportContent() {
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
+      {/* ═══════════════ Header ═══════════════ */}
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-3">
+        <div className="grid grid-cols-3 items-center">
+          {/* 왼쪽 — 타이틀 + LIVE */}
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            <h1 className="text-sm font-bold truncate">{t(lang, "dash_title")}</h1>
+            <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-blue-500/10 px-1.5 py-0.5 border border-blue-500/20">
+              <span className="live-dot h-1.5 w-1.5 rounded-full bg-blue-500" />
+              <span className="text-[9px] font-bold text-blue-400">LIVE</span>
+            </span>
+          </div>
+          {/* 중앙 — 로고 */}
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
+          {/* 오른쪽 — 업데이트 시간 */}
+          <div className="flex items-center justify-end">
+            {updatedTime && (
+              <span className="text-[9px] text-muted-foreground whitespace-nowrap">{updatedTime}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <NoticeTicker />
 
       <div className="flex-1 overflow-y-auto">

@@ -757,3 +757,84 @@ export function useWeeklyPdf(enabled = true) {
     retry: false,
   });
 }
+
+// --- Intelligence Signals ---
+
+export interface SignalSummary {
+  firms_hotspot: number;
+  ioda_outage: number;
+  cf_anomaly: number;
+  gps_jam: number;
+  total: number;
+  affected_countries: number;
+  last_updated: string | null;
+}
+
+export interface SignalGeoJSON {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: { type: "Point"; coordinates: [number, number] };
+    properties: {
+      id: string;
+      signal_type: string;
+      intensity: number;
+      raw_value: number | null;
+      confidence: number;
+      country_code: string | null;
+      observed_at: string | null;
+      metadata: Record<string, unknown>;
+    };
+  }>;
+}
+
+export function useFirmsSignals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["signals", "firms"],
+    queryFn: () => apiFetch<SignalGeoJSON>("/signals/firms"),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useOutageSignals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["signals", "outage"],
+    queryFn: () => apiFetch<SignalGeoJSON>("/signals/outage"),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useGpsJamSignals(enabled: boolean) {
+  return useQuery({
+    queryKey: ["signals", "gps-jam"],
+    queryFn: () => apiFetch<SignalGeoJSON>("/signals/gps-jam"),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useSignalSummary() {
+  return useQuery({
+    queryKey: ["signals", "summary"],
+    queryFn: () => apiFetch<SignalSummary>("/signals/summary"),
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+}
+
+export function useMatchedSignals(clusterId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["signals", "matched", clusterId],
+    queryFn: () => apiFetch<SignalGeoJSON>(`/signals/matched/${clusterId}`),
+    enabled: !!clusterId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
