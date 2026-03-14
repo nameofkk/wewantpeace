@@ -9,7 +9,7 @@ const IS_TOSS = process.env.NEXT_PUBLIC_IS_TOSS_MINIAPP === "true";
 export const metadata: Metadata = {
   title: {
     default: "WeWantPeace",
-    template: "%s | WeWantPeace",
+    template: "WeWantPeace",
   },
   description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
   manifest: "/manifest.json",
