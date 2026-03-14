@@ -234,6 +234,8 @@ export function useAuth() {
         prevUid.current = uid;
         queryClient.invalidateQueries({ queryKey: ["me"] });
         queryClient.invalidateQueries({ queryKey: ["tension"] });
+        queryClient.invalidateQueries({ queryKey: ["impact"] });
+        queryClient.invalidateQueries({ queryKey: ["trending"] });
       }
       setLoading(false);
     });
