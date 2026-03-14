@@ -815,59 +815,185 @@ function ReportContent() {
 
           {/* ═══════════════ SECTION 5: 상세 영향 분석 (Pro) ═══════════════ */}
           <section className="rounded-xl border border-border bg-card overflow-hidden fade-in-up" style={{ animationDelay: "200ms" }}>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="h-3.5 w-3.5 text-blue-400" />
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            {/* Report Header Band */}
+            <div className="px-4 pt-3 pb-2 border-b border-border/30 bg-gradient-to-r from-blue-500/5 via-transparent to-indigo-500/5">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-blue-400" />
+                <h2 className="text-xs font-bold tracking-wide">
                   {t(lang, "dash_pro_detail", { name: nickname })}
                 </h2>
-                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold">Pro</span>
+                <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500/15 to-indigo-500/15 text-blue-400 font-bold">Pro</span>
               </div>
-              <p className="text-[10px] text-muted-foreground/70 ml-6 mb-3">
+              <p className="text-[9px] text-muted-foreground/60 mt-0.5 ml-6">
                 {t(lang, "dash_impact_brief_desc")}
               </p>
+            </div>
 
+            <div className="p-4">
               {hasPro && isPro ? (
-                <div className="space-y-2">
-                  {[
-                    { key: "economy" as const, icon: Briefcase, label: t(lang, "dash_pro_economy"), color: "text-blue-400", bg: "bg-blue-500/8" },
-                    { key: "trade" as const, icon: ShoppingCart, label: t(lang, "dash_pro_trade"), color: "text-orange-400", bg: "bg-orange-500/8" },
-                    { key: "travel" as const, icon: Plane, label: t(lang, "dash_pro_travel"), color: "text-emerald-400", bg: "bg-emerald-500/8" },
-                  ].map((dim, idx) => {
-                    const text = summary?.[dim.key];
-                    if (!text) return null;
-                    return (
-                      <div
-                        key={dim.key}
-                        className={cn("rounded-lg p-3 fade-in-up", dim.bg)}
-                        style={{ animationDelay: `${(idx + 6) * 60}ms` }}
-                      >
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <dim.icon className={cn("h-3.5 w-3.5 shrink-0", dim.color)} />
-                          <span className={cn("text-[10px] font-bold", dim.color)}>{dim.label}</span>
-                        </div>
-                        <p className="text-[11px] text-foreground/70 leading-relaxed">{text}</p>
+                <div className="space-y-3">
+
+                  {/* ── 경제 영향 ── */}
+                  {summary?.economy && (
+                    <div className="rounded-lg border-l-2 border-blue-400 bg-blue-500/[0.03] p-3 fade-in-up" style={{ animationDelay: "360ms" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Briefcase className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+                        <span className="text-[10px] font-bold text-blue-400">{t(lang, "dash_pro_economy")}</span>
                       </div>
-                    );
-                  })}
+                      {/* 핵심 지표 칩 */}
+                      {summary.market_snapshot && (
+                        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide mb-2.5 pb-0.5">
+                          {summary.market_snapshot.commodities.slice(0, 2).map((c) => (
+                            <div key={c.symbol} className="shrink-0 flex items-center gap-1.5 bg-background/60 rounded-md px-2 py-1 border border-border/30">
+                              <Fuel className="h-2.5 w-2.5 text-muted-foreground/60" />
+                              <span className="text-[9px] text-muted-foreground font-medium">{c.name}</span>
+                              <span className="text-[10px] font-bold tabular-nums">${c.price_usd.toLocaleString()}</span>
+                              <span className={cn("text-[9px] font-bold tabular-nums", changePctColor(c.change_pct))}>
+                                {c.change_pct > 0 ? "+" : ""}{c.change_pct.toFixed(1)}%
+                              </span>
+                            </div>
+                          ))}
+                          {summary.market_snapshot.indices.slice(0, 2).map((i) => (
+                            <div key={i.symbol} className="shrink-0 flex items-center gap-1.5 bg-background/60 rounded-md px-2 py-1 border border-border/30">
+                              <TrendingUp className="h-2.5 w-2.5 text-muted-foreground/60" />
+                              <span className="text-[9px] text-muted-foreground font-medium">{i.name}</span>
+                              <span className="text-[10px] font-bold tabular-nums">{i.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                              <span className={cn("text-[9px] font-bold tabular-nums", changePctColor(i.change_pct))}>
+                                {i.change_pct > 0 ? "+" : ""}{i.change_pct.toFixed(1)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* 분석 불릿 */}
+                      <div className="space-y-1">
+                        {summary.economy.split(". ").filter(Boolean).map((sentence, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="mt-[5px] h-1 w-1 rounded-full bg-blue-400 shrink-0" />
+                            <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 교역 영향 ── */}
+                  {summary?.trade && (
+                    <div className="rounded-lg border-l-2 border-orange-400 bg-orange-500/[0.03] p-3 fade-in-up" style={{ animationDelay: "420ms" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+                        <span className="text-[10px] font-bold text-orange-400">{t(lang, "dash_pro_trade")}</span>
+                      </div>
+                      {/* 교역국 리스크 바 */}
+                      {summary.trade_exposure?.top_partners && summary.trade_exposure.top_partners.length > 0 && (
+                        <div className="space-y-1.5 mb-2.5">
+                          {summary.trade_exposure.top_partners.slice(0, 3).map((p) => (
+                            <div key={p.country_code} className="flex items-center gap-2">
+                              <span className="text-xs">{getFlag(p.country_code)}</span>
+                              <span className="text-[10px] font-medium w-14 truncate">{getCountryName(p.country_code, lang)}</span>
+                              <div className="flex-1 h-1.5 rounded-full bg-background/50 overflow-hidden">
+                                <div className="h-full rounded-full bg-orange-400/60 transition-all duration-700" style={{ width: `${Math.min(p.dependency_pct, 100)}%` }} />
+                              </div>
+                              <span className="text-[9px] font-bold tabular-nums text-orange-400 w-10 text-right">{p.dependency_pct.toFixed(1)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* 분석 불릿 */}
+                      <div className="space-y-1">
+                        {summary.trade.split(". ").filter(Boolean).map((sentence, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="mt-[5px] h-1 w-1 rounded-full bg-orange-400 shrink-0" />
+                            <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── 여행 안전 ── */}
+                  {summary?.travel && (
+                    <div className="rounded-lg border-l-2 border-emerald-400 bg-emerald-500/[0.03] p-3 fade-in-up" style={{ animationDelay: "480ms" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Plane className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-400">{t(lang, "dash_pro_travel")}</span>
+                      </div>
+                      {/* 여행 경보 뱃지 */}
+                      {summary.travel_advisories && summary.travel_advisories.length > 0 && (
+                        <div className="flex gap-1.5 flex-wrap mb-2.5">
+                          {[...summary.travel_advisories].sort((a, b) => b.level - a.level).slice(0, 5).map((ta) => {
+                            const tc = travelLevelColor(ta.level);
+                            return (
+                              <div key={`pro-${ta.country_code}-${ta.source}`} className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 border", tc.bg, tc.border)}>
+                                <span className="text-[10px]">{getFlag(ta.country_code)}</span>
+                                <span className={cn("text-[9px] font-bold", tc.text)}>Lv.{ta.level}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* 분석 불릿 */}
+                      <div className="space-y-1">
+                        {summary.travel.split(". ").filter(Boolean).map((sentence, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="mt-[5px] h-1 w-1 rounded-full bg-emerald-400 shrink-0" />
+                            <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="space-y-2 opacity-40 blur-[2px] select-none pointer-events-none">
-                    {[
-                      { icon: Briefcase, color: "text-blue-400", bg: "bg-blue-500/8", label: t(lang, "dash_pro_economy") },
-                      { icon: ShoppingCart, color: "text-orange-400", bg: "bg-orange-500/8", label: t(lang, "dash_pro_trade") },
-                      { icon: Plane, color: "text-emerald-400", bg: "bg-emerald-500/8", label: t(lang, "dash_pro_travel") },
-                    ].map((dim) => (
-                      <div key={dim.label} className={cn("rounded-lg p-3", dim.bg)}>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <dim.icon className={cn("h-3.5 w-3.5", dim.color)} />
-                          <span className={cn("text-[10px] font-bold", dim.color)}>{dim.label}</span>
-                        </div>
-                        <div className="h-3 rounded bg-muted/30 w-3/4" />
-                        <div className="h-3 rounded bg-muted/30 w-1/2 mt-1" />
+                  <div className="space-y-3 opacity-40 blur-[2px] select-none pointer-events-none">
+                    {/* 블러 처리된 경제 카드 */}
+                    <div className="rounded-lg border-l-2 border-blue-400 bg-blue-500/[0.03] p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Briefcase className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="text-[10px] font-bold text-blue-400">{t(lang, "dash_pro_economy")}</span>
                       </div>
-                    ))}
+                      <div className="flex gap-1.5 mb-2">
+                        <div className="h-6 w-24 rounded bg-muted/30" />
+                        <div className="h-6 w-24 rounded bg-muted/30" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-3 rounded bg-muted/30 w-full" />
+                        <div className="h-3 rounded bg-muted/30 w-3/4" />
+                      </div>
+                    </div>
+                    {/* 블러 처리된 교역 카드 */}
+                    <div className="rounded-lg border-l-2 border-orange-400 bg-orange-500/[0.03] p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShoppingCart className="h-3.5 w-3.5 text-orange-400" />
+                        <span className="text-[10px] font-bold text-orange-400">{t(lang, "dash_pro_trade")}</span>
+                      </div>
+                      <div className="space-y-1.5 mb-2">
+                        <div className="flex items-center gap-2"><div className="h-4 w-4 rounded bg-muted/30" /><div className="flex-1 h-1.5 rounded-full bg-muted/20" /><div className="h-3 w-8 rounded bg-muted/30" /></div>
+                        <div className="flex items-center gap-2"><div className="h-4 w-4 rounded bg-muted/30" /><div className="flex-1 h-1.5 rounded-full bg-muted/20" /><div className="h-3 w-8 rounded bg-muted/30" /></div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-3 rounded bg-muted/30 w-full" />
+                        <div className="h-3 rounded bg-muted/30 w-2/3" />
+                      </div>
+                    </div>
+                    {/* 블러 처리된 여행 카드 */}
+                    <div className="rounded-lg border-l-2 border-emerald-400 bg-emerald-500/[0.03] p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Plane className="h-3.5 w-3.5 text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-400">{t(lang, "dash_pro_travel")}</span>
+                      </div>
+                      <div className="flex gap-1.5 mb-2">
+                        <div className="h-5 w-16 rounded-full bg-muted/30" />
+                        <div className="h-5 w-16 rounded-full bg-muted/30" />
+                        <div className="h-5 w-16 rounded-full bg-muted/30" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="h-3 rounded bg-muted/30 w-full" />
+                        <div className="h-3 rounded bg-muted/30 w-4/5" />
+                      </div>
+                    </div>
                   </div>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <Lock className="h-5 w-5 text-muted-foreground mb-2" />
