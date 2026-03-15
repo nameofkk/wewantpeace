@@ -9,6 +9,7 @@ import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedAlerts, useTensionAll, useMySubscription } from "@/lib/api";
 import { TOPIC_COLORS, roundKScore, personalizedKScore, kscoreAccent, getKScoreBadge, isNew, isRising, isUpdated, formatFirstSeen, type TrendingItem } from "@/lib/kscore-utils";
+import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -590,8 +591,9 @@ export default function FeedPage() {
 function FeedPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry, completedTours } = useAppStore();
+  const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry, setHomeCountry, completedTours } = useAppStore();
   const [tourRun, setTourRun] = useState(false);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작
   useEffect(() => {
@@ -617,6 +619,8 @@ function FeedPageContent() {
   const meObj = me as { plan?: string; role?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
   const isAdmin = meObj?.role === "admin";
+  const isPro = userPlan !== "free";
+  const availableCountries = isPro ? SUPPORTED_HOME_COUNTRIES : [];
 
   // 서버 plan → store 동기화
   useEffect(() => {
@@ -624,6 +628,16 @@ function FeedPageContent() {
       setUserPlan(userPlan as "free" | "pro" | "pro_plus");
     }
   }, [userPlan, storePlan, setUserPlan]);
+
+  // 바텀시트 열릴 때 배경 스크롤 방지
+  useEffect(() => {
+    if (showCountryPicker) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [showCountryPicker]);
 
   // Sprint 3: 놓친 알림 배너
   const { data: missedAlerts } = useMissedAlerts();
@@ -793,6 +807,14 @@ function FeedPageContent() {
           </div>
           {/* 오른쪽 */}
           <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => setShowCountryPicker(true)}
+              className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
+            >
+              <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+              <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>
+              <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
             {extremeCount > 0 && (
               <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
@@ -1095,6 +1117,96 @@ function FeedPageContent() {
             )}
           </div>
         )}
+
+      {/* ═══════════════ 기준 국가 선택 바텀시트 ═══════════════ */}
+      {showCountryPicker && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowCountryPicker(false)} />
+          <div className="fixed bottom-[60px] left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[60vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+              <h3 className="text-sm font-bold">
+                {lang === "ko" ? "기준 국가 선택" : "Select Base Country"}
+              </h3>
+              <button
+                onClick={() => setShowCountryPicker(false)}
+                className="p-1 rounded-full hover:bg-muted/50 transition-colors"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 py-2 overscroll-contain">
+              {/* 글로벌 옵션 */}
+              <button
+                onClick={() => {
+                  setHomeCountry("");
+                  setShowCountryPicker(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                  !homeCountry && "bg-primary/5"
+                )}
+              >
+                <span className="text-lg">🌐</span>
+                <span className="text-sm flex-1">{lang === "ko" ? "글로벌 (전체)" : "Global (All)"}</span>
+                <span className="text-[10px] text-muted-foreground">ALL</span>
+                {!homeCountry && <Check className="h-4 w-4 text-primary" />}
+              </button>
+              {/* 대륙별 그룹 */}
+              {([
+                { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
+                { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
+                { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
+                { label: lang === "ko" ? "유럽" : "Europe", codes: ["DE", "GB", "FR", "PL", "RU"] },
+                { label: lang === "ko" ? "아메리카" : "Americas", codes: ["US", "CA", "MX", "BR"] },
+              ] as { label: string; codes: string[] }[]).map((group) => {
+                const groupCountries = group.codes.filter((c) => availableCountries.includes(c));
+                if (!groupCountries.length) return null;
+                return (
+                  <div key={group.label}>
+                    <div className="px-5 pt-3 pb-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">{group.label}</span>
+                    </div>
+                    {groupCountries.map((cc) => (
+                      <button
+                        key={cc}
+                        onClick={() => {
+                          setHomeCountry(cc);
+                          setShowCountryPicker(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                          homeCountry === cc && "bg-primary/5"
+                        )}
+                      >
+                        <span className="text-lg">{getFlag(cc)}</span>
+                        <span className="text-sm flex-1">{getCountryName(cc, lang)}</span>
+                        <span className="text-[10px] text-muted-foreground">{cc}</span>
+                        {homeCountry === cc && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+              {!isPro && availableCountries.length === 0 && (
+                <div className="px-5 py-4 text-center border-t border-border/30 mt-2">
+                  <p className="text-[10px] text-muted-foreground mb-2">
+                    {lang === "ko"
+                      ? "Pro 플랜에서 특정 국가를 기준으로 개인화된 분석을 받을 수 있습니다"
+                      : "Get personalized analysis from specific countries' perspective with Pro"}
+                  </p>
+                  <a
+                    href="/upgrade?source=feed_country_picker"
+                    className="inline-flex rounded-full px-4 py-1.5 text-[10px] font-bold text-white"
+                    style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                  >
+                    {lang === "ko" ? "Pro로 업그레이드" : "Upgrade to Pro"}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
