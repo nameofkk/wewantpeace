@@ -209,6 +209,23 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // 데이터 변경 시 자연스러운 트랜지션
+  const dataKey = data.nodes.map((n) => n.id).join(",");
+  const [visible, setVisible] = useState(true);
+  const prevKeyRef = useRef(dataKey);
+  useEffect(() => {
+    if (dataKey !== prevKeyRef.current) {
+      setVisible(false); // fade out
+      const timer = setTimeout(() => {
+        prevKeyRef.current = dataKey;
+        setPopupIdx(null);
+        setHoveredNodeId(null);
+        setVisible(true); // fade in with new data
+      }, 180);
+      return () => clearTimeout(timer);
+    }
+  }, [dataKey]);
+
   useEffect(() => {
     function measure() {
       if (containerRef.current) {
@@ -283,10 +300,13 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   return (
     <div className="relative" ref={containerRef}>
       {/* 순수 SVG Sankey */}
-      <div className={cn(
-        "relative",
-        !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
-      )}>
+      <div
+        className={cn(
+          "relative",
+          !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
+        )}
+        style={{ opacity: visible ? 1 : 0, transition: "opacity 0.25s ease-in-out" }}
+      >
         <svg
           width={effectiveWidth}
           height={chartHeight}
@@ -476,7 +496,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       </div>
 
       {/* 분쟁 이슈 버튼 목록 */}
-      <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+      <div className="px-3 pb-2 flex flex-wrap gap-1.5" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.25s ease-in-out" }}>
         {conflictNodes.map((node, idx) => {
           const issue = conflictIssues?.[idx];
           const flags = issue?.countryCodes?.slice(0, 2).map(getFlag).join("") ?? "";
