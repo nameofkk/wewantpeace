@@ -156,12 +156,12 @@ export default function SettingsPage() {
   const [quietStart, setQuietStart] = useState("23:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
   // 토스트 알림
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "info" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
+  const showToast = (msg: string, type: "success" | "info" = "success") => {
+    setToast({ msg, type });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastMsg(null), 3000);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
   };
   // notifSaving/notifSaved 제거 — 자동 저장
 
@@ -1173,19 +1173,15 @@ export default function SettingsPage() {
                     const turningOn = !me?.marketing_agreed_at;
                     const value = turningOn ? "now" : "";
                     patchProfile.mutate({ marketing_agreed_at: value }, {
-                      onSuccess: (data) => {
+                      onSuccess: () => {
                         if (turningOn) {
-                          const d = new Date();
-                          const dateStr = lang === "ko"
-                            ? `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
-                            : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
                           showToast(lang === "ko"
-                            ? `${dateStr}자로 마케팅 수신에 동의하셨습니다.`
-                            : `Marketing consent agreed on ${dateStr}.`);
+                            ? "마케팅 수신에 동의하였습니다"
+                            : "Marketing consent agreed", "success");
                         } else {
                           showToast(lang === "ko"
-                            ? "마케팅 수신 동의를 철회하셨습니다."
-                            : "Marketing consent has been withdrawn.");
+                            ? "마케팅 수신을 거부하였습니다"
+                            : "Marketing consent withdrawn", "info");
                         }
                       },
                     });
@@ -1680,11 +1676,20 @@ export default function SettingsPage() {
         </section>
 
         {/* 토스트 알림 */}
-        {toastMsg && (
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
-              <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-              <p className="text-sm">{toastMsg}</p>
+        {toast && (
+          <div className="fixed bottom-20 inset-x-4 z-50 flex justify-center animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className={cn(
+              "flex items-center gap-2.5 rounded-2xl px-5 py-3 shadow-2xl backdrop-blur-sm whitespace-nowrap",
+              toast.type === "success"
+                ? "bg-emerald-500/90 text-white"
+                : "bg-zinc-700/90 text-zinc-100"
+            )}>
+              {toast.type === "success" ? (
+                <CheckCircle className="h-4 w-4 shrink-0" />
+              ) : (
+                <Mail className="h-4 w-4 shrink-0 opacity-80" />
+              )}
+              <span className="text-[13px] font-medium">{toast.msg}</span>
             </div>
           </div>
         )}

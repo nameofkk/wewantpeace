@@ -743,7 +743,7 @@ export const translations = {
     admin_clusters: "클러스터 관리",
     admin_tension: "긴장도 현황",
     admin_kscore: "KScore 현황",
-    admin_events: "이벤트 뷰어",
+    admin_events: "이벤트 조회",
     admin_reports: "신고 관리",
     admin_settings: "사이트 설정",
     admin_back_to_site: "메인 사이트",
@@ -1034,17 +1034,17 @@ export const translations = {
     admin_marketing: "마케팅",
     admin_comments: "댓글 관리",
     admin_logs: "어드민 로그",
-    admin_trending: "트렌딩",
-    admin_guide_title: "어드민 가이드",
+    admin_trending: "인기 이슈",
+    admin_guide_title: "운영 가이드",
     admin_this_week_followup: "이번 주 팔로업",
     admin_partner_url: "파트너 URL",
     admin_partner_prospect: "잠재",
     admin_partner_rejected: "거절",
 
     // 파이프라인 Overview
-    admin_pipeline: "파이프라인",
-    pipeline_title: "파이프라인 Overview",
-    pipeline_health: "건강상태",
+    admin_pipeline: "수집 현황",
+    pipeline_title: "데이터 수집 현황",
+    pipeline_health: "상태",
     pipeline_stage_collect: "수집",
     pipeline_stage_normalize: "정규화",
     pipeline_stage_dedup: "중복제거",
@@ -1122,8 +1122,8 @@ export const translations = {
     pipeline_push_fail: "테스트 푸시 실패",
     pipeline_orphan_done: "오펀 재처리 완료",
     pipeline_orphan_fail: "오펀 재처리 실패",
-    dashboard_pipeline_health: "파이프라인 건강",
-    dashboard_data_quality: "데이터 품질 (24h)",
+    dashboard_pipeline_health: "수집 상태",
+    dashboard_data_quality: "데이터 정확도 (24h)",
     dashboard_last_24h: "최근 24시간",
 
     // 홈 더보기
@@ -1196,7 +1196,7 @@ export const translations = {
     promo_already_paid: "이미 유료 플랜을 사용 중입니다",
 
     // Phase 2: Admin KPI
-    admin_kpi: "KPI",
+    admin_kpi: "핵심 지표",
 
     // Phase 2: 공유
     share_button: "공유하기",
@@ -1225,7 +1225,7 @@ export const translations = {
     admin_links: "단축 링크",
     admin_reports_perf: "성과 리포트",
     admin_weekly_report: "주간 리포트",
-    admin_guide: "운영 가이드",
+    admin_guide: "운영 매뉴얼",
     admin_social: "SNS 관리",
     admin_social_pending: "승인 대기",
     admin_social_approved: "승인됨",
@@ -1261,7 +1261,7 @@ export const translations = {
     admin_social_platform_filter: "플랫폼 필터",
     admin_social_skipped: "스킵됨",
     admin_content_moderation: "콘텐츠 관리",
-    admin_kpi_weekly: "주간 KPI 추이",
+    admin_kpi_weekly: "주간 지표 추이",
     admin_kpi_wow: "전주 대비",
     admin_kpi_alert: "경고",
     admin_kpi_generate: "스냅샷 생성",

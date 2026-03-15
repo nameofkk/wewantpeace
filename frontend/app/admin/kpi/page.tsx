@@ -44,8 +44,8 @@ function InlineGuide({ lang }: { lang: "ko" | "en" }) {
         <div className="px-4 pb-3 text-xs text-muted-foreground space-y-1 leading-relaxed">
           <p>
             {lang === "ko"
-              ? "KPI 대시보드에서는 온보딩율, Paywall 전환율, Trial\u2192Paid 전환율, D7 리텐션을 실시간으로 추적합니다. 주간 추이 섹션에서 WoW 비교가 가능합니다."
-              : "Track onboarding rate, paywall conversion, trial-to-paid rate, and D7 retention in real time. Use the weekly trend section for WoW comparisons."}
+              ? "온보딩 완료율, 유료 전환율, 체험판→유료 전환율, 7일 재방문율을 실시간으로 추적합니다. 주간 추이에서 전주 대비 비교가 가능합니다."
+              : "Track onboarding rate, paid conversion, trial-to-paid rate, and D7 retention in real time. Use the weekly trend for week-over-week comparisons."}
           </p>
         </div>
       )}
@@ -141,12 +141,12 @@ export default function KpiPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">
-            {lang === "ko" ? "KPI 대시보드" : "KPI Dashboard"}
+            {lang === "ko" ? "핵심 지표" : "KPI Dashboard"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {lang === "ko"
-              ? "Phase Gate 핵심 지표를 실시간으로 추적합니다"
-              : "Track Phase Gate key metrics in real time"}
+              ? "서비스 핵심 지표를 실시간으로 추적합니다"
+              : "Track key metrics in real time"}
           </p>
         </div>
         <select
@@ -166,22 +166,22 @@ export default function KpiPage() {
       {/* KPI Cards — Phase Gate */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label={lang === "ko" ? "온보딩 완료율 (A1)" : "Onboarding Rate (A1)"}
+          label={lang === "ko" ? "온보딩 완료율" : "Onboarding Rate"}
           value={kpi.a1_onboarding_rate}
           color="text-blue-500"
         />
         <KpiCard
-          label={lang === "ko" ? "Paywall 전환율" : "Paywall Conversion"}
+          label={lang === "ko" ? "유료 전환율" : "Paid Conversion"}
           value={kpi.paywall_conversion_rate}
           color="text-green-500"
         />
         <KpiCard
-          label={lang === "ko" ? "Trial → Paid 전환율" : "Trial → Paid Rate"}
+          label={lang === "ko" ? "체험판 → 유료 전환" : "Trial → Paid Rate"}
           value={kpi.trial_to_paid_rate}
           color="text-purple-500"
         />
         <KpiCard
-          label={lang === "ko" ? "D7 리텐션" : "D7 Retention"}
+          label={lang === "ko" ? "7일 재방문율" : "D7 Retention"}
           value={kpi.d7_retention_rate}
           color="text-orange-500"
         />
@@ -190,28 +190,28 @@ export default function KpiPage() {
       {/* 전환 유도 효과 카드 */}
       <div>
         <h2 className="text-sm font-semibold mb-3">
-          {lang === "ko" ? "전환 유도 효과" : "Conversion Pipeline"}
+          {lang === "ko" ? "전환 분석" : "Conversion Pipeline"}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
-            label={lang === "ko" ? "Promo → Paid 전환율" : "Promo → Paid Rate"}
+            label={lang === "ko" ? "프로모 → 유료 전환" : "Promo → Paid Rate"}
             value={kpi.promo_to_paid_rate}
             color="text-cyan-500"
           />
           <KpiCard
-            label={lang === "ko" ? "할인 오퍼 전환율" : "Discount Offer Conv."}
+            label={lang === "ko" ? "할인 전환율" : "Discount Conversion"}
             value={kpi.discount_conversion_rate}
             color="text-pink-500"
           />
           <KpiCard
-            label={lang === "ko" ? "Referral 활성 유저" : "Active Referral Users"}
+            label={lang === "ko" ? "추천 활성 유저" : "Active Referral Users"}
             value={kpi.raw.active_referral_users ?? 0}
             suffix={lang === "ko" ? "명" : ""}
             color="text-amber-500"
           />
           <div className="rounded-xl border border-border bg-card p-5">
             <p className="text-xs text-muted-foreground mb-1">
-              {lang === "ko" ? "할인 대상 / 전환" : "Discount Eligible / Converted"}
+              {lang === "ko" ? "할인 대상 / 유료 전환" : "Discount Eligible / Converted"}
             </p>
             <p className="text-2xl font-bold text-muted-foreground">
               {kpi.raw.discount_eligible ?? 0}
@@ -226,7 +226,7 @@ export default function KpiPage() {
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">
-            {lang === "ko" ? "원시 이벤트 카운트" : "Raw Event Counts"}
+            {lang === "ko" ? "상세 수치" : "Detailed Counts"}
           </h2>
         </div>
         <div className="divide-y divide-border">
@@ -270,16 +270,16 @@ export default function KpiPage() {
                     {lang === "ko" ? "주차" : "Week"}
                   </th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                    {lang === "ko" ? "온보딩율" : "Onboarding"}
+                    {lang === "ko" ? "온보딩" : "Onboarding"}
                   </th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                    {lang === "ko" ? "Paywall" : "Paywall"}
+                    {lang === "ko" ? "유료전환" : "Paid Conv."}
                   </th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                    {lang === "ko" ? "Trial\u2192Paid" : "Trial\u2192Paid"}
+                    {lang === "ko" ? "체험→유료" : "Trial→Paid"}
                   </th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                    {lang === "ko" ? "D7 리텐션" : "D7 Retention"}
+                    {lang === "ko" ? "7일 재방문" : "D7 Retention"}
                   </th>
                 </tr>
               </thead>
