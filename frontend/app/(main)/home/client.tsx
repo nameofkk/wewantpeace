@@ -166,6 +166,14 @@ function ReportContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 바텀시트 열릴 때 배경 스크롤 방지
+  useEffect(() => {
+    if (showCountryPicker) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [showCountryPicker]);
+
   const isGlobalMode = !homeCountry;
   const homeData = Array.isArray(homeTension) ? homeTension[0] : null;
   const singleCountryScore = (homeData as TensionAllItem | null)?.raw_score ?? 0;
@@ -866,7 +874,7 @@ function ReportContent() {
       {showCountryPicker && (
         <>
           <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowCountryPicker(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[70vh] flex flex-col">
+          <div className="fixed bottom-[60px] left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[60vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
               <h3 className="text-sm font-bold">
                 {lang === "ko" ? "기준 국가 선택" : "Select Home Country"}
@@ -878,7 +886,7 @@ function ReportContent() {
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="overflow-y-auto flex-1 py-2">
+            <div className="overflow-y-auto flex-1 py-2 overscroll-contain">
               {/* 글로벌 옵션 */}
               <button
                 onClick={() => {
