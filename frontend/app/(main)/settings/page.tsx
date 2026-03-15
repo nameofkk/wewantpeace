@@ -1279,11 +1279,12 @@ export default function SettingsPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    { icon: "🗺️", ko: "실시간 이슈 지도", en: "Real-time map" },
                     { icon: "✅", ko: "신뢰 알림", en: "Verified alerts" },
-                    { icon: "📊", ko: "KScore 필터", en: "KScore filter" },
+                    { icon: "📊", ko: "KScore 조정", en: "KScore adjust" },
                     { icon: "🔕", ko: "방해금지 시간", en: "Quiet hours" },
                     { icon: "📍", ko: `관심 국가 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} countries` },
+                    { icon: "🛰️", ko: "인텔리전스 레이어", en: "Intel layers" },
+                    { icon: "🔗", ko: "교차검증 상세", en: "Cross-verification" },
                   ].map((f) => (
                     <span key={f.ko} className="flex items-center gap-1 rounded-full bg-primary/8 border border-primary/20 px-2 py-0.5 text-[10px] text-primary/80">
                       <span>{f.icon}</span>
