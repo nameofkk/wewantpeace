@@ -228,12 +228,14 @@ function ReportContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 바텀시트 열릴 때 배경 스크롤 방지 + 전 국가 데이터 prefetch
+  // 바텀시트 열릴 때 배경 스크롤 방지 + watchlist 국가만 prefetch
   useEffect(() => {
     if (showCountryPicker) {
       document.body.style.overflow = "hidden";
-      // 모든 국가 + 글로벌 데이터를 백그라운드에서 미리 로드
-      prefetchSummary(["", ...availableCountries], lang);
+      // watchlist(관심 국가)만 prefetch — 195개국 전체 prefetch 방지
+      if (myCountries.length > 0) {
+        prefetchSummary(myCountries, lang);
+      }
       return () => { document.body.style.overflow = ""; };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
