@@ -676,13 +676,6 @@ export default function TensionPage() {
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-400">LIVE</span>
             </span>
-          </div>
-          {/* 중앙 — 로고 */}
-          <div className="flex justify-center">
-            <LogoIcon height={26} hideText />
-          </div>
-          {/* 오른쪽 */}
-          <div className="flex items-center justify-end gap-1.5">
             {crisisCount > 0 && (
               <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
@@ -703,6 +696,13 @@ export default function TensionPage() {
                   : `🔴 ${crisisCount} Extreme (Score 80+)\n🟠 ${severeCount - crisisCount} Severe (Score 60-80)`}
               />
             )}
+          </div>
+          {/* 중앙 — 로고 */}
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
+          {/* 오른쪽 */}
+          <div className="flex items-center justify-end gap-1.5">
             <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button
               onClick={handleRefresh}
