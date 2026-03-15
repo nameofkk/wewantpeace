@@ -1316,6 +1316,34 @@ SECTOR_DATA = {
         "defense": {"gdp_pct": 3.9, "key_partners": ["IN", "CN", "EG", "DZ", "VN"]},
         "manufacturing": {"gdp_pct": 13.0, "key_partners": ["CN", "BY", "KZ", "TR", "DE"]},
     },
+    "ID": {  # 인도네시아
+        "energy": {"gdp_pct": 3.5, "key_partners": ["SA", "AE", "MY", "NG", "IQ"]},
+        "manufacturing": {"gdp_pct": 20.0, "key_partners": ["CN", "JP", "US", "KR", "TH"]},
+        "agriculture": {"gdp_pct": 13.0, "key_partners": ["CN", "US", "IN", "JP", "MY"]},
+        "mining": {"gdp_pct": 7.0, "key_partners": ["CN", "JP", "IN", "KR", "US"]},
+        "tourism": {"gdp_pct": 4.5, "key_partners": ["MY", "SG", "AU", "CN", "JP"]},
+    },
+    "PH": {  # 필리핀
+        "electronics": {"gdp_pct": 6.0, "key_partners": ["US", "CN", "JP", "HK", "SG"]},
+        "manufacturing": {"gdp_pct": 18.0, "key_partners": ["US", "JP", "CN", "HK", "SG"]},
+        "agriculture": {"gdp_pct": 9.0, "key_partners": ["US", "JP", "CN", "HK", "NL"]},
+        "shipping": {"gdp_pct": 3.0, "key_partners": ["US", "CN", "JP", "SG", "HK"]},
+        "tourism": {"gdp_pct": 5.5, "key_partners": ["KR", "US", "JP", "CN", "AU"]},
+    },
+    "PL": {  # 폴란드
+        "manufacturing": {"gdp_pct": 18.0, "key_partners": ["DE", "FR", "GB", "CZ", "IT"]},
+        "automotive": {"gdp_pct": 4.0, "key_partners": ["DE", "GB", "FR", "IT", "CZ"]},
+        "agriculture": {"gdp_pct": 2.5, "key_partners": ["DE", "GB", "FR", "NL", "IT"]},
+        "energy": {"gdp_pct": 4.0, "key_partners": ["DE", "NO", "US", "SA", "RU"]},
+        "technology": {"gdp_pct": 5.0, "key_partners": ["DE", "US", "GB", "FR", "NL"]},
+    },
+    "EG": {  # 이집트
+        "energy": {"gdp_pct": 6.0, "key_partners": ["IT", "US", "IN", "ES", "TR"]},
+        "tourism": {"gdp_pct": 5.0, "key_partners": ["DE", "GB", "RU", "SA", "US"]},
+        "agriculture": {"gdp_pct": 11.0, "key_partners": ["SA", "US", "IT", "TR", "LY"]},
+        "shipping": {"gdp_pct": 3.5, "key_partners": ["SA", "US", "CN", "IN", "AE"]},
+        "manufacturing": {"gdp_pct": 15.0, "key_partners": ["US", "SA", "TR", "IT", "DE"]},
+    },
 }
 
 # Default sectors for countries without specific data
