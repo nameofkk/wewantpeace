@@ -14,7 +14,7 @@ class NormalizedEvent(Base):
         default=uuid.uuid4,
     )
     raw_event_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("raw_events.id", ondelete="SET NULL"), nullable=True
+        Uuid(as_uuid=True), ForeignKey("raw_events.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String, nullable=False)
     title_ko: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -26,11 +26,11 @@ class NormalizedEvent(Base):
     lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     geohash5: Mapped[str | None] = mapped_column(String(8), nullable=True)
     country_code: Mapped[str | None] = mapped_column(String(4), nullable=True)
-    severity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    severity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, index=True)
     source_tier: Mapped[str] = mapped_column(String(1), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     dedup_key: Mapped[str] = mapped_column(String(64), nullable=False)
-    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_duplicate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     translation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)  # ok | failed | skipped
     geo_method: Mapped[str | None] = mapped_column(String(16), nullable=True)  # keyword | geocoder | fallback | none
     image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)

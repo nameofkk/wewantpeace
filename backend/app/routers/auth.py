@@ -149,40 +149,57 @@ TOSS_API_BASE = "https://apps-in-toss-api.toss.im"
 
 async def _exchange_toss_code(authorization_code: str) -> dict:
     """Toss authorizationCode → accessToken 교환."""
+    import json as _json
     import httpx
 
     if not settings.toss_app_secret:
         raise HTTPException(503, detail="토스 로그인이 설정되지 않았습니다. (TOSS_APP_SECRET 필요)")
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
-            json={"authorizationCode": authorization_code},
-            headers={
-                "Authorization": f"Bearer {settings.toss_app_secret}",
-                "Content-Type": "application/json",
-            },
-        )
-    if resp.status_code != 200:
-        logger.error("토스 토큰 교환 실패: %s %s", resp.status_code, resp.text)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
+                json={"authorizationCode": authorization_code},
+                headers={
+                    "Authorization": f"Bearer {settings.toss_app_secret}",
+                    "Content-Type": "application/json",
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.TimeoutException:
+        logger.error("토스 토큰 교환 타임아웃")
+        raise HTTPException(502, detail="토스 API 응답 시간 초과")
+    except httpx.HTTPStatusError as e:
+        logger.error("토스 토큰 교환 실패: %s %s", e.response.status_code, e.response.text)
         raise HTTPException(502, detail="토스 인증에 실패했습니다.")
-    return resp.json()
+    except (_json.JSONDecodeError, KeyError) as e:
+        logger.error("토스 토큰 응답 파싱 오류: %s", e)
+        raise HTTPException(502, detail="토스 응답을 처리할 수 없습니다.")
 
 
 async def _get_toss_user_key(access_token: str) -> str:
     """Toss accessToken → userKey 조회."""
+    import json as _json
     import httpx
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/login-me",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-    if resp.status_code != 200:
-        logger.error("토스 유저 정보 조회 실패: %s %s", resp.status_code, resp.text)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/login-me",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.TimeoutException:
+        logger.error("토스 유저 정보 조회 타임아웃")
+        raise HTTPException(502, detail="토스 API 응답 시간 초과")
+    except httpx.HTTPStatusError as e:
+        logger.error("토스 유저 정보 조회 실패: %s %s", e.response.status_code, e.response.text)
         raise HTTPException(502, detail="토스 유저 정보를 가져올 수 없습니다.")
-
-    data = resp.json()
+    except (_json.JSONDecodeError, KeyError) as e:
+        logger.error("토스 유저 정보 응답 파싱 오류: %s", e)
+        raise HTTPException(502, detail="토스 응답을 처리할 수 없습니다.")
 
     # 응답이 암호화된 경우 복호화 시도
     if "encryptedData" in data and settings.toss_decryption_key:
@@ -191,7 +208,7 @@ async def _get_toss_user_key(access_token: str) -> str:
     user_key = data.get("userKey") or data.get("user_key")
     if not user_key:
         logger.error("토스 응답에 userKey 없음: %s", list(data.keys()))
-        raise HTTPException(500, detail="토스 유저 식별 실패")
+        raise HTTPException(502, detail="토스 유저 식별 실패")
     return user_key
 
 
@@ -229,7 +246,7 @@ async def toss_login(
     token_data = await _exchange_toss_code(body.authorization_code)
     access_token = token_data.get("accessToken") or token_data.get("access_token")
     if not access_token:
-        raise HTTPException(500, detail="토스 토큰 응답에 accessToken 없음")
+        raise HTTPException(502, detail="토스 토큰 응답에 accessToken 없음")
 
     # 2. userKey 조회
     user_key = await _get_toss_user_key(access_token)

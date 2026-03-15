@@ -537,6 +537,13 @@ def process_raw_event(self, raw_event_id: str):
         from worker.processor.calibration import KSCORE_MIN
         from backend.app.core.redis import get_redis
 
+        # Idempotency lock: 같은 이벤트가 동시에 2번 처리되는 것 방지
+        redis = get_redis()
+        lock_key = f"process_raw_event:{raw_event_id}"
+        if not await redis.set(lock_key, "1", nx=True, ex=300):
+            logger.info("Skipping duplicate event %s", raw_event_id)
+            return {"status": "duplicate_lock", "raw_event_id": raw_event_id}
+
         async with AsyncSessionLocal() as db:
             async with db.begin():
                 # 1. RawEvent 조회
@@ -902,13 +909,18 @@ def calculate_trending(self):
 
         # Phase 2: cross-topic 병합 (같은 국가, 관련 토픽, 유사 제목)
         cross_merged = 0
-        # 활성 클러스터만 재조회 (Phase 1에서 severity=0으로 비활성화된 것 제외)
-        active = [c for c in clusters if c.severity > 0 and c.country_code]
+        # cross-topic 병합 대상 토픽만 필터 (비관련 토픽 early skip으로 O(n) 축소)
+        _cross_topic_all = set()
+        for grp in _CROSS_TOPIC_GROUPS:
+            _cross_topic_all.update(grp)
+        # 활성 클러스터 중 cross-topic 대상 토픽만 필터
+        active = [c for c in clusters if c.severity > 0 and c.country_code and (c.topic or "") in _cross_topic_all]
         # 국가별 그룹
         by_country: dict[str, list] = defaultdict(list)
         for c in active:
             by_country[c.country_code].append(c)
 
+        _cross_window_secs = _CROSS_TOPIC_WINDOW.total_seconds()
         for cc, cc_clusters in by_country.items():
             if len(cc_clusters) <= 1:
                 continue
@@ -917,6 +929,8 @@ def calculate_trending(self):
             merged_ids: set = set()
             for i, winner in enumerate(cc_clusters):
                 if winner.id in merged_ids:
+                    continue
+                if winner.event_count >= _MAX_EVENTS:
                     continue
                 for j in range(i + 1, len(cc_clusters)):
                     loser = cc_clusters[j]
@@ -934,11 +948,11 @@ def calculate_trending(self):
                     )
                     if not in_same_group:
                         continue
-                    # 시간 제한
+                    # 시간 제한 (비용 낮은 검사를 유사도 전에 수행)
                     if (winner.last_event_at and loser.last_event_at
-                            and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _CROSS_TOPIC_WINDOW.total_seconds()):
+                            and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _cross_window_secs):
                         continue
-                    # 제목 유사도 체크
+                    # 제목 유사도 체크 (가장 비용 높은 연산이므로 마지막)
                     sim = _title_similarity(
                         winner.title or "", loser.title or "",
                         ko_a=winner.title_ko, ko_b=loser.title_ko,
@@ -2478,7 +2492,8 @@ async def _send_weekly_report_impl():
         logger.error("send_weekly_report: SMTP 연결 실패: %s", e)
         return {"status": "error", "reason": str(e)}
 
-    for batch_start in range(0, len(all_users), batch_size):
+    async with AsyncSessionLocal() as db:
+      for batch_start in range(0, len(all_users), batch_size):
         batch = all_users[batch_start:batch_start + batch_size]
 
         for user in batch:
@@ -2486,47 +2501,46 @@ async def _send_weekly_report_impl():
                 is_pro = user.plan in ("pro", "pro_plus")
                 lang = "ko"
 
-                async with AsyncSessionLocal() as db:
-                    # 사용자 언어 설정 조회
-                    pref_result = await db.execute(
-                        select(UserPreference).where(UserPreference.user_id == user.id)
-                    )
-                    pref = pref_result.scalar_one_or_none()
-                    if pref and pref.language:
-                        lang = pref.language
+                # 사용자 언어 설정 조회
+                pref_result = await db.execute(
+                    select(UserPreference).where(UserPreference.user_id == user.id)
+                )
+                pref = pref_result.scalar_one_or_none()
+                if pref and pref.language:
+                    lang = pref.language
 
-                    # Pro/Pro+ 사용자: 관심 국가 긴장도 조회
-                    tensions = []
-                    if is_pro:
-                        areas_result = await db.execute(
-                            select(UserArea).where(
-                                UserArea.user_id == user.id,
-                                UserArea.is_active == True,
-                                UserArea.country_code.isnot(None),
-                            )
+                # Pro/Pro+ 사용자: 관심 국가 긴장도 조회
+                tensions = []
+                if is_pro:
+                    areas_result = await db.execute(
+                        select(UserArea).where(
+                            UserArea.user_id == user.id,
+                            UserArea.is_active == True,
+                            UserArea.country_code.isnot(None),
                         )
-                        user_areas = areas_result.scalars().all()
-                        country_codes = [a.country_code for a in user_areas if a.country_code]
+                    )
+                    user_areas = areas_result.scalars().all()
+                    country_codes = [a.country_code for a in user_areas if a.country_code]
 
-                        if country_codes:
-                            tension_result = await db.execute(
-                                text("""
-                                    SELECT DISTINCT ON (country_code)
-                                        country_code, tension_level, raw_score
-                                    FROM tension_index
-                                    WHERE country_code = ANY(:codes)
-                                    ORDER BY country_code, time DESC
-                                """),
-                                {"codes": country_codes},
-                            )
-                            tensions = [
-                                {
-                                    "country_code": row.country_code,
-                                    "tension_level": row.tension_level,
-                                    "raw_score": row.raw_score,
-                                }
-                                for row in tension_result.fetchall()
-                            ]
+                    if country_codes:
+                        tension_result = await db.execute(
+                            text("""
+                                SELECT DISTINCT ON (country_code)
+                                    country_code, tension_level, raw_score
+                                FROM tension_index
+                                WHERE country_code = ANY(:codes)
+                                ORDER BY country_code, time DESC
+                            """),
+                            {"codes": country_codes},
+                        )
+                        tensions = [
+                            {
+                                "country_code": row.country_code,
+                                "tension_level": row.tension_level,
+                                "raw_score": row.raw_score,
+                            }
+                            for row in tension_result.fetchall()
+                        ]
 
                 # 템플릿 렌더링
                 subject_ko = "WeWantPeace 주간 리포트"
@@ -2551,16 +2565,15 @@ async def _send_weekly_report_impl():
                 smtp.sendmail(sender, user.email, msg.as_string())
 
                 # 발송 로그 기록
-                async with AsyncSessionLocal() as db:
-                    async with db.begin():
-                        await db.execute(
-                            text(
-                                "INSERT INTO marketing_email_logs"
-                                " (user_id, subject, status)"
-                                " VALUES (:uid, :subj, :st)"
-                            ),
-                            {"uid": str(user.id), "subj": subject, "st": "sent"},
-                        )
+                async with db.begin():
+                    await db.execute(
+                        text(
+                            "INSERT INTO marketing_email_logs"
+                            " (user_id, subject, status)"
+                            " VALUES (:uid, :subj, :st)"
+                        ),
+                        {"uid": str(user.id), "subj": subject, "st": "sent"},
+                    )
 
                 sent_total += 1
 
@@ -2571,22 +2584,21 @@ async def _send_weekly_report_impl():
                 )
                 # 실패 로그 기록
                 try:
-                    async with AsyncSessionLocal() as db:
-                        async with db.begin():
-                            await db.execute(
-                                text(
-                                    "INSERT INTO marketing_email_logs"
-                                    " (user_id, subject, status)"
-                                    " VALUES (:uid, :subj, :st)"
-                                ),
-                                {
-                                    "uid": str(user.id),
-                                    "subj": "WeWantPeace Weekly Report",
-                                    "st": "failed",
-                                },
-                            )
+                    async with db.begin():
+                        await db.execute(
+                            text(
+                                "INSERT INTO marketing_email_logs"
+                                " (user_id, subject, status)"
+                                " VALUES (:uid, :subj, :st)"
+                            ),
+                            {
+                                "uid": str(user.id),
+                                "subj": "WeWantPeace Weekly Report",
+                                "st": "failed",
+                            },
+                        )
                 except Exception:
-                    pass
+                    logger.exception("send_weekly_report: 실패 로그 기록 중 오류 [user=%s]", user.id)
                 failed_total += 1
 
         # 배치 간 딜레이 (마지막 배치 제외)
@@ -2597,7 +2609,7 @@ async def _send_weekly_report_impl():
     try:
         smtp.quit()
     except Exception:
-        pass
+        logger.debug("send_weekly_report: SMTP quit 실패 (무시)", exc_info=True)
 
     logger.info(
         "send_weekly_report 완료: sent=%d, failed=%d",
@@ -3690,7 +3702,7 @@ def recheck_inactive_feeds(self):
                                     await redis.delete(f"rss:consecutive_errors:{feed.id}")
                                     await redis.delete(f"rss:not_found:{feed.id}")
                                 except Exception:
-                                    pass
+                                    logger.debug("Redis 에러 카운트 리셋 실패 (feed=%s)", feed.id, exc_info=True)
 
                             recovered.append(feed.display_name)
                             logger.info(

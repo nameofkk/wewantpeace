@@ -78,9 +78,12 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncSession:
+async def get_db():
+    """Canonical DB session dependency — 모든 라우터에서 이 함수를 사용할 것."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
-        finally:
-            await session.close()
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

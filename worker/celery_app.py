@@ -25,6 +25,9 @@ app.conf.update(
     # 재시도 설정
     task_max_retries=3,
     task_default_retry_delay=60,
+    task_retry_backoff=True,      # exponential backoff 활성화
+    task_retry_backoff_max=600,   # 최대 10분
+    task_retry_jitter=True,       # jitter 추가
     # Celery 6.0 deprecation warning 제거
     broker_connection_retry_on_startup=True,
 )

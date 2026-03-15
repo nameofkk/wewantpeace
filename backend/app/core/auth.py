@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from backend.app.models.user import User, UserPreference
-from backend.app.core.database import AsyncSessionLocal
+from backend.app.core.database import AsyncSessionLocal, get_db
 from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -34,16 +34,6 @@ else:
 
 if DISABLE_AUTH:
     logger.warning("⚠️  DISABLE_AUTH=true: Firebase 토큰 검증이 비활성화됩니다. 개발 환경에서만 사용하세요.")
-
-
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
 
 
 def _verify_firebase_token(token: str) -> Optional[dict]:

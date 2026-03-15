@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import CheckConstraint, ForeignKey, String, TIMESTAMP, Uuid
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, TIMESTAMP, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from backend.app.core.database import Base
 
@@ -26,4 +26,5 @@ class AlertDeliveryLog(Base):
     __table_args__ = (
         CheckConstraint("decision IN ('pending','sent','failed','suppressed')", name="ck_delivery_decision"),
         CheckConstraint("pipeline_mode IN ('shadow','primary')", name="ck_pipeline_mode"),
+        Index("ix_alert_delivery_log_user_cluster_created", "user_id", "cluster_id", "created_at"),
     )

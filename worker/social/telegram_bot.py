@@ -400,11 +400,15 @@ async def _poll_updates():
                         elif chat_id and str(chat_id) == SOCIAL_TG_CHAT_ID and text:
                             await _handle_agent_message(client, chat_id, text)
 
-            # edit_pending TTL 정리: 10분 이상 된 엔트리 제거
+            # edit_pending TTL 정리: 30분 이상 된 엔트리 제거
             now = datetime.now(timezone.utc)
-            expired = [cid for cid, (_, created) in edit_pending.items() if (now - created).total_seconds() > 600]
+            expired = [cid for cid, (_, created) in edit_pending.items() if (now - created).total_seconds() > 1800]
             for cid in expired:
                 edit_pending.pop(cid, None)
+            # 안전장치: dict가 비정상적으로 커지면 전체 초기화
+            if len(edit_pending) > 1000:
+                logger.warning("edit_pending 크기 초과 (%d), 전체 초기화", len(edit_pending))
+                edit_pending.clear()
 
         except Exception:
             logger.exception("Telegram polling 오류")

@@ -213,12 +213,26 @@ logger.info("CORS allowed_origins: %s", settings.allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_origin_regex=r"https://.*\.toss\.im",
+    allow_origins=settings.allowed_origins + [
+        "https://apps-in-toss.toss.im",
+        "https://apps-in-toss-api.toss.im",
+        "https://www.wewantpeace.live",
+        "https://wewantpeace.live",
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-UID", "X-Requested-With"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 import os as _os
@@ -245,11 +259,25 @@ app.include_router(signals_router.router)
 @app.get("/health")
 @limiter.limit("60/minute")
 async def health_check(request: Request):
-    return {
-        "status": "ok",
-        "app": settings.app_name,
-        "version": "0.1.0",
-    }
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.core.redis import get_redis
+    from sqlalchemy import text
+
+    status = {"api": "ok"}
+    try:
+        async with AsyncSessionLocal() as s:
+            await s.execute(text("SELECT 1"))
+        status["db"] = "ok"
+    except Exception:
+        status["db"] = "error"
+    try:
+        r = get_redis()
+        await r.ping()
+        status["redis"] = "ok"
+    except Exception:
+        status["redis"] = "error"
+    code = 200 if all(v == "ok" for v in status.values()) else 503
+    return JSONResponse(status, status_code=code)
 
 
 @app.get("/")

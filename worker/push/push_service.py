@@ -122,16 +122,28 @@ def _daily_push_key(user_id: str, tz_name: str = "") -> str:
     return f"{_DAILY_PUSH_KEY_PREFIX}{user_id}:{today}"
 
 
-async def _check_daily_limit(user_id: str, plan: str, redis, tz_name: str = "") -> bool:
-    """일일 푸시 상한 확인. 초과 시 True 반환."""
+async def _check_and_increment_daily(user_id: str, plan: str, redis, tz_name: str = "") -> bool:
+    """일일 푸시 상한 확인+증가 (atomic INCR 기반). 초과 시 True 반환.
+
+    GET+SET race condition 방지: INCR로 atomic하게 카운터를 증가시키고,
+    상한 초과 시 DECR로 되돌린다. 미초과 시 이미 카운트 증가 완료.
+    """
     limit = DAILY_PUSH_LIMITS.get(plan, DAILY_PUSH_LIMITS["free"])
     key = _daily_push_key(user_id, tz_name=tz_name)
-    current = await redis.get(key)
-    return int(current or 0) >= limit
+    pipe = redis.pipeline()
+    pipe.incr(key)
+    pipe.expire(key, 86400)  # 24시간 TTL
+    results = await pipe.execute()
+    current = results[0]  # INCR 결과 (증가 후 값)
+    if current > limit:
+        # 상한 초과: 되돌리기
+        await redis.decr(key)
+        return True
+    return False
 
 
 async def _increment_daily_push(user_id: str, redis, tz_name: str = ""):
-    """일일 푸시 카운터 증가."""
+    """일일 푸시 카운터 증가 (하위호환 유지)."""
     key = _daily_push_key(user_id, tz_name=tz_name)
     pipe = redis.pipeline()
     pipe.incr(key)
@@ -393,7 +405,7 @@ async def _apply_daily_limits(
         if severity >= CRITICAL_SEVERITY_MIN and plan in ("pro", "pro_plus"):
             allowed_tokens.append(t)
             continue
-        exceeded = await _check_daily_limit(str(t.user_id), plan, redis, tz_name=t.tz_name)
+        exceeded = await _check_and_increment_daily(str(t.user_id), plan, redis, tz_name=t.tz_name)
         if exceeded:
             extra_suppressed.append(_SuppressedInfo(t.user_id, t.platform, "daily_limit"))
             # 상한 첫 도달 시 알림 발송 (1회)
@@ -1153,7 +1165,7 @@ async def send_alert(
         )
         await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
         all_invalid.extend(invalid_v)
-        await _increment_daily_push_for_tokens(target_v.tokens, redis)
+        # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
         verified_user_ids = {t.user_id for t in target_v.tokens}
 
         # Redis 중복방지 설정
@@ -1207,7 +1219,7 @@ async def send_alert(
         )
         await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
         all_invalid.extend(invalid_f)
-        await _increment_daily_push_for_tokens(target_f.tokens, redis)
+        # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
 
         # Redis 중복방지 설정
         await redis.setex(f"alert:fast:{cluster_id}", 259200, "1")  # 72h

@@ -132,6 +132,21 @@ def _area_to_out(a: UserArea) -> AreaOut:
     )
 
 
+def _parse_time(value: str, field: str) -> dt_time:
+    """'HH:MM' 문자열을 datetime.time 으로 파싱. 실패 시 HTTPException(422)."""
+    try:
+        parts = value.split(":")
+        if len(parts) != 2:
+            raise ValueError
+        h, m = int(parts[0]), int(parts[1])
+        return dt_time(h, m)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_FORMAT", "field": field, "expected": "HH:MM"},
+        )
+
+
 def _pref_to_out(p: UserPreference) -> PreferencesOut:
     return PreferencesOut(
         language=p.language,
@@ -415,7 +430,6 @@ async def update_preferences(
         pref.timezone = body.timezone
     # quiet_hours: "" = 해제, "HH:MM" = 설정 (Pro 이상만 허용)
     if body.quiet_hours_start is not None:
-        from datetime import time as dt_time
         if body.quiet_hours_start == "":
             pref.quiet_hours_start = None
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
@@ -424,16 +438,8 @@ async def update_preferences(
                 detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
             )
         else:
-            try:
-                parts = body.quiet_hours_start.split(":")
-                if len(parts) != 2:
-                    raise ValueError
-                h, m = int(parts[0]), int(parts[1])
-                pref.quiet_hours_start = dt_time(h, m)
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_start", "expected": "HH:MM"})
+            pref.quiet_hours_start = _parse_time(body.quiet_hours_start, "quiet_hours_start")
     if body.quiet_hours_end is not None:
-        from datetime import time as dt_time
         if body.quiet_hours_end == "":
             pref.quiet_hours_end = None
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
@@ -442,14 +448,7 @@ async def update_preferences(
                 detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
             )
         else:
-            try:
-                parts = body.quiet_hours_end.split(":")
-                if len(parts) != 2:
-                    raise ValueError
-                h, m = int(parts[0]), int(parts[1])
-                pref.quiet_hours_end = dt_time(h, m)
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_end", "expected": "HH:MM"})
+            pref.quiet_hours_end = _parse_time(body.quiet_hours_end, "quiet_hours_end")
 
     if body.notify_engagement is not None:
         pref.notify_engagement = body.notify_engagement
