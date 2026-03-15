@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>WeWantPeace 프로모션 스크린샷 (1080x1920) x4</title>
+<title>WeWantPeace 프로모션 스크린샷 (1080x1920) x4 - 한국어</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -32,19 +32,19 @@
     opacity: 0.5;
   }
 
-  /* 상단 텍스트 영역 */
+  /* 상단 텍스트 */
   .top {
     position: relative;
     z-index: 10;
     text-align: center;
-    padding: 120px 60px 50px;
+    padding: 80px 60px 40px;
   }
   .headline {
-    font-size: 56px;
+    font-size: 54px;
     font-weight: 900;
     color: #F8FAFC;
     line-height: 1.35;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     letter-spacing: -1px;
   }
   .headline em {
@@ -54,249 +54,127 @@
     -webkit-text-fill-color: transparent;
   }
   .subline {
-    font-size: 28px;
+    font-size: 26px;
     color: #94A3B8;
-    line-height: 1.6;
+    line-height: 1.5;
     font-weight: 400;
   }
 
-  /* 하단 폰 목업 영역 */
-  .phone-area {
+  /* 폰 목업 - 전체 보이게 */
+  .phone-wrap {
     position: relative;
     z-index: 10;
-    flex: 1;
     display: flex;
     justify-content: center;
-    padding: 30px 80px 0;
+    padding: 20px 100px 60px;
   }
-  .phone-mock {
-    width: 680px;
-    height: 100%;
-    background: #1E293B;
-    border-radius: 40px 40px 0 0;
-    border: 3px solid rgba(255,255,255,0.1);
-    border-bottom: none;
+  .phone {
+    width: 620px;
+    height: 1300px;
+    background: #000;
+    border-radius: 50px;
+    border: 4px solid #333;
     overflow: hidden;
-    box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+    box-shadow:
+      0 0 0 2px #1a1a1a,
+      0 20px 60px rgba(0,0,0,0.6),
+      0 0 80px rgba(59,130,246,0.08);
     display: flex;
     flex-direction: column;
   }
-  /* 폰 상단 바 */
-  .phone-bar {
-    height: 44px;
+  /* 상단 노치 */
+  .phone-status {
+    height: 50px;
     background: #0F172A;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
     flex-shrink: 0;
+    position: relative;
   }
-  .phone-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
-  .phone-bar .notch { width: 120px; height: 24px; border-radius: 12px; background: #000; }
-
-  /* 폰 내부 콘텐츠 */
-  .phone-content {
+  .notch {
+    width: 160px;
+    height: 28px;
+    background: #000;
+    border-radius: 0 0 18px 18px;
+    position: absolute;
+    top: 0;
+  }
+  /* 스크린샷 이미지 영역 */
+  .phone-screen {
     flex: 1;
-    background: #0F172A;
-    padding: 20px;
     overflow: hidden;
+    position: relative;
+    background: #0F172A;
   }
-
-  /* ── 카드 UI들 ── */
-  .ui-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 14px;
-  }
-  .ui-card-sm {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 14px;
-    margin-bottom: 10px;
-  }
-  .ui-label {
-    font-size: 13px;
-    font-weight: 700;
-    color: #64748B;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 10px;
-  }
-  .ui-big-num {
-    font-size: 52px;
-    font-weight: 900;
-    line-height: 1;
-    margin-bottom: 4px;
-  }
-  .ui-sub {
-    font-size: 13px;
-    color: #64748B;
-  }
-
-  /* 긴장도 바 */
-  .t-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    font-size: 15px;
-  }
-  .t-flag { font-size: 20px; }
-  .t-name { color: #CBD5E1; width: 80px; font-weight: 500; font-size: 14px; }
-  .t-bar { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
-  .t-fill { height: 100%; border-radius: 4px; }
-  .t-score { font-size: 16px; font-weight: 800; width: 36px; text-align: right; }
-  .c-red { color: #F87171; }
-  .c-orange { color: #FBBF24; }
-  .c-green { color: #34D399; }
-  .f-red { background: linear-gradient(90deg, #EF4444, #F87171); }
-  .f-orange { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
-  .f-green { background: linear-gradient(90deg, #10B981, #34D399); }
-
-  /* 알림 아이템 */
-  .noti-item {
-    display: flex;
-    gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .noti-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-  .noti-text { font-size: 15px; color: #E2E8F0; line-height: 1.4; font-weight: 500; }
-  .noti-meta { font-size: 12px; color: #64748B; margin-top: 3px; }
-
-  /* 영향도 행 */
-  .imp-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .imp-icon { font-size: 20px; }
-  .imp-name { flex: 1; font-size: 15px; color: #CBD5E1; font-weight: 500; }
-  .imp-val { font-size: 15px; font-weight: 700; }
-
-  /* 지도 대체 */
-  .map-placeholder {
+  .phone-screen img {
     width: 100%;
     height: 100%;
-    background:
-      radial-gradient(ellipse at 30% 40%, rgba(239,68,68,0.2) 0%, transparent 50%),
-      radial-gradient(ellipse at 70% 35%, rgba(251,191,36,0.15) 0%, transparent 40%),
-      radial-gradient(ellipse at 50% 60%, rgba(59,130,246,0.1) 0%, transparent 50%),
-      linear-gradient(180deg, #0F172A, #1E293B);
-    border-radius: 12px;
-    position: relative;
-    overflow: hidden;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
   }
-  .map-grid {
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px);
-    background-size: 30px 30px;
-  }
-  .map-dot {
-    position: absolute;
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.3); }
-  }
-  .map-label {
-    position: absolute;
-    font-size: 11px;
-    color: rgba(255,255,255,0.5);
-    font-weight: 500;
-  }
-
-  /* 네비게이션 바 */
-  .nav-bar {
+  /* 이미지 없을 때 안내 */
+  .phone-screen .placeholder {
+    width: 100%;
+    height: 100%;
     display: flex;
-    justify-content: space-around;
-    padding: 12px 0;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 18px;
+    text-align: center;
+    padding: 40px;
+    line-height: 1.6;
+  }
+  /* 하단 홈버튼 바 */
+  .phone-home {
+    height: 28px;
     background: #0F172A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
   }
-  .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    font-size: 10px;
-    color: #64748B;
-    font-weight: 500;
+  .phone-home .bar {
+    width: 120px;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
   }
-  .nav-icon { font-size: 18px; }
-  .nav-active { color: #60A5FA; }
 </style>
 </head>
 <body>
 
+<!--
+  사용법:
+  1. 앱에서 각 페이지 스크린샷을 캡처 (모바일 또는 DevTools 모바일 모드)
+  2. 이 HTML과 같은 폴더에 이미지 파일 저장
+  3. 아래 <img src="..."> 경로를 실제 파일명으로 변경
+  4. 브라우저에서 열고 각 프레임을 1080x1920으로 캡처
+
+  추천 스크린샷:
+  - screenshot-home.png : 홈 대시보드 (긴장도 리스트 보이는 화면)
+  - screenshot-impact.png : 홈 하단 영향도 섹션
+  - screenshot-map.png : 이슈 지도 페이지
+  - screenshot-feed.png : 피드/알림 페이지
+-->
+
 <!-- ========== 프레임 1: 긴장도 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(239,68,68,0.3), transparent); top: 100px; right: -200px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(239,68,68,0.3), transparent); top: 50px; right: -200px;"></div>
   <div class="top">
     <div class="headline">지금, 세계는<br><em>얼마나 위험한가</em></div>
     <div class="subline">국가별 긴장도 지수를<br>실시간으로 확인하세요</div>
   </div>
-  <div class="phone-area">
-    <div class="phone-mock">
-      <div class="phone-bar"><div class="notch"></div></div>
-      <div class="phone-content">
-        <div class="ui-card">
-          <div class="ui-label">Global Tension</div>
-          <div class="ui-big-num c-orange">72</div>
-          <div class="ui-sub">15분 전 갱신 · 197개국 기준</div>
-        </div>
-        <div class="ui-card">
-          <div class="ui-label">Watchlist</div>
-          <div class="t-row">
-            <span class="t-flag">&#x1F1FA;&#x1F1E6;</span>
-            <span class="t-name">Ukraine</span>
-            <div class="t-bar"><div class="t-fill f-red" style="width:89%"></div></div>
-            <span class="t-score c-red">89</span>
-          </div>
-          <div class="t-row">
-            <span class="t-flag">&#x1F1F5;&#x1F1F8;</span>
-            <span class="t-name">Palestine</span>
-            <div class="t-bar"><div class="t-fill f-red" style="width:82%"></div></div>
-            <span class="t-score c-red">82</span>
-          </div>
-          <div class="t-row">
-            <span class="t-flag">&#x1F1F8;&#x1F1E9;</span>
-            <span class="t-name">Sudan</span>
-            <div class="t-bar"><div class="t-fill f-orange" style="width:67%"></div></div>
-            <span class="t-score c-orange">67</span>
-          </div>
-          <div class="t-row">
-            <span class="t-flag">&#x1F1F2;&#x1F1F2;</span>
-            <span class="t-name">Myanmar</span>
-            <div class="t-bar"><div class="t-fill f-orange" style="width:58%"></div></div>
-            <span class="t-score c-orange">58</span>
-          </div>
-          <div class="t-row">
-            <span class="t-flag">&#x1F1F0;&#x1F1F7;</span>
-            <span class="t-name">Korea</span>
-            <div class="t-bar"><div class="t-fill f-green" style="width:18%"></div></div>
-            <span class="t-score c-green">18</span>
-          </div>
-        </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-screen">
+        <img src="screenshot-home.png" alt="Home Dashboard">
       </div>
-      <div class="nav-bar">
-        <div class="nav-item nav-active"><span class="nav-icon">&#x1F3E0;</span>Home</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
-        <div class="nav-item"><span class="nav-icon">&#x2699;</span>Settings</div>
-      </div>
+      <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
@@ -304,49 +182,18 @@
 <!-- ========== 프레임 2: 영향도 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(59,130,246,0.3), transparent); top: 200px; left: -200px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(59,130,246,0.3), transparent); top: 100px; left: -200px;"></div>
   <div class="top">
     <div class="headline">이 분쟁,<br><em>나에게 무슨 영향?</em></div>
     <div class="subline">경제 · 무역 · 여행<br>내 나라 기준 영향도 분석</div>
   </div>
-  <div class="phone-area">
-    <div class="phone-mock">
-      <div class="phone-bar"><div class="notch"></div></div>
-      <div class="phone-content">
-        <div class="ui-card" style="text-align:center; padding: 30px;">
-          <div class="ui-label">Impact Score</div>
-          <div class="ui-big-num" style="font-size:80px; background: linear-gradient(135deg, #F87171, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">72</div>
-          <div class="ui-sub">대한민국 기준 글로벌 영향도</div>
-        </div>
-        <div class="ui-card">
-          <div class="imp-row">
-            <span class="imp-icon">&#9981;</span>
-            <span class="imp-name">에너지 리스크</span>
-            <span class="imp-val c-red">HIGH</span>
-          </div>
-          <div class="imp-row">
-            <span class="imp-icon">&#x1F6E1;&#xFE0F;</span>
-            <span class="imp-name">방위산업 영향</span>
-            <span class="imp-val c-orange">MED</span>
-          </div>
-          <div class="imp-row">
-            <span class="imp-icon">&#x1F4E6;</span>
-            <span class="imp-name">무역 리스크</span>
-            <span class="imp-val c-orange">MED</span>
-          </div>
-          <div class="imp-row" style="border: none;">
-            <span class="imp-icon">&#x2708;&#xFE0F;</span>
-            <span class="imp-name">여행 안전도</span>
-            <span class="imp-val c-green">LOW</span>
-          </div>
-        </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-screen">
+        <img src="screenshot-impact.png" alt="Impact Analysis">
       </div>
-      <div class="nav-bar">
-        <div class="nav-item nav-active"><span class="nav-icon">&#x1F3E0;</span>Home</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
-        <div class="nav-item"><span class="nav-icon">&#x2699;</span>Settings</div>
-      </div>
+      <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
@@ -354,48 +201,18 @@
 <!-- ========== 프레임 3: 지도 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(16,185,129,0.3), transparent); top: 150px; right: -150px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(16,185,129,0.3), transparent); top: 50px; right: -150px;"></div>
   <div class="top">
     <div class="headline">한눈에 보는<br><em>글로벌 분쟁 지도</em></div>
     <div class="subline">히트맵과 마커로<br>분쟁 현황을 직관적으로</div>
   </div>
-  <div class="phone-area">
-    <div class="phone-mock">
-      <div class="phone-bar"><div class="notch"></div></div>
-      <div class="phone-content" style="padding:0;">
-        <div class="map-placeholder">
-          <div class="map-grid"></div>
-          <!-- 분쟁 지역 표시 -->
-          <div class="map-dot" style="width:40px;height:40px;background:rgba(239,68,68,0.4);top:28%;left:52%;box-shadow:0 0 20px rgba(239,68,68,0.6);"></div>
-          <div class="map-dot" style="width:30px;height:30px;background:rgba(239,68,68,0.35);top:35%;left:48%;box-shadow:0 0 15px rgba(239,68,68,0.5);"></div>
-          <div class="map-dot" style="width:35px;height:35px;background:rgba(251,191,36,0.35);top:50%;left:46%;box-shadow:0 0 15px rgba(251,191,36,0.5);"></div>
-          <div class="map-dot" style="width:25px;height:25px;background:rgba(251,191,36,0.3);top:42%;left:68%;box-shadow:0 0 12px rgba(251,191,36,0.4);animation-delay:0.5s;"></div>
-          <div class="map-dot" style="width:20px;height:20px;background:rgba(59,130,246,0.3);top:30%;left:35%;box-shadow:0 0 10px rgba(59,130,246,0.4);animation-delay:1s;"></div>
-          <!-- 라벨 -->
-          <div class="map-label" style="top:24%;left:48%;">Ukraine</div>
-          <div class="map-label" style="top:32%;left:44%;">Gaza</div>
-          <div class="map-label" style="top:47%;left:42%;">Sudan</div>
-          <div class="map-label" style="top:39%;left:64%;">Myanmar</div>
-          <!-- 범례 -->
-          <div style="position:absolute;bottom:20px;left:20px;display:flex;gap:16px;">
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.5);">
-              <div style="width:10px;height:10px;border-radius:50%;background:#EF4444;"></div>Critical
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.5);">
-              <div style="width:10px;height:10px;border-radius:50%;background:#FBBF24;"></div>High
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.5);">
-              <div style="width:10px;height:10px;border-radius:50%;background:#3B82F6;"></div>Moderate
-            </div>
-          </div>
-        </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-screen">
+        <img src="screenshot-map.png" alt="Conflict Map">
       </div>
-      <div class="nav-bar">
-        <div class="nav-item"><span class="nav-icon">&#x1F3E0;</span>Home</div>
-        <div class="nav-item nav-active"><span class="nav-icon">&#x1F30D;</span>Map</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
-        <div class="nav-item"><span class="nav-icon">&#x2699;</span>Settings</div>
-      </div>
+      <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
@@ -403,63 +220,18 @@
 <!-- ========== 프레임 4: 알림 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(251,191,36,0.3), transparent); top: 150px; left: -150px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(251,191,36,0.3), transparent); top: 50px; left: -150px;"></div>
   <div class="top">
     <div class="headline">내 관심 국가<br><em>긴급 알림 즉시 수신</em></div>
     <div class="subline">중요한 이슈만 골라서<br>실시간 푸시 알림</div>
   </div>
-  <div class="phone-area">
-    <div class="phone-mock">
-      <div class="phone-bar"><div class="notch"></div></div>
-      <div class="phone-content">
-        <div class="ui-card">
-          <div class="ui-label">Latest Alerts</div>
-          <div class="noti-item">
-            <div class="noti-dot" style="background:#EF4444;"></div>
-            <div>
-              <div class="noti-text">&#x1F1FA;&#x1F1E6; 우크라이나 동부 전선 신규 교전</div>
-              <div class="noti-meta">KScore 8.2 · 3분 전</div>
-            </div>
-          </div>
-          <div class="noti-item">
-            <div class="noti-dot" style="background:#F59E0B;"></div>
-            <div>
-              <div class="noti-text">&#x1F1F5;&#x1F1F8; 가자 지구 휴전 협상 재개</div>
-              <div class="noti-meta">KScore 6.5 · 15분 전</div>
-            </div>
-          </div>
-          <div class="noti-item">
-            <div class="noti-dot" style="background:#3B82F6;"></div>
-            <div>
-              <div class="noti-text">&#x1F1F8;&#x1F1E9; 수단 인도적 지원 통로 합의</div>
-              <div class="noti-meta">KScore 5.1 · 42분 전</div>
-            </div>
-          </div>
-          <div class="noti-item" style="border:none;">
-            <div class="noti-dot" style="background:#10B981;"></div>
-            <div>
-              <div class="noti-text">&#x1F1F0;&#x1F1F7; 한반도 긴장도 하락 추세</div>
-              <div class="noti-meta">KScore 4.2 · 1시간 전</div>
-            </div>
-          </div>
-        </div>
-        <div class="ui-card-sm" style="text-align:center;">
-          <div style="font-size:14px; color:#64748B;">관심 국가 설정 →</div>
-          <div style="display:flex; justify-content:center; gap:8px; margin-top:8px;">
-            <span style="font-size:24px;">&#x1F1FA;&#x1F1E6;</span>
-            <span style="font-size:24px;">&#x1F1F5;&#x1F1F8;</span>
-            <span style="font-size:24px;">&#x1F1F8;&#x1F1E9;</span>
-            <span style="font-size:24px;">&#x1F1F0;&#x1F1F7;</span>
-            <span style="font-size:20px; color:#64748B;">+</span>
-          </div>
-        </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-screen">
+        <img src="screenshot-feed.png" alt="Feed & Alerts">
       </div>
-      <div class="nav-bar">
-        <div class="nav-item"><span class="nav-icon">&#x1F3E0;</span>Home</div>
-        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
-        <div class="nav-item nav-active"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
-        <div class="nav-item"><span class="nav-icon">&#x2699;</span>Settings</div>
-      </div>
+      <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
