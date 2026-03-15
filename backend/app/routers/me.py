@@ -78,6 +78,14 @@ class PushTokenCreate(BaseModel):
     platform: str = "web"
 
 
+class ProfilePatchBody(BaseModel):
+    nickname: Optional[str] = None
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    marketing_agreed_at: Optional[str] = None  # ISO datetime, "now", or "" to revoke
+
+
 class UserOut(BaseModel):
     id: str
     firebase_uid: str
@@ -87,6 +95,8 @@ class UserOut(BaseModel):
     nickname: Optional[str] = None
     display_name: Optional[str] = None
     bio: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    marketing_agreed_at: Optional[str] = None
     agreed_terms_at: Optional[str] = None
 
 
@@ -135,19 +145,64 @@ def _pref_to_out(p: UserPreference) -> PreferencesOut:
 
 # ── /me (내 정보) ─────────────────────────────────────────────────────────────
 
+def _me_to_out(u: User) -> UserOut:
+    return UserOut(
+        id=str(u.id),
+        firebase_uid=u.firebase_uid,
+        plan=u.plan,
+        role=u.role or "user",
+        email=u.email,
+        nickname=u.nickname,
+        display_name=u.display_name,
+        bio=u.bio,
+        profile_image_url=u.profile_image_url,
+        marketing_agreed_at=u.marketing_agreed_at.isoformat() if u.marketing_agreed_at else None,
+        agreed_terms_at=u.agreed_terms_at.isoformat() if u.agreed_terms_at else None,
+    )
+
+
 @router.get("", response_model=UserOut)
 async def get_me(current_user: User = Depends(get_current_user)):
-    return UserOut(
-        id=str(current_user.id),
-        firebase_uid=current_user.firebase_uid,
-        plan=current_user.plan,
-        role=current_user.role or "user",
-        email=current_user.email,
-        nickname=current_user.nickname,
-        display_name=current_user.display_name,
-        bio=current_user.bio,
-        agreed_terms_at=current_user.agreed_terms_at.isoformat() if current_user.agreed_terms_at else None,
-    )
+    return _me_to_out(current_user)
+
+
+@router.patch("", response_model=UserOut)
+async def patch_me(
+    body: ProfilePatchBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로필 수정 (마케팅 동의 등)."""
+    if body.nickname is not None:
+        nick = body.nickname.strip()
+        if nick != current_user.nickname:
+            existing = await db.execute(select(User).where(User.nickname == nick))
+            if existing.scalar_one_or_none():
+                raise HTTPException(409, detail="이미 사용 중인 닉네임입니다.")
+        current_user.nickname = nick
+    if body.display_name is not None:
+        current_user.display_name = body.display_name
+    if body.bio is not None:
+        if len(body.bio) > 200:
+            raise HTTPException(422, detail="자기소개는 200자 이내로 입력해주세요.")
+        current_user.bio = body.bio
+    if body.profile_image_url is not None:
+        current_user.profile_image_url = body.profile_image_url
+    if body.marketing_agreed_at is not None:
+        if body.marketing_agreed_at == "":
+            current_user.marketing_agreed_at = None
+        else:
+            if body.marketing_agreed_at.lower() == "now":
+                current_user.marketing_agreed_at = datetime.now(timezone.utc)
+            else:
+                try:
+                    current_user.marketing_agreed_at = datetime.fromisoformat(
+                        body.marketing_agreed_at.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    raise HTTPException(422, detail="marketing_agreed_at: 올바른 ISO datetime 형식이 아닙니다.")
+    await db.flush()
+    return _me_to_out(current_user)
 
 
 # ── /me/areas ─────────────────────────────────────────────────────────────────
