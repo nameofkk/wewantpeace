@@ -911,24 +911,42 @@ function ReportContent() {
                 <span className="text-[10px] text-muted-foreground">ALL</span>
                 {!homeCountry && <Check className="h-4 w-4 text-primary" />}
               </button>
-              {availableCountries.map((cc) => (
-                <button
-                  key={cc}
-                  onClick={() => {
-                    setHomeCountry(cc);
-                    setShowCountryPicker(false);
-                  }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
-                    homeCountry === cc && "bg-primary/5"
-                  )}
-                >
-                  <span className="text-lg">{getFlag(cc)}</span>
-                  <span className="text-sm flex-1">{getCountryName(cc, lang)}</span>
-                  <span className="text-[10px] text-muted-foreground">{cc}</span>
-                  {homeCountry === cc && <Check className="h-4 w-4 text-primary" />}
-                </button>
-              ))}
+              {/* 대륙별 그룹 */}
+              {([
+                { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
+                { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
+                { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
+                { label: lang === "ko" ? "유럽" : "Europe", codes: ["DE", "GB", "FR", "PL", "RU"] },
+                { label: lang === "ko" ? "아메리카" : "Americas", codes: ["US", "CA", "MX", "BR"] },
+              ] as { label: string; codes: string[] }[]).map((group) => {
+                const groupCountries = group.codes.filter((c) => availableCountries.includes(c));
+                if (!groupCountries.length) return null;
+                return (
+                  <div key={group.label}>
+                    <div className="px-5 pt-3 pb-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">{group.label}</span>
+                    </div>
+                    {groupCountries.map((cc) => (
+                      <button
+                        key={cc}
+                        onClick={() => {
+                          setHomeCountry(cc);
+                          setShowCountryPicker(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                          homeCountry === cc && "bg-primary/5"
+                        )}
+                      >
+                        <span className="text-lg">{getFlag(cc)}</span>
+                        <span className="text-sm flex-1">{getCountryName(cc, lang)}</span>
+                        <span className="text-[10px] text-muted-foreground">{cc}</span>
+                        {homeCountry === cc && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
               {!isPro && availableCountries.length <= 1 && (
                 <div className="px-5 py-4 text-center border-t border-border/30 mt-2">
                   <p className="text-[10px] text-muted-foreground mb-2">
