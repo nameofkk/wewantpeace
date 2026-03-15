@@ -228,13 +228,12 @@ function ReportContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 바텀시트 열릴 때 배경 스크롤 방지 + watchlist 국가만 prefetch
+  // 바텀시트 열릴 때 배경 스크롤 방지 + 지원 국가 prefetch (25개국)
   useEffect(() => {
     if (showCountryPicker) {
       document.body.style.overflow = "hidden";
-      // watchlist(관심 국가)만 prefetch — 195개국 전체 prefetch 방지
-      if (myCountries.length > 0) {
-        prefetchSummary(myCountries, lang);
+      if (availableCountries.length > 0) {
+        prefetchSummary(["", ...availableCountries], lang);
       }
       return () => { document.body.style.overflow = ""; };
     }
