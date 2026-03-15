@@ -62,7 +62,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
             boxShadow: "0 0 12px 2px rgba(59,130,246,0.15)",
           }}
         />
-      </>}
+      </>
 
       {/* 로고 + 레이더 영역 */}
       <div className="relative flex items-center justify-center w-[184px] h-20">
@@ -77,7 +77,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/15 opacity-0 splash-radar"
             style={{ animationDelay: "2s" }}
           />
-        </>}
+        </>
         <Image
           src="/logo-eye.png"
           alt="WeWantPeace"
