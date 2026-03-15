@@ -374,11 +374,11 @@ function LayerToggleRow({
         )}
       </div>
       {showInfo && tooltip && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-0.5 mx-1 rounded-lg border border-border bg-popover p-2 shadow-lg">
+        <div className="absolute left-0 right-0 bottom-full z-[60] mb-1 mx-1 rounded-lg border border-border bg-popover p-2.5 shadow-lg">
           <div className="flex items-start gap-1.5">
-            <p className="text-[10px] text-muted-foreground leading-relaxed flex-1">{tooltip}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed flex-1">{tooltip}</p>
             <button onClick={() => setShowInfo(false)} className="shrink-0 p-0.5 rounded hover:bg-muted">
-              <X className="h-2.5 w-2.5 text-muted-foreground" />
+              <X className="h-3 w-3 text-muted-foreground" />
             </button>
           </div>
         </div>
