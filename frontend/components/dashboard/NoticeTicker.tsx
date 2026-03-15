@@ -10,6 +10,7 @@ import { Megaphone } from "lucide-react";
 interface Notice {
   id: string;
   title: string;
+  title_en?: string | null;
   created_at: string;
 }
 
@@ -43,7 +44,7 @@ export function NoticeTicker() {
         </span>
       </span>
       <span className="flex-1 text-[11px] text-foreground/80 truncate text-left">
-        {latest.title}
+        {lang === "en" && latest.title_en ? latest.title_en : latest.title}
       </span>
       <span className="text-[9px] text-muted-foreground shrink-0">
         {new Date(latest.created_at).toLocaleDateString(
