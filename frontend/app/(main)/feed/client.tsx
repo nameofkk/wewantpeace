@@ -879,6 +879,12 @@ function FeedPageContent() {
             )}
           </div>
         </div>
+        {/* 로딩 진행 바 */}
+        {(isLoading || isFetching) && (
+          <div className="h-0.5 w-full bg-muted overflow-hidden">
+            <div className="h-full w-1/3 bg-primary rounded-full animate-loading-bar" />
+          </div>
+        )}
       </div>
 
       {/* ── Sprint 3: 놓친 알림 배너 (Free 유저만) ─────────────────── */}

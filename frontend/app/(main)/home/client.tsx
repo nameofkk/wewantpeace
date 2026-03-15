@@ -241,6 +241,12 @@ function ReportContent() {
             )}
           </div>
         </div>
+        {/* 로딩 진행 바 */}
+        {summaryLoading && (
+          <div className="h-0.5 w-full bg-muted overflow-hidden">
+            <div className="h-full w-1/3 bg-primary rounded-full animate-loading-bar" />
+          </div>
+        )}
       </div>
 
       <NoticeTicker />
@@ -406,6 +412,13 @@ function ReportContent() {
                 </div>
                 <div className="overflow-x-auto">
                   <ImpactFlowSankey data={summary.impact_flow} isPro={isPro} lang={lang} />
+                </div>
+                <div className="px-4 pb-3">
+                  <p className="text-[9px] text-muted-foreground/60 leading-relaxed">
+                    {lang === "ko"
+                      ? `현재 활성 이슈 중 ${homeCountry ? getCountryName(homeCountry, lang) : "글로벌"} 영향도가 높은 상위 이슈의 경제 파급 경로를 시각화합니다.`
+                      : `Visualizes the economic impact paths of top issues affecting ${homeCountry ? getCountryName(homeCountry, lang) : "global"} from active conflicts.`}
+                  </p>
                 </div>
               </div>
             )}

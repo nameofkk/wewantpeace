@@ -201,17 +201,22 @@ export async function signOut(): Promise<void> {
 
 // ── Auth 준비 완료 Promise (apiFetch가 auth 복원을 기다리는 용도) ──
 let _authReadyResolve: (() => void) | null = null;
+let _authReady = false;
 const _authReadyPromise: Promise<void> = IS_FIREBASE_CONFIGURED
   ? new Promise<void>((resolve) => {
       _authReadyResolve = resolve;
-      // 안전장치: 5초 후 강제 resolve (Firebase 장애 대비)
-      setTimeout(resolve, 5000);
+      // 안전장치: 8초 후 강제 resolve (모바일 느린 환경 대비)
+      setTimeout(() => {
+        _authReady = true;
+        resolve();
+      }, 8000);
     })
   : Promise.resolve();
 
-/** auth 모듈 초기화 시 onIdTokenChanged 최초 콜백에서 호출 */
+/** auth ready 플래그 설정 — 어디서든 호출 가능 */
 export function _markAuthReady() {
   if (_authReadyResolve) {
+    _authReady = true;
     _authReadyResolve();
     _authReadyResolve = null;
   }
@@ -219,7 +224,30 @@ export function _markAuthReady() {
 
 /** API 호출 전 auth 준비 완료를 기다림 */
 export function waitForAuth(): Promise<void> {
+  if (_authReady) return Promise.resolve();
   return _authReadyPromise;
+}
+
+// ── React 훅과 무관하게 모듈 로드 시 auth 복원 감지 ──
+// 브라우저 환경에서만 즉시 Firebase auth를 초기화하고 onIdTokenChanged를 구독
+// useAuth() 훅 마운트 전에도 auth ready를 감지할 수 있음
+if (typeof window !== "undefined" && IS_FIREBASE_CONFIGURED) {
+  // 비동기로 즉시 실행 (모듈 최상위에서)
+  Promise.resolve().then(() => {
+    try {
+      const auth = getFirebaseAuth();
+      if (auth) {
+        // 최초 1회 콜백으로 auth 복원 감지
+        const unsub = onIdTokenChanged(auth, () => {
+          _markAuthReady();
+          unsub(); // 최초 1회만 — 이후는 useAuth 훅이 관리
+        });
+      }
+    } catch {
+      // Firebase 초기화 실패 시 강제 ready
+      _markAuthReady();
+    }
+  });
 }
 
 // Firebase ID Token 가져오기 (API 호출용)

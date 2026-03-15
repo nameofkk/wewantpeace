@@ -1448,7 +1448,7 @@ export const translations = {
 
     // Impact Flow
     dash_flow_title: "영향 흐름",
-    dash_flow_desc: "분쟁이 내 생활비에 미치는 경로",
+    dash_flow_desc: "분쟁이 내 생활에 미치는 경로",
 
     // Pro Demo CTAs
     dash_pro_demo_trade: "Pro로 교역 파트너 {n}개국 더 보기",
@@ -2960,7 +2960,7 @@ export const translations = {
 
     // Impact Flow
     dash_flow_title: "Impact Flow",
-    dash_flow_desc: "How conflicts affect your daily costs",
+    dash_flow_desc: "How conflicts affect your daily life",
 
     // Pro Demo CTAs
     dash_pro_demo_trade: "See {n} more partners with Pro",

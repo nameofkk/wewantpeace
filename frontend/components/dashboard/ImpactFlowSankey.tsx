@@ -10,7 +10,7 @@ const ResponsiveSankey = dynamic(
   () => import("@nivo/sankey").then((m) => m.ResponsiveSankey),
   {
     ssr: false,
-    loading: () => <div className="h-[200px] animate-pulse bg-muted/20 rounded" />,
+    loading: () => <div className="h-[260px] animate-pulse bg-muted/20 rounded" />,
   }
 );
 
@@ -26,11 +26,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   impact: "#3b82f6",
 };
 
-/** Truncate label for mobile-friendly display */
+/** Truncate label for display */
 function truncateLabel(label: string, category: string, compact: boolean): string {
   const maxLen = compact
-    ? (category === "conflict" ? 6 : category === "impact" ? 5 : 4)
-    : (category === "conflict" ? 10 : category === "impact" ? 8 : 6);
+    ? (category === "conflict" ? 8 : category === "impact" ? 7 : 6)
+    : (category === "conflict" ? 16 : category === "impact" ? 14 : 10);
   if (label.length <= maxLen) return label;
   return label.slice(0, maxLen) + "…";
 }
@@ -53,7 +53,7 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
 
   // Responsive margins: smaller on mobile
   const isCompact = containerWidth < 380;
-  const sideMargin = isCompact ? 50 : 70;
+  const sideMargin = isCompact ? 55 : 90;
 
   const categoryMap = new Map(data.nodes.map((n) => [n.id, n.category]));
 
@@ -75,7 +75,7 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
   return (
     <div className="relative" ref={containerRef}>
       <div className={cn(
-        "h-[200px]",
+        "h-[260px]",
         !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
       )}>
         {containerWidth > 0 && (
@@ -116,7 +116,7 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
             theme={{
               labels: {
                 text: {
-                  fontSize: isCompact ? 7 : 8,
+                  fontSize: isCompact ? 8 : 10,
                   fill: "rgba(156,163,175,0.9)",
                   fontWeight: 500,
                 },

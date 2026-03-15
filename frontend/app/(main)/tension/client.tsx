@@ -773,6 +773,12 @@ export default function TensionPage() {
             )}
           </div>
         </div>
+        {/* 로딩 진행 바 */}
+        {(isLoading || isFetching) && (
+          <div className="h-0.5 w-full bg-muted overflow-hidden">
+            <div className="h-full w-1/3 bg-primary rounded-full animate-loading-bar" />
+          </div>
+        )}
       </div>
 
       {/* ── 일간 변동 Ticker (전일 대비만 표시) ─────────────────── */}

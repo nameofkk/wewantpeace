@@ -331,6 +331,16 @@
   to   { transform: scaleX(0); }
 }
 
+/* 헤더 로딩 바 좌우 왕복 */
+@keyframes loading-bar {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-loading-bar {
+  animation: loading-bar 1.5s ease-in-out infinite;
+}
+
 /* ── 스플래시 화면 ────────────────────────────────── */
 @keyframes splash-radar {
   0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 0.6; }
