@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown } from "lucide-react";
+import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown, Info, X } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary, useMatchedSignals } from "@/lib/api";
@@ -330,42 +330,60 @@ function LayerToggleRow({
   icon: string; label: string; tooltip?: string; enabled: boolean; isPro: boolean;
   count?: number; onToggle: () => void; lang: Lang;
 }) {
+  const [showInfo, setShowInfo] = useState(false);
   return (
-    <button
-      onClick={onToggle}
-      title={tooltip}
-      className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted/50 transition-colors"
-    >
-      <span className="text-sm">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-medium truncate">{label}</div>
+    <div className="relative">
+      <div className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors">
+        <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+          <span className="text-sm shrink-0">{icon}</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-medium truncate">{label}</div>
+            {count !== undefined && count > 0 && (
+              <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
+            )}
+          </div>
+        </button>
         {tooltip && (
-          <div className="text-[10px] text-muted-foreground/80 leading-tight mt-0.5">{tooltip}</div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }}
+            className="shrink-0 p-0.5 rounded-full hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
+          >
+            <Info className="h-3 w-3" />
+          </button>
         )}
-        {count !== undefined && count > 0 && (
-          <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
+        {!isPro ? (
+          <button onClick={onToggle} className="text-[9px] text-amber-500 flex items-center gap-0.5 shrink-0">
+            <Lock className="h-2.5 w-2.5" /> Pro
+          </button>
+        ) : (
+          <button onClick={onToggle} className="shrink-0">
+            <div
+              className={cn(
+                "w-7 h-4 rounded-full transition-colors relative",
+                enabled ? "bg-cyan-500" : "bg-muted-foreground/30"
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform",
+                  enabled ? "translate-x-3.5" : "translate-x-0.5"
+                )}
+              />
+            </div>
+          </button>
         )}
       </div>
-      {!isPro ? (
-        <span className="text-[9px] text-amber-500 flex items-center gap-0.5">
-          <Lock className="h-2.5 w-2.5" /> Pro
-        </span>
-      ) : (
-        <div
-          className={cn(
-            "w-7 h-4 rounded-full transition-colors relative shrink-0",
-            enabled ? "bg-cyan-500" : "bg-muted-foreground/30"
-          )}
-        >
-          <div
-            className={cn(
-              "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform",
-              enabled ? "translate-x-3.5" : "translate-x-0.5"
-            )}
-          />
+      {showInfo && tooltip && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-0.5 mx-1 rounded-lg border border-border bg-popover p-2 shadow-lg">
+          <div className="flex items-start gap-1.5">
+            <p className="text-[10px] text-muted-foreground leading-relaxed flex-1">{tooltip}</p>
+            <button onClick={() => setShowInfo(false)} className="shrink-0 p-0.5 rounded hover:bg-muted">
+              <X className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -646,7 +664,7 @@ export default function MapPage() {
         source: "firms-source",
         maxzoom: 8,
         paint: {
-          "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity", ["get", "properties"]], 0, 0, 1, 1],
+          "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
           "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 0.5, 9, 1.5],
           "heatmap-color": [
             "interpolate", ["linear"], ["heatmap-density"],
@@ -699,6 +717,8 @@ export default function MapPage() {
 
     const cleanup = () => {
       if (outageAnimRef.current) { cancelAnimationFrame(outageAnimRef.current); outageAnimRef.current = null; }
+      try { if (map.getLayer("outage-label")) map.removeLayer("outage-label"); } catch {}
+      try { if (map.getLayer("outage-ripple")) map.removeLayer("outage-ripple"); } catch {}
       try { if (map.getLayer("outage-circle")) map.removeLayer("outage-circle"); } catch {}
       try { if (map.getSource("outage-source")) map.removeSource("outage-source"); } catch {}
     };
@@ -710,28 +730,78 @@ export default function MapPage() {
 
     try {
       cleanup();
-      map.addSource("outage-source", { type: "geojson", data: outageData });
 
+      // GeoJSON에 라벨 텍스트 추가
+      const enriched = {
+        ...outageData,
+        features: outageData.features.map((f: any) => {
+          const pct = Math.round((f.properties.intensity ?? 0) * 100);
+          const cc = f.properties.country_code ?? "";
+          return { ...f, properties: { ...f.properties, label: `${cc} ▼${pct}%` } };
+        }),
+      };
+
+      map.addSource("outage-source", { type: "geojson", data: enriched });
+
+      // 바깥 ripple 원 (큰 반투명)
+      map.addLayer({
+        id: "outage-ripple",
+        type: "circle",
+        source: "outage-source",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "intensity"], 0, 30, 1, 70],
+          "circle-color": "#6366f1",
+          "circle-opacity": 0.08,
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "#818cf8",
+          "circle-stroke-opacity": 0.3,
+        },
+      }, map.getLayer("firms-heat") ? "firms-heat" : undefined);
+
+      // 안쪽 원 (진한 코어)
       map.addLayer({
         id: "outage-circle",
         type: "circle",
         source: "outage-source",
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["get", "intensity", ["get", "properties"]], 0, 10, 1, 50],
+          "circle-radius": ["interpolate", ["linear"], ["get", "intensity"], 0, 12, 1, 35],
           "circle-color": "#6366f1",
-          "circle-opacity": 0.35,
+          "circle-opacity": 0.45,
           "circle-stroke-width": 2,
-          "circle-stroke-color": "#818cf8",
-          "circle-stroke-opacity": 0.6,
+          "circle-stroke-color": "#a5b4fc",
+          "circle-stroke-opacity": 0.8,
         },
-      }, map.getLayer("firms-heat") ? "firms-heat" : undefined);
+      });
+
+      // 국가 + 비율 라벨
+      map.addLayer({
+        id: "outage-label",
+        type: "symbol",
+        source: "outage-source",
+        layout: {
+          "text-field": ["get", "label"],
+          "text-size": 12,
+          "text-font": ["Open Sans Bold"],
+          "text-anchor": "center",
+          "text-allow-overlap": true,
+        },
+        paint: {
+          "text-color": "#e0e7ff",
+          "text-halo-color": "#312e81",
+          "text-halo-width": 1.5,
+        },
+      });
 
       // 파동 애니메이션 (ripple)
       let phase = 0;
       const animate = () => {
-        phase += 0.02;
-        const strokeWidth = 1 + 3 * Math.abs(Math.sin(phase));
-        try { map.setPaintProperty("outage-circle", "circle-stroke-width", strokeWidth); } catch {}
+        phase += 0.015;
+        const rippleOpacity = 0.04 + 0.06 * Math.abs(Math.sin(phase));
+        const strokeWidth = 1 + 2 * Math.abs(Math.sin(phase));
+        try {
+          map.setPaintProperty("outage-ripple", "circle-opacity", rippleOpacity);
+          map.setPaintProperty("outage-ripple", "circle-stroke-width", strokeWidth);
+        } catch {}
         outageAnimRef.current = requestAnimationFrame(animate);
       };
       outageAnimRef.current = requestAnimationFrame(animate);
