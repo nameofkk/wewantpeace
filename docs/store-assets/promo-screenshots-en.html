@@ -18,6 +18,10 @@
     position: relative;
     overflow: hidden;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
   }
   .bg {
     position: absolute;
@@ -31,19 +35,19 @@
     filter: blur(80px);
     opacity: 0.5;
   }
-
   .top {
     position: relative;
     z-index: 10;
     text-align: center;
-    padding: 80px 60px 40px;
+    padding: 40px 60px 30px;
+    width: 100%;
   }
   .headline {
-    font-size: 54px;
+    font-size: 64px;
     font-weight: 900;
     color: #F8FAFC;
-    line-height: 1.35;
-    margin-bottom: 16px;
+    line-height: 1.3;
+    margin-bottom: 20px;
     letter-spacing: -1px;
   }
   .headline em {
@@ -53,18 +57,17 @@
     -webkit-text-fill-color: transparent;
   }
   .subline {
-    font-size: 26px;
+    font-size: 30px;
     color: #94A3B8;
     line-height: 1.5;
     font-weight: 400;
   }
-
   .phone-wrap {
     position: relative;
     z-index: 10;
     display: flex;
     justify-content: center;
-    padding: 20px 100px 60px;
+    padding: 10px 100px 40px;
   }
   .phone {
     width: 620px;
@@ -79,6 +82,7 @@
       0 0 80px rgba(59,130,246,0.08);
     display: flex;
     flex-direction: column;
+    position: relative;
   }
   .phone-status {
     height: 50px;
@@ -88,6 +92,7 @@
     justify-content: center;
     flex-shrink: 0;
     position: relative;
+    z-index: 20;
   }
   .notch {
     width: 160px;
@@ -97,6 +102,69 @@
     position: absolute;
     top: 0;
   }
+  .status-left {
+    position: absolute;
+    left: 24px;
+    top: 16px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 500;
+  }
+  .status-right {
+    position: absolute;
+    right: 24px;
+    top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+  }
+  .battery {
+    width: 24px;
+    height: 12px;
+    border: 1.5px solid rgba(255,255,255,0.7);
+    border-radius: 3px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 1.5px;
+  }
+  .battery::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 5px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 0 1px 1px 0;
+  }
+  .battery-fill {
+    width: 75%;
+    height: 100%;
+    background: rgba(255,255,255,0.8);
+    border-radius: 1px;
+  }
+  .wifi {
+    width: 16px;
+    height: 12px;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .wifi-bar {
+    width: 3px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 1px;
+    margin: 0 0.5px;
+  }
+  .wifi-bar:nth-child(1) { height: 4px; }
+  .wifi-bar:nth-child(2) { height: 7px; }
+  .wifi-bar:nth-child(3) { height: 10px; }
+  .wifi-bar:nth-child(4) { height: 13px; }
   .phone-screen {
     flex: 1;
     overflow: hidden;
@@ -110,8 +178,29 @@
     object-position: top center;
     display: block;
   }
+  .phone-navbar {
+    height: 56px;
+    background: #0F172A;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 10px;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: #64748B;
+    font-weight: 500;
+  }
+  .nav-icon { font-size: 18px; }
+  .nav-active { color: #60A5FA; }
   .phone-home {
-    height: 28px;
+    height: 24px;
     background: #0F172A;
     display: flex;
     align-items: center;
@@ -121,7 +210,7 @@
   .phone-home .bar {
     width: 120px;
     height: 4px;
-    background: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.35);
     border-radius: 2px;
   }
 </style>
@@ -138,9 +227,25 @@
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">2:32 PM</div>
+        <div class="status-right">
+          <div class="wifi">
+            <div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div>
+          </div>
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
         <img src="screenshot-home-en.png" alt="Home">
+      </div>
+      <div class="phone-navbar">
+        <div class="nav-item nav-active"><span class="nav-icon">&#x1F3E0;</span>Home</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
+        <div class="nav-item"><span class="nav-icon">&#x2699;&#xFE0F;</span>Settings</div>
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
@@ -157,9 +262,25 @@
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">2:33 PM</div>
+        <div class="status-right">
+          <div class="wifi">
+            <div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div>
+          </div>
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
         <img src="screenshot-feed-en.png" alt="Feed">
+      </div>
+      <div class="phone-navbar">
+        <div class="nav-item"><span class="nav-icon">&#x1F3E0;</span>Home</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
+        <div class="nav-item nav-active"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
+        <div class="nav-item"><span class="nav-icon">&#x2699;&#xFE0F;</span>Settings</div>
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
@@ -176,9 +297,25 @@
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">2:34 PM</div>
+        <div class="status-right">
+          <div class="wifi">
+            <div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div>
+          </div>
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
         <img src="screenshot-map-en.png" alt="Map">
+      </div>
+      <div class="phone-navbar">
+        <div class="nav-item"><span class="nav-icon">&#x1F3E0;</span>Home</div>
+        <div class="nav-item nav-active"><span class="nav-icon">&#x1F30D;</span>Map</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
+        <div class="nav-item"><span class="nav-icon">&#x2699;&#xFE0F;</span>Settings</div>
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
@@ -191,13 +328,29 @@
   <div class="glow" style="background: radial-gradient(circle, rgba(251,191,36,0.3), transparent); top: 50px; left: -150px;"></div>
   <div class="top">
     <div class="headline">Country Tension<br><em>Scored in Real-Time</em></div>
-    <div class="subline">Tension index updated<br>every 15 minutes</div>
+    <div class="subline">Tension index updated<br>in real-time</div>
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">2:35 PM</div>
+        <div class="status-right">
+          <div class="wifi">
+            <div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div><div class="wifi-bar"></div>
+          </div>
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
         <img src="screenshot-tension-en.png" alt="Tension">
+      </div>
+      <div class="phone-navbar">
+        <div class="nav-item"><span class="nav-icon">&#x1F3E0;</span>Home</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F30D;</span>Map</div>
+        <div class="nav-item"><span class="nav-icon">&#x1F4F0;</span>Feed</div>
+        <div class="nav-item"><span class="nav-icon">&#x2699;&#xFE0F;</span>Settings</div>
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
