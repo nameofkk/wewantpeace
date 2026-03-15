@@ -55,10 +55,6 @@ const FEATURES: Feature[] = [
     free: { ko: "5건", en: "5" },      pro: { ko: "20건", en: "20" },    proplus: { ko: "100건", en: "100" },
   },
   {
-    labelKo: "긴급 상한 무시",         labelEn: "Critical bypass",
-    free: false,                       pro: true,                       proplus: true,
-  },
-  {
     labelKo: "KScore 필터",             labelEn: "KScore filter",
     free: { ko: "4.0 고정", en: "4.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
   },

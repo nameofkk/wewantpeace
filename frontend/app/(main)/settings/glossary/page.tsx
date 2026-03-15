@@ -66,7 +66,7 @@ function getCategories(lang: Lang): GlossaryCategory[] {
         { key: "kscore_alert", label: t(lang, "glossary_kscore_alert"), desc: t(lang, "glossary_kscore_alert_desc") },
         { key: "fast_alert", label: t(lang, "glossary_fast_alert"), desc: t(lang, "glossary_fast_alert_desc") },
         { key: "verified_alert", label: t(lang, "glossary_verified_alert"), desc: t(lang, "glossary_verified_alert_desc") },
-        { key: "critical_bypass", label: t(lang, "glossary_critical_bypass"), desc: t(lang, "glossary_critical_bypass_desc") },
+        { key: "daily_limit", label: t(lang, "glossary_daily_limit"), desc: t(lang, "glossary_daily_limit_desc") },
       ],
     },
     {

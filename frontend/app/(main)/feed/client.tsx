@@ -10,7 +10,6 @@ import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedAlerts, useTensionAll, useMySubscription } from "@/lib/api";
 import { TOPIC_COLORS, roundKScore, personalizedKScore, kscoreAccent, getKScoreBadge, isNew, isRising, isUpdated, formatFirstSeen, type TrendingItem } from "@/lib/kscore-utils";
 import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
-import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
@@ -642,7 +641,6 @@ function FeedPageContent() {
   // Sprint 3: 놓친 알림 배너
   const { data: missedAlerts } = useMissedAlerts();
   const missedCount = Array.isArray(missedAlerts) ? missedAlerts.length : 0;
-  const paywall = usePaywall("map_locked");
 
   // Trial/Promo 배너
   const { data: mySub } = useMySubscription();
@@ -912,7 +910,7 @@ function FeedPageContent() {
       {/* ── Sprint 3: 놓친 알림 배너 (Free 유저만) ─────────────────── */}
       {userPlan === "free" && missedCount > 0 && (
         <button
-          onClick={() => paywall.show()}
+          onClick={() => router.push("/upgrade?source=missed_alerts")}
           className="w-full flex items-center gap-2 px-4 py-2.5 border-b border-border bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left"
         >
           <Bell className="h-4 w-4 text-amber-500 shrink-0" />
@@ -924,7 +922,6 @@ function FeedPageContent() {
           </span>
         </button>
       )}
-      <PaywallModal trigger="map_locked" isOpen={paywall.isOpen} onClose={paywall.close} />
       <UpgradeNudgeBanner />
 
       {/* Trial/Promo 만료 임박 배너 (잔여 3일 이하) */}

@@ -13,16 +13,12 @@ import { getSessionId } from "@/lib/session";
 import { useRouter } from "next/navigation";
 
 interface PaywallModalProps {
-  trigger: "map_locked" | "verified_locked" | "kscore_threshold_locked" | "watch_country_limit_locked" | "intel_locked";
+  trigger: "verified_locked" | "kscore_threshold_locked" | "watch_country_limit_locked" | "intel_locked";
   isOpen: boolean;
   onClose: () => void;
 }
 
 const TRIGGER_TITLES: Record<string, { ko: string; en: string }> = {
-  map_locked: {
-    ko: "실시간 이슈 지도",
-    en: "Real-time Issue Map",
-  },
   verified_locked: {
     ko: "신뢰 알림",
     en: "Verified Alerts",
@@ -42,10 +38,6 @@ const TRIGGER_TITLES: Record<string, { ko: string; en: string }> = {
 };
 
 const TRIGGER_DESCRIPTIONS: Record<string, { ko: string; en: string }> = {
-  map_locked: {
-    ko: "Pro 플랜에서 실시간 글로벌 이슈 지도를 확인하세요",
-    en: "Access the real-time global issue map with Pro",
-  },
   verified_locked: {
     ko: "공신력 있는 소스로 확인된 이슈 알림을 받아보세요",
     en: "Get alerts for issues verified by trusted sources",

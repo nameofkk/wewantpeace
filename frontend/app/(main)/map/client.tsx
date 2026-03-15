@@ -507,7 +507,7 @@ export default function MapPage() {
   useEffect(() => { showPreviewRef.current = showPreview; }, [showPreview]);
 
   // ── PaywallModal: 5초 프리뷰 후 blur + 모달 ────────────────────────────
-  const mapPaywall = usePaywall("map_locked");
+  const mapPaywall = usePaywall("intel_locked");
   const [previewExpired, setPreviewExpired] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   useEffect(() => {
@@ -1589,7 +1589,7 @@ export default function MapPage() {
       )}
 
       {/* ── PaywallModal ──────────────────────────────────────────── */}
-      <PaywallModal trigger="map_locked" isOpen={mapPaywall.isOpen} onClose={mapPaywall.close} />
+      <PaywallModal trigger="intel_locked" isOpen={mapPaywall.isOpen} onClose={mapPaywall.close} />
     </div>
   );
 }

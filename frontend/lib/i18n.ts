@@ -73,7 +73,7 @@ export const translations = {
     dash_trade_flow: "교역 흐름",
     dash_trade_flow_desc: "분쟁 관련 국가 간 교역 흐름을 시각화합니다.",
     dash_weekly_report: "주간 리포트",
-    dash_weekly_report_desc: "매주 월요일 자동 생성되는 주간 분석 리포트입니다.",
+    dash_weekly_report_desc: "주간 분쟁 모니터링 분석 리포트입니다. (준비중)",
     dash_last_updated: "{time} 갱신",
     dash_source_label: "데이터 출처",
     dash_source_news: "공개 뉴스 데이터",
@@ -307,15 +307,15 @@ export const translations = {
     glossary_kscore_alert: "KScore Alert (KScore 알림)",
     glossary_kscore_alert_desc: "KScore가 사용자의 임계값을 넘는 이슈가 발생하면 푸시 알림. 기준 국가 관점 KScore로 계산됩니다.",
     glossary_home_country: "기준 국가",
-    glossary_home_country_desc: "KScore 계산의 기준이 되는 국가. 이 국가 관점에서 글로벌 이슈의 영향도를 계산합니다.\nFree=KR 고정, Pro 이상 변경 가능.",
+    glossary_home_country_desc: "KScore 계산의 기준이 되는 국가. 이 국가 관점에서 글로벌 이슈의 영향도를 계산합니다.\nFree=글로벌, Pro 이상 개인화 가능.",
     glossary_watched_country: "관심 국가",
     glossary_watched_country_desc: "알림을 받을 국가. 이 국가에서 발생한 이슈가 KScore 임계값을 넘으면 알림이 발송됩니다.\nFree 2개, Pro 5개, Pro+ 무제한.",
     glossary_fast_alert: "속보 알림 (Fast Alert)",
     glossary_fast_alert_desc: "KScore가 임계값을 넘으면 즉시 발송되는 알림. 공식 확인 전이라 오탐 가능성이 있습니다.\n모든 플랜에서 사용 가능.",
     glossary_verified_alert: "신뢰 알림 (Verified Alert)",
     glossary_verified_alert_desc: "AP, Reuters 등 공식 매체에서 확인된 이슈만 발송하는 알림.\nPro/Pro+ 전용.",
-    glossary_critical_bypass: "긴급 상한 무시 (Critical Bypass)",
-    glossary_critical_bypass_desc: "severity 80 이상의 긴급 이슈는 일일 알림 상한을 무시하고 발송됩니다.\nPro/Pro+ 전용.",
+    glossary_daily_limit: "일일 알림 상한",
+    glossary_daily_limit_desc: "플랜별 하루 최대 알림 수. Free 5건, Pro 20건, Pro+ 100건.",
     glossary_source_t1: "Tier 1 (최상위 출처)",
     glossary_source_t1_desc: "AP, Reuters, BBC, Al Jazeera 등 국제 공인 통신사·방송사.",
     glossary_source_t2: "Tier 2 (주요 출처)",
@@ -703,7 +703,7 @@ export const translations = {
     settings_plan_feature_fast: "속보 알림",
     settings_plan_feature_verified: "신뢰 알림",
     settings_plan_feature_daily_limit: "일일 상한",
-    settings_plan_feature_critical: "긴급 상한 무시",
+    settings_plan_feature_critical: "일일 알림 상한",
     settings_plan_feature_kscore_range: "KScore 범위",
     settings_plan_fixed: "고정",
     settings_alert_loading: "알림 설정 로딩중...",
@@ -971,7 +971,7 @@ export const translations = {
     upgrade_cancel_success: "구독이 취소되었습니다. 현재 결제 기간 만료까지 서비스를 이용할 수 있습니다.",
     upgrade_footer: "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능",
     upgrade_source_from: "{source}에서 이동",
-    source_map_locked: "이슈 지도",
+    source_map_locked: "인텔리전스",
     source_fast_alert: "속보 알림",
     source_kscore_filter: "KScore 필터",
     source_topic_filter: "토픽 필터",
@@ -984,7 +984,7 @@ export const translations = {
     upgrade_success_desc: "이제 더 많은 기능을 이용할 수 있어요",
     upgrade_success_feature1_pro: "관심 국가 5개까지 모니터링",
     upgrade_success_feature1_proplus: "관심 국가 무제한 모니터링",
-    upgrade_success_feature2: "실시간 이슈 지도 접근",
+    upgrade_success_feature2: "인텔리전스 레이어 접근",
     upgrade_success_feature3: "속보 알림 (미확인 포함)",
     upgrade_success_go_home: "시작하기",
     upgrade_success_go_settings: "구독 관리",
@@ -1339,7 +1339,7 @@ export const translations = {
 
     // Phase 2: 지도 프리뷰
     map_preview_countdown: "{n}초 후 프리뷰가 종료됩니다",
-    map_preview_expired_text: "지도를 계속 사용하려면 Pro 업그레이드",
+    map_preview_expired_text: "더 많은 기능을 사용하려면 Pro 업그레이드",
 
     // Phase 2: 긴장도 퍼센타일 상세 툴팁
     tension_percentile_detail: "이 수치는 최근 30일 대비 현재 긴장도의 상대적 위치입니다",
@@ -1527,7 +1527,7 @@ export const translations = {
     // Free 유저 데모 배너/CTA
     demo_banner_intel: "샘플 데이터입니다. Pro 구독 시 실시간 인텔리전스를 확인할 수 있습니다.",
     demo_banner_impact: "데모 데이터입니다. Pro 구독 시 실제 영향 분석을 확인할 수 있습니다.",
-    demo_banner_weekly: "데모 데이터입니다. Pro+ 구독 시 실제 주간 리포트를 받아볼 수 있습니다.",
+    demo_banner_weekly: "주간 리포트는 현재 준비중입니다.",
     demo_cta_pro: "Pro 구독하기",
     demo_cta_proplus: "Pro+ 구독하기",
 
@@ -1558,10 +1558,10 @@ export const translations = {
     weekly_pdf_section_country_risk: "국가별 위기 수준",
 
     // 마케팅 수신 동의
-    marketing_consent_label: "주간 리포트 및 뉴스레터 수신 동의 (선택)",
-    marketing_consent_desc: "주간 분쟁 모니터링 리포트를 이메일로 받아보세요. 언제든 설정에서 해제할 수 있습니다.",
+    marketing_consent_label: "마케팅 정보 수신 동의 (선택)",
+    marketing_consent_desc: "뉴스레터 등 마케팅 정보를 이메일로 받아보세요. 언제든 설정에서 해제할 수 있습니다.",
     settings_marketing_toggle: "마케팅 수신 동의",
-    settings_marketing_desc: "주간 리포트, 뉴스레터 등 마케팅 정보를 이메일로 수신합니다. 언제든 해제할 수 있습니다.",
+    settings_marketing_desc: "뉴스레터 등 마케팅 정보를 이메일로 수신합니다. 언제든 해제할 수 있습니다.",
   },
   en: {
     // bottom nav
@@ -1633,7 +1633,7 @@ export const translations = {
     dash_trade_flow: "Trade Flow",
     dash_trade_flow_desc: "Visualizes trade flows between conflict-affected countries.",
     dash_weekly_report: "Weekly Report",
-    dash_weekly_report_desc: "Auto-generated weekly analysis report every Monday.",
+    dash_weekly_report_desc: "Weekly conflict monitoring analysis report. (Coming soon)",
     dash_last_updated: "Updated {time}",
     dash_source_label: "Data source",
     dash_source_news: "Open news data",
@@ -1867,15 +1867,15 @@ export const translations = {
     glossary_kscore_alert: "KScore Alert",
     glossary_kscore_alert_desc: "Push alerts triggered when an issue's KScore exceeds your threshold. Calculated from your base country's perspective.",
     glossary_home_country: "Base Country",
-    glossary_home_country_desc: "The country used as the basis for KScore calculation. Global issues are scored based on their impact on this country.\nFree=KR only, Pro and above can change.",
+    glossary_home_country_desc: "The country used as the basis for KScore calculation. Global issues are scored based on their impact on this country.\nFree=Global, Pro and above can customize.",
     glossary_watched_country: "Watched Country",
     glossary_watched_country_desc: "Countries you want alerts for. When an issue in these countries exceeds your KScore threshold, you'll be notified.\nFree: 2, Pro: 5, Pro+: Unlimited.",
     glossary_fast_alert: "Fast Alert",
     glossary_fast_alert_desc: "Sent immediately when KScore exceeds your threshold. May include unverified reports.\nAvailable on all plans.",
     glossary_verified_alert: "Verified Alert",
     glossary_verified_alert_desc: "Only sends alerts for issues confirmed by official sources (AP, Reuters, etc.).\nPro/Pro+ only.",
-    glossary_critical_bypass: "Critical Bypass",
-    glossary_critical_bypass_desc: "Issues with severity 80+ bypass the daily alert limit.\nPro/Pro+ only.",
+    glossary_daily_limit: "Daily Alert Limit",
+    glossary_daily_limit_desc: "Maximum alerts per day by plan. Free: 5, Pro: 20, Pro+: 100.",
     glossary_source_t1: "Tier 1 (Top Sources)",
     glossary_source_t1_desc: "International wire services: AP, Reuters, BBC, Al Jazeera.",
     glossary_source_t2: "Tier 2 (Major Sources)",
@@ -2263,7 +2263,7 @@ export const translations = {
     settings_plan_feature_fast: "Fast alerts",
     settings_plan_feature_verified: "Verified alerts",
     settings_plan_feature_daily_limit: "Daily limit",
-    settings_plan_feature_critical: "Critical bypass",
+    settings_plan_feature_critical: "Daily alert limit",
     settings_plan_feature_kscore_range: "KScore range",
     settings_plan_fixed: "Fixed",
     settings_alert_loading: "Loading alert settings...",
@@ -2531,7 +2531,7 @@ export const translations = {
     upgrade_cancel_success: "Subscription cancelled. You can continue using the service until the current billing period ends.",
     upgrade_footer: "Cancel anytime",
     upgrade_source_from: "From {source}",
-    source_map_locked: "Issue Map",
+    source_map_locked: "Intelligence",
     source_fast_alert: "Fast Alerts",
     source_kscore_filter: "KScore Filter",
     source_topic_filter: "Topic Filter",
@@ -2544,7 +2544,7 @@ export const translations = {
     upgrade_success_desc: "Unlock powerful features to stay informed",
     upgrade_success_feature1_pro: "Monitor up to 5 countries",
     upgrade_success_feature1_proplus: "Monitor unlimited countries",
-    upgrade_success_feature2: "Real-time issue map access",
+    upgrade_success_feature2: "Intelligence layer access",
     upgrade_success_feature3: "Breaking news alerts",
     upgrade_success_go_home: "Get started",
     upgrade_success_go_settings: "Manage subscription",
@@ -2899,7 +2899,7 @@ export const translations = {
 
     // Phase 2: Map preview
     map_preview_countdown: "Preview ends in {n} seconds",
-    map_preview_expired_text: "Upgrade to Pro to continue using the map",
+    map_preview_expired_text: "Upgrade to Pro for more features",
 
     // Phase 2: Tension percentile detail tooltip
     tension_percentile_detail: "This value shows the relative position of current tension compared to the past 30 days",
@@ -3087,7 +3087,7 @@ export const translations = {
     // Free user demo banners/CTA
     demo_banner_intel: "Sample data. Subscribe to Pro for real-time intelligence.",
     demo_banner_impact: "Demo data. Subscribe to Pro for real impact analysis.",
-    demo_banner_weekly: "Demo data. Subscribe to Pro+ for real weekly reports.",
+    demo_banner_weekly: "Weekly reports are coming soon.",
     demo_cta_pro: "Subscribe to Pro",
     demo_cta_proplus: "Subscribe to Pro+",
 
@@ -3118,10 +3118,10 @@ export const translations = {
     weekly_pdf_section_country_risk: "Country Risk Levels",
 
     // Marketing consent
-    marketing_consent_label: "Weekly report & newsletter opt-in (optional)",
-    marketing_consent_desc: "Receive weekly conflict reports by email. You can opt out anytime in settings.",
+    marketing_consent_label: "Marketing opt-in (optional)",
+    marketing_consent_desc: "Receive newsletters and marketing emails. You can opt out anytime in settings.",
     settings_marketing_toggle: "Marketing opt-in",
-    settings_marketing_desc: "Receive weekly reports, newsletters, and marketing emails. You can opt out anytime.",
+    settings_marketing_desc: "Receive newsletters and marketing emails. You can opt out anytime.",
   },
 } as const;
 

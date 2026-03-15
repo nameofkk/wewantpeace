@@ -208,7 +208,7 @@ export const PRIVACY_EN = [
 export const REFUND_KO = [
   {
     title: "1. 환불 정책 개요",
-    content: `wewantpeace는 구독 기반 SaaS 서비스입니다. 본 환불 정책은 유료 구독(Pro, Pro+)에 적용됩니다.\n무료(Free/BASIC) 플랜은 결제가 없으므로 환불 대상이 아닙니다.`,
+    content: `wewantpeace는 구독 기반 SaaS 서비스입니다. 본 환불 정책은 유료 구독(Pro, Pro+)에 적용됩니다.\n무료(Free) 플랜은 결제가 없으므로 환불 대상이 아닙니다.`,
   },
   {
     title: "2. 구독 취소",
@@ -235,7 +235,7 @@ export const REFUND_KO = [
 export const REFUND_EN = [
   {
     title: "1. Refund Policy Overview",
-    content: `WeWantPeace is a subscription-based SaaS service. This refund policy applies to paid subscriptions (Pro, Pro+).\nThe free (Free/BASIC) plan involves no payment and is not subject to refunds.`,
+    content: `WeWantPeace is a subscription-based SaaS service. This refund policy applies to paid subscriptions (Pro, Pro+).\nThe free (Free) plan involves no payment and is not subject to refunds.`,
   },
   {
     title: "2. Subscription Cancellation",
