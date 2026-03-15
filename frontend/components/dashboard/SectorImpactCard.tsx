@@ -13,7 +13,6 @@ import {
   Loader2,
   Lock,
 } from "lucide-react";
-import { SectionHeader } from "./SectionHeader";
 import dynamic from "next/dynamic";
 
 const BarChart = dynamic(
@@ -277,80 +276,65 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
     return <SectorContent data={data} chartData={chartData} lang={lang} />;
   }
 
-  // ── Standalone mode: expand/collapse 래퍼 ──
+  // ── Standalone mode: 이슈 상세 스타일 ──
   return (
-    <div>
-      <SectionHeader
-        icon={<Sparkles className="h-3.5 w-3.5 text-purple-400" />}
-        titleKey="dash_sector_impact"
-        descKey="dash_sector_desc"
-        badge={{ label: "Pro+", color: "bg-purple-500/10 text-purple-400" }}
-      />
-      <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-card/80 transition-colors"
-        >
-          <span className="text-xs font-medium text-foreground/80">
-            {expanded
-              ? lang === "ko"
-                ? "접기"
-                : "Collapse"
-              : lang === "ko"
-                ? "산업별 리스크 분석 보기"
-                : "View sector risk analysis"}
-          </span>
-          {expanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-
-        {expanded && (
-          <div className="px-4 pb-4 border-t border-border/40">
-            {(isLoading || (expanded && !effectiveClusterId && !is403 && !isError)) && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
-              </div>
-            )}
-
-            {is403 && (
-              <div className="py-4 text-center">
-                <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground mb-2">
-                  {lang === "ko"
-                    ? "Pro+ 플랜에서 이용 가능합니다"
-                    : "Available for Pro+ plan"}
-                </p>
-                <a
-                  href="/upgrade"
-                  className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                  style={{
-                    background: "linear-gradient(to right, #7c3aed, #6366f1)",
-                  }}
-                >
-                  {t(lang, "dash_unlock_pro_plus")}
-                </a>
-              </div>
-            )}
-
-            {isError && !is403 && (
-              <p className="py-4 text-xs text-muted-foreground text-center">
-                {lang === "ko"
-                  ? "분석을 불러올 수 없습니다"
-                  : "Failed to load analysis"}
-              </p>
-            )}
-
-            {data && (
-              <div className="mt-3">
-                <SectorContent data={data} chartData={chartData} lang={lang} />
-              </div>
-            )}
-          </div>
+    <div className="rounded-xl border border-purple-500/20 bg-card fade-in-up overflow-hidden">
+      {/* 헤더 — 이슈 상세 스타일 */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/5 transition-colors"
+      >
+        <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+        <h3 className="text-xs font-semibold text-purple-400 flex-1 text-left">
+          {lang === "ko" ? "산업별 리스크 분석" : "Sector Risk Analysis"}
+        </h3>
+        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold shrink-0">Pro+</span>
+        {expanded ? (
+          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         )}
-      </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-purple-500/10">
+          {(isLoading || (expanded && !effectiveClusterId && !is403 && !isError)) && (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+            </div>
+          )}
+
+          {is403 && (
+            <div className="py-4 text-center">
+              <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground mb-2">
+                {lang === "ko"
+                  ? "Pro+ 플랜에서 이용 가능합니다"
+                  : "Available for Pro+ plan"}
+              </p>
+              <a
+                href="/upgrade"
+                className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+                style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
+              >
+                {t(lang, "dash_unlock_pro_plus")}
+              </a>
+            </div>
+          )}
+
+          {isError && !is403 && (
+            <p className="py-4 text-xs text-muted-foreground text-center">
+              {lang === "ko" ? "분석을 불러올 수 없습니다" : "Failed to load analysis"}
+            </p>
+          )}
+
+          {data && (
+            <div className="mt-3">
+              <SectorContent data={data} chartData={chartData} lang={lang} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
