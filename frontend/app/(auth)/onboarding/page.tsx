@@ -183,6 +183,7 @@ export default function OnboardingPage() {
   }
 
   async function finishOnboarding() {
+    trackEvent("onboarding_complete", { countries: selectedCountries.length, home: homeCountryLocal });
     // 마케팅 수신 동의 시 PATCH /me
     if (marketingConsent) {
       try {
@@ -258,9 +259,11 @@ export default function OnboardingPage() {
       const me = meResult.data as { nickname: string | null; agreed_terms_at: string | null } | undefined;
 
       if (me?.nickname && me?.agreed_terms_at) {
+        trackEvent("auth_success", { provider, source: "onboarding" });
         trackEvent("onboarding_login_complete", { provider });
         finishOnboarding();
       } else {
+        trackEvent("auth_success", { provider, source: "onboarding" });
         trackEvent("onboarding_login_need_register", { provider });
         localStorage.setItem("onboarding_done", "true");
         router.push("/login?tab=google-register");
@@ -285,11 +288,13 @@ export default function OnboardingPage() {
         const meResult = await refetchMe();
         const me = meResult.data as { nickname: string | null; agreed_terms_at: string | null } | undefined;
         if (me?.nickname && me?.agreed_terms_at) {
+          trackEvent("auth_success", { provider: "toss", source: "onboarding" });
           trackEvent("onboarding_login_complete", { provider: "toss" });
           finishOnboarding();
           return;
         }
       }
+      trackEvent("auth_success", { provider: "toss", source: "onboarding" });
       trackEvent("onboarding_login_need_register", { provider: "toss" });
       localStorage.setItem("onboarding_done", "true");
       router.push("/login?tab=google-register");

@@ -6,6 +6,7 @@ Firebase JWT 인증 미들웨어.
 """
 import os
 import logging
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -138,6 +139,13 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
 
     user = await _get_or_create_user(firebase_uid, db, email=firebase_email)
+
+    # last_active 갱신 (1시간 이상 경과 시만 업데이트 — DB 부하 최소화)
+    now = datetime.now(timezone.utc)
+    if not user.last_active or (now - user.last_active) > timedelta(hours=1):
+        user.last_active = now
+        await db.flush()
+
     return user
 
 

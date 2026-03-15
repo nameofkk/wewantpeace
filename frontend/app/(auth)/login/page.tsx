@@ -23,6 +23,7 @@ import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
 import { detectPlatform } from "@/lib/platform-detect";
+import { trackEvent } from "@/lib/analytics";
 import { TERMS_KO, TERMS_EN, PRIVACY_KO, PRIVACY_EN } from "@/lib/legal-data";
 
 type Tab = "login" | "register" | "google-register";
@@ -114,6 +115,7 @@ export default function LoginPage() {
             setCheckingRedirect(false);
             return;
           }
+          trackEvent("auth_success", { provider: "google", source: "redirect" });
           localStorage.setItem("onboarding_done", "true");
           localStorage.setItem("wwp_welcome_seen", String(Date.now()));
           clearTimeout(safetyTimeout);
@@ -253,6 +255,7 @@ export default function LoginPage() {
             return;
           }
         }
+        trackEvent("auth_success", { provider: "toss", source: "login" });
         localStorage.setItem("onboarding_done", "true");
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
@@ -283,6 +286,7 @@ export default function LoginPage() {
           setTab("google-register");
           return;
         }
+        trackEvent("auth_success", { provider: "google", source: "login" });
         localStorage.setItem("onboarding_done", "true");
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
@@ -338,6 +342,7 @@ export default function LoginPage() {
           setTab("google-register");
           return;
         }
+        trackEvent("auth_success", { provider: "apple", source: "login" });
         localStorage.setItem("onboarding_done", "true");
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
@@ -422,6 +427,7 @@ export default function LoginPage() {
           : (typeof detail === "string" ? detail : (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
         throw new Error(msg);
       }
+      trackEvent("auth_success", { provider: "google", source: "register" });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));
@@ -493,6 +499,7 @@ export default function LoginPage() {
           setTab("google-register");
           return;
         }
+        trackEvent("auth_success", { provider: "email", source: "login" });
         localStorage.setItem("onboarding_done", "true");
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
@@ -569,6 +576,7 @@ export default function LoginPage() {
         throw new Error(msg);
       }
 
+      trackEvent("auth_success", { provider: "email", source: "register" });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       localStorage.setItem("onboarding_done", "true");
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));

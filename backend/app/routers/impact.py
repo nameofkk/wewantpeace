@@ -7,6 +7,7 @@ Phase 4: Weekly Report (Pro+) — weekly impact summary
 Phase 5: Behavior Personalization — event tracking + recommendations
 """
 
+import asyncio
 import os
 import json
 import hashlib
@@ -37,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v7"
+_CACHE_VERSION = "v8"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -594,25 +595,34 @@ async def get_impact_summary(
         # 교역 의존도 비율 계산 (분쟁국 vs 전체)
         total_conflict_trade = sum(trade_vols.values()) if trade_vols else 0
 
-        # 경제 지표 조회 (인플레이션, 교역비중, 경상수지)
+        # 경제 지표 조회 (인플레이션, 교역비중, 경상수지) — IN절 배치화
         from backend.app.models.economic_data import EconomicIndicator
         econ_extras: dict[str, float | None] = {}
+        _IND_CODE_MAP = {
+            "FP.CPI.TOTL.ZG": "inflation",
+            "NE.TRD.GNFS.ZS": "trade_openness",
+            "BN.CAB.XOKA.CD": "current_account",
+        }
         if home:
-            for ind_code, key in [
-                ("FP.CPI.TOTL.ZG", "inflation"),
-                ("NE.TRD.GNFS.ZS", "trade_openness"),
-                ("BN.CAB.XOKA.CD", "current_account"),
-            ]:
-                eq = await db.execute(
-                    select(EconomicIndicator.value)
-                    .where(
-                        EconomicIndicator.country_code == home,
-                        EconomicIndicator.indicator_code == ind_code,
-                    )
-                    .order_by(EconomicIndicator.year.desc())
-                    .limit(1)
+            eq = await db.execute(
+                select(
+                    EconomicIndicator.indicator_code,
+                    EconomicIndicator.value,
                 )
-                econ_extras[key] = eq.scalar_one_or_none()
+                .where(
+                    EconomicIndicator.country_code == home,
+                    EconomicIndicator.indicator_code.in_(list(_IND_CODE_MAP.keys())),
+                )
+                .order_by(EconomicIndicator.indicator_code, EconomicIndicator.year.desc())
+            )
+            _seen_ind: set[str] = set()
+            for row in eq.fetchall():
+                ind_code = row[0]
+                if ind_code not in _seen_ind:
+                    _seen_ind.add(ind_code)
+                    key = _IND_CODE_MAP.get(ind_code)
+                    if key:
+                        econ_extras[key] = row[1]
 
         if lang == "ko":
             display_home = "글로벌" if is_global else home
@@ -736,19 +746,31 @@ async def get_impact_summary(
                 travel_parts.append("No major travel restrictions. Monitoring advisory escalation near conflict zones")
             travel = ". ".join(travel_parts) + "."
 
-    # ── 시장 동향 (market_snapshot) — 모든 플랜 ──
-    market_snapshot = None
-    try:
-        market_snapshot = await _get_market_snapshot(home, db)
-    except Exception as e:
-        logger.warning("market_snapshot_error", error=str(e))
+    # ── 병렬 조회: market_snapshot, trade_exposure, travel_advisories, risk_radar ──
+    # 서로 독립적인 비동기 쿼리들을 asyncio.gather로 병렬 실행
+    trade_home = home if home else "US"
 
-    # ── 교역 노출도 — Free: top 3 (dependency만), Pro: top 5 (full) ──
+    gather_results = await asyncio.gather(
+        _get_market_snapshot(home, db),
+        _get_trade_exposure(trade_home, db),
+        _get_travel_advisories(home, scored[:10], is_pro, db),
+        _compute_risk_radar(home, scored, sectors_data, oil_row, db),
+        return_exceptions=True,
+    )
+
+    # market_snapshot
+    market_snapshot = None
+    if isinstance(gather_results[0], Exception):
+        logger.warning("market_snapshot_error", error=str(gather_results[0]))
+    else:
+        market_snapshot = gather_results[0]
+
+    # trade_exposure
     trade_exposure = None
-    try:
-        # 글로벌 모드면 US 기준으로 fallback
-        trade_home = home if home else "US"
-        trade_exposure_data = await _get_trade_exposure(trade_home, db)
+    if isinstance(gather_results[1], Exception):
+        logger.warning("trade_exposure_error", error=str(gather_results[1]))
+    else:
+        trade_exposure_data = gather_results[1]
         if trade_exposure_data:
             if not is_pro:
                 # Free: top 3 partners, dependency_pct only
@@ -768,25 +790,23 @@ async def get_impact_summary(
                 }
             else:
                 trade_exposure = trade_exposure_data
-    except Exception as e:
-        logger.warning("trade_exposure_error", error=str(e))
 
-    # ── 여행 경보 (travel_advisories) — 모든 플랜 ──
+    # travel_advisories
     travel_advisories = []
-    try:
-        travel_advisories = await _get_travel_advisories(home, scored[:10], is_pro, db)
-    except Exception as e:
-        logger.warning("travel_advisories_error", error=str(e))
+    if isinstance(gather_results[2], Exception):
+        logger.warning("travel_advisories_error", error=str(gather_results[2]))
+    else:
+        travel_advisories = gather_results[2] or []
 
-    # ── Risk Radar (모든 플랜) ──
+    # risk_radar
     risk_radar = None
-    try:
-        risk_radar_obj = await _compute_risk_radar(home, scored, sectors_data, oil_row, db)
+    if isinstance(gather_results[3], Exception):
+        logger.warning("risk_radar_error", error=str(gather_results[3]))
+    else:
+        risk_radar_obj = gather_results[3]
         risk_radar = risk_radar_obj.model_dump() if risk_radar_obj else None
-    except Exception as e:
-        logger.warning("risk_radar_error", error=str(e))
 
-    # ── Impact Flow (모든 플랜) ──
+    # ── Impact Flow (동기 함수 — gather 불필요) ──
     impact_flow = None
     try:
         impact_flow_obj = _compute_impact_flow(scored, home, sectors_data, trade_map, oil_row, lang)
@@ -1997,43 +2017,45 @@ async def _get_market_snapshot(
             "currency": row.currency,
         })
 
-    # 3) 환율: 1 배치 쿼리 (최신만)
+    # 3) 환율: 배치 쿼리 — 각 통화별 최신 2행을 한번에 조회 (N+1 해결)
     target_currencies = _HOME_CURRENCIES.get(home_country, ["EUR", "JPY", "GBP", "CNY"])
     rate_q = await db.execute(
-        select(ExchangeRate)
-        .distinct(ExchangeRate.target_currency)
+        select(
+            ExchangeRate.target_currency,
+            ExchangeRate.rate,
+            ExchangeRate.rate_date,
+        )
         .where(
             ExchangeRate.base_currency == "USD",
             ExchangeRate.target_currency.in_(target_currencies),
         )
         .order_by(ExchangeRate.target_currency, ExchangeRate.rate_date.desc())
     )
-    latest_rates = rate_q.scalars().all()
+    all_rate_rows = rate_q.fetchall()
 
-    # 전일 대비를 위한 2번째 최신 배치 조회
-    if latest_rates:
-        # 각 통화의 최신 날짜를 모아서 이전 데이터 조회
-        for row in latest_rates:
-            prev_q = await db.execute(
-                select(ExchangeRate.rate)
-                .where(
-                    ExchangeRate.base_currency == "USD",
-                    ExchangeRate.target_currency == row.target_currency,
-                    ExchangeRate.rate_date < row.rate_date,
-                )
-                .order_by(ExchangeRate.rate_date.desc())
-                .limit(1)
-            )
-            prev_rate = prev_q.scalar_one_or_none()
-            change_pct = None
+    # 각 통화별 최신 2행을 Python에서 분리 (현재/전일)
+    rate_by_currency: dict[str, list] = {}
+    for row in all_rate_rows:
+        tc = row[0]
+        if tc not in rate_by_currency:
+            rate_by_currency[tc] = []
+        if len(rate_by_currency[tc]) < 2:
+            rate_by_currency[tc].append(row)
+
+    for tc, rows in rate_by_currency.items():
+        if not rows:
+            continue
+        current_rate = rows[0][1]
+        change_pct = None
+        if len(rows) >= 2:
+            prev_rate = rows[1][1]
             if prev_rate and prev_rate > 0:
-                change_pct = round(((row.rate - prev_rate) / prev_rate) * 100, 2)
-
-            exchange_rates.append({
-                "target_currency": row.target_currency,
-                "rate": row.rate,
-                "change_pct": change_pct,
-            })
+                change_pct = round(((current_rate - prev_rate) / prev_rate) * 100, 2)
+        exchange_rates.append({
+            "target_currency": tc,
+            "rate": current_rate,
+            "change_pct": change_pct,
+        })
 
     if not commodities and not indices and not exchange_rates:
         return None
