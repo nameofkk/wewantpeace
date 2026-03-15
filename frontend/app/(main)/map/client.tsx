@@ -396,6 +396,7 @@ export default function MapPage() {
   const [showPreview, setShowPreview] = useState(false);
   const showPreviewRef = useRef(false);  // 클릭 핸들러에서 최신 값 참조
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [markersVisible, setMarkersVisible] = useState(true);
   const [heatmapPulse, setHeatmapPulse] = useState(false);
   const { data: tensionAll } = useTensionAll();
 
@@ -955,7 +956,14 @@ export default function MapPage() {
 
   const renderMarkers = useCallback(() => {
     const map = mapRef.current;
-    if (!map || !isMapReady || clusters.length === 0) return;
+    if (!map || !isMapReady) return;
+
+    // 마커 숨김 시 기존 마커만 제거
+    if (!markersVisible || clusters.length === 0) {
+      markersRef.current.forEach((m) => { try { m.remove(); } catch { /* noop */ } });
+      markersRef.current = [];
+      return;
+    }
 
       const doRender = (maplibregl: any) => {
       const currentMap = mapRef.current;
@@ -1038,7 +1046,7 @@ export default function MapPage() {
       import("maplibre-gl").then((ml) => { maplibreRef.current = ml; doRender(ml); });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusters, isMapReady, markerVersion]);
+  }, [clusters, isMapReady, markerVersion, markersVisible]);
 
   useEffect(() => { renderMarkers(); }, [renderMarkers]);
 
@@ -1104,8 +1112,20 @@ export default function MapPage() {
             ))}
             <InfoTooltip direction="down" text={t(lang, "map_kscore_legend")} />
           </div>
-          {/* Row 3: 히트맵 + Intel 토글 (오른쪽 정렬) */}
+          {/* Row 3: 마커 + 히트맵 + Intel 토글 (오른쪽 정렬) */}
           <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => setMarkersVisible((v) => !v)}
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap",
+                markersVisible
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "text-muted-foreground border-border hover:text-foreground",
+              )}
+            >
+              <Radio className="h-2.5 w-2.5" />
+              {lang === "ko" ? "마커" : "Markers"}
+            </button>
             <button
               data-tour="map-heatmap"
               onClick={() => {
