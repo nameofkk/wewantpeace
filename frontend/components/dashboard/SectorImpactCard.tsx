@@ -48,7 +48,7 @@ const RISK_COLORS: Record<string, { text: string; bg: string; bar: string }> = {
   critical: {
     text: "text-red-700 dark:text-red-300",
     bg: "bg-red-900/10",
-    bar: "#7f1d1d",
+    bar: "#dc2626",
   },
   high: {
     text: "text-red-600 dark:text-red-400",
@@ -174,7 +174,7 @@ function SectorContent({
                     {RISK_LABELS[lang]?.[sector.risk_level] || sector.risk_level}
                   </span>
                 </div>
-                <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-1">
+                <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">
                   {sector.description}
                 </p>
               </div>

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -603,6 +603,7 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     },
     enabled,
     staleTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
     retry: (count, error) => {
       // 401은 auth 복원 지연일 수 있으므로 2회까지 재시도
       if ((error as any)?.status === 401 && count < 2) return true;
@@ -685,6 +686,7 @@ export function useSectorOverview(homeCountry?: string, lang?: string, enabled =
     },
     enabled,
     staleTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
     retry: false,
   });
 }

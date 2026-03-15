@@ -319,7 +319,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             >
               <span className="font-bold">{NUM_LABELS[idx]}</span>
               {flags && <span className="text-xs">{flags}</span>}
-              <span className="truncate max-w-[100px]">{shortTitle}</span>
+              <span className="truncate max-w-[140px]">{shortTitle}</span>
             </button>
           );
         })}

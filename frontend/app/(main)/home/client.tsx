@@ -116,11 +116,11 @@ function SectionHeader({ icon: Icon, title, desc, tooltip }: {
   lang?: "ko" | "en";
 }) {
   return (
-    <div className="flex items-center gap-1.5 min-w-0 mb-2.5">
+    <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
       <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <h2 className="text-[11px] font-bold text-foreground shrink-0">{title}</h2>
       <span className="text-[9px] text-muted-foreground/50 shrink-0">·</span>
-      <span className="text-[9px] text-muted-foreground/50 truncate min-w-0">{desc}</span>
+      <span className="text-[9px] text-muted-foreground/50">{desc}</span>
       <InfoTooltip text={tooltip} direction="down" />
     </div>
   );
@@ -389,6 +389,10 @@ function ReportContent() {
 
             {/* Watchlist chips */}
             {myCountries.length > 0 ? (
+              <div className="space-y-1">
+              <span className="text-[9px] text-muted-foreground/60 font-medium">
+                {lang === "ko" ? "관심 국가 긴장도" : "Watchlist Tension"}
+              </span>
               <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
                 {myCountries.map((code) => {
                   const data = tensionMap.get(code) as TensionAllItem | undefined;
@@ -416,6 +420,7 @@ function ReportContent() {
                 >
                   <Plus className="h-2.5 w-2.5" />
                 </Link>
+              </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 justify-center py-1">
@@ -730,7 +735,7 @@ function ReportContent() {
                                     Lv.{ta.level} {t(lang, lvlKey)}
                                   </span>
                                   {isPro && ta.title && (
-                                    <span className="text-[9px] text-muted-foreground truncate max-w-[80px]">{ta.title}</span>
+                                    <span className="text-[9px] text-muted-foreground truncate max-w-[140px]">{ta.title}</span>
                                   )}
                                 </div>
                               );

@@ -1545,7 +1545,7 @@ export const translations = {
     sort_name: "Name",
 
     // dashboard
-    dash_title: "My Dashboard",
+    dash_title: "Dashboard",
     dash_subtitle: "How global conflicts affect you — in real time",
     dash_report_title: "{name}'s Live Impact Report",
     dash_report_subtitle: "Personalized analysis based on 197-country monitoring",

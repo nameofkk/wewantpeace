@@ -30,16 +30,20 @@ interface SmartSummaryFullProps {
 
 function getRelevantMarketChips(cc: string, market: MarketSnapshot | null | undefined) {
   if (!market) return [];
+  const toChip = (i: { symbol: string; name: string; value: number; change_pct: number }) => ({
+    symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
+  });
   if (["IL", "IR", "IQ", "SA", "SY", "LB", "YE"].includes(cc))
     return market.commodities.filter((c) => ["WTI", "BRENT"].includes(c.symbol));
-  if (["CN", "TW", "JP", "KP", "KR"].includes(cc))
-    return market.indices.filter((i) => ["KOSPI", "NKY"].includes(i.symbol)).map((i) => ({
-      symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
-    }));
+  if (["CN", "TW"].includes(cc))
+    return market.indices.filter((i) => ["SSE", "SHCOMP"].includes(i.symbol)).map(toChip);
+  if (["JP", "KP"].includes(cc))
+    return market.indices.filter((i) => ["NKY"].includes(i.symbol)).map(toChip);
+  if (["KR"].includes(cc))
+    return market.indices.filter((i) => ["KOSPI"].includes(i.symbol)).map(toChip);
   if (["UA", "RU", "DE", "FR", "GB"].includes(cc))
-    return market.indices.filter((i) => ["DAX", "FTSE"].includes(i.symbol)).map((i) => ({
-      symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
-    }));
+    return market.indices.filter((i) => ["DAX", "FTSE"].includes(i.symbol)).map(toChip);
+  // 매칭 안 되면 유가라도 표시
   return market.commodities.slice(0, 1);
 }
 
@@ -150,7 +154,9 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
           </div>
         )}
         {isPro && entityAnchor && (
-          <p className="text-[8px] text-muted-foreground/60 truncate">{entityAnchor}</p>
+          <p className="text-[8px] text-muted-foreground/60 truncate">
+            {/^[A-Z]{2}$/.test(entityAnchor) ? getCountryName(entityAnchor, lang) : entityAnchor}
+          </p>
         )}
       </div>
 

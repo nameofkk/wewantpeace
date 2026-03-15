@@ -1494,10 +1494,10 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
             so_what_line = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), 가스비·물류비 상승 압력"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"교역 {trade_str}, {top_sector} 수입품 가격 상승 예상"
+            so_what_line = f"{c_name}과 교역 {trade_str}, {top_sector} 수입품 가격 상승 예상"
         elif affected_sectors:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{top_sector}(GDP {gdp}%) 관련주 변동성 확대"
+            so_what_line = f"{c_name} 관련 {top_sector}(GDP {gdp}%) 변동성 확대"
         else:
             so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
     else:
@@ -1505,10 +1505,10 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
             so_what_line = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), gas & logistics cost pressure"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"Trade {trade_str}, {top_sector} import price increase expected"
+            so_what_line = f"Trade with {c_name} {trade_str}, {top_sector} import prices may rise"
         elif affected_sectors:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{top_sector} (GDP {gdp}%) — related stock volatility"
+            so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%) — volatility expected"
         else:
             so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
 
@@ -1648,22 +1648,35 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
                 if link_value > 0:
                     links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
 
-    # Right column: impact categories
+    # Right column: impact categories — 실제 데이터 기반 라벨
     oil_change = oil_row[1] if oil_row else 0
+    oil_price = oil_row[0] if oil_row else 0
     h_name = _country_name(home, lang)
     impact_items = []
     if "energy" in seen_commodities:
-        lbl = f"가스비 +{abs(oil_change)*2:.0f}%" if lang == "ko" else f"Gas +{abs(oil_change)*2:.0f}%"
-        impact_items.append(("gas", lbl))
-    if "agriculture" in seen_commodities or "shipping" in seen_commodities:
-        lbl = "식료품비 상승" if lang == "ko" else "Food costs up"
+        if oil_change != 0:
+            lbl = f"에너지 비용 {oil_change:+.1f}%" if lang == "ko" else f"Energy costs {oil_change:+.1f}%"
+        else:
+            lbl = "에너지 비용 상승" if lang == "ko" else "Energy cost rise"
+        impact_items.append(("energy_cost", lbl))
+    if "agriculture" in seen_commodities:
+        lbl = "식료품 가격 상승" if lang == "ko" else "Food prices up"
         impact_items.append(("food_cost", lbl))
+    if "shipping" in seen_commodities:
+        lbl = "물류비 상승" if lang == "ko" else "Shipping costs up"
+        impact_items.append(("shipping_cost", lbl))
     if "semiconductor" in seen_commodities or "electronics" in seen_commodities or "technology" in seen_commodities:
-        lbl = "전자제품 가격" if lang == "ko" else "Electronics prices"
+        lbl = "전자제품 가격 상승" if lang == "ko" else "Electronics prices up"
         impact_items.append(("electronics_cost", lbl))
-    if "automotive" in seen_commodities or "manufacturing" in seen_commodities:
-        lbl = "제조 원가" if lang == "ko" else "Mfg costs"
+    if "automotive" in seen_commodities:
+        lbl = "자동차 가격 영향" if lang == "ko" else "Auto prices affected"
+        impact_items.append(("auto_cost", lbl))
+    if "manufacturing" in seen_commodities:
+        lbl = "제조 원가 상승" if lang == "ko" else "Mfg costs up"
         impact_items.append(("mfg_cost", lbl))
+    if "tourism" in seen_commodities:
+        lbl = "여행 경비 영향" if lang == "ko" else "Travel costs affected"
+        impact_items.append(("travel_cost", lbl))
 
     if not impact_items:
         lbl = "물가 상승 압력" if lang == "ko" else "Inflation pressure"
@@ -2287,6 +2300,14 @@ async def get_sector_overview(
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     aggregated: dict[str, dict] = {}
 
+    # 실제 교역 데이터 조회 (한 번만)
+    real_trade_deps: dict[str, float | None] = {}
+    for cc in country_severity:
+        try:
+            real_trade_deps[cc] = await _get_real_trade_dependency(home, cc, db)
+        except Exception:
+            real_trade_deps[cc] = None
+
     for sector, info in sectors_data.items():
         partners = info.get("key_partners", [])
         gdp_pct = info["gdp_pct"]
@@ -2303,7 +2324,11 @@ async def get_sector_overview(
             partner_rank = partners.index(cc) + 1
             affected_countries.append(cc)
 
-            if partner_rank == 1:
+            real_dep = real_trade_deps.get(cc)
+            if real_dep is not None:
+                rank_weight = max(0.3, 1.0 - (partner_rank - 1) * 0.15)
+                trade_dep = min(0.95, real_dep * rank_weight * 3)
+            elif partner_rank == 1:
                 trade_dep = 0.85
             elif partner_rank == 2:
                 trade_dep = 0.6
