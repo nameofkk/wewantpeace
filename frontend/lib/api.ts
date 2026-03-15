@@ -674,6 +674,21 @@ export function useSectorAnalysis(clusterId?: string, homeCountry?: string, lang
   });
 }
 
+export function useSectorOverview(homeCountry?: string, lang?: string, enabled = true) {
+  return useQuery({
+    queryKey: ["impact", "sector-overview", homeCountry ?? "db", lang ?? "ko"],
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (homeCountry) params.home_country = homeCountry;
+      if (lang) params.lang = lang;
+      return apiFetch<SectorAnalysis>("/impact/sector-overview", params);
+    },
+    enabled,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  });
+}
+
 export interface WeeklyReportIssue {
   cluster_id: string;
   title: string;

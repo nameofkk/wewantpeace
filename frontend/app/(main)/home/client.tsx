@@ -19,6 +19,7 @@ import {
   personalizedKScore,
   type TrendingItem,
 } from "@/lib/kscore-utils";
+import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
 import { useCountUp } from "@/hooks/useCountUp";
 import { NoticeTicker } from "@/components/dashboard/NoticeTicker";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
@@ -43,6 +44,9 @@ import {
   BarChart3,
   Globe2,
   Sparkles,
+  ChevronDown,
+  X,
+  Check,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -138,6 +142,7 @@ function ReportContent() {
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
   const homeCountry = useAppStore((s) => s.homeCountry);
+  const setHomeCountry = useAppStore((s) => s.setHomeCountry);
   const myCountries = useAppStore((s) => s.myCountries);
 
   const { data: me, isLoading: meLoading } = useMe();
@@ -151,6 +156,9 @@ function ReportContent() {
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
 
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel" | "detail">("market");
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const isPro = userPlan === "pro" || userPlan === "pro_plus";
+  const availableCountries = isPro ? SUPPORTED_HOME_COUNTRIES : ["KR"];
 
   const trackBehavior = useTrackBehavior();
   useEffect(() => {
@@ -187,7 +195,6 @@ function ReportContent() {
   const color = impactColor(impactScore);
   const levelKey = `dash_impact_level_${summary?.level || "low"}` as Parameters<typeof t>[1];
   const hasPro = !!(summary?.economy || summary?.trade || summary?.travel);
-  const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
   const topItems = useMemo(() => {
     if (!summary?.top_issues?.length) return [];
@@ -254,8 +261,16 @@ function ReportContent() {
           <div className="flex justify-center">
             <LogoIcon height={26} hideText />
           </div>
-          {/* 오른쪽 — 업데이트 시간 */}
-          <div className="flex items-center justify-end">
+          {/* 오른쪽 — 기준 국가 + 업데이트 시간 */}
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => setShowCountryPicker(true)}
+              className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
+            >
+              <span className="text-xs">{getFlag(homeCountry || "KR")}</span>
+              <span className="text-[9px] font-bold text-foreground">{homeCountry || "KR"}</span>
+              <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
             {updatedTime && (
               <span className="text-[9px] text-muted-foreground whitespace-nowrap">{updatedTime}</span>
             )}
@@ -828,10 +843,10 @@ function ReportContent() {
             <SectionHeader
               icon={Sparkles}
               title={lang === "ko" ? "산업별 리스크" : "Sector Risk"}
-              desc={lang === "ko" ? "영향도 1위 이슈 기준" : "Based on top impact issue"}
+              desc={lang === "ko" ? "전체 활성 이슈 기반" : "Based on all active issues"}
               tooltip={lang === "ko"
-                ? "현재 가장 영향이 큰 이슈를 기준으로, 관련 산업별 교역 의존도와 리스크를 분석합니다."
-                : "Analyzes trade dependency and risk by sector, based on the highest impact issue."}
+                ? "현재 모든 활성 분쟁 이슈의 영향을 종합하여, 기준국가의 산업별 교역 의존도와 리스크를 분석합니다."
+                : "Aggregated analysis of trade dependency and risk across all active conflict issues."}
             />
             <SectorImpactCard embedded />
           </m.section>
@@ -841,6 +856,62 @@ function ReportContent() {
 
         </div>
       </div>
+
+      {/* ═══════════════ 기준 국가 선택 바텀시트 ═══════════════ */}
+      {showCountryPicker && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowCountryPicker(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+              <h3 className="text-sm font-bold">
+                {lang === "ko" ? "기준 국가 선택" : "Select Home Country"}
+              </h3>
+              <button
+                onClick={() => setShowCountryPicker(false)}
+                className="p-1 rounded-full hover:bg-muted/50 transition-colors"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 py-2">
+              {availableCountries.map((cc) => (
+                <button
+                  key={cc}
+                  onClick={() => {
+                    setHomeCountry(cc);
+                    setShowCountryPicker(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                    homeCountry === cc && "bg-primary/5"
+                  )}
+                >
+                  <span className="text-lg">{getFlag(cc)}</span>
+                  <span className="text-sm flex-1">{getCountryName(cc, lang)}</span>
+                  <span className="text-[10px] text-muted-foreground">{cc}</span>
+                  {homeCountry === cc && <Check className="h-4 w-4 text-primary" />}
+                </button>
+              ))}
+              {!isPro && availableCountries.length <= 1 && (
+                <div className="px-5 py-4 text-center border-t border-border/30 mt-2">
+                  <p className="text-[10px] text-muted-foreground mb-2">
+                    {lang === "ko"
+                      ? "Pro 플랜에서 다른 국가를 기준으로 분석할 수 있습니다"
+                      : "Analyze from other countries' perspective with Pro"}
+                  </p>
+                  <a
+                    href="/upgrade?source=home_country_picker"
+                    className="inline-flex rounded-full px-4 py-1.5 text-[10px] font-bold text-white"
+                    style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                  >
+                    {lang === "ko" ? "Pro로 업그레이드" : "Upgrade to Pro"}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

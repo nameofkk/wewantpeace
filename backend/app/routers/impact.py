@@ -2221,6 +2221,163 @@ async def get_sector_analysis(
     return SectorAnalysisOut(**response_data)
 
 
+@router.get("/sector-overview", response_model=SectorAnalysisOut)
+async def get_sector_overview(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    lang: str | None = Query(None, description="응답 언어 (ko/en)"),
+    home_country: str | None = Query(None, description="분석 기준 국가 (ISO2)"),
+):
+    """전체 활성 이슈 기반 종합 섹터 리스크 분석 (모든 플랜)"""
+    resolved_lang = lang
+    if not resolved_lang:
+        from backend.app.models.user import UserPreference
+        pref_q = await db.execute(
+            select(UserPreference.language).where(UserPreference.user_id == user.id)
+        )
+        pref_lang = pref_q.scalar_one_or_none()
+        resolved_lang = pref_lang or "ko"
+    lang = resolved_lang
+
+    home = home_country or user.home_country or "KR"
+
+    redis = get_redis()
+    cache_key = f"impact:sector-overview:{_CACHE_VERSION}:{home}:{lang}"
+    if redis:
+        cached = await redis.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            data["cached"] = True
+            return SectorAnalysisOut(**data)
+
+    # 최근 7일 활성 클러스터
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    clusters_q = await db.execute(
+        select(IssueCluster)
+        .where(
+            IssueCluster.is_active == True,
+            IssueCluster.severity > 0,
+            IssueCluster.kscore > 0,
+            IssueCluster.last_event_at >= since,
+        )
+        .order_by(IssueCluster.kscore.desc())
+        .limit(50)
+    )
+    clusters = clusters_q.scalars().all()
+
+    if not clusters:
+        return SectorAnalysisOut(
+            home_country=home, affected_country="global",
+            sectors=[], overall_risk="low",
+            generated_at=datetime.now(timezone.utc).isoformat(), cached=False,
+        )
+
+    # 모든 클러스터의 국가별 최고 severity 집계
+    country_severity: dict[str, int] = {}
+    for c in clusters:
+        cc = c.country_code or ""
+        if not cc:
+            continue
+        sev = c.severity or 0
+        if cc not in country_severity or sev > country_severity[cc]:
+            country_severity[cc] = sev
+
+    # 섹터별 노출도 집계: 모든 분쟁 국가에 대해 계산 후 최대값 취합
+    sectors_data = SECTOR_DATA.get(home, DEFAULT_SECTORS)
+    labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+    aggregated: dict[str, dict] = {}
+
+    for sector, info in sectors_data.items():
+        partners = info.get("key_partners", [])
+        gdp_pct = info["gdp_pct"]
+        sector_label = labels.get(sector, sector)
+
+        max_trade_dep = 0.05
+        max_risk_score = 0.0
+        affected_countries = []
+
+        for cc, sev in country_severity.items():
+            is_partner = cc in partners
+            if not is_partner:
+                continue
+            partner_rank = partners.index(cc) + 1
+            affected_countries.append(cc)
+
+            if partner_rank == 1:
+                trade_dep = 0.85
+            elif partner_rank == 2:
+                trade_dep = 0.6
+            elif partner_rank <= 3:
+                trade_dep = 0.4
+            else:
+                trade_dep = 0.2
+
+            risk_score = trade_dep * (sev / 100)
+            if trade_dep > max_trade_dep:
+                max_trade_dep = trade_dep
+            if risk_score > max_risk_score:
+                max_risk_score = risk_score
+
+        if max_risk_score >= 0.6:
+            risk_level = "critical"
+        elif max_risk_score >= 0.4:
+            risk_level = "high"
+        elif max_risk_score >= 0.2:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+
+        n_affected = len(affected_countries)
+        if lang == "ko":
+            desc = f"GDP 대비 {gdp_pct}% 비중. "
+            if n_affected > 0:
+                desc += f"현재 {n_affected}개 분쟁국이 핵심 교역 파트너."
+            else:
+                desc += "현재 분쟁국 중 핵심 교역 파트너 없음."
+        else:
+            desc = f"{gdp_pct}% of GDP. "
+            if n_affected > 0:
+                desc += f"{n_affected} conflict-affected countries are key partners."
+            else:
+                desc += "No key trade partners currently in conflict zones."
+
+        aggregated[sector] = {
+            "sector": sector_label,
+            "exposure_pct": gdp_pct,
+            "trade_dependency": round(max_trade_dep, 2),
+            "risk_level": risk_level,
+            "description": desc,
+        }
+
+    risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    sectors_list = sorted(aggregated.values(), key=lambda x: risk_order.get(x["risk_level"], 4))
+
+    critical_count = sum(1 for s in sectors_list if s["risk_level"] == "critical")
+    high_count = sum(1 for s in sectors_list if s["risk_level"] == "high")
+    if critical_count >= 2:
+        overall = "critical"
+    elif critical_count >= 1 or high_count >= 2:
+        overall = "high"
+    elif high_count >= 1:
+        overall = "medium"
+    else:
+        overall = "low"
+
+    response_data = {
+        "home_country": home,
+        "affected_country": "global",
+        "sectors": sectors_list,
+        "overall_risk": overall,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cached": False,
+    }
+
+    if redis:
+        await redis.set(cache_key, json.dumps(response_data), ex=6 * 3600)
+
+    return SectorAnalysisOut(**response_data)
+
+
 # ── Phase 4: Weekly Report ─────────────────────────────────────────────────
 
 class WeeklyReportIssue(BaseModel):

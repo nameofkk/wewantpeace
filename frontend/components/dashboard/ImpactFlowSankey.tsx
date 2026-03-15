@@ -2,21 +2,18 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
 import { getFlag } from "@/lib/countries";
 import { ChevronRight, X } from "lucide-react";
 import type { ImpactFlowOut } from "@/lib/api";
 
-// 고정 크기 Sankey 사용 — ResponsiveSankey는 내부 ResizeObserver 의존으로 모바일 인앱 브라우저에서 실패
-const Sankey = dynamic(
-  () => import("@nivo/sankey").then((m) => m.Sankey),
-  {
-    ssr: false,
-    loading: () => <div className="h-[220px] animate-pulse bg-muted/20 rounded" />,
-  }
-);
+/**
+ * 순수 SVG Sankey 차트 — @nivo/sankey 제거
+ * nivo의 ResponsiveSankey/Sankey 모두 내부적으로 ResizeObserver 또는
+ * useMeasure를 사용하여 모바일 인앱 브라우저(토스, 웨일 등)에서 렌더링 실패.
+ * 외부 라이브러리 의존성 0으로 모바일 호환성 100% 보장.
+ */
 
 interface ConflictIssue {
   clusterId?: string;
@@ -28,7 +25,6 @@ interface Props {
   data: ImpactFlowOut;
   isPro: boolean;
   lang: "ko" | "en";
-  /** 좌측 분쟁 노드에 매칭되는 이슈 정보 (cluster_id, full title 등) */
   conflictIssues?: ConflictIssue[];
 }
 
@@ -40,14 +36,108 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const NUM_LABELS = ["①", "②", "③", "④", "⑤"];
 
-/** Truncate for non-conflict labels */
-function truncateLabel(label: string, category: string, compact: boolean): string {
-  if (category === "conflict") return ""; // conflict labels handled externally
-  const maxLen = compact
-    ? (category === "impact" ? 7 : 6)
-    : (category === "impact" ? 14 : 10);
-  if (label.length <= maxLen) return label;
-  return label.slice(0, maxLen) + "…";
+function truncLabel(s: string, max: number) {
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+/** 3단 Sankey 레이아웃 계산 */
+function computeLayout(data: ImpactFlowOut, width: number, height: number) {
+  const margin = { top: 8, right: 8, bottom: 8, left: 8 };
+  const nodeW = 10;
+  const colGap = 40;
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+
+  // 3개 칼럼: conflict, commodity, impact
+  const cols: Record<string, typeof data.nodes> = { conflict: [], commodity: [], impact: [] };
+  for (const n of data.nodes) {
+    const cat = n.category || "commodity";
+    if (cols[cat]) cols[cat].push(n);
+    else cols.commodity.push(n);
+  }
+
+  const colX = {
+    conflict: margin.left,
+    commodity: margin.left + (innerW - nodeW) / 2 - colGap / 2,
+    impact: margin.left + innerW - nodeW,
+  };
+
+  // 각 노드에 y위치 계산 (균등 분배)
+  const nodePositions = new Map<string, { x: number; y: number; h: number; color: string; label: string; category: string }>();
+
+  for (const cat of ["conflict", "commodity", "impact"] as const) {
+    const nodes = cols[cat];
+    if (!nodes.length) continue;
+    const totalPad = Math.max(0, (nodes.length - 1) * 6);
+    const nodeH = Math.max(12, (innerH - totalPad) / nodes.length);
+    let y = margin.top;
+    for (const n of nodes) {
+      nodePositions.set(n.id, {
+        x: colX[cat],
+        y,
+        h: nodeH,
+        color: n.color || CATEGORY_COLORS[cat] || "#6b7280",
+        label: n.label,
+        category: cat,
+      });
+      y += nodeH + 6;
+    }
+  }
+
+  // 링크 계산: 각 링크에 대해 source/target 노드의 중앙 연결
+  // 각 노드의 링크 할당 위치 추적
+  const nodeOutOffset = new Map<string, number>();
+  const nodeInOffset = new Map<string, number>();
+  for (const n of data.nodes) {
+    nodeOutOffset.set(n.id, 0);
+    nodeInOffset.set(n.id, 0);
+  }
+
+  // 링크 value 합계 계산
+  const nodeOutTotal = new Map<string, number>();
+  const nodeInTotal = new Map<string, number>();
+  for (const l of data.links) {
+    nodeOutTotal.set(l.source, (nodeOutTotal.get(l.source) ?? 0) + Math.max(1, l.value));
+    nodeInTotal.set(l.target, (nodeInTotal.get(l.target) ?? 0) + Math.max(1, l.value));
+  }
+
+  const links = data.links.map((l) => {
+    const src = nodePositions.get(l.source);
+    const tgt = nodePositions.get(l.target);
+    if (!src || !tgt) return null;
+
+    const val = Math.max(1, l.value);
+    const srcTotal = nodeOutTotal.get(l.source) ?? 1;
+    const tgtTotal = nodeInTotal.get(l.target) ?? 1;
+
+    const srcH = (val / srcTotal) * src.h;
+    const tgtH = (val / tgtTotal) * tgt.h;
+    const linkThickness = Math.max(2, Math.min(srcH, tgtH, 20));
+
+    const srcOff = nodeOutOffset.get(l.source) ?? 0;
+    const tgtOff = nodeInOffset.get(l.target) ?? 0;
+
+    const y0 = src.y + srcOff + linkThickness / 2;
+    const y1 = tgt.y + tgtOff + linkThickness / 2;
+
+    nodeOutOffset.set(l.source, srcOff + linkThickness);
+    nodeInOffset.set(l.target, tgtOff + linkThickness);
+
+    const x0 = src.x + nodeW;
+    const x1 = tgt.x;
+    const cx = (x0 + x1) / 2;
+
+    return {
+      d: `M${x0},${y0} C${cx},${y0} ${cx},${y1} ${x1},${y1}`,
+      thickness: linkThickness,
+      srcColor: src.color,
+      tgtColor: tgt.color,
+      sourceId: l.source,
+      targetId: l.target,
+    };
+  }).filter(Boolean);
+
+  return { nodePositions, links: links as NonNullable<(typeof links)[0]>[], nodeW, colX };
 }
 
 export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
@@ -56,7 +146,6 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const [chartWidth, setChartWidth] = useState(0);
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
 
-  // 컨테이너 실제 너비 측정 — 직접 DOM 측정 (ResizeObserver 미사용)
   useEffect(() => {
     function measure() {
       if (containerRef.current) {
@@ -64,46 +153,27 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
         if (w > 0) setChartWidth(Math.floor(w));
       }
     }
-    // 즉시 + 약간의 딜레이 후 재측정 (레이아웃 완료 보장)
     measure();
-    const t1 = setTimeout(measure, 100);
-    const t2 = setTimeout(measure, 500);
-
+    const t1 = setTimeout(measure, 50);
+    const t2 = setTimeout(measure, 200);
+    const t3 = setTimeout(measure, 500);
     window.addEventListener("resize", measure);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
       window.removeEventListener("resize", measure);
     };
   }, []);
 
-  const isCompact = chartWidth < 380;
-  const chartHeight = 220;
+  // fallback: window.innerWidth 기반
+  const effectiveWidth = chartWidth > 0 ? chartWidth : (typeof window !== "undefined" ? Math.min(window.innerWidth - 32, 600) : 360);
+  const chartHeight = 200;
 
-  // conflict nodes: use number labels like ①②③
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
-
-  const categoryMap = new Map(data.nodes.map((n) => [n.id, n.category]));
   const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 
-  const sankeyData = {
-    nodes: data.nodes.map((n) => {
-      const isConflict = n.category === "conflict";
-      const idx = conflictIdxMap.get(n.id) ?? 0;
-      return {
-        id: n.id,
-        label: n.label,
-        shortLabel: isConflict ? NUM_LABELS[idx] : truncateLabel(n.label, n.category, isCompact),
-        color: n.color || CATEGORY_COLORS[n.category] || "#6b7280",
-        category: n.category,
-      };
-    }),
-    links: data.links.map((l) => ({
-      source: l.source,
-      target: l.target,
-      value: Math.max(1, l.value),
-    })),
-  };
+  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight);
 
   const popupIssue = popupIdx !== null ? (conflictIssues?.[popupIdx] ?? {
     title: conflictNodes[popupIdx]?.label ?? "",
@@ -113,62 +183,79 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Sankey 차트 */}
+      {/* 순수 SVG Sankey */}
       <div className={cn(
         "relative",
         !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
-      )} style={{ height: chartHeight }}>
-        {chartWidth > 0 && (
-          <Sankey
-            width={chartWidth}
-            height={chartHeight}
-            data={sankeyData}
-            margin={{ top: 6, right: isCompact ? 55 : 80, bottom: 6, left: isCompact ? 20 : 24 }}
-            align="justify"
-            colors={(node: any) => node.color || "#6b7280"}
-            nodeOpacity={1}
-            nodeHoverOpacity={1}
-            nodeThickness={isCompact ? 10 : 12}
-            nodeInnerPadding={2}
-            nodeBorderWidth={0}
-            nodeBorderRadius={3}
-            linkOpacity={isPro ? 0.4 : 0.15}
-            linkHoverOpacity={0.6}
-            linkContract={1}
-            linkBlendMode="normal"
-            enableLinkGradient={true}
-            labelPosition="outside"
-            labelOrientation="horizontal"
-            labelPadding={isCompact ? 3 : 5}
-            labelTextColor={{ from: "color", modifiers: [["brighter", 0.8]] }}
-            label={(node: any) =>
-              node.shortLabel ?? truncateLabel(
-                node.label || node.id,
-                categoryMap.get(node.id) || "commodity",
-                isCompact
-              )
-            }
-            nodeTooltip={({ node }: any) => (
-              <div className="bg-popover text-popover-foreground border border-border rounded-lg px-3 py-2 shadow-lg max-w-[220px]">
-                <p className="text-[11px] font-medium leading-snug">{node.label || node.id}</p>
-              </div>
-            )}
-            linkTooltip={() => null}
-            motionConfig="gentle"
-            theme={{
-              labels: {
-                text: {
-                  fontSize: isCompact ? 9 : 11,
-                  fill: "rgba(156,163,175,0.9)",
-                  fontWeight: 600,
-                },
-              },
-            }}
-          />
-        )}
+      )}>
+        <svg
+          width={effectiveWidth}
+          height={chartHeight}
+          viewBox={`0 0 ${effectiveWidth} ${chartHeight}`}
+          className="w-full"
+          style={{ display: "block" }}
+        >
+          {/* 링크 (곡선) */}
+          {links.map((l, i) => (
+            <path
+              key={i}
+              d={l.d}
+              fill="none"
+              stroke={l.srcColor}
+              strokeWidth={l.thickness}
+              strokeOpacity={isPro ? 0.3 : 0.12}
+              strokeLinecap="round"
+            />
+          ))}
+
+          {/* 노드 (사각형) */}
+          {Array.from(nodePositions.entries()).map(([id, pos]) => (
+            <rect
+              key={id}
+              x={pos.x}
+              y={pos.y}
+              width={nodeW}
+              height={pos.h}
+              rx={3}
+              fill={pos.color}
+            />
+          ))}
+
+          {/* 라벨 */}
+          {Array.from(nodePositions.entries()).map(([id, pos]) => {
+            const isConflict = pos.category === "conflict";
+            const isImpact = pos.category === "impact";
+            const idx = conflictIdxMap.get(id) ?? -1;
+            const maxLen = effectiveWidth < 380 ? 6 : 10;
+
+            const labelText = isConflict
+              ? NUM_LABELS[idx] ?? ""
+              : truncLabel(pos.label, isImpact ? maxLen + 4 : maxLen);
+
+            const textX = isConflict
+              ? pos.x - 4
+              : pos.x + nodeW + 4;
+            const textAnchor = isConflict ? "end" : "start";
+
+            return (
+              <text
+                key={`label-${id}`}
+                x={textX}
+                y={pos.y + pos.h / 2}
+                dy="0.35em"
+                textAnchor={textAnchor}
+                fill={isConflict ? pos.color : "rgba(156,163,175,0.9)"}
+                fontSize={effectiveWidth < 380 ? 9 : 11}
+                fontWeight={600}
+              >
+                {labelText}
+              </text>
+            );
+          })}
+        </svg>
       </div>
 
-      {/* 분쟁 이슈 버튼 목록 — Sankey 아래 */}
+      {/* 분쟁 이슈 버튼 목록 */}
       <div className="px-3 pb-2 flex flex-wrap gap-1.5">
         {conflictNodes.map((node, idx) => {
           const issue = conflictIssues?.[idx];
@@ -203,7 +290,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       </div>
 
       {!isPro && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ top: chartHeight / 2 }}>
+        <div className="absolute pointer-events-none" style={{ top: chartHeight / 2, left: "50%", transform: "translate(-50%, -50%)" }}>
           <span className="text-[10px] text-muted-foreground/40 bg-background/60 px-3 py-1 rounded-full pointer-events-auto">
             {t(lang, "dash_pro_demo_flow" as TranslationKey)}
           </span>

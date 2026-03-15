@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useSectorAnalysis, useImpactSummary } from "@/lib/api";
+import { useSectorAnalysis, useSectorOverview, useImpactSummary } from "@/lib/api";
 import { t, type Lang } from "@/lib/i18n";
 import {
   Sparkles,
@@ -218,16 +218,23 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
   const [expanded, setExpanded] = useState(false);
 
   const shouldFetch = embedded || expanded;
+  const useOverview = embedded && !clusterId; // 홈: 전체 이슈 기반 overview
 
   // clusterId가 있으면 직접 사용, 없으면 Impact Summary에서 top issue 가져오기
-  const { data: summaryData } = useImpactSummary(homeCountry, lang, !clusterId && shouldFetch);
+  const { data: summaryData } = useImpactSummary(homeCountry, lang, !clusterId && !useOverview && shouldFetch);
   const effectiveClusterId = clusterId || summaryData?.top_issues?.[0]?.cluster_id;
 
-  const { data, isLoading, isError, error } = useSectorAnalysis(
-    shouldFetch && effectiveClusterId ? effectiveClusterId : undefined,
+  // 전체 이슈 기반 overview (홈 embedded 모드)
+  const overviewQuery = useSectorOverview(homeCountry, lang, useOverview && shouldFetch);
+  // 개별 클러스터 기반 (이슈 상세 페이지)
+  const clusterQuery = useSectorAnalysis(
+    !useOverview && shouldFetch && effectiveClusterId ? effectiveClusterId : undefined,
     homeCountry,
     lang,
   );
+
+  const activeQuery = useOverview ? overviewQuery : clusterQuery;
+  const { data, isLoading, isError, error } = activeQuery;
 
   const is403 = (error as any)?.status === 403;
 
