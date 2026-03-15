@@ -30,7 +30,6 @@ _FEEDS = [
 def upgrade():
     # source_channels 테이블에 INSERT
     conn = op.get_bind()
-    now = datetime.now(timezone.utc).isoformat()
     for name, url, tier, geo in _FEEDS:
         # 중복 방지: feed_url이 이미 있으면 스킵
         existing = conn.execute(
@@ -41,10 +40,10 @@ def upgrade():
             continue
         conn.execute(
             sa.text(
-                "INSERT INTO source_channels (channel_name, source_type, feed_url, source_tier, is_active, created_at) "
-                "VALUES (:name, 'rss', :url, :tier, true, :now)"
+                "INSERT INTO source_channels (display_name, source_type, feed_url, tier, is_active, created_at) "
+                "VALUES (:name, 'rss', :url, :tier, true, now())"
             ),
-            {"name": name, "url": url, "tier": tier, "now": now},
+            {"name": name, "url": url, "tier": tier},
         )
 
 
