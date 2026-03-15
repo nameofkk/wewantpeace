@@ -1621,10 +1621,10 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     if not scored:
         return None
 
-    # 글로벌 모드(home="")면 모든 SECTOR_DATA의 key_partners를 합산
-    if not home:
+    # 글로벌 합산 sectors (fallback용으로도 사용)
+    def _build_merged_sectors() -> dict:
         merged: dict[str, dict] = {}
-        for _country_code, country_sectors in SECTOR_DATA.items():
+        for _cc, country_sectors in SECTOR_DATA.items():
             for sector, info in country_sectors.items():
                 if sector not in merged:
                     merged[sector] = {"gdp_pct": info["gdp_pct"], "key_partners": list(info.get("key_partners", []))}
@@ -1632,7 +1632,10 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
                     for p in info.get("key_partners", []):
                         if p not in merged[sector]["key_partners"]:
                             merged[sector]["key_partners"].append(p)
-        sectors_data = merged
+        return merged
+
+    if not home:
+        sectors_data = _build_merged_sectors()
 
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     nodes = []
@@ -1661,6 +1664,32 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
                 link_value = round(severity * info.get("gdp_pct", 1) / 100, 2)
                 if link_value > 0:
                     links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
+
+    # Fallback: 매칭 실패 시 글로벌 합산 데이터로 재시도
+    if not links and home:
+        nodes = []
+        links = []
+        seen_commodities = set()
+        fallback_sectors = _build_merged_sectors()
+        for idx, (c, impact) in enumerate(top3):
+            cc = c.country_code or ""
+            severity = c.severity or 0
+            title = c.title_ko if lang == "ko" and c.title_ko else c.title or f"Issue {idx+1}"
+            title = title[:20]
+            node_id = f"c{idx}"
+            nodes.append(ImpactFlowNode(id=node_id, label=title, color="#dc2626", category="conflict"))
+            for sector, info in fallback_sectors.items():
+                if cc in info.get("key_partners", []):
+                    commodity_id = sector
+                    if commodity_id not in seen_commodities:
+                        seen_commodities.add(commodity_id)
+                        nodes.append(ImpactFlowNode(
+                            id=commodity_id, label=labels.get(sector, sector),
+                            color="#f59e0b", category="commodity"
+                        ))
+                    link_value = round(severity * info.get("gdp_pct", 1) / 100, 2)
+                    if link_value > 0:
+                        links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
 
     # Right column: impact categories — 실제 데이터 기반 라벨
     oil_change = oil_row[1] if oil_row else 0
