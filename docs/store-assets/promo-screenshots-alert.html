@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>WeWantPeace 알림 프로모 스크린샷 (1080x1920) - 한국어 + English</title>
+<title>WeWantPeace 알림 프로모 스크린샷 (1080x1920)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -31,7 +31,6 @@
     filter: blur(80px);
     opacity: 0.5;
   }
-
   .top {
     position: relative;
     z-index: 10;
@@ -58,7 +57,6 @@
     line-height: 1.5;
     font-weight: 400;
   }
-
   .phone-wrap {
     position: relative;
     z-index: 10;
@@ -82,12 +80,13 @@
   }
   .phone-status {
     height: 50px;
-    background: #0F172A;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     position: relative;
+    z-index: 20;
   }
   .notch {
     width: 160px;
@@ -97,126 +96,216 @@
     position: absolute;
     top: 0;
   }
+  /* 상태바 아이콘들 */
+  .status-left {
+    position: absolute;
+    left: 24px;
+    top: 16px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 500;
+  }
+  .status-right {
+    position: absolute;
+    right: 24px;
+    top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+  }
+  .status-right svg {
+    width: 16px;
+    height: 16px;
+    fill: rgba(255,255,255,0.8);
+  }
+  .battery {
+    width: 24px;
+    height: 12px;
+    border: 1.5px solid rgba(255,255,255,0.7);
+    border-radius: 3px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 1.5px;
+  }
+  .battery::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 5px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 0 1px 1px 0;
+  }
+  .battery-fill {
+    width: 75%;
+    height: 100%;
+    background: rgba(255,255,255,0.8);
+    border-radius: 1px;
+  }
   .phone-screen {
     flex: 1;
     overflow: hidden;
     position: relative;
-    background: #0F172A;
   }
   .phone-home {
     height: 28px;
-    background: #0F172A;
+    background: rgba(0,0,0,0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    position: relative;
+    z-index: 20;
   }
   .phone-home .bar {
     width: 120px;
     height: 4px;
-    background: rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.4);
     border-radius: 2px;
   }
 
-  /* ── 안드로이드 알림 스타일 ── */
-  .lock-screen {
+  /* ── 잠금화면 ── */
+  .lockscreen {
     width: 100%;
     height: 100%;
-    background: linear-gradient(180deg, #0a0f1e 0%, #111827 40%, #0f172a 100%);
-    padding: 40px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  /* 배경: 블러된 어두운 월페이퍼 */
+  .ls-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(30,58,95,0.6) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 70%, rgba(15,23,42,0.8) 0%, transparent 60%),
+      linear-gradient(180deg, #0c1424 0%, #0f1a2e 30%, #0a1020 100%);
+  }
+  .ls-content {
+    position: relative;
+    z-index: 10;
+    height: 100%;
     display: flex;
     flex-direction: column;
-  }
-  .lock-time {
-    text-align: center;
-    margin-bottom: 8px;
-  }
-  .lock-time .time {
-    font-size: 72px;
-    font-weight: 200;
-    color: #F8FAFC;
-    letter-spacing: 2px;
-  }
-  .lock-time .date {
-    font-size: 16px;
-    color: #94A3B8;
-    font-weight: 400;
+    padding: 20px 20px 30px;
   }
 
-  .notif-list {
-    margin-top: 30px;
+  /* 시계 */
+  .ls-clock {
+    text-align: center;
+    padding: 30px 0 20px;
+  }
+  .ls-time {
+    font-size: 88px;
+    font-weight: 100;
+    color: #FFFFFF;
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+  .ls-date {
+    font-size: 17px;
+    color: rgba(255,255,255,0.65);
+    font-weight: 400;
+    margin-top: 8px;
+  }
+
+  /* 알림 목록 */
+  .ls-notifs {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
+    padding-top: 20px;
+    overflow: hidden;
   }
-  .notif {
-    background: rgba(30, 41, 59, 0.85);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
-    padding: 16px 18px;
-    border: 1px solid rgba(255,255,255,0.06);
+
+  /* 개별 알림 카드 */
+  .noti {
+    background: rgba(40, 50, 70, 0.7);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-radius: 18px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.05);
   }
-  .notif-header {
+  .noti-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
-  .notif-app-icon {
-    width: 20px;
-    height: 20px;
+  .noti-icon {
+    width: 22px;
+    height: 22px;
     background: linear-gradient(135deg, #3B82F6, #06B6D4);
-    border-radius: 5px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    font-size: 12px;
+    flex-shrink: 0;
   }
-  .notif-app-name {
+  .noti-app {
     font-size: 13px;
-    color: #94A3B8;
+    color: rgba(255,255,255,0.55);
     font-weight: 500;
     flex: 1;
   }
-  .notif-time {
+  .noti-when {
     font-size: 12px;
-    color: #64748B;
+    color: rgba(255,255,255,0.35);
   }
-  .notif-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #F1F5F9;
-    margin-bottom: 4px;
-    line-height: 1.3;
-  }
-  .notif-body {
-    font-size: 14px;
-    color: #CBD5E1;
-    line-height: 1.4;
-  }
-  .notif-badge {
-    display: inline-block;
+  .noti-chevron {
     font-size: 11px;
-    font-weight: 700;
-    padding: 2px 8px;
+    color: rgba(255,255,255,0.25);
+    margin-left: 4px;
+  }
+  .noti-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.92);
+    line-height: 1.35;
+    margin-bottom: 3px;
+  }
+  .noti-body {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.35;
+  }
+  .noti-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .noti-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
     border-radius: 6px;
-    margin-top: 6px;
   }
-  .badge-critical {
-    background: rgba(239,68,68,0.2);
-    color: #F87171;
+  .tag-crit { background: rgba(239,68,68,0.2); color: #F87171; }
+  .tag-high { background: rgba(251,191,36,0.2); color: #FBBF24; }
+  .tag-ok { background: rgba(16,185,129,0.2); color: #34D399; }
+  .tag-info { background: rgba(59,130,246,0.2); color: #60A5FA; }
+
+  /* 하단 잠금화면 힌트 */
+  .ls-bottom {
+    text-align: center;
+    padding-top: 20px;
   }
-  .badge-high {
-    background: rgba(251,191,36,0.2);
-    color: #FBBF24;
+  .ls-swipe {
+    font-size: 13px;
+    color: rgba(255,255,255,0.3);
+    font-weight: 400;
   }
-  .badge-verified {
-    background: rgba(16,185,129,0.2);
-    color: #34D399;
-  }
-  .badge-info {
-    background: rgba(59,130,246,0.2);
-    color: #60A5FA;
+  .ls-lock-icon {
+    font-size: 18px;
+    color: rgba(255,255,255,0.25);
+    margin-bottom: 6px;
   }
 </style>
 </head>
@@ -232,72 +321,87 @@
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">14:32</div>
+        <div class="status-right">
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
-        <div class="lock-screen">
-          <div class="lock-time">
-            <div class="time">14:32</div>
-            <div class="date">3월 15일 토요일</div>
-          </div>
-          <div class="notif-list">
-            <!-- 알림 1: 속보 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">방금</span>
+        <div class="lockscreen">
+          <div class="ls-bg"></div>
+          <div class="ls-content">
+            <div class="ls-clock">
+              <div class="ls-time">14:32</div>
+              <div class="ls-date">3월 15일 토요일</div>
+            </div>
+            <div class="ls-notifs">
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">방금</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F6A8; 우크라이나 동부 전선 신규 교전 보고</div>
+                <div class="noti-body">도네츠크 인근 대규모 포격 발생. 민간 피해 우려.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-crit">심각도 85</span>
+                  <span class="noti-tag tag-crit">KScore 8.2</span>
+                </div>
               </div>
-              <div class="notif-title">&#x1F6A8; 우크라이나 동부 전선 신규 교전 보고</div>
-              <div class="notif-body">도네츠크 인근 대규모 포격 발생. 민간 피해 우려.</div>
-              <div>
-                <span class="notif-badge badge-critical">심각도 85</span>
-                <span class="notif-badge badge-critical">KScore 8.2</span>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">12분 전</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x2705; 가자 지구 휴전 협상 재개</div>
+                <div class="noti-body">카타르 중재 하에 양측 대표단 회동. AP, Reuters 확인.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-high">심각도 72</span>
+                  <span class="noti-tag tag-ok">신뢰 확인</span>
+                </div>
+              </div>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">38분 전</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F1F8;&#x1F1E9; 수단 인도적 지원 통로 개방 합의</div>
+                <div class="noti-body">UN 주도 협상으로 다르푸르 구호물자 수송 재개.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-high">심각도 60</span>
+                  <span class="noti-tag tag-info">KScore 5.1</span>
+                </div>
+              </div>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">1시간 전</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F1F0;&#x1F1F7; 한반도 긴장도 하락 추세 지속</div>
+                <div class="noti-body">남북 군사 핫라인 통화 재개. 긴장도 18로 하락.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-ok">긴장도 18</span>
+                  <span class="noti-tag tag-info">KScore 4.2</span>
+                </div>
               </div>
             </div>
 
-            <!-- 알림 2: 신뢰 알림 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">12분 전</span>
-              </div>
-              <div class="notif-title">&#x2705; 가자 지구 휴전 협상 재개</div>
-              <div class="notif-body">카타르 중재 하에 양측 대표단 회동. AP, Reuters 확인.</div>
-              <div>
-                <span class="notif-badge badge-high">심각도 72</span>
-                <span class="notif-badge badge-verified">신뢰 확인</span>
-              </div>
-            </div>
-
-            <!-- 알림 3 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">38분 전</span>
-              </div>
-              <div class="notif-title">&#x1F1F8;&#x1F1E9; 수단 인도적 지원 통로 개방 합의</div>
-              <div class="notif-body">UN 주도 협상으로 다르푸르 지역 구호물자 수송 재개.</div>
-              <div>
-                <span class="notif-badge badge-high">심각도 60</span>
-                <span class="notif-badge badge-info">KScore 5.1</span>
-              </div>
-            </div>
-
-            <!-- 알림 4 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">1시간 전</span>
-              </div>
-              <div class="notif-title">&#x1F1F0;&#x1F1F7; 한반도 긴장도 하락 추세 지속</div>
-              <div class="notif-body">남북 군사 핫라인 통화 재개. 긴장도 18로 하락.</div>
-              <div>
-                <span class="notif-badge badge-verified">긴장도 18</span>
-                <span class="notif-badge badge-info">KScore 4.2</span>
-              </div>
+            <div class="ls-bottom">
+              <div class="ls-lock-icon">&#x1F512;</div>
+              <div class="ls-swipe">위로 밀어서 잠금 해제</div>
             </div>
           </div>
         </div>
@@ -317,72 +421,87 @@
   </div>
   <div class="phone-wrap">
     <div class="phone">
-      <div class="phone-status"><div class="notch"></div></div>
+      <div class="phone-status">
+        <div class="notch"></div>
+        <div class="status-left">2:32 PM</div>
+        <div class="status-right">
+          <span style="font-size:12px;">LTE</span>
+          <div class="battery"><div class="battery-fill"></div></div>
+        </div>
+      </div>
       <div class="phone-screen">
-        <div class="lock-screen">
-          <div class="lock-time">
-            <div class="time">14:32</div>
-            <div class="date">Saturday, Mar 15</div>
-          </div>
-          <div class="notif-list">
-            <!-- Alert 1: Breaking -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">now</span>
+        <div class="lockscreen">
+          <div class="ls-bg"></div>
+          <div class="ls-content">
+            <div class="ls-clock">
+              <div class="ls-time">2:32</div>
+              <div class="ls-date">Saturday, March 15</div>
+            </div>
+            <div class="ls-notifs">
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">now</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F6A8; New clashes on Ukraine eastern front</div>
+                <div class="noti-body">Large-scale shelling near Donetsk. Civilian casualties feared.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-crit">Severity 85</span>
+                  <span class="noti-tag tag-crit">KScore 8.2</span>
+                </div>
               </div>
-              <div class="notif-title">&#x1F6A8; New clashes on Ukraine eastern front</div>
-              <div class="notif-body">Large-scale shelling near Donetsk. Civilian casualties feared.</div>
-              <div>
-                <span class="notif-badge badge-critical">Severity 85</span>
-                <span class="notif-badge badge-critical">KScore 8.2</span>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">12m ago</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x2705; Gaza ceasefire negotiations resume</div>
+                <div class="noti-body">Both delegations meet under Qatar mediation. Confirmed by AP, Reuters.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-high">Severity 72</span>
+                  <span class="noti-tag tag-ok">Verified</span>
+                </div>
+              </div>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">38m ago</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F1F8;&#x1F1E9; Sudan humanitarian corridor agreed</div>
+                <div class="noti-body">UN-led talks reopen aid delivery to Darfur region.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-high">Severity 60</span>
+                  <span class="noti-tag tag-info">KScore 5.1</span>
+                </div>
+              </div>
+
+              <div class="noti">
+                <div class="noti-head">
+                  <div class="noti-icon">&#x1F441;</div>
+                  <span class="noti-app">WeWantPeace</span>
+                  <span class="noti-when">1h ago</span>
+                  <span class="noti-chevron">&#x276F;</span>
+                </div>
+                <div class="noti-title">&#x1F1F0;&#x1F1F7; Korean Peninsula tension declining</div>
+                <div class="noti-body">Inter-Korean military hotline calls resumed. Tension at 18.</div>
+                <div class="noti-tags">
+                  <span class="noti-tag tag-ok">Tension 18</span>
+                  <span class="noti-tag tag-info">KScore 4.2</span>
+                </div>
               </div>
             </div>
 
-            <!-- Alert 2: Verified -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">12m ago</span>
-              </div>
-              <div class="notif-title">&#x2705; Gaza ceasefire negotiations resume</div>
-              <div class="notif-body">Both delegations meet under Qatar mediation. Confirmed by AP, Reuters.</div>
-              <div>
-                <span class="notif-badge badge-high">Severity 72</span>
-                <span class="notif-badge badge-verified">Verified</span>
-              </div>
-            </div>
-
-            <!-- Alert 3 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">38m ago</span>
-              </div>
-              <div class="notif-title">&#x1F1F8;&#x1F1E9; Sudan humanitarian corridor agreed</div>
-              <div class="notif-body">UN-led talks reopen aid delivery to Darfur region.</div>
-              <div>
-                <span class="notif-badge badge-high">Severity 60</span>
-                <span class="notif-badge badge-info">KScore 5.1</span>
-              </div>
-            </div>
-
-            <!-- Alert 4 -->
-            <div class="notif">
-              <div class="notif-header">
-                <div class="notif-app-icon">&#x1F441;</div>
-                <span class="notif-app-name">WeWantPeace</span>
-                <span class="notif-time">1h ago</span>
-              </div>
-              <div class="notif-title">&#x1F1F0;&#x1F1F7; Korean Peninsula tension declining</div>
-              <div class="notif-body">Inter-Korean military hotline calls resumed. Tension at 18.</div>
-              <div>
-                <span class="notif-badge badge-verified">Tension 18</span>
-                <span class="notif-badge badge-info">KScore 4.2</span>
-              </div>
+            <div class="ls-bottom">
+              <div class="ls-lock-icon">&#x1F512;</div>
+              <div class="ls-swipe">Swipe up to unlock</div>
             </div>
           </div>
         </div>
