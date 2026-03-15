@@ -214,16 +214,18 @@ interface SectorImpactCardProps {
 
 export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps) {
   const lang = useAppStore((s) => s.lang);
+  const homeCountry = useAppStore((s) => s.homeCountry);
   const [expanded, setExpanded] = useState(false);
 
   const shouldFetch = embedded || expanded;
 
   // clusterId가 있으면 직접 사용, 없으면 Impact Summary에서 top issue 가져오기
-  const { data: summaryData } = useImpactSummary(undefined, lang, !clusterId && shouldFetch);
+  const { data: summaryData } = useImpactSummary(homeCountry, lang, !clusterId && shouldFetch);
   const effectiveClusterId = clusterId || summaryData?.top_issues?.[0]?.cluster_id;
 
   const { data, isLoading, isError, error } = useSectorAnalysis(
     shouldFetch && effectiveClusterId ? effectiveClusterId : undefined,
+    homeCountry,
     lang,
   );
 

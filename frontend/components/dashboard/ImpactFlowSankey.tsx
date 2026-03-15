@@ -1,23 +1,34 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
+import { getFlag } from "@/lib/countries";
+import { ChevronRight, X } from "lucide-react";
 import type { ImpactFlowOut } from "@/lib/api";
 
 const ResponsiveSankey = dynamic(
   () => import("@nivo/sankey").then((m) => m.ResponsiveSankey),
   {
     ssr: false,
-    loading: () => <div className="h-[260px] animate-pulse bg-muted/20 rounded" />,
+    loading: () => <div className="h-[220px] animate-pulse bg-muted/20 rounded" />,
   }
 );
+
+interface ConflictIssue {
+  clusterId?: string;
+  title: string;
+  countryCodes: string[];
+}
 
 interface Props {
   data: ImpactFlowOut;
   isPro: boolean;
   lang: "ko" | "en";
+  /** 좌측 분쟁 노드에 매칭되는 이슈 정보 (cluster_id, full title 등) */
+  conflictIssues?: ConflictIssue[];
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -26,18 +37,23 @@ const CATEGORY_COLORS: Record<string, string> = {
   impact: "#3b82f6",
 };
 
-/** Truncate label for display */
+const NUM_LABELS = ["①", "②", "③", "④", "⑤"];
+
+/** Truncate for non-conflict labels */
 function truncateLabel(label: string, category: string, compact: boolean): string {
+  if (category === "conflict") return ""; // conflict labels handled externally
   const maxLen = compact
-    ? (category === "conflict" ? 8 : category === "impact" ? 7 : 6)
-    : (category === "conflict" ? 16 : category === "impact" ? 14 : 10);
+    ? (category === "impact" ? 7 : 6)
+    : (category === "impact" ? 14 : 10);
   if (label.length <= maxLen) return label;
   return label.slice(0, maxLen) + "…";
 }
 
-export function ImpactFlowSankey({ data, isPro, lang }: Props) {
+export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(400);
+  const [popupIdx, setPopupIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -51,20 +67,26 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  // Responsive margins: smaller on mobile
   const isCompact = containerWidth < 380;
-  const sideMargin = isCompact ? 55 : 90;
+
+  // conflict nodes: use number labels like ①②③
+  const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
 
   const categoryMap = new Map(data.nodes.map((n) => [n.id, n.category]));
+  const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 
   const sankeyData = {
-    nodes: data.nodes.map((n) => ({
-      id: n.id,
-      label: n.label,
-      shortLabel: truncateLabel(n.label, n.category, isCompact),
-      color: n.color || CATEGORY_COLORS[n.category] || "#6b7280",
-      category: n.category,
-    })),
+    nodes: data.nodes.map((n) => {
+      const isConflict = n.category === "conflict";
+      const idx = conflictIdxMap.get(n.id) ?? 0;
+      return {
+        id: n.id,
+        label: n.label,
+        shortLabel: isConflict ? NUM_LABELS[idx] : truncateLabel(n.label, n.category, isCompact),
+        color: n.color || CATEGORY_COLORS[n.category] || "#6b7280",
+        category: n.category,
+      };
+    }),
     links: data.links.map((l) => ({
       source: l.source,
       target: l.target,
@@ -72,16 +94,23 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
     })),
   };
 
+  const popupIssue = popupIdx !== null ? (conflictIssues?.[popupIdx] ?? {
+    title: conflictNodes[popupIdx]?.label ?? "",
+    countryCodes: [],
+    clusterId: undefined,
+  }) : null;
+
   return (
     <div className="relative" ref={containerRef}>
+      {/* Sankey 차트 */}
       <div className={cn(
-        "h-[260px]",
+        "h-[220px]",
         !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
       )}>
         {containerWidth > 0 && (
           <ResponsiveSankey
             data={sankeyData}
-            margin={{ top: 6, right: sideMargin, bottom: 6, left: sideMargin }}
+            margin={{ top: 6, right: isCompact ? 55 : 80, bottom: 6, left: isCompact ? 20 : 24 }}
             align="justify"
             colors={(node: any) => node.color || "#6b7280"}
             nodeOpacity={1}
@@ -97,7 +126,7 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
             enableLinkGradient={true}
             labelPosition="outside"
             labelOrientation="horizontal"
-            labelPadding={isCompact ? 4 : 6}
+            labelPadding={isCompact ? 3 : 5}
             labelTextColor={{ from: "color", modifiers: [["brighter", 0.8]] }}
             label={(node: any) =>
               node.shortLabel ?? truncateLabel(
@@ -107,7 +136,7 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
               )
             }
             nodeTooltip={({ node }: any) => (
-              <div className="bg-popover text-popover-foreground border border-border rounded-lg px-3 py-2 shadow-lg max-w-[200px]">
+              <div className="bg-popover text-popover-foreground border border-border rounded-lg px-3 py-2 shadow-lg max-w-[220px]">
                 <p className="text-[11px] font-medium leading-snug">{node.label || node.id}</p>
               </div>
             )}
@@ -116,21 +145,42 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
             theme={{
               labels: {
                 text: {
-                  fontSize: isCompact ? 8 : 10,
+                  fontSize: isCompact ? 9 : 11,
                   fill: "rgba(156,163,175,0.9)",
-                  fontWeight: 500,
+                  fontWeight: 600,
                 },
               },
             }}
           />
         )}
       </div>
+
+      {/* 분쟁 이슈 버튼 목록 — Sankey 아래 */}
+      <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+        {conflictNodes.map((node, idx) => {
+          const issue = conflictIssues?.[idx];
+          const flags = issue?.countryCodes?.slice(0, 2).map(getFlag).join("") ?? "";
+          const shortTitle = node.label.length > 12 ? node.label.slice(0, 12) + "…" : node.label;
+          return (
+            <button
+              key={node.id}
+              onClick={(e) => { e.stopPropagation(); setPopupIdx(idx); }}
+              className="inline-flex items-center gap-1 rounded-full bg-red-500/10 border border-red-500/20 px-2 py-1 text-[10px] font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              <span className="font-bold">{NUM_LABELS[idx]}</span>
+              {flags && <span className="text-xs">{flags}</span>}
+              <span className="truncate max-w-[100px]">{shortTitle}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Category legend */}
       <div className="flex items-center justify-center gap-3 px-3 pb-2 pt-0.5">
         {[
           { key: "conflict", color: "#dc2626", label: lang === "ko" ? "분쟁" : "Conflict" },
           { key: "commodity", color: "#f59e0b", label: lang === "ko" ? "산업" : "Industry" },
-          { key: "impact", color: "#3b82f6", label: lang === "ko" ? "생활영향" : "Cost" },
+          { key: "impact", color: "#3b82f6", label: lang === "ko" ? "생활영향" : "Life Impact" },
         ].map((c) => (
           <span key={c.key} className="flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c.color }} />
@@ -138,12 +188,53 @@ export function ImpactFlowSankey({ data, isPro, lang }: Props) {
           </span>
         ))}
       </div>
+
       {!isPro && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
           <span className="text-[10px] text-muted-foreground/40 bg-background/60 px-3 py-1 rounded-full pointer-events-auto">
             {t(lang, "dash_pro_demo_flow" as TranslationKey)}
           </span>
         </div>
+      )}
+
+      {/* 팝업 — 이슈 전체 제목 + 상세 보기 */}
+      {popupIdx !== null && popupIssue && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setPopupIdx(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card px-5 py-4 shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto">
+            <div className="flex items-start gap-3">
+              <span className="text-lg font-bold text-red-400 shrink-0">{NUM_LABELS[popupIdx]}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  {(popupIssue as ConflictIssue).countryCodes?.map((cc) => (
+                    <span key={cc} className="text-sm">{getFlag(cc)}</span>
+                  ))}
+                </div>
+                <p className="text-sm font-semibold text-foreground leading-snug mb-3">
+                  {popupIssue.title}
+                </p>
+                {(popupIssue as ConflictIssue).clusterId && (
+                  <button
+                    onClick={() => {
+                      setPopupIdx(null);
+                      router.push(`/issues/${(popupIssue as ConflictIssue).clusterId}`);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+                  >
+                    {lang === "ko" ? "이슈 상세 보기" : "View Issue"}
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setPopupIdx(null)}
+                className="shrink-0 p-1 rounded-full hover:bg-muted/50 transition-colors"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

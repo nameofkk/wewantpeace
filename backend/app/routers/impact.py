@@ -1088,6 +1088,7 @@ async def get_impact_brief(
     user: User = Depends(plan_required("pro")),
     db: AsyncSession = Depends(get_db),
     lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
+    home_country: str | None = Query(None, description="분석 기준 국가 (ISO2). 미지정 시 사용자 설정 사용"),
 ):
     """이슈의 경제/무역/여행 영향 분석 (Pro 이상)"""
     # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
@@ -1101,9 +1102,12 @@ async def get_impact_brief(
         resolved_lang = pref_lang or "ko"
     lang = resolved_lang
 
+    # 기준 국가 결정 (쿼리 파라미터 > 사용자 설정 > 기본값)
+    effective_home = home_country or user.home_country or "KR"
+
     # 캐시 확인
     redis = get_redis()
-    cache_key = _brief_cache_key(cluster_id, user.home_country or "KR", lang)
+    cache_key = _brief_cache_key(cluster_id, effective_home, lang)
     if redis:
         cached = await redis.get(cache_key)
         if cached:
@@ -1120,7 +1124,7 @@ async def get_impact_brief(
         raise HTTPException(404, detail="Cluster not found")
 
     # AI 분석 생성
-    brief = await _generate_impact_brief(cluster, user.home_country or "KR", lang, db)
+    brief = await _generate_impact_brief(cluster, effective_home, lang, db)
 
     response_data = {
         "cluster_id": str(cluster.id),
@@ -2151,6 +2155,7 @@ async def get_sector_analysis(
     user: User = Depends(plan_required("pro_plus")),
     db: AsyncSession = Depends(get_db),
     lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
+    home_country: str | None = Query(None, description="분석 기준 국가 (ISO2). 미지정 시 사용자 설정 사용"),
 ):
     """섹터별 영향도 분석 (Pro+ 이상)"""
     # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
@@ -2164,8 +2169,9 @@ async def get_sector_analysis(
         resolved_lang = pref_lang or "ko"
     lang = resolved_lang
 
+    # 기준 국가 결정 (쿼리 파라미터 > 사용자 설정 > 기본값)
     redis = get_redis()
-    home = user.home_country or "KR"
+    home = home_country or user.home_country or "KR"
     cache_key = f"impact:sector:{cluster_id}:{home}:{lang}"
 
     if redis:

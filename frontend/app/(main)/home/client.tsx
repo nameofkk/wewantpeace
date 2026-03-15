@@ -411,19 +411,33 @@ function ReportContent() {
                   />
                 </div>
                 <div className="overflow-x-auto">
-                  <ImpactFlowSankey data={summary.impact_flow} isPro={isPro} lang={lang} />
-                </div>
-                <div className="px-4 pb-3">
-                  <p className="text-[9px] text-muted-foreground/60 leading-relaxed">
-                    {lang === "ko"
-                      ? `현재 활성 이슈 중 ${homeCountry ? getCountryName(homeCountry, lang) : "글로벌"} 영향도가 높은 상위 이슈의 경제 파급 경로를 시각화합니다.`
-                      : `Visualizes the economic impact paths of top issues affecting ${homeCountry ? getCountryName(homeCountry, lang) : "global"} from active conflicts.`}
-                  </p>
+                  <ImpactFlowSankey
+                    data={summary.impact_flow}
+                    isPro={isPro}
+                    lang={lang}
+                    conflictIssues={summary.top_issues?.slice(0, 3).map((ti: any) => ({
+                      clusterId: ti.cluster_id,
+                      title: lang === "en" && ti.title_en ? ti.title_en : ti.title,
+                      countryCodes: ti.country_codes ?? [],
+                    }))}
+                  />
                 </div>
               </div>
             )}
 
             {/* #1 Issue: SmartSummaryCard Full */}
+            {topIssue && (
+              <div className="mt-5 mb-2">
+                <SectionHeader
+                  icon={AlertTriangle}
+                  title={lang === "ko" ? "가장 영향이 큰 이슈" : "Top Impact Issue"}
+                  desc={lang === "ko" ? "종합 영향도 1위" : "#1 by impact score"}
+                  tooltip={lang === "ko"
+                    ? "현재 활성 이슈 중 설정한 기준국가에 가장 영향이 큰 이슈의 요약입니다. 무슨 일인지, 나에게 어떤 영향이 있는지, 언제 영향이 올지를 3줄로 보여줍니다."
+                    : "Summary of the issue with highest impact on your home country. Shows what happened, how it affects you, and when to expect effects."}
+                />
+              </div>
+            )}
             {topIssue && (
               <SmartSummaryCardFull
                 item={topIssue}
@@ -778,23 +792,26 @@ function ReportContent() {
                       </div>
                     </ProDemoWrapper>
 
-                    {/* Sector Impact — embedded in detail tab */}
-                    <div className="mt-4 pt-3 border-t border-border/30">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                        <span className="text-[10px] font-bold text-purple-400">
-                          {lang === "ko" ? "산업별 리스크" : "Sector Risk"}
-                        </span>
-                        <span className="text-[8px] px-1 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold">
-                          Pro+
-                        </span>
-                      </div>
-                      <SectorImpactCard embedded />
-                    </div>
+                    {/* (SectorImpactCard moved to standalone section below) */}
                   </div>
                 )}
               </m.div>
             </AnimatePresence>
+          </m.section>
+
+          {/* ═══════════════ SECTION D: 산업별 리스크 분석 ═══════════════ */}
+          <m.section custom={3} initial="hidden" animate="visible" variants={sectionVariants}
+            className="rounded-xl border border-purple-500/20 bg-card p-4"
+          >
+            <SectionHeader
+              icon={Sparkles}
+              title={lang === "ko" ? "산업별 리스크" : "Sector Risk"}
+              desc={lang === "ko" ? "영향도 1위 이슈 기준" : "Based on top impact issue"}
+              tooltip={lang === "ko"
+                ? "현재 가장 영향이 큰 이슈를 기준으로, 관련 산업별 교역 의존도와 리스크를 분석합니다."
+                : "Analyzes trade dependency and risk by sector, based on the highest impact issue."}
+            />
+            <SectorImpactCard embedded />
           </m.section>
 
           {/* ═══════════════ Disclaimer ═══════════════ */}

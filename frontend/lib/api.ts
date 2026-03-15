@@ -627,11 +627,12 @@ export interface ImpactBrief {
   cached: boolean;
 }
 
-export function useImpactBrief(clusterId?: string, lang?: string) {
+export function useImpactBrief(clusterId?: string, homeCountry?: string, lang?: string) {
   return useQuery({
-    queryKey: ["impact", "brief", clusterId, lang ?? "ko"],
+    queryKey: ["impact", "brief", clusterId, homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
+      if (homeCountry) params.home_country = homeCountry;
       if (lang) params.lang = lang;
       return apiFetch<ImpactBrief>(`/impact/brief/${clusterId}`, params);
     },
@@ -658,11 +659,12 @@ export interface SectorAnalysis {
   cached: boolean;
 }
 
-export function useSectorAnalysis(clusterId?: string, lang?: string) {
+export function useSectorAnalysis(clusterId?: string, homeCountry?: string, lang?: string) {
   return useQuery({
-    queryKey: ["impact", "sector", clusterId, lang ?? "ko"],
+    queryKey: ["impact", "sector", clusterId, homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
+      if (homeCountry) params.home_country = homeCountry;
       if (lang) params.lang = lang;
       return apiFetch<SectorAnalysis>(`/impact/sector/${clusterId}`, params);
     },
