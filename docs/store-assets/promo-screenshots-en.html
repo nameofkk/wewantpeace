@@ -35,6 +35,59 @@
     filter: blur(80px);
     opacity: 0.5;
   }
+  .scan-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  .scan-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 2;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,0.3), rgba(96,165,250,0.5), rgba(59,130,246,0.3), transparent);
+    box-shadow: 0 0 20px rgba(59,130,246,0.3), 0 0 60px rgba(59,130,246,0.1);
+    animation: scanDown 4s linear infinite;
+  }
+  @keyframes scanDown {
+    0% { top: -2px; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .radar {
+    position: absolute;
+    z-index: 2;
+    border-radius: 50%;
+    border: 1px solid rgba(59,130,246,0.15);
+    animation: radarPulse 3s ease-out infinite;
+  }
+  .radar-1 { width: 300px; height: 300px; top: 15%; left: -5%; animation-delay: 0s; }
+  .radar-2 { width: 400px; height: 400px; bottom: 10%; right: -10%; animation-delay: 1s; }
+  .radar-3 { width: 200px; height: 200px; top: 45%; right: 5%; animation-delay: 2s; }
+  @keyframes radarPulse {
+    0% { transform: scale(0.5); opacity: 0.6; border-color: rgba(59,130,246,0.25); }
+    100% { transform: scale(1.8); opacity: 0; border-color: rgba(59,130,246,0); }
+  }
+  .blink-dot {
+    position: absolute;
+    z-index: 3;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #60A5FA;
+    box-shadow: 0 0 8px rgba(96,165,250,0.6);
+    animation: blinkFade 2s ease-in-out infinite;
+  }
+  @keyframes blinkFade {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
   .top {
     position: relative;
     z-index: 10;
@@ -70,8 +123,8 @@
     padding: 10px 100px 40px;
   }
   .phone {
-    width: 620px;
-    height: 1300px;
+    width: 720px;
+    height: 1480px;
     background: #000;
     border-radius: 50px;
     border: 4px solid #333;
@@ -220,6 +273,14 @@
 <!-- ========== 1. Home Dashboard ========== -->
 <div class="frame">
   <div class="bg"></div>
+  <div class="scan-grid"></div>
+  <div class="scan-line"></div>
+  <div class="radar radar-1"></div>
+  <div class="radar radar-2"></div>
+  <div class="radar radar-3"></div>
+  <div class="blink-dot" style="top:25%;left:12%;animation-delay:0s;"></div>
+  <div class="blink-dot" style="top:60%;right:8%;animation-delay:0.7s;"></div>
+  <div class="blink-dot" style="top:40%;left:85%;animation-delay:1.4s;"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(59,130,246,0.3), transparent); top: 50px; right: -200px;"></div>
   <div class="top">
     <div class="headline">How Global Conflicts<br><em>Affect Your Life</em></div>
@@ -255,6 +316,12 @@
 <!-- ========== 2. Issue Feed ========== -->
 <div class="frame">
   <div class="bg"></div>
+  <div class="scan-grid"></div>
+  <div class="scan-line" style="animation-delay:1s;"></div>
+  <div class="radar radar-1"></div>
+  <div class="radar radar-2" style="animation-delay:1.5s;"></div>
+  <div class="blink-dot" style="top:30%;right:10%;animation-delay:0.3s;"></div>
+  <div class="blink-dot" style="top:55%;left:6%;animation-delay:1.1s;"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(239,68,68,0.3), transparent); top: 100px; left: -200px;"></div>
   <div class="top">
     <div class="headline">Global Conflict Issues<br><em>Tracked in Real-Time</em></div>
@@ -290,6 +357,12 @@
 <!-- ========== 3. Conflict Map ========== -->
 <div class="frame">
   <div class="bg"></div>
+  <div class="scan-grid"></div>
+  <div class="scan-line" style="animation-delay:2s;"></div>
+  <div class="radar radar-2"></div>
+  <div class="radar radar-3" style="animation-delay:0.5s;"></div>
+  <div class="blink-dot" style="top:20%;left:15%;animation-delay:0.5s;"></div>
+  <div class="blink-dot" style="top:70%;right:12%;animation-delay:1.8s;"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(16,185,129,0.3), transparent); top: 50px; right: -150px;"></div>
   <div class="top">
     <div class="headline">Global Conflict<br><em>At a Glance</em></div>
@@ -325,6 +398,12 @@
 <!-- ========== 4. Tension Index ========== -->
 <div class="frame">
   <div class="bg"></div>
+  <div class="scan-grid"></div>
+  <div class="scan-line" style="animation-delay:3s;"></div>
+  <div class="radar radar-1" style="animation-delay:0.8s;"></div>
+  <div class="radar radar-3" style="animation-delay:2s;"></div>
+  <div class="blink-dot" style="top:35%;right:6%;animation-delay:0.9s;"></div>
+  <div class="blink-dot" style="top:65%;left:10%;animation-delay:2.1s;"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(251,191,36,0.3), transparent); top: 50px; left: -150px;"></div>
   <div class="top">
     <div class="headline">Country Tension<br><em>Scored in Real-Time</em></div>
