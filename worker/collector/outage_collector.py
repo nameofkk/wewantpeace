@@ -151,7 +151,7 @@ class OutageCollector:
                     intensity=intensity,
                     raw_value=fraction,
                     confidence=0.7,
-                    metadata={"datasource": datasource, "fraction": fraction},
+                    extra_data={"datasource": datasource, "fraction": fraction},
                     observed_at=observed_at,
                     expires_at=observed_at + timedelta(hours=48),
                 )

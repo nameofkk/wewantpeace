@@ -39,7 +39,7 @@ def _to_geojson(signals: list) -> dict:
                 "confidence": s.confidence,
                 "country_code": s.country_code,
                 "observed_at": s.observed_at.isoformat() if s.observed_at else None,
-                "metadata": s.metadata or {},
+                "metadata": s.extra_data or {},
             },
         })
     return {

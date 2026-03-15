@@ -149,7 +149,7 @@ class GpsJamCollector:
                         intensity=min(1.0, detection["ratio"]),
                         raw_value=detection["ratio"],
                         confidence=0.5,
-                        metadata={
+                        extra_data={
                             "region": z["name"],
                             "aircraft_count": detection["total_aircraft"],
                             "low_accuracy_count": detection["low_accuracy"],

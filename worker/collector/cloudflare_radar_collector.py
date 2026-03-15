@@ -118,7 +118,7 @@ class CloudflareRadarCollector:
                         intensity=intensity,
                         raw_value=intensity,
                         confidence=0.6,
-                        metadata={
+                        extra_data={
                             "source": "cloudflare_radar",
                             "impact": impact,
                             "start_time": start_time,

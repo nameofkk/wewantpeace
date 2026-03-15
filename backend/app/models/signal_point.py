@@ -28,7 +28,7 @@ class SignalPoint(Base):
     intensity: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     raw_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
-    metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    extra_data: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, server_default="{}")
     observed_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     collected_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),

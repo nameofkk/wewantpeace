@@ -315,7 +315,7 @@ async def get_cluster_signals(
             time_delta_h=s.match_time_delta_h,
             country_code=s.country_code,
             observed_at=s.observed_at.isoformat() if s.observed_at else None,
-            metadata=s.metadata,
+            metadata=s.extra_data,
         )
         for s in signals
     ]

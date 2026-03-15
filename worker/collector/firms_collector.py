@@ -144,7 +144,7 @@ class FIRMSCollector:
                         intensity=intensity,
                         raw_value=frp,
                         confidence=conf_multiplier,
-                        metadata={"source": source, "frp": frp, "confidence_raw": conf_raw},
+                        extra_data={"source": source, "frp": frp, "confidence_raw": conf_raw},
                         observed_at=observed_at,
                         expires_at=observed_at + timedelta(hours=24),
                     )
