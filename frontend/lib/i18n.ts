@@ -1484,8 +1484,11 @@ export const translations = {
     // Intelligence Layers
     layer_panel_title: "인텔리전스",
     layer_firms: "위성 열점",
+    layer_firms_tooltip: "NASA 위성이 감지한 열점(화재/폭발). FRP 10MW 이상만 표시",
     layer_outage: "인터넷 단절",
+    layer_outage_tooltip: "분쟁 지역의 인터넷 트래픽 50% 이상 감소 감지",
     layer_gps_jam: "GPS 교란",
+    layer_gps_jam_tooltip: "분쟁 지역 상공 항공기의 GPS 신호 교란 감지",
     layer_cf_anomaly: "트래픽 이상",
     layer_count: "{count}건",
     layer_countries: "{count}개국",
@@ -2996,8 +2999,11 @@ export const translations = {
     // Intelligence Layers
     layer_panel_title: "Intelligence",
     layer_firms: "Satellite Hotspots",
+    layer_firms_tooltip: "Hotspots detected by NASA satellites (fires/explosions). Showing FRP 10MW+",
     layer_outage: "Internet Outage",
+    layer_outage_tooltip: "Internet traffic drop over 50% detected in conflict zones",
     layer_gps_jam: "GPS Jamming",
+    layer_gps_jam_tooltip: "GPS signal interference detected from aircraft in conflict airspace",
     layer_cf_anomaly: "Traffic Anomaly",
     layer_count: "{count}",
     layer_countries: "{count} countries",

@@ -11,6 +11,7 @@ import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { ShareButton } from "@/components/issue/ShareButton";
+import { LogoIcon } from "@/components/ui/logo-icon";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
@@ -324,19 +325,23 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
 
 // ── LayerToggleRow ──────────────────────────────────────────────────────────
 function LayerToggleRow({
-  icon, label, enabled, isPro, count, onToggle, lang,
+  icon, label, tooltip, enabled, isPro, count, onToggle, lang,
 }: {
-  icon: string; label: string; enabled: boolean; isPro: boolean;
+  icon: string; label: string; tooltip?: string; enabled: boolean; isPro: boolean;
   count?: number; onToggle: () => void; lang: Lang;
 }) {
   return (
     <button
       onClick={onToggle}
+      title={tooltip}
       className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted/50 transition-colors"
     >
       <span className="text-sm">{icon}</span>
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-medium truncate">{label}</div>
+        {tooltip && (
+          <div className="text-[8px] text-muted-foreground/70 truncate">{tooltip}</div>
+        )}
         {count !== undefined && count > 0 && (
           <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
         )}
@@ -1001,9 +1006,10 @@ export default function MapPage() {
       {/* ── 상단 헤더 바 ─────────────────────────────────────────── */}
       <div className="absolute left-3 right-3 z-10" style={{ top: "calc(12px + env(safe-area-inset-top, 0px))" }}>
         <div className="rounded-xl border border-border bg-background/90 px-3 py-2 backdrop-blur-sm space-y-1.5">
-          {/* Row 1: LIVE + 이슈/스파이크 (왼쪽) | 새로고침 + 경과시간 (오른쪽) */}
+          {/* Row 1: 로고 + LIVE + 이슈 (왼쪽) | 새로고침 + 경과시간 (오른쪽) */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+              <LogoIcon height={20} hideText />
               <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 border border-red-500/30 shrink-0">
                 <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
                 <span className="text-[10px] font-bold text-red-400">LIVE</span>
@@ -1076,6 +1082,7 @@ export default function MapPage() {
                   <LayerToggleRow
                     icon="🔥"
                     label={t(lang, "layer_firms")}
+                    tooltip={t(lang, "layer_firms_tooltip")}
                     enabled={firmsEnabled}
                     isPro={isPro}
                     count={signalSummary?.firms_hotspot}
@@ -1089,6 +1096,7 @@ export default function MapPage() {
                   <LayerToggleRow
                     icon="🌐"
                     label={t(lang, "layer_outage")}
+                    tooltip={t(lang, "layer_outage_tooltip")}
                     enabled={outageEnabled}
                     isPro={isPro}
                     count={signalSummary?.ioda_outage}
@@ -1102,6 +1110,7 @@ export default function MapPage() {
                   <LayerToggleRow
                     icon="📡"
                     label={t(lang, "layer_gps_jam")}
+                    tooltip={t(lang, "layer_gps_jam_tooltip")}
                     enabled={gpsJamEnabled}
                     isPro={isPro}
                     count={signalSummary?.gps_jam}
