@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon } from "lucide-react";
+import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useClusters, useMe, useTensionAll } from "@/lib/api";
+import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
@@ -322,6 +322,48 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
   );
 }
 
+// ── LayerToggleRow ──────────────────────────────────────────────────────────
+function LayerToggleRow({
+  icon, label, enabled, isPro, count, onToggle, lang,
+}: {
+  icon: string; label: string; enabled: boolean; isPro: boolean;
+  count?: number; onToggle: () => void; lang: Lang;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted/50 transition-colors"
+    >
+      <span className="text-sm">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-medium truncate">{label}</div>
+        {count !== undefined && count > 0 && (
+          <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
+        )}
+      </div>
+      {!isPro ? (
+        <span className="text-[9px] text-amber-500 flex items-center gap-0.5">
+          <Lock className="h-2.5 w-2.5" /> Pro
+        </span>
+      ) : (
+        <div
+          className={cn(
+            "w-7 h-4 rounded-full transition-colors relative shrink-0",
+            enabled ? "bg-cyan-500" : "bg-muted-foreground/30"
+          )}
+        >
+          <div
+            className={cn(
+              "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform",
+              enabled ? "translate-x-3.5" : "translate-x-0.5"
+            )}
+          />
+        </div>
+      )}
+    </button>
+  );
+}
+
 // ── 메인 ──────────────────────────────────────────────────────────────────
 export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -346,6 +388,20 @@ export default function MapPage() {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [heatmapPulse, setHeatmapPulse] = useState(false);
   const { data: tensionAll } = useTensionAll();
+
+  // ── Intelligence Layers ──
+  const [showIntelPanel, setShowIntelPanel] = useState(false);
+  const [firmsEnabled, setFirmsEnabled] = useState(false);
+  const [outageEnabled, setOutageEnabled] = useState(false);
+  const [gpsJamEnabled, setGpsJamEnabled] = useState(false);
+  const firmsAnimRef = useRef<number | null>(null);
+  const outageAnimRef = useRef<number | null>(null);
+  const gpsJamAnimRef = useRef<number | null>(null);
+  const isPro = !meLoading && !authLoading && (plan === "pro" || plan === "pro_plus");
+  const { data: firmsData } = useFirmsSignals(firmsEnabled && isPro);
+  const { data: outageData } = useOutageSignals(outageEnabled && isPro);
+  const { data: gpsJamData } = useGpsJamSignals(gpsJamEnabled && isPro);
+  const { data: signalSummary } = useSignalSummary();
 
   // ── 가이드 투어 ──────────────────────────────────────────
   const [tourRun, setTourRun] = useState(false);
@@ -553,6 +609,207 @@ export default function MapPage() {
     addChoropleth();
   }, [showHeatmap, tensionAll, isMapReady]);
 
+  // ── FIRMS Heatmap WebGL 레이어 ──────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    const cleanup = () => {
+      if (firmsAnimRef.current) { cancelAnimationFrame(firmsAnimRef.current); firmsAnimRef.current = null; }
+      try { if (map.getLayer("firms-heat")) map.removeLayer("firms-heat"); } catch {}
+      try { if (map.getLayer("firms-circle")) map.removeLayer("firms-circle"); } catch {}
+      try { if (map.getSource("firms-source")) map.removeSource("firms-source"); } catch {}
+    };
+
+    if (!firmsEnabled || !firmsData || firmsData.features.length === 0) {
+      cleanup();
+      return;
+    }
+
+    try {
+      cleanup();
+      map.addSource("firms-source", { type: "geojson", data: firmsData });
+
+      // 히트맵 레이어 (저줌)
+      map.addLayer({
+        id: "firms-heat",
+        type: "heatmap",
+        source: "firms-source",
+        maxzoom: 8,
+        paint: {
+          "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity", ["get", "properties"]], 0, 0, 1, 1],
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 0.5, 9, 1.5],
+          "heatmap-color": [
+            "interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(100,0,0,0)",
+            0.2, "rgb(139,0,0)",
+            0.4, "rgb(178,34,34)",
+            0.6, "rgb(220,80,20)",
+            0.8, "rgb(255,165,0)",
+            1, "rgb(255,255,220)",
+          ],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 2, 8, 8, 25],
+          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.7, 9, 0.5],
+        },
+      }, map.getLayer("choropleth-line") ? "choropleth-line" : undefined);
+
+      // 서클 레이어 (고줌)
+      map.addLayer({
+        id: "firms-circle",
+        type: "circle",
+        source: "firms-source",
+        minzoom: 6,
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 2, 12, 6],
+          "circle-color": "#ff4500",
+          "circle-opacity": 0.7,
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#fff",
+          "circle-stroke-opacity": 0.3,
+        },
+      });
+
+      // 펄스 애니메이션 (breathing)
+      let phase = 0;
+      const animate = () => {
+        phase += 0.03;
+        const intensity = 0.85 + 0.15 * Math.sin(phase);
+        try { map.setPaintProperty("firms-heat", "heatmap-intensity", intensity); } catch {}
+        firmsAnimRef.current = requestAnimationFrame(animate);
+      };
+      firmsAnimRef.current = requestAnimationFrame(animate);
+    } catch {}
+
+    return cleanup;
+  }, [firmsEnabled, firmsData, isMapReady]);
+
+  // ── Outage Bubble WebGL 레이어 ──────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    const cleanup = () => {
+      if (outageAnimRef.current) { cancelAnimationFrame(outageAnimRef.current); outageAnimRef.current = null; }
+      try { if (map.getLayer("outage-circle")) map.removeLayer("outage-circle"); } catch {}
+      try { if (map.getSource("outage-source")) map.removeSource("outage-source"); } catch {}
+    };
+
+    if (!outageEnabled || !outageData || outageData.features.length === 0) {
+      cleanup();
+      return;
+    }
+
+    try {
+      cleanup();
+      map.addSource("outage-source", { type: "geojson", data: outageData });
+
+      map.addLayer({
+        id: "outage-circle",
+        type: "circle",
+        source: "outage-source",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "intensity", ["get", "properties"]], 0, 10, 1, 50],
+          "circle-color": "#6366f1",
+          "circle-opacity": 0.35,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#818cf8",
+          "circle-stroke-opacity": 0.6,
+        },
+      }, map.getLayer("firms-heat") ? "firms-heat" : undefined);
+
+      // 파동 애니메이션 (ripple)
+      let phase = 0;
+      const animate = () => {
+        phase += 0.02;
+        const strokeWidth = 1 + 3 * Math.abs(Math.sin(phase));
+        try { map.setPaintProperty("outage-circle", "circle-stroke-width", strokeWidth); } catch {}
+        outageAnimRef.current = requestAnimationFrame(animate);
+      };
+      outageAnimRef.current = requestAnimationFrame(animate);
+    } catch {}
+
+    return cleanup;
+  }, [outageEnabled, outageData, isMapReady]);
+
+  // ── GPS Jamming Zone WebGL 레이어 ───────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    const cleanup = () => {
+      if (gpsJamAnimRef.current) { cancelAnimationFrame(gpsJamAnimRef.current); gpsJamAnimRef.current = null; }
+      try { if (map.getLayer("gpsjam-fill")) map.removeLayer("gpsjam-fill"); } catch {}
+      try { if (map.getLayer("gpsjam-line")) map.removeLayer("gpsjam-line"); } catch {}
+      try { if (map.getSource("gpsjam-source")) map.removeSource("gpsjam-source"); } catch {}
+    };
+
+    if (!gpsJamEnabled || !gpsJamData || gpsJamData.features.length === 0) {
+      cleanup();
+      return;
+    }
+
+    try {
+      cleanup();
+      // 포인트를 원형 폴리곤으로 변환 (반경 ~100km 근사)
+      const polygonFeatures = gpsJamData.features.map((f) => {
+        const [lon, lat] = f.geometry.coordinates;
+        const intensity = f.properties.intensity || 0.3;
+        const steps = 24;
+        const radius = 1.0; // ~100km in degrees
+        const coords: [number, number][] = [];
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i / steps) * 2 * Math.PI;
+          coords.push([
+            lon + radius * Math.cos(angle) / Math.cos((lat * Math.PI) / 180),
+            lat + radius * Math.sin(angle),
+          ]);
+        }
+        return {
+          type: "Feature" as const,
+          geometry: { type: "Polygon" as const, coordinates: [coords] },
+          properties: { ...f.properties, intensity },
+        };
+      });
+
+      const polygonGeoJSON = { type: "FeatureCollection" as const, features: polygonFeatures };
+      map.addSource("gpsjam-source", { type: "geojson", data: polygonGeoJSON });
+
+      map.addLayer({
+        id: "gpsjam-fill",
+        type: "fill",
+        source: "gpsjam-source",
+        paint: {
+          "fill-color": "#06b6d4",
+          "fill-opacity": ["interpolate", ["linear"], ["get", "intensity"], 0, 0.08, 1, 0.35],
+        },
+      }, map.getLayer("outage-circle") ? "outage-circle" : undefined);
+
+      map.addLayer({
+        id: "gpsjam-line",
+        type: "line",
+        source: "gpsjam-source",
+        paint: {
+          "line-color": "#22d3ee",
+          "line-width": 1.5,
+          "line-dasharray": [4, 4],
+          "line-opacity": 0.7,
+        },
+      });
+
+      // 파동 애니메이션 (전자파 느낌)
+      let phase = 0;
+      const animate = () => {
+        phase += 0.015;
+        const opacity = 0.15 + 0.2 * Math.abs(Math.sin(phase));
+        try { map.setPaintProperty("gpsjam-fill", "fill-opacity", opacity); } catch {}
+        gpsJamAnimRef.current = requestAnimationFrame(animate);
+      };
+      gpsJamAnimRef.current = requestAnimationFrame(animate);
+    } catch {}
+
+    return cleanup;
+  }, [gpsJamEnabled, gpsJamData, isMapReady]);
+
   const renderMarkers = useCallback(() => {
     const map = mapRef.current;
     if (!map || !isMapReady || clusters.length === 0) return;
@@ -722,6 +979,65 @@ export default function MapPage() {
               <MapIcon className="h-2.5 w-2.5" />
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
+            {/* Intel Layer Toggle */}
+            <div className="relative">
+              <button
+                onClick={() => setShowIntelPanel((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap shrink-0",
+                  (firmsEnabled || outageEnabled || gpsJamEnabled)
+                    ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                    : "text-muted-foreground border-border hover:text-foreground",
+                )}
+              >
+                <Shield className="h-2.5 w-2.5" />
+                {t(lang, "layer_panel_title")}
+                <ChevronDown className={cn("h-2 w-2 transition-transform", showIntelPanel && "rotate-180")} />
+              </button>
+              {showIntelPanel && (
+                <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl p-2 space-y-1">
+                  {/* FIRMS 위성 열점 */}
+                  <LayerToggleRow
+                    icon="🔥"
+                    label={t(lang, "layer_firms")}
+                    enabled={firmsEnabled}
+                    isPro={isPro}
+                    count={signalSummary?.firms_hotspot}
+                    onToggle={() => {
+                      if (!isPro) { mapPaywall.show(); return; }
+                      setFirmsEnabled((v) => !v);
+                    }}
+                    lang={lang}
+                  />
+                  {/* IODA 인터넷 단절 */}
+                  <LayerToggleRow
+                    icon="🌐"
+                    label={t(lang, "layer_outage")}
+                    enabled={outageEnabled}
+                    isPro={isPro}
+                    count={signalSummary?.ioda_outage}
+                    onToggle={() => {
+                      if (!isPro) { mapPaywall.show(); return; }
+                      setOutageEnabled((v) => !v);
+                    }}
+                    lang={lang}
+                  />
+                  {/* GPS 교란 */}
+                  <LayerToggleRow
+                    icon="📡"
+                    label={t(lang, "layer_gps_jam")}
+                    enabled={gpsJamEnabled}
+                    isPro={isPro}
+                    count={signalSummary?.gps_jam}
+                    onToggle={() => {
+                      if (!isPro) { mapPaywall.show(); return; }
+                      setGpsJamEnabled((v) => !v);
+                    }}
+                    lang={lang}
+                  />
+                </div>
+              )}
+            </div>
           </div>
           {/* 히트맵 ON 시 메트릭 안내 배너 */}
           {showHeatmap && (
@@ -1028,8 +1344,52 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* ── Signal Nudge Banner (Free 유저) ──────────────────────── */}
+      {isFree && signalSummary && signalSummary.total > 0 && (
+        <SignalNudgeBanner summary={signalSummary} lang={lang} onUpgrade={() => mapPaywall.show()} />
+      )}
+
       {/* ── PaywallModal ──────────────────────────────────────────── */}
       <PaywallModal trigger="map_locked" isOpen={mapPaywall.isOpen} onClose={mapPaywall.close} />
+    </div>
+  );
+}
+
+// ── Signal Nudge Banner ─────────────────────────────────────────────────────
+function SignalNudgeBanner({
+  summary, lang, onUpgrade,
+}: {
+  summary: { firms_hotspot: number; gps_jam: number; total: number };
+  lang: Lang; onUpgrade: () => void;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 8000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (dismissed || !visible || summary.total === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "absolute bottom-20 left-3 right-3 z-10 rounded-xl bg-indigo-950/90 backdrop-blur-sm border border-indigo-800/50 px-4 py-2.5 flex items-center gap-3 transition-opacity duration-500",
+        !visible && "opacity-0 pointer-events-none",
+      )}
+    >
+      <Shield className="h-4 w-4 text-cyan-400 shrink-0" />
+      <p className="text-[11px] text-slate-300 flex-1">
+        {t(lang, "signal_nudge", { firms: String(summary.firms_hotspot), gps: String(summary.gps_jam) })}
+      </p>
+      <button
+        onClick={onUpgrade}
+        className="shrink-0 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-[10px] font-bold text-white"
+      >
+        {t(lang, "signal_nudge_cta")}
+      </button>
+      <button onClick={() => setDismissed(true)} className="text-slate-500 hover:text-slate-300 text-xs">✕</button>
     </div>
   );
 }

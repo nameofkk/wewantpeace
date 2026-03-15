@@ -18,7 +18,8 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 async function apiFetch<T>(
   path: string,
   params?: Record<string, string>,
-  options?: RequestInit
+  options?: RequestInit,
+  _retried?: boolean,
 ): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
   if (params) {
@@ -34,6 +35,11 @@ async function apiFetch<T>(
     },
   });
   if (!res.ok) {
+    // 401이면 Firebase auth 복원 대기 후 1회 재시도
+    if (res.status === 401 && !_retried) {
+      await new Promise((r) => setTimeout(r, 1500));
+      return apiFetch<T>(path, params, options, true);
+    }
     const body = await res.json().catch(() => ({}));
     throw Object.assign(new Error(`API 오류: ${res.status}`), { status: res.status, body });
   }
@@ -189,7 +195,11 @@ export function useMe() {
   return useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<MeData>("/me"),
-    retry: false,
+    retry: (count, error) => {
+      if ((error as any)?.status === 401 && count < 2) return true;
+      return false;
+    },
+    retryDelay: 2000,
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -592,7 +602,12 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     },
     enabled,
     staleTime: 30 * 60 * 1000,
-    retry: false,
+    retry: (count, error) => {
+      // 401은 auth 복원 지연일 수 있으므로 2회까지 재시도
+      if ((error as any)?.status === 401 && count < 2) return true;
+      return false;
+    },
+    retryDelay: 2000,
   });
 }
 

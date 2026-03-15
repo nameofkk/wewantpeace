@@ -210,7 +210,7 @@ function ReportContent() {
     } as TrendingItem));
   }, [summary, lang]);
 
-  if (meLoading || summaryLoading) {
+  if (summaryLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
