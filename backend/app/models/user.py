@@ -149,3 +149,4 @@ class UserPreference(Base):
     min_kscore: Mapped[float] = mapped_column(nullable=False, default=4.0)
     intent: Mapped[str] = mapped_column(String(16), nullable=False, default="general")
     home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="KR")
+    notify_engagement: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)

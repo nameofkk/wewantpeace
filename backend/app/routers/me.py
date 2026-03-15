@@ -60,6 +60,7 @@ class PreferencesOut(BaseModel):
     quiet_hours_end: Optional[str]
     timezone: str
     home_country: str = ""
+    notify_engagement: bool = True
 
 
 class PreferencesPatch(BaseModel):
@@ -71,6 +72,7 @@ class PreferencesPatch(BaseModel):
     quiet_hours_end: Optional[str] = None
     timezone: Optional[str] = None
     home_country: Optional[str] = None
+    notify_engagement: Optional[bool] = None
 
 
 class PushTokenCreate(BaseModel):
@@ -140,6 +142,7 @@ def _pref_to_out(p: UserPreference) -> PreferencesOut:
         quiet_hours_end=p.quiet_hours_end.isoformat() if p.quiet_hours_end else None,
         timezone=p.timezone,
         home_country=getattr(p, "home_country", "KR"),
+        notify_engagement=getattr(p, "notify_engagement", True),
     )
 
 
@@ -447,6 +450,9 @@ async def update_preferences(
                 pref.quiet_hours_end = dt_time(h, m)
             except (ValueError, TypeError):
                 raise HTTPException(status_code=422, detail={"code": "INVALID_FORMAT", "field": "quiet_hours_end", "expected": "HH:MM"})
+
+    if body.notify_engagement is not None:
+        pref.notify_engagement = body.notify_engagement
 
     if body.home_country is not None:
         new_hc = body.home_country.strip()

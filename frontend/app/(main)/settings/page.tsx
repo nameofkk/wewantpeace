@@ -1160,6 +1160,31 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* 4.5 일일 브리핑 알림 */}
+            <div className="p-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "settings_engagement_title")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "settings_engagement_desc")}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const next = !(prefs?.notify_engagement ?? true);
+                    saveNotifPatch({ notify_engagement: next });
+                  }}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                    (prefs?.notify_engagement ?? true) ? "bg-primary" : "bg-secondary",
+                  )}
+                >
+                  <span className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform",
+                    (prefs?.notify_engagement ?? true) ? "translate-x-5" : "translate-x-0"
+                  )} />
+                </button>
+              </div>
+            </div>
+
             {/* 5. 마케팅 수신 동의 */}
             <div className="p-4 border-t border-border" data-tour="settings-marketing-email">
               <div className="flex items-center justify-between">

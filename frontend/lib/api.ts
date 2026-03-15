@@ -457,6 +457,7 @@ export interface UserPreferences {
   quiet_hours_end: string | null;
   timezone: string;
   home_country: string;
+  notify_engagement: boolean;
 }
 
 // --- 구독 정보 ---

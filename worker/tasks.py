@@ -1882,6 +1882,175 @@ def send_trial_nudges(self):
         raise self.retry(exc=exc)
 
 
+# ── 일일 접속 유도 푸시 (Daily Engagement) ──────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.send_daily_engagement",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_daily_engagement(self):
+    """24시간 미접속 유저에게 관심 국가 기반 개인화 푸시 발송.
+    매일 00:00 UTC (09:00 KST).
+    """
+
+    async def _run():
+        from sqlalchemy import select, func
+        from backend.app.models.user import User, UserArea, UserPushToken, UserPreference
+        from backend.app.models.tension_index import TensionIndex
+        from backend.app.models.issue_cluster import IssueCluster
+        from worker.push.push_service import (
+            _HOME_COUNTRY_NAMES_KO, _HOME_COUNTRY_NAMES_EN,
+            _is_in_quiet_hours,
+        )
+
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=24)
+        sent = 0
+        skipped_quiet = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 대상: last_active < 24h, notify_engagement=True, active 토큰 보유
+                rows = await db.execute(
+                    select(
+                        User.id,
+                        User.last_active,
+                        UserPreference.language,
+                        UserPreference.quiet_hours_start,
+                        UserPreference.quiet_hours_end,
+                        UserPreference.timezone,
+                    )
+                    .join(UserPreference, UserPreference.user_id == User.id)
+                    .join(UserPushToken, UserPushToken.user_id == User.id)
+                    .where(
+                        User.status == "active",
+                        User.last_active < cutoff,
+                        UserPreference.notify_engagement == True,
+                        UserPushToken.status == "active",
+                    )
+                    .group_by(
+                        User.id,
+                        User.last_active,
+                        UserPreference.language,
+                        UserPreference.quiet_hours_start,
+                        UserPreference.quiet_hours_end,
+                        UserPreference.timezone,
+                    )
+                )
+                users = rows.all()
+
+                for row in users:
+                    user_id = row.id
+                    lang = row.language if row.language in ("ko", "en") else "ko"
+                    qh_start = row.quiet_hours_start
+                    qh_end = row.quiet_hours_end
+                    tz_name = row.timezone or "Asia/Seoul"
+
+                    # quiet_hours 체크
+                    if qh_start and qh_end:
+                        try:
+                            from zoneinfo import ZoneInfo
+                            from datetime import time as dt_time
+                            now_local = datetime.now(ZoneInfo(tz_name)).time()
+                            if _is_in_quiet_hours(now_local, qh_start, qh_end):
+                                skipped_quiet += 1
+                                continue
+                        except Exception:
+                            pass
+
+                    # 관심 국가 조회
+                    areas_q = await db.execute(
+                        select(UserArea.country_code).where(
+                            UserArea.user_id == user_id,
+                            UserArea.is_active == True,
+                            UserArea.country_code.isnot(None),
+                        )
+                    )
+                    country_codes = [r[0] for r in areas_q.all()]
+
+                    if country_codes:
+                        # 관심 국가 중 최고 긴장도 조회
+                        tension_q = await db.execute(
+                            select(
+                                TensionIndex.country_code,
+                                TensionIndex.raw_score,
+                            )
+                            .where(TensionIndex.country_code.in_(country_codes))
+                            .order_by(TensionIndex.time.desc())
+                            .distinct(TensionIndex.country_code)
+                        )
+                        tensions = tension_q.all()
+                        top = max(tensions, key=lambda t: t.raw_score) if tensions else None
+
+                        # 최근 24h 관심 국가 신규 클러스터 수
+                        cluster_q = await db.execute(
+                            select(func.count())
+                            .select_from(IssueCluster)
+                            .where(
+                                IssueCluster.country_code.in_(country_codes),
+                                IssueCluster.created_at >= cutoff,
+                                IssueCluster.is_active == True,
+                            )
+                        )
+                        new_issues = cluster_q.scalar() or 0
+
+                        if top:
+                            cc = top.country_code
+                            score = int(top.raw_score)
+                            names_ko = _HOME_COUNTRY_NAMES_KO
+                            names_en = _HOME_COUNTRY_NAMES_EN
+                            name = names_ko.get(cc, cc) if lang == "ko" else names_en.get(cc, cc)
+
+                            if lang == "ko":
+                                title = "오늘의 관심 국가 브리핑"
+                                if new_issues > 0:
+                                    body = f"{name} 긴장도 {score}점 · 어제 새 이슈 {new_issues}건 감지"
+                                else:
+                                    body = f"{name} 긴장도 {score}점 · 최신 상황을 확인하세요"
+                            else:
+                                title = "Your daily briefing"
+                                if new_issues > 0:
+                                    body = f"{name} tension {score}/100 · {new_issues} new issue(s) detected"
+                                else:
+                                    body = f"{name} tension {score}/100 · Check the latest updates"
+                        else:
+                            # 긴장도 데이터 없을 때
+                            if lang == "ko":
+                                title = "오늘의 글로벌 분쟁 상황"
+                                body = "관심 국가의 최신 상황을 확인해보세요"
+                            else:
+                                title = "Today's global conflicts"
+                                body = "Check the latest updates in your watched regions"
+                    else:
+                        # 관심 국가가 없는 유저
+                        if lang == "ko":
+                            title = "오늘의 글로벌 분쟁 상황"
+                            body = "전 세계 분쟁 상황을 확인해보세요"
+                        else:
+                            title = "Today's global conflicts"
+                            body = "Check today's worldwide conflict updates"
+
+                    await _send_fcm_to_user(
+                        user_id, title, body,
+                        {"type": "engagement", "action": "open_home"},
+                    )
+                    sent += 1
+
+        logger.info("send_daily_engagement: sent=%d, skipped_quiet=%d, total_eligible=%d",
+                     sent, skipped_quiet, len(users))
+        return {"sent": sent, "skipped_quiet": skipped_quiet}
+
+    try:
+        _record_heartbeat("send_daily_engagement")
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_daily_engagement 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
 # ── 만료 후 전환 오퍼 발송 ────────────────────────────────────────────────
 
 

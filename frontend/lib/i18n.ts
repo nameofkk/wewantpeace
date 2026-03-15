@@ -1567,6 +1567,8 @@ export const translations = {
     marketing_consent_desc: "뉴스레터 등 마케팅 정보를 이메일로 받아보세요. 언제든 설정에서 해제할 수 있습니다.",
     settings_marketing_toggle: "마케팅 수신 동의",
     settings_marketing_desc: "뉴스레터 등 마케팅 정보를 이메일로 수신합니다. 언제든 해제할 수 있습니다.",
+    settings_engagement_title: "일일 브리핑 알림",
+    settings_engagement_desc: "24시간 미접속 시 관심 국가 상황을 알려드립니다",
   },
   en: {
     // bottom nav
@@ -3132,6 +3134,8 @@ export const translations = {
     marketing_consent_desc: "Receive newsletters and marketing emails. You can opt out anytime in settings.",
     settings_marketing_toggle: "Marketing opt-in",
     settings_marketing_desc: "Receive newsletters and marketing emails. You can opt out anytime.",
+    settings_engagement_title: "Daily briefing",
+    settings_engagement_desc: "Get your watched regions' summary if inactive for 24h",
   },
 } as const;
 
