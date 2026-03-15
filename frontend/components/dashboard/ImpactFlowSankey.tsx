@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
@@ -42,10 +42,15 @@ function truncLabel(s: string, max: number) {
 }
 
 /** 3단 Sankey 레이아웃 계산 */
-function computeLayout(data: ImpactFlowOut, width: number, height: number) {
-  const margin = { top: 8, right: 100, bottom: 8, left: 22 };
-  const nodeW = 10;
-  const colGap = 40;
+function computeLayout(data: ImpactFlowOut, width: number, height: number, isDesktop: boolean) {
+  const margin = {
+    top: 8,
+    right: isDesktop ? 140 : 100,
+    bottom: 8,
+    left: isDesktop ? 28 : 22,
+  };
+  const nodeW = isDesktop ? 14 : 10;
+  const colGap = isDesktop ? 60 : 40;
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
 
@@ -64,13 +69,14 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number) {
   };
 
   // 각 노드에 y위치 계산 (균등 분배)
+  const nodePad = isDesktop ? 10 : 6;
   const nodePositions = new Map<string, { x: number; y: number; h: number; color: string; label: string; category: string }>();
 
   for (const cat of ["conflict", "commodity", "impact"] as const) {
     const nodes = cols[cat];
     if (!nodes.length) continue;
-    const totalPad = Math.max(0, (nodes.length - 1) * 6);
-    const nodeH = Math.max(12, (innerH - totalPad) / nodes.length);
+    const totalPad = Math.max(0, (nodes.length - 1) * nodePad);
+    const nodeH = Math.max(isDesktop ? 18 : 12, (innerH - totalPad) / nodes.length);
     let y = margin.top;
     for (const n of nodes) {
       nodePositions.set(n.id, {
@@ -81,12 +87,11 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number) {
         label: n.label,
         category: cat,
       });
-      y += nodeH + 6;
+      y += nodeH + nodePad;
     }
   }
 
   // 링크 계산: 각 링크에 대해 source/target 노드의 중앙 연결
-  // 각 노드의 링크 할당 위치 추적
   const nodeOutOffset = new Map<string, number>();
   const nodeInOffset = new Map<string, number>();
   for (const n of data.nodes) {
@@ -94,7 +99,6 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number) {
     nodeInOffset.set(n.id, 0);
   }
 
-  // 링크 value 합계 계산
   const nodeOutTotal = new Map<string, number>();
   const nodeInTotal = new Map<string, number>();
   for (const l of data.links) {
@@ -113,7 +117,7 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number) {
 
     const srcH = (val / srcTotal) * src.h;
     const tgtH = (val / tgtTotal) * tgt.h;
-    const linkThickness = Math.max(2, Math.min(srcH, tgtH, 20));
+    const linkThickness = Math.max(isDesktop ? 3 : 2, Math.min(srcH, tgtH, isDesktop ? 28 : 20));
 
     const srcOff = nodeOutOffset.get(l.source) ?? 0;
     const tgtOff = nodeInOffset.get(l.target) ?? 0;
@@ -141,11 +145,43 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number) {
   return { nodePositions, links: links as NonNullable<(typeof links)[0]>[], nodeW, colX };
 }
 
+/** 연결된 링크 인덱스 + 노드 ID 찾기 (2-hop: 분쟁→산업→생활) */
+function getConnectedSet(
+  nodeId: string,
+  links: { sourceId: string; targetId: string }[],
+) {
+  const connectedLinks = new Set<number>();
+  const connectedNodes = new Set<string>([nodeId]);
+
+  // 1st hop: direct links
+  links.forEach((l, i) => {
+    if (l.sourceId === nodeId || l.targetId === nodeId) {
+      connectedLinks.add(i);
+      connectedNodes.add(l.sourceId);
+      connectedNodes.add(l.targetId);
+    }
+  });
+
+  // 2nd hop: links connected to 1st-hop nodes
+  links.forEach((l, i) => {
+    if (!connectedLinks.has(i)) {
+      if (connectedNodes.has(l.sourceId) || connectedNodes.has(l.targetId)) {
+        connectedLinks.add(i);
+        connectedNodes.add(l.sourceId);
+        connectedNodes.add(l.targetId);
+      }
+    }
+  });
+
+  return { connectedLinks, connectedNodes };
+}
+
 export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     function measure() {
@@ -155,10 +191,9 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       }
       // fallback: DOM에서 못 읽으면 window.innerWidth 사용
       if (chartWidth <= 0 && typeof window !== "undefined") {
-        setChartWidth(Math.min(window.innerWidth - 32, 600));
+        setChartWidth(Math.min(window.innerWidth - 32, 900));
       }
     }
-    // 즉시 + 지연 측정 (모바일 인앱 브라우저 대응)
     measure();
     const t1 = setTimeout(measure, 50);
     const t2 = setTimeout(measure, 150);
@@ -175,12 +210,24 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const chartHeight = 200;
+  // 터치 해제 타이머
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleNodeHover = useCallback((nodeId: string | null) => {
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    setHoveredNodeId(nodeId);
+    // 터치 후 3초 뒤 자동 해제
+    if (nodeId) {
+      touchTimerRef.current = setTimeout(() => setHoveredNodeId(null), 3000);
+    }
+  }, []);
+
+  const isDesktop = chartWidth > 640;
+  const chartHeight = isDesktop ? 260 : 200;
 
   // SSR에서 렌더링하지 않음 — hydration mismatch 방지
   if (chartWidth <= 0) {
     return (
-      <div ref={containerRef} className="relative" style={{ minHeight: chartHeight }}>
+      <div ref={containerRef} className="relative" style={{ minHeight: 200 }}>
         <div className="flex items-center justify-center py-8">
           <div className="h-4 w-4 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
         </div>
@@ -192,7 +239,13 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
   const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 
-  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight);
+  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight, isDesktop);
+
+  // 호버 시 연결 계산
+  const { connectedLinks, connectedNodes } = hoveredNodeId
+    ? getConnectedSet(hoveredNodeId, links)
+    : { connectedLinks: new Set<number>(), connectedNodes: new Set<string>() };
+  const isHovering = hoveredNodeId !== null;
 
   const popupIssue = popupIdx !== null ? (conflictIssues?.[popupIdx] ?? {
     title: conflictNodes[popupIdx]?.label ?? "",
@@ -213,20 +266,50 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           viewBox={`0 0 ${effectiveWidth} ${chartHeight}`}
           className="w-full"
           style={{ display: "block" }}
+          onMouseLeave={() => setHoveredNodeId(null)}
         >
           {/* 링크 (곡선) */}
           {links.map((l, i) => {
             const srcIdx = conflictIdxMap.get(l.sourceId) ?? -1;
+            const isConnected = connectedLinks.has(i);
+            const baseOpacity = isPro ? 0.3 : 0.12;
+            const linkOpacity = isHovering
+              ? isConnected ? 0.55 : 0.06
+              : baseOpacity;
+
             return (
               <g key={i}>
+                {/* 기본 링크 */}
                 <path
                   d={l.d}
                   fill="none"
                   stroke={l.srcColor}
                   strokeWidth={l.thickness}
-                  strokeOpacity={isPro ? 0.3 : 0.12}
+                  strokeOpacity={linkOpacity}
                   strokeLinecap="round"
+                  style={{ transition: "stroke-opacity 0.25s ease" }}
                 />
+
+                {/* 호버 시 흐르는 파티클 애니메이션 */}
+                {isHovering && isConnected && (
+                  <path
+                    d={l.d}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.55)"
+                    strokeWidth={Math.max(l.thickness * 0.35, 1.5)}
+                    strokeDasharray="5 10"
+                    strokeLinecap="round"
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      from="0"
+                      to="-15"
+                      dur="0.7s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                )}
+
                 {/* 넓은 투명 터치 영역 (모바일 탭용) */}
                 {srcIdx >= 0 && (
                   <path
@@ -242,12 +325,36 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             );
           })}
 
-          {/* 노드 (사각형) + 터치 영역 */}
+          {/* 노드 (사각형) + 터치/호버 영역 */}
           {Array.from(nodePositions.entries()).map(([id, pos]) => {
             const isConflict = pos.category === "conflict";
             const cIdx = conflictIdxMap.get(id) ?? -1;
+            const isNodeConnected = !isHovering || connectedNodes.has(id);
+            const nodeOpacity = isHovering && !isNodeConnected ? 0.2 : 1;
+
             return (
               <g key={id}>
+                {/* 호버 시 연결된 노드 글로우 */}
+                {isHovering && connectedNodes.has(id) && (
+                  <rect
+                    x={pos.x - 3}
+                    y={pos.y - 3}
+                    width={nodeW + 6}
+                    height={pos.h + 6}
+                    rx={5}
+                    fill="none"
+                    stroke={pos.color}
+                    strokeWidth={1.5}
+                    strokeOpacity={0.5}
+                  >
+                    <animate
+                      attributeName="stroke-opacity"
+                      values="0.3;0.7;0.3"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                  </rect>
+                )}
                 <rect
                   x={pos.x}
                   y={pos.y}
@@ -255,19 +362,21 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   height={pos.h}
                   rx={3}
                   fill={pos.color}
+                  opacity={nodeOpacity}
+                  style={{ transition: "opacity 0.25s ease" }}
                 />
-                {/* 넓은 투명 터치 영역 (모바일용) */}
-                {isConflict && cIdx >= 0 && (
-                  <rect
-                    x={pos.x - 16}
-                    y={pos.y - 4}
-                    width={nodeW + 32}
-                    height={pos.h + 8}
-                    fill="transparent"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setPopupIdx(cIdx)}
-                  />
-                )}
+                {/* 넓은 호버/터치 영역 */}
+                <rect
+                  x={pos.x - 16}
+                  y={pos.y - 4}
+                  width={nodeW + 32}
+                  height={pos.h + 8}
+                  fill="transparent"
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() => handleNodeHover(id)}
+                  onTouchStart={() => handleNodeHover(id)}
+                  onClick={isConflict && cIdx >= 0 ? () => setPopupIdx(cIdx) : undefined}
+                />
               </g>
             );
           })}
@@ -277,7 +386,8 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const isConflict = pos.category === "conflict";
             const isImpact = pos.category === "impact";
             const idx = conflictIdxMap.get(id) ?? -1;
-            const maxLen = effectiveWidth < 380 ? 6 : 10;
+            const maxLen = effectiveWidth < 380 ? 6 : isDesktop ? 16 : 10;
+            const isNodeConnected = !isHovering || connectedNodes.has(id);
 
             const labelText = isConflict
               ? NUM_LABELS[idx] ?? ""
@@ -296,8 +406,10 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                 dy="0.35em"
                 textAnchor={textAnchor}
                 fill={isConflict ? pos.color : "rgba(156,163,175,0.9)"}
-                fontSize={effectiveWidth < 380 ? 9 : 11}
-                fontWeight={600}
+                fontSize={isDesktop ? 12 : effectiveWidth < 380 ? 9 : 11}
+                fontWeight={isHovering && isNodeConnected ? 700 : 600}
+                opacity={isHovering && !isNodeConnected ? 0.25 : 1}
+                style={{ transition: "opacity 0.25s ease, font-weight 0.25s ease" }}
               >
                 {labelText}
               </text>
@@ -312,11 +424,20 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           const issue = conflictIssues?.[idx];
           const flags = issue?.countryCodes?.slice(0, 2).map(getFlag).join("") ?? "";
           const shortTitle = node.label.length > 12 ? node.label.slice(0, 12) + "…" : node.label;
+          const isActive = hoveredNodeId === node.id;
           return (
             <button
               key={node.id}
+              onMouseEnter={() => handleNodeHover(node.id)}
+              onMouseLeave={() => setHoveredNodeId(null)}
+              onTouchStart={() => handleNodeHover(node.id)}
               onClick={(e) => { e.stopPropagation(); setPopupIdx(idx); }}
-              className="inline-flex items-center gap-1 rounded-full bg-red-500/10 border border-red-500/20 px-2 py-1 text-[10px] font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-colors",
+                isActive
+                  ? "bg-red-500/25 border-red-500/40 text-red-300"
+                  : "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20"
+              )}
             >
               <span className="font-bold">{NUM_LABELS[idx]}</span>
               {flags && <span className="text-xs">{flags}</span>}

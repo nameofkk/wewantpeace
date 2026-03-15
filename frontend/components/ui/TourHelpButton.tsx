@@ -18,7 +18,7 @@ export default function TourHelpButton({ tourId, onStartTour }: TourHelpButtonPr
   return (
     <button
       onClick={handleClick}
-      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground/60 backdrop-blur-sm transition-colors hover:bg-accent hover:text-foreground"
+      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-4 z-[51] flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground/60 backdrop-blur-sm transition-colors hover:bg-accent hover:text-foreground"
       aria-label="Guide Tour"
     >
       <svg
