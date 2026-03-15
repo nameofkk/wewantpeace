@@ -293,14 +293,11 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           style={{ display: "block" }}
           onMouseLeave={() => setHoveredNodeId(null)}
         >
-          {/* 글로우 필터 */}
+          {/* 글로우 필터 (은은하게) */}
           <defs>
-            <filter id="particle-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
+            <filter id="pg" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="1.5" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
 
@@ -312,9 +309,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const linkOpacity = isHovering
               ? isConnected ? 0.55 : 0.06
               : baseOpacity;
-            // 유휴 파티클 속도: 링크별 비동기
-            const idleDur = 2.8 + (i % 4) * 0.7;
-            const idleDur2 = 3.2 + ((i + 2) % 4) * 0.6;
+            const idleDur = 3.5 + (i % 5) * 0.8;
 
             return (
               <g key={i}>
@@ -329,70 +324,42 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   style={{ transition: "stroke-opacity 0.25s ease" }}
                 />
 
-                {/* 유휴: 빛나는 점이 경로를 따라 이동 (2개 비동기) */}
+                {/* 유휴: 작은 점 1개가 천천히 경로를 따라 이동 */}
                 {!isHovering && (
-                  <>
-                    <circle
-                      r={Math.max(l.thickness * 0.25, 2)}
-                      fill="white"
-                      opacity={isPro ? 0.6 : 0.3}
-                      filter="url(#particle-glow)"
-                    >
-                      <animateMotion
-                        dur={`${idleDur}s`}
-                        repeatCount="indefinite"
-                        path={l.d}
-                      />
-                    </circle>
-                    <circle
-                      r={Math.max(l.thickness * 0.18, 1.5)}
-                      fill={l.srcColor}
-                      opacity={isPro ? 0.45 : 0.2}
-                      filter="url(#particle-glow)"
-                    >
-                      <animateMotion
-                        dur={`${idleDur2}s`}
-                        repeatCount="indefinite"
-                        path={l.d}
-                        begin={`${idleDur2 * 0.5}s`}
-                      />
-                    </circle>
-                  </>
+                  <circle
+                    r={Math.max(l.thickness * 0.15, 1.5)}
+                    fill="white"
+                    opacity={isPro ? 0.35 : 0.18}
+                    filter="url(#pg)"
+                  >
+                    <animateMotion
+                      dur={`${idleDur}s`}
+                      repeatCount="indefinite"
+                      path={l.d}
+                    />
+                  </circle>
                 )}
 
-                {/* 호버 시: 밝은 점 빠르게 + 경로 글로우 */}
+                {/* 호버 시: 밝은 점 + 은은한 경로 글로우 */}
                 {isHovering && isConnected && (
                   <>
                     <path
                       d={l.d}
                       fill="none"
-                      stroke="rgba(255,255,255,0.15)"
-                      strokeWidth={l.thickness + 4}
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth={l.thickness + 3}
                       strokeLinecap="round"
                     />
                     <circle
-                      r={Math.max(l.thickness * 0.35, 2.5)}
+                      r={Math.max(l.thickness * 0.22, 2)}
                       fill="white"
-                      opacity={0.8}
-                      filter="url(#particle-glow)"
+                      opacity={0.6}
+                      filter="url(#pg)"
                     >
                       <animateMotion
-                        dur="1s"
+                        dur="1.2s"
                         repeatCount="indefinite"
                         path={l.d}
-                      />
-                    </circle>
-                    <circle
-                      r={Math.max(l.thickness * 0.25, 2)}
-                      fill="white"
-                      opacity={0.5}
-                      filter="url(#particle-glow)"
-                    >
-                      <animateMotion
-                        dur="1s"
-                        repeatCount="indefinite"
-                        path={l.d}
-                        begin="0.5s"
                       />
                     </circle>
                   </>
