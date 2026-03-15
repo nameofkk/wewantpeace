@@ -174,7 +174,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                       {scoreLabel(data.level, lang)}
                     </span>
                   </div>
-                  <p className="text-[11px] text-foreground/70 leading-relaxed line-clamp-2">
+                  <p className="text-[11px] text-foreground/70 leading-relaxed">
                     {data.summary}
                   </p>
                 </div>

@@ -1000,7 +1000,7 @@ Recent events:
 {events_text}
 
 Respond in {"Korean" if lang == "ko" else "English"} as JSON:
-{{"economy": "...", "trade": "...", "travel": "...", "summary": "one-line summary", "score": {impact_score}, "data_sources": ["World Bank", ...]}}
+{{"economy": "2-3 sentences", "trade": "2-3 sentences", "travel": "2-3 sentences", "summary": "2-3 sentence brief covering key risks and their magnitude", "score": {impact_score}, "data_sources": ["World Bank", ...]}}
 
 Note: The score should be close to {impact_score} (pre-calculated based on trade dependency and severity). You may adjust ±10 based on qualitative factors."""
 
@@ -2300,7 +2300,8 @@ async def _calc_sector_exposure(
             else:
                 trade_dep = 0.12
         else:
-            trade_dep = 0.0  # 실제 데이터도 없고 key_partner도 아니면 0%
+            # 직접 교역 없지만 간접 글로벌 파급 효과 반영 (severity 비례)
+            trade_dep = min(0.25, severity / 100 * 0.2)
 
         risk_score = trade_dep * (severity / 100)
         if risk_score >= 0.6:
@@ -2321,7 +2322,7 @@ async def _calc_sector_exposure(
             elif is_partner:
                 desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
             else:
-                desc += "해당 지역과 직접 교역 노출 없음."
+                desc += "직접 교역 관계는 낮으나 글로벌 공급망 간접 영향 가능."
         else:
             desc = f"{gdp_pct}% of GDP. "
             if real_trade_dep is not None and real_trade_dep > 0.001:
@@ -2329,7 +2330,7 @@ async def _calc_sector_exposure(
             elif is_partner:
                 desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
             else:
-                desc += "No direct trade exposure with the affected region."
+                desc += "Low direct trade exposure, but potential indirect impact via global supply chains."
 
         result.append({
             "sector": sector_label,
