@@ -32,7 +32,6 @@
     opacity: 0.5;
   }
 
-  /* 상단 텍스트 */
   .top {
     position: relative;
     z-index: 10;
@@ -60,7 +59,6 @@
     font-weight: 400;
   }
 
-  /* 폰 목업 - 전체 보이게 */
   .phone-wrap {
     position: relative;
     z-index: 10;
@@ -82,7 +80,6 @@
     display: flex;
     flex-direction: column;
   }
-  /* 상단 노치 */
   .phone-status {
     height: 50px;
     background: #0F172A;
@@ -100,7 +97,6 @@
     position: absolute;
     top: 0;
   }
-  /* 스크린샷 이미지 영역 */
   .phone-screen {
     flex: 1;
     overflow: hidden;
@@ -114,20 +110,6 @@
     object-position: top center;
     display: block;
   }
-  /* 이미지 없을 때 안내 */
-  .phone-screen .placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #475569;
-    font-size: 18px;
-    text-align: center;
-    padding: 40px;
-    line-height: 1.6;
-  }
-  /* 하단 홈버튼 바 */
   .phone-home {
     height: 28px;
     background: #0F172A;
@@ -148,57 +130,53 @@
 
 <!--
   사용법:
-  1. 앱에서 각 페이지 스크린샷을 캡처 (모바일 또는 DevTools 모바일 모드)
-  2. 이 HTML과 같은 폴더에 이미지 파일 저장
-  3. 아래 <img src="..."> 경로를 실제 파일명으로 변경
+  1. Chrome DevTools → 모바일 모드 (393x852)
+  2. www.wewantpeace.live 에서 각 페이지 캡처
+  3. 이 HTML과 같은 폴더에 이미지 저장
   4. 브라우저에서 열고 각 프레임을 1080x1920으로 캡처
-
-  추천 스크린샷:
-  - screenshot-home.png : 홈 대시보드 (긴장도 리스트 보이는 화면)
-  - screenshot-impact.png : 홈 하단 영향도 섹션
-  - screenshot-map.png : 이슈 지도 페이지
-  - screenshot-feed.png : 피드/알림 페이지
 -->
 
-<!-- ========== 프레임 1: 긴장도 ========== -->
+<!-- ========== 1. 홈 대시보드 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(239,68,68,0.3), transparent); top: 50px; right: -200px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(59,130,246,0.3), transparent); top: 50px; right: -200px;"></div>
   <div class="top">
-    <div class="headline">지금, 세계는<br><em>얼마나 위험한가</em></div>
-    <div class="subline">국가별 긴장도 지수를<br>실시간으로 확인하세요</div>
+    <div class="headline">세계 분쟁이<br><em>내 삶에 미치는 영향</em></div>
+    <div class="subline">실시간 모니터링 대시보드로<br>한눈에 파악하세요</div>
   </div>
   <div class="phone-wrap">
     <div class="phone">
       <div class="phone-status"><div class="notch"></div></div>
       <div class="phone-screen">
-        <img src="screenshot-home.png" alt="Home Dashboard">
+        <!-- 홈 페이지(/) 스크린샷 -->
+        <img src="screenshot-home.png" alt="Home">
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ========== 프레임 2: 영향도 ========== -->
+<!-- ========== 2. 이슈 피드 ========== -->
 <div class="frame">
   <div class="bg"></div>
-  <div class="glow" style="background: radial-gradient(circle, rgba(59,130,246,0.3), transparent); top: 100px; left: -200px;"></div>
+  <div class="glow" style="background: radial-gradient(circle, rgba(239,68,68,0.3), transparent); top: 100px; left: -200px;"></div>
   <div class="top">
-    <div class="headline">이 분쟁,<br><em>나에게 무슨 영향?</em></div>
-    <div class="subline">경제 · 무역 · 여행<br>내 나라 기준 영향도 분석</div>
+    <div class="headline">전 세계 분쟁 이슈<br><em>실시간으로 추적</em></div>
+    <div class="subline">100+ 뉴스 소스에서 수집한<br>최신 이슈를 확인하세요</div>
   </div>
   <div class="phone-wrap">
     <div class="phone">
       <div class="phone-status"><div class="notch"></div></div>
       <div class="phone-screen">
-        <img src="screenshot-impact.png" alt="Impact Analysis">
+        <!-- 피드 페이지(/feed) 스크린샷 -->
+        <img src="screenshot-feed.png" alt="Feed">
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ========== 프레임 3: 지도 ========== -->
+<!-- ========== 3. 이슈 지도 ========== -->
 <div class="frame">
   <div class="bg"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(16,185,129,0.3), transparent); top: 50px; right: -150px;"></div>
@@ -210,26 +188,28 @@
     <div class="phone">
       <div class="phone-status"><div class="notch"></div></div>
       <div class="phone-screen">
-        <img src="screenshot-map.png" alt="Conflict Map">
+        <!-- 지도 페이지(/map) 스크린샷 -->
+        <img src="screenshot-map.png" alt="Map">
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ========== 프레임 4: 알림 ========== -->
+<!-- ========== 4. 긴장도 ========== -->
 <div class="frame">
   <div class="bg"></div>
   <div class="glow" style="background: radial-gradient(circle, rgba(251,191,36,0.3), transparent); top: 50px; left: -150px;"></div>
   <div class="top">
-    <div class="headline">내 관심 국가<br><em>긴급 알림 즉시 수신</em></div>
-    <div class="subline">중요한 이슈만 골라서<br>실시간 푸시 알림</div>
+    <div class="headline">국가별 긴장도를<br><em>실시간 점수로</em></div>
+    <div class="subline">15분마다 갱신되는<br>긴장도 지수를 확인하세요</div>
   </div>
   <div class="phone-wrap">
     <div class="phone">
       <div class="phone-status"><div class="notch"></div></div>
       <div class="phone-screen">
-        <img src="screenshot-feed.png" alt="Feed & Alerts">
+        <!-- 긴장도 페이지(/tension) 스크린샷 -->
+        <img src="screenshot-tension.png" alt="Tension">
       </div>
       <div class="phone-home"><div class="bar"></div></div>
     </div>
