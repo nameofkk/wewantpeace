@@ -145,33 +145,58 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, isDes
   return { nodePositions, links: links as NonNullable<(typeof links)[0]>[], nodeW, colX };
 }
 
-/** 연결된 링크 인덱스 + 노드 ID 찾기 (2-hop: 분쟁→산업→생활) */
+/** 방향성 추적: 해당 노드의 흐름만 하이라이트 (다른 conflict로 번지지 않음) */
 function getConnectedSet(
   nodeId: string,
   links: { sourceId: string; targetId: string }[],
+  nodePositions: Map<string, { category: string }>,
 ) {
   const connectedLinks = new Set<number>();
   const connectedNodes = new Set<string>([nodeId]);
+  const cat = nodePositions.get(nodeId)?.category;
 
-  // 1st hop: direct links
-  links.forEach((l, i) => {
-    if (l.sourceId === nodeId || l.targetId === nodeId) {
-      connectedLinks.add(i);
-      connectedNodes.add(l.sourceId);
-      connectedNodes.add(l.targetId);
-    }
-  });
-
-  // 2nd hop: links connected to 1st-hop nodes
-  links.forEach((l, i) => {
-    if (!connectedLinks.has(i)) {
-      if (connectedNodes.has(l.sourceId) || connectedNodes.has(l.targetId)) {
+  if (cat === "conflict") {
+    // conflict → 순방향만: conflict→commodity→impact
+    const midNodes = new Set<string>();
+    links.forEach((l, i) => {
+      if (l.sourceId === nodeId) {
+        connectedLinks.add(i);
+        connectedNodes.add(l.targetId);
+        midNodes.add(l.targetId);
+      }
+    });
+    links.forEach((l, i) => {
+      if (midNodes.has(l.sourceId)) {
+        connectedLinks.add(i);
+        connectedNodes.add(l.targetId);
+      }
+    });
+  } else if (cat === "impact") {
+    // impact → 역방향만: impact←commodity←conflict
+    const midNodes = new Set<string>();
+    links.forEach((l, i) => {
+      if (l.targetId === nodeId) {
+        connectedLinks.add(i);
+        connectedNodes.add(l.sourceId);
+        midNodes.add(l.sourceId);
+      }
+    });
+    links.forEach((l, i) => {
+      if (midNodes.has(l.targetId)) {
+        connectedLinks.add(i);
+        connectedNodes.add(l.sourceId);
+      }
+    });
+  } else {
+    // commodity → 양방향이지만 해당 commodity 경유 링크만
+    links.forEach((l, i) => {
+      if (l.sourceId === nodeId || l.targetId === nodeId) {
         connectedLinks.add(i);
         connectedNodes.add(l.sourceId);
         connectedNodes.add(l.targetId);
       }
-    }
-  });
+    });
+  }
 
   return { connectedLinks, connectedNodes };
 }
@@ -243,7 +268,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
 
   // 호버 시 연결 계산
   const { connectedLinks, connectedNodes } = hoveredNodeId
-    ? getConnectedSet(hoveredNodeId, links)
+    ? getConnectedSet(hoveredNodeId, links, nodePositions as Map<string, { category: string }>)
     : { connectedLinks: new Set<number>(), connectedNodes: new Set<string>() };
   const isHovering = hoveredNodeId !== null;
 
