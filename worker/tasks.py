@@ -1910,6 +1910,8 @@ def send_daily_engagement(self):
         cutoff = now - timedelta(hours=24)
         sent = 0
         skipped_quiet = 0
+        failed = 0
+        total_eligible = 0
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -1941,6 +1943,7 @@ def send_daily_engagement(self):
                     )
                 )
                 users = rows.all()
+                total_eligible = len(users)
 
                 for row in users:
                     user_id = row.id
@@ -1953,13 +1956,12 @@ def send_daily_engagement(self):
                     if qh_start and qh_end:
                         try:
                             from zoneinfo import ZoneInfo
-                            from datetime import time as dt_time
                             now_local = datetime.now(ZoneInfo(tz_name)).time()
                             if _is_in_quiet_hours(now_local, qh_start, qh_end):
                                 skipped_quiet += 1
                                 continue
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("engagement quiet_hours 체크 실패 (user=%s, tz=%s): %s", user_id, tz_name, e)
 
                     # 관심 국가 조회
                     areas_q = await db.execute(
@@ -1972,14 +1974,14 @@ def send_daily_engagement(self):
                     country_codes = [r[0] for r in areas_q.all()]
 
                     if country_codes:
-                        # 관심 국가 중 최고 긴장도 조회
+                        # 관심 국가 중 최고 긴장도 조회 (DISTINCT ON 규칙: ORDER BY 첫 컬럼 = DISTINCT 컬럼)
                         tension_q = await db.execute(
                             select(
                                 TensionIndex.country_code,
                                 TensionIndex.raw_score,
                             )
                             .where(TensionIndex.country_code.in_(country_codes))
-                            .order_by(TensionIndex.time.desc())
+                            .order_by(TensionIndex.country_code, TensionIndex.time.desc())
                             .distinct(TensionIndex.country_code)
                         )
                         tensions = tension_q.all()
@@ -2017,7 +2019,6 @@ def send_daily_engagement(self):
                                 else:
                                     body = f"{name} tension {score}/100 · Check the latest updates"
                         else:
-                            # 긴장도 데이터 없을 때
                             if lang == "ko":
                                 title = "오늘의 글로벌 분쟁 상황"
                                 body = "관심 국가의 최신 상황을 확인해보세요"
@@ -2025,7 +2026,6 @@ def send_daily_engagement(self):
                                 title = "Today's global conflicts"
                                 body = "Check the latest updates in your watched regions"
                     else:
-                        # 관심 국가가 없는 유저
                         if lang == "ko":
                             title = "오늘의 글로벌 분쟁 상황"
                             body = "전 세계 분쟁 상황을 확인해보세요"
@@ -2033,15 +2033,31 @@ def send_daily_engagement(self):
                             title = "Today's global conflicts"
                             body = "Check today's worldwide conflict updates"
 
-                    await _send_fcm_to_user(
-                        user_id, title, body,
-                        {"type": "engagement", "action": "open_home"},
-                    )
-                    sent += 1
+                    try:
+                        await _send_fcm_to_user(
+                            user_id, title, body,
+                            {"type": "engagement", "action": "open_home"},
+                        )
+                        sent += 1
+                    except Exception as e:
+                        logger.warning("engagement FCM 발송 실패 (user=%s): %s", user_id, e)
+                        failed += 1
 
-        logger.info("send_daily_engagement: sent=%d, skipped_quiet=%d, total_eligible=%d",
-                     sent, skipped_quiet, len(users))
-        return {"sent": sent, "skipped_quiet": skipped_quiet}
+        # 일일 푸시 카운터에 engagement 발송분 반영
+        if sent > 0:
+            try:
+                from backend.app.core.redis import get_redis
+                redis = await get_redis()
+                from worker.push.push_service import _increment_daily_push
+                for row in users:
+                    tz = row.timezone or "Asia/Seoul"
+                    await _increment_daily_push(str(row.id), redis, tz_name=tz)
+            except Exception as e:
+                logger.warning("engagement 일일 카운터 증가 실패: %s", e)
+
+        logger.info("send_daily_engagement: sent=%d, failed=%d, skipped_quiet=%d, total_eligible=%d",
+                     sent, failed, skipped_quiet, total_eligible)
+        return {"sent": sent, "failed": failed, "skipped_quiet": skipped_quiet}
 
     try:
         _record_heartbeat("send_daily_engagement")

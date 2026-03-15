@@ -1168,13 +1168,18 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_engagement_desc")}</p>
                 </div>
                 <button
-                  onClick={() => {
+                  disabled={patchPrefs.isPending}
+                  onClick={async () => {
                     const next = !(prefs?.notify_engagement ?? true);
-                    saveNotifPatch({ notify_engagement: next });
+                    try {
+                      await patchPrefs.mutateAsync({ notify_engagement: next });
+                      showToast(t(lang, next ? "settings_engagement_on" : "settings_engagement_off"), "success");
+                    } catch {}
                   }}
                   className={cn(
                     "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
                     (prefs?.notify_engagement ?? true) ? "bg-primary" : "bg-secondary",
+                    patchPrefs.isPending && "opacity-50",
                   )}
                 >
                   <span className={cn(
