@@ -610,8 +610,24 @@ function FeedPageContent() {
       disableBeacon: true,
     },
     {
+      target: "[data-tour='feed-country-picker']",
+      content: t(lang, "tour_home_country_picker"),
+      disableBeacon: true,
+    },
+    {
       target: "[data-tour='feed-tabs']",
       content: t(lang, "tour_home_tabs"),
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='feed-rising']",
+      content: t(lang, "tour_home_rising"),
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='feed-kscore-history']",
+      content: t(lang, "tour_home_kscore_history"),
+      disableBeacon: true,
     },
   ], [lang]);
   const { data: me } = useMe();
@@ -808,6 +824,7 @@ function FeedPageContent() {
             <button
               onClick={() => setShowCountryPicker(true)}
               className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
+              data-tour="feed-country-picker"
             >
               <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>

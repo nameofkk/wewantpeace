@@ -1347,14 +1347,19 @@ export const translations = {
     // 가이드 투어 — Home
     tour_home_page_role: "이 화면은 전 세계 주요 위기를 실시간으로 추적하는 이슈 피드입니다.",
     tour_home_tabs: "Global은 전체 이슈, 관심 국가는 내가 설정한 국가의 이슈만 보여줍니다.",
+    tour_home_country_picker: "기준 국가를 바꾸면 KScore 순위가 해당 국가 관점으로 재정렬됩니다.",
     tour_home_rising: "최근 6시간 내 새로 등장하여 빠르게 확산 중인 이슈입니다.",
-    tour_home_kscore_history: "시간대별 KScore 변화를 추적합니다. Pro에서 30일/90일 히스토리를 확인할 수 있습니다.",
+    tour_home_kscore_history: "카드 하단의 'KScore 히스토리 보기'를 눌러 시간별 변화를 추적할 수 있습니다.",
 
     // 가이드 투어 — Dashboard
     tour_dash_page_role: "내 대시보드입니다. 글로벌 분쟁이 나에게 미치는 영향을 한눈에 볼 수 있습니다.",
-    tour_dash_risk: "홈 국가의 현재 긴장도와 전 세계 위기 현황을 보여줍니다.",
+    tour_dash_risk: "영향도 점수와 5축 리스크 레이더입니다. 군사·에너지·무역·식량·금융 중 어디가 위험한지 한눈에 보입니다.",
+    tour_dash_country_picker: "기준 국가를 바꾸면 해당 국가 관점에서 모든 분석이 재계산됩니다. Pro 플랜에서 다양한 국가를 선택할 수 있습니다.",
     tour_dash_watchlist: "관심 국가의 긴장도를 카드로 빠르게 확인합니다. 탭하면 상세 페이지로 이동합니다.",
+    tour_dash_flow: "분쟁이 산업을 거쳐 내 생활비에 닿는 경로입니다. 터치하면 연결된 흐름이 강조됩니다.",
+    tour_dash_smart_summary: "가장 영향이 큰 이슈의 3줄 요약입니다. 무슨 일 → 나에게 → 언제 순서로 핵심을 파악하세요.",
     tour_dash_top_issues: "나에게 영향이 가장 큰 이슈 TOP 5입니다. KScore 기반으로 개인화됩니다.",
+    tour_dash_sector_risk: "기준 국가의 산업별 교역 의존도와 리스크를 분석한 차트입니다. 어떤 산업이 분쟁에 취약한지 보여줍니다.",
 
     // 가이드 투어 — Tension
     tour_tension_page_role: "국가별 긴장도를 수치화하여 위험 수준을 모니터링하는 페이지입니다.",
@@ -2913,14 +2918,19 @@ export const translations = {
     // Guide Tour — Home
     tour_home_page_role: "This is the issues feed that tracks major crises worldwide in real time.",
     tour_home_tabs: "Global shows all issues, My Countries shows issues from your watched countries only.",
+    tour_home_country_picker: "Change the base country to re-rank issues by KScore from that country's perspective.",
     tour_home_rising: "Issues that have emerged within the last 6 hours and are spreading rapidly.",
-    tour_home_kscore_history: "Track KScore changes over time. Pro unlocks 30-day and 90-day history.",
+    tour_home_kscore_history: "Tap 'Show KScore history' at the bottom of a card to track changes over time.",
 
     // Guide Tour — Dashboard
     tour_dash_page_role: "Your personalized dashboard. See how global conflicts affect you at a glance.",
-    tour_dash_risk: "Shows your base country's current tension level and the global crisis overview.",
+    tour_dash_risk: "Impact score and 5-axis risk radar. See which area — military, energy, trade, food, or finance — is most at risk.",
+    tour_dash_country_picker: "Change the base country to recalculate all analyses from that country's perspective. More countries available with Pro.",
     tour_dash_watchlist: "Quick view of tension levels for your watched countries. Tap a card for details.",
+    tour_dash_flow: "Visualizes how conflicts flow through industries to affect your daily costs. Touch to highlight connected paths.",
+    tour_dash_smart_summary: "A 3-line AI summary of the highest-impact issue: What happened → Impact on me → When to expect effects.",
     tour_dash_top_issues: "Top 5 issues with the highest impact on you, personalized by KScore.",
+    tour_dash_sector_risk: "Analyzes trade dependency and risk by sector for your base country. Shows which industries are vulnerable to conflicts.",
 
     // Guide Tour — Tension
     tour_tension_page_role: "This page quantifies country-level tension to monitor risk levels.",

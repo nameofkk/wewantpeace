@@ -2,7 +2,7 @@
 
 import React, { Suspense, useMemo, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getFlag, getCountryName } from "@/lib/countries";
 import { useAppStore } from "@/lib/store";
@@ -144,10 +144,12 @@ const sectionVariants = {
 
 function ReportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const lang = useAppStore((s) => s.lang);
   const homeCountry = useAppStore((s) => s.homeCountry);
   const setHomeCountry = useAppStore((s) => s.setHomeCountry);
   const myCountries = useAppStore((s) => s.myCountries);
+  const completedTours = useAppStore((s) => s.completedTours);
 
   const { data: me, isLoading: meLoading } = useMe();
   const meObj = me as { plan?: string; nickname?: string; display_name?: string } | undefined;
@@ -164,6 +166,16 @@ function ReportContent() {
   const [tourRun, setTourRun] = useState(false);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
+  // 온보딩 완료 후 tour=1 파라미터로 자동 시작
+  useEffect(() => {
+    if (searchParams.get("tour") === "1" && !completedTours.includes("dashboard")) {
+      // 데이터 로딩 후 투어 시작 (1.5초 대기)
+      const timer = setTimeout(() => setTourRun(true), 1500);
+      window.history.replaceState({}, "", "/home");
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, completedTours]);
+
   const dashTourSteps: Step[] = useMemo(() => [
     {
       target: "[data-tour='dash-page']",
@@ -177,13 +189,33 @@ function ReportContent() {
       disableBeacon: true,
     },
     {
+      target: "[data-tour='dash-country-picker']",
+      content: t(lang, "tour_dash_country_picker"),
+      disableBeacon: true,
+    },
+    {
       target: "[data-tour='dash-watchlist']",
       content: t(lang, "tour_dash_watchlist"),
       disableBeacon: true,
     },
     {
+      target: "[data-tour='dash-flow']",
+      content: t(lang, "tour_dash_flow"),
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='dash-smart-summary']",
+      content: t(lang, "tour_dash_smart_summary"),
+      disableBeacon: true,
+    },
+    {
       target: "[data-tour='dash-top-issues']",
       content: t(lang, "tour_dash_top_issues"),
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='dash-sector-risk']",
+      content: t(lang, "tour_dash_sector_risk"),
       disableBeacon: true,
     },
   ], [lang]);
@@ -312,6 +344,7 @@ function ReportContent() {
             <button
               onClick={() => setShowCountryPicker(true)}
               className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
+              data-tour="dash-country-picker"
             >
               <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>
@@ -490,7 +523,7 @@ function ReportContent() {
           <m.section custom={1} initial="hidden" animate="visible" variants={sectionVariants}>
             {/* Impact Flow Sankey */}
             {summary?.impact_flow && (
-              <div className="rounded-xl border border-border bg-card mb-5">
+              <div className="rounded-xl border border-border bg-card mb-5" data-tour="dash-flow">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={Activity}
@@ -515,7 +548,7 @@ function ReportContent() {
             )}
 
             {/* #1 Issue: SmartSummaryCard Full */}
-            <div data-tour="dash-top-issues">
+            <div data-tour="dash-smart-summary">
             {topIssue && (
               <div className="rounded-xl border border-border bg-card mt-5">
                 <div className="px-4 pt-3 pb-1">
@@ -544,7 +577,7 @@ function ReportContent() {
 
             {/* #2-#5 Issues: Compact */}
             {restIssues.length > 0 && (
-              <div className="rounded-xl border border-border bg-card mt-5">
+              <div className="rounded-xl border border-border bg-card mt-5" data-tour="dash-top-issues">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={AlertTriangle}
@@ -897,6 +930,7 @@ function ReportContent() {
           {/* ═══════════════ SECTION D: 산업별 리스크 분석 ═══════════════ */}
           <m.section custom={3} initial="hidden" animate="visible" variants={sectionVariants}
             className="rounded-xl border border-purple-500/20 bg-card p-4"
+            data-tour="dash-sector-risk"
           >
             <SectionHeader
               icon={Sparkles}
