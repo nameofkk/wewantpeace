@@ -69,13 +69,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       type: "website",
       url: canonicalUrl,
       siteName: "WeWantPeace",
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, type: "image/png" }],
     },
     twitter: {
       card: "summary_large_image",
       title: `${title} | WeWantPeace`,
       description: siteDesc,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630 }],
     },
   };
 }

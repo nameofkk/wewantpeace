@@ -258,7 +258,7 @@ export async function GET(
         ? `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=80&w=1200`
         : issue.image_url;
 
-      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
+      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
       if (imgRes.ok) {
         const ct = imgRes.headers.get("content-type") || "";
         const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
@@ -512,6 +512,12 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size, fonts: ogFonts }
+    {
+      ...size,
+      fonts: ogFonts,
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=120",
+      },
+    }
   );
 }

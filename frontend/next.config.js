@@ -53,18 +53,6 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
-      {
-        source: "/issues/:id/og",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=120, s-maxage=120, stale-while-revalidate=60" },
-        ],
-      },
-      {
-        source: "/issues/country/:code/og",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=300, s-maxage=300, stale-while-revalidate=120" },
-        ],
-      },
     ];
   },
 };

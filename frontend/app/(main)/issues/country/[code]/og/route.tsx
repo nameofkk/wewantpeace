@@ -505,6 +505,12 @@ export async function GET(
         </div>
       </div>
     ),
-    { ...size, fonts: ogFonts }
+    {
+      ...size,
+      fonts: ogFonts,
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=120",
+      },
+    }
   );
 }

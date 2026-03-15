@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchIssueServer } from "@/lib/server/issues";
-import { TOPIC_LABELS, TOPIC_LABELS_EN } from "@/lib/utils";
 import IssueDetailClient from "./client";
 
 export const revalidate = 120;
@@ -54,15 +53,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const langSuffix = isEn ? "?lang=en" : "";
   const ogImage = `${SITE_URL}/issues/${issue.id}/og${langSuffix}`;
   const pageUrl = `${SITE_URL}/issues/${issue.id}${langSuffix}`;
-  // 이슈별 구체적 description (토픽 + 브랜드명 포함)
   const severity = issue.severity ?? 0;
   const eventCount = issue.event_count ?? 0;
-  const topicLabel = isEn
-    ? (TOPIC_LABELS_EN[issue.topic] || issue.topic)
-    : (TOPIC_LABELS[issue.topic] || issue.topic);
   const desc = isEn
-    ? `[${topicLabel}] ${ogTitle} | Severity ${severity} | ${eventCount} reports — WeWantPeace`
-    : `[${topicLabel}] ${ogTitle} | 위기지수 ${severity} | ${eventCount}건 보도 — WeWantPeace`;
+    ? `${ogTitle} | Severity ${severity} | ${eventCount} reports`
+    : `${ogTitle} | 위기지수 ${severity} | ${eventCount}건 보도`;
 
   const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
 
@@ -83,13 +78,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       type: "website",
       url: canonicalUrl,
       siteName: "WeWantPeace",
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, type: "image/png" }],
     },
     twitter: {
       card: "summary_large_image",
       title: ogTitle,
       description: desc,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630 }],
     },
   };
 }
