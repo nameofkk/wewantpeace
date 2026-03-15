@@ -1090,6 +1090,44 @@ export default function MapPage() {
               </span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Intel Layer Toggle — Row 1 우측 */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowIntelPanel((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap",
+                    (firmsEnabled || outageEnabled || gpsJamEnabled)
+                      ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                      : "text-muted-foreground border-border hover:text-foreground",
+                  )}
+                >
+                  <Shield className="h-2.5 w-2.5" />
+                  {t(lang, "layer_panel_title")}
+                  <ChevronDown className={cn("h-2 w-2 transition-transform", showIntelPanel && "rotate-180")} />
+                </button>
+                {showIntelPanel && (
+                  <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl p-2 space-y-1">
+                    <LayerToggleRow
+                      icon="🔥" label={t(lang, "layer_firms")} tooltip={t(lang, "layer_firms_tooltip")}
+                      enabled={firmsEnabled} isPro={isPro} count={signalSummary?.firms_hotspot}
+                      onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setFirmsEnabled((v) => !v); }}
+                      lang={lang}
+                    />
+                    <LayerToggleRow
+                      icon="🌐" label={t(lang, "layer_outage")} tooltip={t(lang, "layer_outage_tooltip")}
+                      enabled={outageEnabled} isPro={isPro} count={signalSummary?.ioda_outage}
+                      onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setOutageEnabled((v) => !v); }}
+                      lang={lang}
+                    />
+                    <LayerToggleRow
+                      icon="📡" label={t(lang, "layer_gps_jam")} tooltip={t(lang, "layer_gps_jam_tooltip")}
+                      enabled={gpsJamEnabled} isPro={isPro} count={signalSummary?.gps_jam}
+                      onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setGpsJamEnabled((v) => !v); }}
+                      lang={lang}
+                    />
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing || isFetching}
@@ -1103,7 +1141,7 @@ export default function MapPage() {
             </div>
           </div>
           {/* Row 2: 범례 + 히트맵 */}
-          <div className="flex items-center gap-1 overflow-hidden" data-tour="map-filters">
+          <div className="flex items-center gap-1" data-tour="map-filters">
             {LEGEND.map(([label, col]) => (
               <span key={label} className="flex items-center gap-0.5 text-[9px] text-muted-foreground whitespace-nowrap">
                 <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: col }} />
@@ -1131,68 +1169,6 @@ export default function MapPage() {
               <MapIcon className="h-2.5 w-2.5" />
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
-            {/* Intel Layer Toggle */}
-            <div className="relative">
-              <button
-                onClick={() => setShowIntelPanel((v) => !v)}
-                className={cn(
-                  "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap shrink-0",
-                  (firmsEnabled || outageEnabled || gpsJamEnabled)
-                    ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
-                    : "text-muted-foreground border-border hover:text-foreground",
-                )}
-              >
-                <Shield className="h-2.5 w-2.5" />
-                {t(lang, "layer_panel_title")}
-                <ChevronDown className={cn("h-2 w-2 transition-transform", showIntelPanel && "rotate-180")} />
-              </button>
-              {showIntelPanel && (
-                <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl p-2 space-y-1">
-                  {/* FIRMS 위성 열점 */}
-                  <LayerToggleRow
-                    icon="🔥"
-                    label={t(lang, "layer_firms")}
-                    tooltip={t(lang, "layer_firms_tooltip")}
-                    enabled={firmsEnabled}
-                    isPro={isPro}
-                    count={signalSummary?.firms_hotspot}
-                    onToggle={() => {
-                      if (!isPro) { mapPaywall.show(); return; }
-                      setFirmsEnabled((v) => !v);
-                    }}
-                    lang={lang}
-                  />
-                  {/* IODA 인터넷 단절 */}
-                  <LayerToggleRow
-                    icon="🌐"
-                    label={t(lang, "layer_outage")}
-                    tooltip={t(lang, "layer_outage_tooltip")}
-                    enabled={outageEnabled}
-                    isPro={isPro}
-                    count={signalSummary?.ioda_outage}
-                    onToggle={() => {
-                      if (!isPro) { mapPaywall.show(); return; }
-                      setOutageEnabled((v) => !v);
-                    }}
-                    lang={lang}
-                  />
-                  {/* GPS 교란 */}
-                  <LayerToggleRow
-                    icon="📡"
-                    label={t(lang, "layer_gps_jam")}
-                    tooltip={t(lang, "layer_gps_jam_tooltip")}
-                    enabled={gpsJamEnabled}
-                    isPro={isPro}
-                    count={signalSummary?.gps_jam}
-                    onToggle={() => {
-                      if (!isPro) { mapPaywall.show(); return; }
-                      setGpsJamEnabled((v) => !v);
-                    }}
-                    lang={lang}
-                  />
-                </div>
-              )}
-            </div>
           </div>
           {/* 히트맵 ON 시 메트릭 안내 배너 */}
           {showHeatmap && (
