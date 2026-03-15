@@ -9,7 +9,7 @@
     width: 1024px;
     height: 500px;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
   }
   .container {
     width: 1024px;
@@ -21,41 +21,93 @@
     position: relative;
     overflow: hidden;
   }
-  /* 배경 그리드 효과 */
+
+  /* 그리드 배경 */
   .grid-bg {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(rgba(59,130,246,0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59,130,246,0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
   }
-  /* 글로우 효과 */
+
+  /* 스캔 라인 */
+  .scan-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 2;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,0.3), rgba(96,165,250,0.5), rgba(59,130,246,0.3), transparent);
+    box-shadow: 0 0 20px rgba(59,130,246,0.3), 0 0 60px rgba(59,130,246,0.1);
+    animation: scanDown 4s linear infinite;
+  }
+  @keyframes scanDown {
+    0% { top: -2px; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* 레이더 */
+  .radar {
+    position: absolute;
+    z-index: 2;
+    border-radius: 50%;
+    border: 1px solid rgba(59,130,246,0.15);
+    animation: radarPulse 3s ease-out infinite;
+  }
+  @keyframes radarPulse {
+    0% { transform: scale(0.5); opacity: 0.6; border-color: rgba(59,130,246,0.25); }
+    100% { transform: scale(1.8); opacity: 0; border-color: rgba(59,130,246,0); }
+  }
+
+  /* 점멸 점 */
+  .blink-dot {
+    position: absolute;
+    z-index: 3;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #60A5FA;
+    box-shadow: 0 0 8px rgba(96,165,250,0.6);
+    animation: blinkFade 2s ease-in-out infinite;
+  }
+  @keyframes blinkFade {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
+  /* 글로우 */
   .glow-1 {
     position: absolute;
-    width: 300px; height: 300px;
+    width: 350px; height: 350px;
     background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
-    top: -50px; right: 100px;
+    top: -80px; right: 60px;
   }
   .glow-2 {
     position: absolute;
-    width: 250px; height: 250px;
+    width: 300px; height: 300px;
     background: radial-gradient(circle, rgba(239,68,68,0.1) 0%, transparent 70%);
-    bottom: -30px; left: 150px;
+    bottom: -60px; left: 80px;
   }
   .glow-3 {
     position: absolute;
-    width: 200px; height: 200px;
+    width: 250px; height: 250px;
     background: radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%);
-    top: 100px; left: 50px;
+    top: 80px; left: 350px;
   }
+
+  /* 콘텐츠 */
   .content {
     position: relative;
     z-index: 10;
     display: flex;
     align-items: center;
-    gap: 60px;
-    padding: 0 80px;
+    gap: 50px;
+    padding: 0 70px;
+    width: 100%;
   }
   .left {
     flex: 1;
@@ -63,46 +115,49 @@
   .logo-section {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 14px;
+    margin-bottom: 20px;
   }
   .logo-icon {
-    width: 56px; height: 56px;
+    width: 52px; height: 52px;
     background: linear-gradient(135deg, #3B82F6, #06B6D4);
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    font-size: 26px;
     box-shadow: 0 4px 20px rgba(59,130,246,0.3);
   }
   .logo-text {
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 800;
     color: #F8FAFC;
     letter-spacing: -0.5px;
   }
   .tagline {
-    font-size: 20px;
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 700;
     color: #94A3B8;
     line-height: 1.5;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
   .tagline em {
     color: #F8FAFC;
     font-style: normal;
-    font-weight: 700;
+    font-weight: 800;
+    background: linear-gradient(135deg, #60A5FA, #34D399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   .features {
     display: flex;
-    gap: 12px;
+    gap: 10px;
   }
   .feature-pill {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
+    padding: 7px 14px;
     border-radius: 20px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.1);
@@ -114,87 +169,152 @@
     width: 6px; height: 6px;
     border-radius: 50%;
   }
-  .dot-blue { background: #3B82F6; }
   .dot-red { background: #EF4444; }
+  .dot-blue { background: #3B82F6; }
   .dot-green { background: #10B981; }
+  .dot-yellow { background: #FBBF24; }
 
-  /* 오른쪽: 미니 대시보드 카드 */
+  /* 오른쪽: 미니 폰 목업 */
   .right {
-    width: 340px;
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .mini-phone {
+    width: 220px;
+    height: 380px;
+    background: #000;
+    border-radius: 28px;
+    border: 3px solid #333;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px #1a1a1a,
+      0 10px 40px rgba(0,0,0,0.5),
+      0 0 60px rgba(59,130,246,0.06);
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
-  .mini-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 16px 20px;
-    backdrop-filter: blur(10px);
-  }
-  .card-header {
+  .mini-phone-status {
+    height: 20px;
+    background: #0F172A;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
   }
-  .card-label {
-    font-size: 11px;
-    font-weight: 600;
+  .mini-notch {
+    width: 60px;
+    height: 12px;
+    background: #000;
+    border-radius: 0 0 8px 8px;
+    position: absolute;
+    top: 0;
+  }
+  .mini-phone-screen {
+    flex: 1;
+    background: #0F172A;
+    padding: 10px;
+    overflow: hidden;
+  }
+  .mini-phone-home {
+    height: 14px;
+    background: #0F172A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mini-phone-home .bar {
+    width: 50px;
+    height: 3px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+  }
+
+  /* 미니 카드 */
+  .mc {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+  }
+  .mc-label {
+    font-size: 8px;
+    font-weight: 700;
     color: #64748B;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
   }
-  .card-badge {
-    font-size: 9px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-weight: 700;
-  }
-  .badge-live {
-    background: rgba(239,68,68,0.15);
-    color: #F87171;
-  }
-  .card-score {
-    font-size: 36px;
-    font-weight: 800;
+  .mc-score {
+    font-size: 24px;
+    font-weight: 900;
     color: #F8FAFC;
     line-height: 1;
   }
-  .card-sub {
-    font-size: 11px;
+  .mc-sub {
+    font-size: 7px;
     color: #64748B;
-    margin-top: 4px;
+    margin-top: 2px;
   }
-  /* 국가 행 */
-  .country-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .mc-badge {
+    display: inline-block;
+    font-size: 7px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    font-weight: 700;
+    background: rgba(239,68,68,0.15);
+    color: #F87171;
+    margin-left: 4px;
   }
-  .country-row {
+  /* 미니 국가 행 */
+  .mc-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
+    gap: 5px;
+    font-size: 9px;
+    margin-bottom: 3px;
   }
-  .country-flag { font-size: 14px; }
-  .country-name { color: #CBD5E1; flex: 1; font-weight: 500; }
-  .country-score { font-weight: 700; font-size: 13px; }
-  .score-high { color: #F87171; }
-  .score-mid { color: #FBBF24; }
-  .score-low { color: #34D399; }
-  .trend { font-size: 10px; margin-left: 2px; }
-  .trend-up { color: #F87171; }
-  .trend-down { color: #34D399; }
+  .mc-flag { font-size: 10px; }
+  .mc-name { color: #CBD5E1; flex: 1; font-weight: 500; }
+  .mc-val { font-weight: 700; }
+  .mc-hi { color: #F87171; }
+  .mc-md { color: #FBBF24; }
+  /* 미니 바 */
+  .mc-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .mc-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+  .fill-r { background: linear-gradient(90deg, #EF4444, #F87171); }
+  .fill-o { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+  .fill-g { background: linear-gradient(90deg, #10B981, #34D399); }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="grid-bg"></div>
+  <div class="scan-line"></div>
   <div class="glow-1"></div>
   <div class="glow-2"></div>
   <div class="glow-3"></div>
+
+  <!-- 레이더 + 점멸 -->
+  <div class="radar" style="width:200px;height:200px;top:-30px;left:60px;animation-delay:0s;"></div>
+  <div class="radar" style="width:250px;height:250px;bottom:-40px;right:80px;animation-delay:1.5s;"></div>
+  <div class="blink-dot" style="top:20%;left:8%;animation-delay:0s;"></div>
+  <div class="blink-dot" style="top:70%;left:45%;animation-delay:0.8s;"></div>
+  <div class="blink-dot" style="top:30%;right:5%;animation-delay:1.6s;"></div>
+  <div class="blink-dot" style="bottom:15%;left:25%;animation-delay:2.2s;"></div>
 
   <div class="content">
     <div class="left">
@@ -213,48 +333,66 @@
         </div>
         <div class="feature-pill">
           <span class="dot dot-blue"></span>
-          맞춤 알림
+          실시간 알림
         </div>
         <div class="feature-pill">
           <span class="dot dot-green"></span>
-          글로벌 지도
+          분쟁 지도
+        </div>
+        <div class="feature-pill">
+          <span class="dot dot-yellow"></span>
+          이슈 피드
         </div>
       </div>
     </div>
 
     <div class="right">
-      <div class="mini-card">
-        <div class="card-header">
-          <span class="card-label">Tension Index</span>
-          <span class="card-badge badge-live">LIVE</span>
-        </div>
-        <div class="card-score">72</div>
-        <div class="card-sub">Global Average &middot; Updated 3min ago</div>
-      </div>
-      <div class="mini-card">
-        <div class="card-header">
-          <span class="card-label">Watchlist</span>
-        </div>
-        <div class="country-rows">
-          <div class="country-row">
-            <span class="country-flag">&#x1F1FA;&#x1F1E6;</span>
-            <span class="country-name">Ukraine</span>
-            <span class="country-score score-high">89</span>
-            <span class="trend trend-up">&#9650;3</span>
+      <div class="mini-phone">
+        <div class="mini-phone-status"><div class="mini-notch"></div></div>
+        <div class="mini-phone-screen">
+          <div class="mc">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="mc-label">Global Tension</span>
+              <span class="mc-badge">LIVE</span>
+            </div>
+            <div class="mc-score">72</div>
+            <div class="mc-sub">Updated 3min ago</div>
           </div>
-          <div class="country-row">
-            <span class="country-flag">&#x1F1F5;&#x1F1F8;</span>
-            <span class="country-name">Palestine</span>
-            <span class="country-score score-high">82</span>
-            <span class="trend trend-up">&#9650;1</span>
-          </div>
-          <div class="country-row">
-            <span class="country-flag">&#x1F1F8;&#x1F1E9;</span>
-            <span class="country-name">Sudan</span>
-            <span class="country-score score-mid">67</span>
-            <span class="trend trend-down">&#9660;2</span>
+          <div class="mc">
+            <div class="mc-label">Watchlist</div>
+            <div class="mc-row">
+              <span class="mc-flag">&#x1F1FA;&#x1F1E6;</span>
+              <span class="mc-name">Ukraine</span>
+              <div class="mc-bar-bg"><div class="mc-bar-fill fill-r" style="width:89%"></div></div>
+              <span class="mc-val mc-hi">89</span>
+            </div>
+            <div class="mc-row">
+              <span class="mc-flag">&#x1F1F5;&#x1F1F8;</span>
+              <span class="mc-name">Palestine</span>
+              <div class="mc-bar-bg"><div class="mc-bar-fill fill-r" style="width:82%"></div></div>
+              <span class="mc-val mc-hi">82</span>
+            </div>
+            <div class="mc-row">
+              <span class="mc-flag">&#x1F1F8;&#x1F1E9;</span>
+              <span class="mc-name">Sudan</span>
+              <div class="mc-bar-bg"><div class="mc-bar-fill fill-o" style="width:67%"></div></div>
+              <span class="mc-val mc-md">67</span>
+            </div>
+            <div class="mc-row">
+              <span class="mc-flag">&#x1F1F2;&#x1F1F2;</span>
+              <span class="mc-name">Myanmar</span>
+              <div class="mc-bar-bg"><div class="mc-bar-fill fill-o" style="width:58%"></div></div>
+              <span class="mc-val mc-md">58</span>
+            </div>
+            <div class="mc-row">
+              <span class="mc-flag">&#x1F1F0;&#x1F1F7;</span>
+              <span class="mc-name">Korea</span>
+              <div class="mc-bar-bg"><div class="mc-bar-fill fill-g" style="width:18%"></div></div>
+              <span class="mc-val" style="color:#34D399;">18</span>
+            </div>
           </div>
         </div>
+        <div class="mini-phone-home"><div class="bar"></div></div>
       </div>
     </div>
   </div>
