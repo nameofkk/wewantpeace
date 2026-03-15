@@ -340,7 +340,7 @@ function LayerToggleRow({
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-medium truncate">{label}</div>
         {tooltip && (
-          <div className="text-[8px] text-muted-foreground/70 truncate">{tooltip}</div>
+          <div className="text-[10px] text-muted-foreground/80 leading-tight mt-0.5">{tooltip}</div>
         )}
         {count !== undefined && count > 0 && (
           <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>

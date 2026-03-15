@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-# IODA API (인증 불필요)
-IODA_EVENTS_URL = "https://ioda.caida.org/ioda/data/events"
+# IODA API (Georgia Tech으로 이전, 인증 불필요)
+IODA_ALERTS_URL = "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/alerts"
 
 # 분쟁 16개국
 MONITORED_COUNTRIES = [
@@ -48,24 +48,25 @@ class OutageCollector:
     TIMEOUT = 30
 
     async def collect(self, db: AsyncSession, redis=None) -> OutageCollectResult:
-        """IODA API에서 분쟁지역 인터넷 단절 이벤트 수집."""
+        """IODA API(Georgia Tech)에서 분쟁지역 인터넷 단절 이벤트 수집."""
         result = OutageCollectResult()
         from backend.app.models.signal_point import SignalPoint
 
         now = datetime.now(timezone.utc)
-        # 최근 1시간 이벤트 조회
-        since = int((now - timedelta(hours=1)).timestamp())
+        # 최근 24시간 이벤트 조회 (IODA 데이터 지연 + 간헐적 이벤트 고려)
+        since = int((now - timedelta(hours=24)).timestamp())
         until = int(now.timestamp())
 
         try:
             params = {
                 "from": since,
                 "until": until,
+                "entityType": "country",
             }
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)
             ) as session:
-                async with session.get(IODA_EVENTS_URL, params=params) as resp:
+                async with session.get(IODA_ALERTS_URL, params=params) as resp:
                     if resp.status != 200:
                         result.errors.append(f"HTTP {resp.status}")
                         return result
@@ -77,51 +78,56 @@ class OutageCollector:
             result.errors.append(f"API 오류: {e}")
             return result
 
-        events = data if isinstance(data, list) else data.get("data", data.get("events", []))
-        if not isinstance(events, list):
+        # 새 API 응답: {"type": "outages.alerts", "data": [...]}
+        alerts = data.get("data", []) if isinstance(data, dict) else data
+        if not isinstance(alerts, list):
             return result
 
-        for event in events:
+        for alert in alerts:
             try:
-                # IODA 이벤트 구조 파싱
-                location = event.get("location", {})
+                # entity에서 국가 코드 추출
+                entity = alert.get("entity", {})
                 cc = ""
-                if isinstance(location, dict):
-                    cc = location.get("code", "").upper()
-                elif isinstance(event.get("entity", {}), dict):
-                    entity = event.get("entity", {})
+                if isinstance(entity, dict):
                     cc = entity.get("code", "").upper()
 
-                # country code 직접 제공되지 않으면 name에서 추출 시도
                 if not cc or len(cc) != 2:
-                    cc = event.get("country", event.get("cc", "")).upper()
+                    result.skipped += 1
+                    continue
 
                 if cc not in MONITORED_COUNTRIES:
                     result.skipped += 1
                     continue
 
-                # fraction: 정상 트래픽 대비 비율 (0=완전단절, 1=정상)
-                fraction = event.get("fraction", event.get("score", 1.0))
-                if fraction is None:
-                    fraction = 1.0
-                try:
-                    fraction = float(fraction)
-                except (ValueError, TypeError):
-                    fraction = 1.0
-
-                if fraction >= 0.5:
+                # level: critical/warning → intensity 매핑
+                level = alert.get("level", "").lower()
+                if level not in ("critical", "warning"):
                     result.skipped += 1
                     continue
 
-                intensity = round(1.0 - fraction, 3)
+                # value vs historyValue로 fraction 계산
+                value = alert.get("value", 0)
+                history_value = alert.get("historyValue", 0)
+                if history_value and history_value > 0:
+                    fraction = round(value / history_value, 3)
+                else:
+                    fraction = 0.5 if level == "warning" else 0.2
+
+                # critical: 5%+ 트래픽 감소만 (0.95 이상은 노이즈)
+                # warning: 20%+ 트래픽 감소만
+                if level == "critical" and fraction >= 0.95:
+                    result.skipped += 1
+                    continue
+                if level == "warning" and fraction >= 0.80:
+                    result.skipped += 1
+                    continue
+
+                intensity = round(max(0.0, min(1.0, 1.0 - fraction)), 3)
 
                 # 타임스탬프
-                ts = event.get("start", event.get("from", event.get("time")))
-                if ts:
-                    if isinstance(ts, (int, float)):
-                        observed_at = datetime.fromtimestamp(ts, tz=timezone.utc)
-                    else:
-                        observed_at = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                ts = alert.get("time")
+                if ts and isinstance(ts, (int, float)):
+                    observed_at = datetime.fromtimestamp(ts, tz=timezone.utc)
                 else:
                     observed_at = now
 
@@ -129,7 +135,7 @@ class OutageCollector:
                 rounded_ts = observed_at.replace(second=0, microsecond=0)
                 rounded_ts = rounded_ts.replace(minute=(rounded_ts.minute // 5) * 5)
 
-                datasource = event.get("datasource", event.get("type", "unknown"))
+                datasource = alert.get("datasource", "unknown")
                 external_id = f"ioda:{cc}:{datasource}:{int(rounded_ts.timestamp())}"
 
                 # 중복 확인
@@ -150,8 +156,14 @@ class OutageCollector:
                     country_code=cc,
                     intensity=intensity,
                     raw_value=fraction,
-                    confidence=0.7,
-                    extra_data={"datasource": datasource, "fraction": fraction},
+                    confidence=0.7 if level == "critical" else 0.5,
+                    extra_data={
+                        "datasource": datasource,
+                        "fraction": fraction,
+                        "level": level,
+                        "value": value,
+                        "history_value": history_value,
+                    },
                     observed_at=observed_at,
                     expires_at=observed_at + timedelta(hours=48),
                 )
