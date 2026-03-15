@@ -174,14 +174,17 @@ function ReportContent() {
     {
       target: "[data-tour='dash-risk']",
       content: t(lang, "tour_dash_risk"),
+      disableBeacon: true,
     },
     {
       target: "[data-tour='dash-watchlist']",
       content: t(lang, "tour_dash_watchlist"),
+      disableBeacon: true,
     },
     {
       target: "[data-tour='dash-top-issues']",
       content: t(lang, "tour_dash_top_issues"),
+      disableBeacon: true,
     },
   ], [lang]);
   const availableCountries = isPro ? SUPPORTED_HOME_COUNTRIES : [];
@@ -432,8 +435,9 @@ function ReportContent() {
             </div>
 
             {/* Watchlist chips */}
+            <div data-tour="dash-watchlist">
             {myCountries.length > 0 ? (
-              <div className="space-y-1" data-tour="dash-watchlist">
+              <div className="space-y-1">
               <span className="text-[9px] text-muted-foreground/60 font-medium">
                 {lang === "ko" ? "관심 국가 긴장도" : "Watchlist Tension"}
               </span>
@@ -479,6 +483,7 @@ function ReportContent() {
                 </Link>
               </div>
             )}
+            </div>
           </m.section>
 
           {/* ═══════════════ SECTION B: Impact Stories (Sankey + Smart Cards) ═══════════════ */}
@@ -510,8 +515,9 @@ function ReportContent() {
             )}
 
             {/* #1 Issue: SmartSummaryCard Full */}
+            <div data-tour="dash-top-issues">
             {topIssue && (
-              <div className="rounded-xl border border-border bg-card mt-5" data-tour="dash-top-issues">
+              <div className="rounded-xl border border-border bg-card mt-5">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={AlertTriangle}
@@ -534,6 +540,7 @@ function ReportContent() {
                 </div>
               </div>
             )}
+            </div>
 
             {/* #2-#5 Issues: Compact */}
             {restIssues.length > 0 && (
