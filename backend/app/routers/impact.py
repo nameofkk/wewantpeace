@@ -1188,6 +1188,8 @@ SECTOR_DATA = {
     "KR": {
         "energy": {"gdp_pct": 3.2, "key_partners": ["SA", "AE", "IQ", "KW", "RU"]},
         "semiconductor": {"gdp_pct": 4.8, "key_partners": ["US", "CN", "JP", "TW", "VN"]},
+        "electronics": {"gdp_pct": 5.5, "key_partners": ["US", "CN", "VN", "JP", "IN"]},
+        "manufacturing": {"gdp_pct": 25.0, "key_partners": ["CN", "US", "VN", "JP", "IN"]},
         "automotive": {"gdp_pct": 3.5, "key_partners": ["US", "CN", "IN", "DE"]},
         "agriculture": {"gdp_pct": 1.8, "key_partners": ["US", "AU", "BR", "UA", "RU"]},
         "shipping": {"gdp_pct": 2.1, "key_partners": ["CN", "JP", "US", "SG", "VN"]},
@@ -1196,6 +1198,9 @@ SECTOR_DATA = {
     "US": {
         "energy": {"gdp_pct": 5.8, "key_partners": ["CA", "SA", "MX", "RU", "IQ"]},
         "technology": {"gdp_pct": 8.2, "key_partners": ["CN", "TW", "KR", "JP", "IE"]},
+        "semiconductor": {"gdp_pct": 2.5, "key_partners": ["TW", "KR", "JP", "CN", "NL"]},
+        "manufacturing": {"gdp_pct": 11.0, "key_partners": ["CN", "MX", "CA", "DE", "JP"]},
+        "shipping": {"gdp_pct": 2.8, "key_partners": ["CN", "JP", "KR", "DE", "GB"]},
         "automotive": {"gdp_pct": 3.0, "key_partners": ["MX", "CA", "JP", "DE", "KR"]},
         "agriculture": {"gdp_pct": 4.5, "key_partners": ["CN", "CA", "MX", "JP", "BR"]},
         "defense": {"gdp_pct": 3.4, "key_partners": ["GB", "AU", "JP", "KR", "IL"]},
@@ -1205,6 +1210,8 @@ SECTOR_DATA = {
         "energy": {"gdp_pct": 3.8, "key_partners": ["SA", "AE", "AU", "QA", "RU"]},
         "automotive": {"gdp_pct": 5.2, "key_partners": ["US", "CN", "TH", "ID", "DE"]},
         "electronics": {"gdp_pct": 4.1, "key_partners": ["CN", "US", "KR", "TW", "TH"]},
+        "semiconductor": {"gdp_pct": 3.0, "key_partners": ["US", "TW", "CN", "KR", "NL"]},
+        "manufacturing": {"gdp_pct": 20.0, "key_partners": ["US", "CN", "KR", "TH", "DE"]},
         "agriculture": {"gdp_pct": 1.1, "key_partners": ["US", "AU", "CA", "BR", "TH"]},
         "shipping": {"gdp_pct": 1.8, "key_partners": ["CN", "US", "KR", "AU", "TW"]},
         "tourism": {"gdp_pct": 1.5, "key_partners": ["CN", "KR", "TW", "US", "TH"]},
@@ -1221,6 +1228,8 @@ SECTOR_DATA = {
         "energy": {"gdp_pct": 3.5, "key_partners": ["NO", "US", "NL", "RU", "GB"]},
         "automotive": {"gdp_pct": 5.0, "key_partners": ["US", "CN", "GB", "FR", "IT"]},
         "manufacturing": {"gdp_pct": 19.7, "key_partners": ["US", "CN", "FR", "NL", "PL"]},
+        "shipping": {"gdp_pct": 2.0, "key_partners": ["NL", "CN", "US", "FR", "PL"]},
+        "electronics": {"gdp_pct": 3.2, "key_partners": ["CN", "US", "NL", "FR", "CZ"]},
         "agriculture": {"gdp_pct": 0.8, "key_partners": ["NL", "FR", "PL", "IT", "ES"]},
         "tourism": {"gdp_pct": 2.5, "key_partners": ["NL", "CH", "AT", "US", "GB"]},
     },
@@ -1228,12 +1237,16 @@ SECTOR_DATA = {
         "energy": {"gdp_pct": 3.2, "key_partners": ["NO", "US", "NL", "QA", "SA"]},
         "finance": {"gdp_pct": 8.3, "key_partners": ["US", "DE", "FR", "NL", "JP"]},
         "technology": {"gdp_pct": 5.5, "key_partners": ["US", "DE", "IE", "NL", "CN"]},
+        "manufacturing": {"gdp_pct": 9.0, "key_partners": ["US", "DE", "FR", "NL", "CN"]},
+        "shipping": {"gdp_pct": 1.5, "key_partners": ["NL", "US", "DE", "FR", "CN"]},
         "agriculture": {"gdp_pct": 0.6, "key_partners": ["IE", "NL", "FR", "DE", "ES"]},
         "tourism": {"gdp_pct": 3.0, "key_partners": ["US", "FR", "DE", "IE", "ES"]},
     },
     "FR": {
         "energy": {"gdp_pct": 2.8, "key_partners": ["NO", "SA", "US", "RU", "NE"]},
         "automotive": {"gdp_pct": 2.5, "key_partners": ["DE", "ES", "IT", "GB", "BE"]},
+        "manufacturing": {"gdp_pct": 10.0, "key_partners": ["DE", "US", "IT", "ES", "BE"]},
+        "shipping": {"gdp_pct": 1.8, "key_partners": ["DE", "US", "CN", "NL", "IT"]},
         "agriculture": {"gdp_pct": 1.7, "key_partners": ["DE", "BE", "IT", "ES", "NL"]},
         "tourism": {"gdp_pct": 4.2, "key_partners": ["GB", "DE", "BE", "NL", "US"]},
         "defense": {"gdp_pct": 1.9, "key_partners": ["US", "GB", "DE", "IN", "SA"]},
@@ -1762,6 +1775,9 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
         "electronics":   ["electronics_cost"],
         "technology":    ["electronics_cost"],
         "manufacturing": ["mfg_cost", "electronics_cost"],      # 제조 → 제조원가 + 전자제품
+        "mining":        ["energy_cost", "mfg_cost"],           # 광업 → 에너지 + 제조원가
+        "finance":       ["energy_cost"],                       # 금융 → 에너지비 (간접)
+        "construction":  ["mfg_cost"],                          # 건설 → 제조원가
         "automotive":    ["auto_cost"],
         "tourism":       ["travel_cost"],
         "defense":       ["energy_cost"],
