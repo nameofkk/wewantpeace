@@ -43,10 +43,11 @@ function truncLabel(s: string, max: number) {
 }
 
 /** 3단 Sankey 레이아웃 계산 */
-function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeClass: "sm" | "md" | "lg") {
+function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeClass: "sm" | "md" | "lg", lang: "ko" | "en" = "ko") {
+  const isEn = lang === "en";
   const sizeCfg = {
-    sm:  { top: 10, right: 100, bottom: 18, left: 22, nodeW: 10, colGap: 40, nodePad: 6, minNodeH: 12, maxLinkH: 20, minLink: 2 },
-    md:  { top: 10, right: 140, bottom: 20, left: 28, nodeW: 14, colGap: 60, nodePad: 10, minNodeH: 18, maxLinkH: 28, minLink: 3 },
+    sm:  { top: 10, right: isEn ? 130 : 100, bottom: 18, left: isEn ? 16 : 22, nodeW: 10, colGap: 40, nodePad: 6, minNodeH: 12, maxLinkH: 20, minLink: 2 },
+    md:  { top: 10, right: isEn ? 160 : 140, bottom: 20, left: isEn ? 22 : 28, nodeW: 14, colGap: 60, nodePad: 10, minNodeH: 18, maxLinkH: 28, minLink: 3 },
     lg:  { top: 12, right: 160, bottom: 22, left: 36, nodeW: 16, colGap: 80, nodePad: 14, minNodeH: 22, maxLinkH: 34, minLink: 4 },
   };
   const cfg = sizeCfg[sizeClass];
@@ -283,7 +284,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
   const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 
-  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight, sizeClass);
+  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight, sizeClass, lang);
 
   // 호버 시 연결 계산
   const { connectedLinks, connectedNodes } = hoveredNodeId
@@ -312,7 +313,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           height={chartHeight}
           viewBox={`0 0 ${effectiveWidth} ${chartHeight}`}
           className="w-full"
-          style={{ display: "block" }}
+          style={{ display: "block", overflow: "visible" }}
           onMouseLeave={() => setHoveredNodeId(null)}
         >
           {/* 글로우 필터 (은은하게) */}
