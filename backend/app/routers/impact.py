@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v8"
+_CACHE_VERSION = "v9"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -2279,31 +2279,29 @@ async def _calc_sector_exposure(
         partners = info.get("key_partners", [])
         gdp_pct = info["gdp_pct"]
 
-        # 영향받는 국가가 핵심 파트너인지 확인
         is_partner = affected_country in partners
         partner_rank = partners.index(affected_country) + 1 if is_partner else 0
 
-        # 교역 의존도 계산: 실 데이터 > 순위 기반 fallback
-        if real_trade_dep is not None and is_partner:
-            # 실 데이터 보정: 실제 교역 비중 × 파트너 순위 가중
-            rank_weight = max(0.3, 1.0 - (partner_rank - 1) * 0.15)
-            trade_dep = min(0.95, real_trade_dep * rank_weight * 3)  # ×3: 교역 비중을 의존도 스케일로 확대
-        elif partner_rank == 1:
-            trade_dep = 0.85
-        elif partner_rank == 2:
-            trade_dep = 0.6
-        elif partner_rank == 3:
-            trade_dep = 0.35
-        elif partner_rank == 4:
-            trade_dep = 0.25
-        elif partner_rank == 5:
-            trade_dep = 0.18
+        # 교역 의존도: 실제 DB 데이터 우선, 없으면 key_partners 순위 기반
+        if real_trade_dep is not None and real_trade_dep > 0.001:
+            # 실제 교역 데이터 있으면 key_partners 여부 무관하게 사용
+            trade_dep = min(0.95, real_trade_dep * 3)
         elif is_partner:
-            trade_dep = 0.12
+            if partner_rank == 1:
+                trade_dep = 0.85
+            elif partner_rank == 2:
+                trade_dep = 0.6
+            elif partner_rank == 3:
+                trade_dep = 0.35
+            elif partner_rank == 4:
+                trade_dep = 0.25
+            elif partner_rank == 5:
+                trade_dep = 0.18
+            else:
+                trade_dep = 0.12
         else:
-            trade_dep = 0.05 if real_trade_dep is None else min(0.15, real_trade_dep * 2)
+            trade_dep = 0.0  # 실제 데이터도 없고 key_partner도 아니면 0%
 
-        # 리스크 레벨
         risk_score = trade_dep * (severity / 100)
         if risk_score >= 0.6:
             risk_level = "critical"
@@ -2316,24 +2314,22 @@ async def _calc_sector_exposure(
 
         sector_label = labels.get(sector, sector)
 
-        # 설명 생성 (실 데이터 유무에 따라 다른 문구)
-        data_source = " (IMF)" if real_trade_dep is not None else ""
         if lang == "ko":
             desc = f"GDP 대비 {gdp_pct}% 비중. "
-            if is_partner:
+            if real_trade_dep is not None and real_trade_dep > 0.001:
+                desc += f"해당 지역과 교역 비중 {real_trade_dep * 100:.1f}%."
+            elif is_partner:
                 desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
-                if real_trade_dep is not None:
-                    desc += f" 실제 교역 비중 {real_trade_dep * 100:.1f}%{data_source}."
             else:
-                desc += f"해당 지역과 직접 교역 비중은 낮음."
+                desc += "해당 지역과 직접 교역 노출 없음."
         else:
             desc = f"{gdp_pct}% of GDP. "
-            if is_partner:
+            if real_trade_dep is not None and real_trade_dep > 0.001:
+                desc += f"Trade share with affected region: {real_trade_dep * 100:.1f}%."
+            elif is_partner:
                 desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
-                if real_trade_dep is not None:
-                    desc += f" Actual trade share: {real_trade_dep * 100:.1f}%{data_source}."
             else:
-                desc += f"Low direct trade exposure with the affected region."
+                desc += "No direct trade exposure with the affected region."
 
         result.append({
             "sector": sector_label,
@@ -2479,12 +2475,12 @@ async def get_sector_overview(
         if cc not in country_severity or sev > country_severity[cc]:
             country_severity[cc] = sev
 
-    # 섹터별 노출도 집계: 모든 분쟁 국가에 대해 계산 후 최대값 취합
+    # 섹터별 노출도 집계: 실제 DB 교역 데이터 우선, 없으면 토픽 기반 간접 영향
     sectors_data = SECTOR_DATA.get(home, DEFAULT_SECTORS)
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     aggregated: dict[str, dict] = {}
 
-    # 실제 교역 데이터 조회 (한 번만)
+    # 실제 교역 데이터 조회 (한 번만) — 모든 분쟁국 대상
     real_trade_deps: dict[str, float | None] = {}
     for cc in country_severity:
         try:
@@ -2492,40 +2488,82 @@ async def get_sector_overview(
         except Exception:
             real_trade_deps[cc] = None
 
+    # 토픽 → 관련 섹터 매핑 (간접 영향 계산용)
+    _topic_sector_map: dict[str, list[str]] = {
+        "conflict": ["energy", "shipping"],
+        "terror": ["energy", "shipping", "tourism"],
+        "military": ["energy", "shipping", "defense"],
+        "economy": ["energy", "manufacturing", "shipping"],
+        "trade": ["shipping", "manufacturing", "semiconductor"],
+        "cyber": ["technology", "semiconductor", "electronics"],
+        "diplomacy": ["energy", "shipping"],
+        "sanctions": ["energy", "shipping", "manufacturing"],
+        "humanitarian": ["agriculture"],
+        "nuclear": ["energy", "defense"],
+    }
+
+    # 분쟁 클러스터의 토픽별 최고 severity 수집 (간접 영향용)
+    topic_severity: dict[str, int] = {}
+    for c in clusters:
+        tp = c.topic or ""
+        sev = c.severity or 0
+        if tp and (tp not in topic_severity or sev > topic_severity[tp]):
+            topic_severity[tp] = sev
+
     for sector, info in sectors_data.items():
         partners = info.get("key_partners", [])
         gdp_pct = info["gdp_pct"]
         sector_label = labels.get(sector, sector)
 
-        max_trade_dep = 0.05
+        max_trade_dep = 0.0
         max_risk_score = 0.0
         affected_countries = []
+        best_real_dep: float | None = None
 
+        # 1차: 모든 분쟁국에 대해 실제 교역 데이터 + key_partners 체크
         for cc, sev in country_severity.items():
-            is_partner = cc in partners
-            if not is_partner:
-                continue
-            partner_rank = partners.index(cc) + 1
-            affected_countries.append(cc)
-
             real_dep = real_trade_deps.get(cc)
-            if real_dep is not None:
-                rank_weight = max(0.3, 1.0 - (partner_rank - 1) * 0.15)
-                trade_dep = min(0.95, real_dep * rank_weight * 3)
-            elif partner_rank == 1:
-                trade_dep = 0.85
-            elif partner_rank == 2:
-                trade_dep = 0.6
-            elif partner_rank <= 3:
-                trade_dep = 0.4
+            is_partner = cc in partners
+            partner_rank = partners.index(cc) + 1 if is_partner else 0
+
+            # 실제 교역 데이터가 있으면 key_partners 여부와 무관하게 사용
+            if real_dep is not None and real_dep > 0.001:
+                trade_dep = min(0.95, real_dep * 3)  # 교역 비중을 의존도 스케일로 확대
+                affected_countries.append(cc)
+                if best_real_dep is None or real_dep > best_real_dep:
+                    best_real_dep = real_dep
+            elif is_partner:
+                # DB 데이터 없지만 key_partners에 있으면 순위 기반 추정
+                if partner_rank == 1:
+                    trade_dep = 0.85
+                elif partner_rank == 2:
+                    trade_dep = 0.6
+                elif partner_rank <= 3:
+                    trade_dep = 0.4
+                else:
+                    trade_dep = 0.2
+                affected_countries.append(cc)
             else:
-                trade_dep = 0.2
+                continue  # 실제 데이터도 없고 key_partner도 아니면 스킵
 
             risk_score = trade_dep * (sev / 100)
             if trade_dep > max_trade_dep:
                 max_trade_dep = trade_dep
             if risk_score > max_risk_score:
                 max_risk_score = risk_score
+
+        # 2차: 직접 교역 매칭이 없으면 토픽 기반 간접 영향 반영
+        if not affected_countries:
+            for tp, related_sectors in _topic_sector_map.items():
+                if sector in related_sectors and tp in topic_severity:
+                    sev = topic_severity[tp]
+                    indirect_dep = 0.08 * (gdp_pct / 10)  # GDP 비중 높을수록 간접 영향 큼
+                    indirect_dep = min(0.25, indirect_dep)
+                    risk_score = indirect_dep * (sev / 100)
+                    if indirect_dep > max_trade_dep:
+                        max_trade_dep = indirect_dep
+                    if risk_score > max_risk_score:
+                        max_risk_score = risk_score
 
         if max_risk_score >= 0.6:
             risk_level = "critical"
@@ -2539,16 +2577,24 @@ async def get_sector_overview(
         n_affected = len(affected_countries)
         if lang == "ko":
             desc = f"GDP 대비 {gdp_pct}% 비중. "
-            if n_affected > 0:
+            if n_affected > 0 and best_real_dep is not None:
+                desc += f"{n_affected}개 분쟁국과 교역 중 (교역 비중 {best_real_dep * 100:.1f}%)."
+            elif n_affected > 0:
                 desc += f"현재 {n_affected}개 분쟁국이 핵심 교역 파트너."
+            elif max_trade_dep > 0:
+                desc += "글로벌 공급망 통한 간접 영향 가능."
             else:
-                desc += "현재 분쟁국 중 핵심 교역 파트너 없음."
+                desc += "현재 분쟁 지역과 직접 교역 노출 없음."
         else:
             desc = f"{gdp_pct}% of GDP. "
-            if n_affected > 0:
+            if n_affected > 0 and best_real_dep is not None:
+                desc += f"Trading with {n_affected} conflict-affected countries (trade share {best_real_dep * 100:.1f}%)."
+            elif n_affected > 0:
                 desc += f"{n_affected} conflict-affected countries are key partners."
+            elif max_trade_dep > 0:
+                desc += "Indirect exposure through global supply chains."
             else:
-                desc += "No key trade partners currently in conflict zones."
+                desc += "No direct trade exposure with conflict zones."
 
         aggregated[sector] = {
             "sector": sector_label,

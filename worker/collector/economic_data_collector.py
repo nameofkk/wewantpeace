@@ -50,6 +50,7 @@ IMF_COUNTRY_MAP = {
     "ID": "IDN", "PH": "PHL", "MY": "MYS", "NL": "NLD", "IT": "ITA",
     "ES": "ESP", "BE": "BEL", "AR": "ARG", "NZ": "NZL", "QA": "QAT",
     "KW": "KWT", "NO": "NOR", "PL": "POL", "IE": "IRL", "HK": "HKG",
+    "EG": "EGY",
 }
 
 # World Bank 경제 지표 코드
@@ -61,29 +62,29 @@ WB_INDICATORS = {
     "BN.CAB.XOKA.CD": "Current account balance (BoP, current US$)",
 }
 
-# 주요 교역 파트너 (각 국가당 상위 5개)
+# 주요 교역 파트너 (각 국가당 상위 15개)
 # IMF API에서 가져올 reporter-partner 쌍
 TRADE_PAIRS = {
-    "KR": ["CN", "US", "JP", "VN", "TW"],
-    "US": ["CN", "MX", "CA", "JP", "DE"],
-    "JP": ["CN", "US", "KR", "TW", "TH"],
-    "CN": ["US", "JP", "KR", "VN", "DE"],
-    "DE": ["US", "CN", "FR", "NL", "IT"],
-    "GB": ["US", "DE", "NL", "FR", "CN"],
-    "FR": ["DE", "US", "IT", "ES", "BE"],
-    "AU": ["CN", "JP", "KR", "US", "IN"],
-    "IN": ["US", "CN", "AE", "SA", "SG"],
-    "BR": ["CN", "US", "AR", "NL", "DE"],
-    "SA": ["CN", "IN", "JP", "KR", "US"],
-    "AE": ["IN", "CN", "JP", "US", "SA"],
-    "IL": ["US", "CN", "DE", "GB", "IN"],
-    "TR": ["DE", "US", "GB", "IT", "IQ"],
-    "TW": ["CN", "US", "JP", "KR", "SG"],
-    "TH": ["CN", "US", "JP", "VN", "MY"],
-    "VN": ["US", "CN", "KR", "JP", "TH"],
-    "SG": ["CN", "MY", "US", "ID", "JP"],
-    "CA": ["US", "CN", "GB", "JP", "MX"],
-    "MX": ["US", "CN", "CA", "DE", "JP"],
+    "KR": ["CN", "US", "JP", "VN", "TW", "SA", "AE", "DE", "AU", "IN", "SG", "ID", "MY", "IQ", "RU"],
+    "US": ["CN", "MX", "CA", "JP", "DE", "KR", "GB", "IN", "TW", "VN", "FR", "IT", "BR", "SA", "IE"],
+    "JP": ["CN", "US", "KR", "TW", "TH", "AU", "AE", "SA", "DE", "VN", "ID", "MY", "SG", "IN", "FR"],
+    "CN": ["US", "JP", "KR", "VN", "DE", "TW", "AU", "MY", "BR", "RU", "TH", "IN", "SG", "ID", "SA"],
+    "DE": ["US", "CN", "FR", "NL", "IT", "PL", "GB", "BE", "AU", "ES", "TR", "JP", "KR", "RU", "IN"],
+    "GB": ["US", "DE", "NL", "FR", "CN", "IE", "BE", "IT", "ES", "NO", "IN", "TR", "JP", "SA", "AE"],
+    "FR": ["DE", "US", "IT", "ES", "BE", "GB", "NL", "CN", "PL", "SA", "IN", "TR", "JP", "AE", "IE"],
+    "AU": ["CN", "JP", "KR", "US", "IN", "SG", "NZ", "TH", "MY", "DE", "GB", "TW", "ID", "SA", "AE"],
+    "IN": ["US", "CN", "AE", "SA", "SG", "IQ", "ID", "KR", "JP", "DE", "MY", "AU", "GB", "TH", "QA"],
+    "BR": ["CN", "US", "AR", "NL", "DE", "IN", "JP", "KR", "SG", "MX", "SA", "IT", "FR", "AE", "ID"],
+    "SA": ["CN", "IN", "JP", "KR", "US", "AE", "SG", "EG", "DE", "TR", "PK", "IT", "FR", "TH", "ID"],
+    "AE": ["IN", "CN", "JP", "US", "SA", "KR", "TR", "DE", "IQ", "TH", "SG", "EG", "GB", "IT", "ID"],
+    "IL": ["US", "CN", "DE", "GB", "IN", "TR", "NL", "IT", "BE", "FR", "JP", "KR", "AE", "TW", "ES"],
+    "TR": ["DE", "US", "GB", "IT", "IQ", "CN", "RU", "FR", "ES", "NL", "AE", "SA", "IN", "EG", "KR"],
+    "TW": ["CN", "US", "JP", "KR", "SG", "MY", "VN", "DE", "TH", "IN", "NL", "ID", "AU", "SA", "AE"],
+    "TH": ["CN", "US", "JP", "VN", "MY", "SG", "IN", "AU", "ID", "KR", "AE", "SA", "DE", "TW", "GB"],
+    "VN": ["US", "CN", "KR", "JP", "TH", "TW", "IN", "DE", "MY", "ID", "AU", "SG", "SA", "AE", "GB"],
+    "SG": ["CN", "MY", "US", "ID", "JP", "TW", "KR", "HK", "TH", "IN", "AU", "DE", "VN", "SA", "AE"],
+    "CA": ["US", "CN", "GB", "JP", "MX", "DE", "KR", "FR", "IT", "IN", "SA", "NO", "AU", "NL", "TW"],
+    "MX": ["US", "CN", "CA", "DE", "JP", "KR", "BR", "IT", "MY", "IN", "FR", "TW", "NL", "SA", "GB"],
 }
 
 
@@ -310,6 +311,9 @@ _ISO3_TO_ISO2 = {
     "THA": "TH", "VNM": "VN", "SGP": "SG", "CAN": "CA", "MEX": "MX",
     "RUS": "RU", "UKR": "UA", "IRN": "IR", "IRQ": "IQ", "PAK": "PK",
     "IDN": "ID", "PHL": "PH", "MYS": "MY", "NLD": "NL", "ITA": "IT",
+    "ESP": "ES", "BEL": "BE", "ARG": "AR", "NZL": "NZ", "QAT": "QA",
+    "KWT": "KW", "NOR": "NO", "POL": "PL", "IRL": "IE", "HKG": "HK",
+    "EGY": "EG",
 }
 
 
