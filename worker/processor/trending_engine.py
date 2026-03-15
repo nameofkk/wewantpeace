@@ -239,14 +239,7 @@ async def calculate_global_trending(db: AsyncSession) -> list[dict]:
                 .values(kscore=0.0)
             )
 
-    # ── 소규모 클러스터 자동 병합 (5분 주기 배치와 함께 실행) ──────────────────
-    try:
-        from worker.processor.clusterer import merge_fragmented_clusters
-        merged = await merge_fragmented_clusters(db, max_merges=50)
-        if merged:
-            logger.info("소규모 클러스터 %d개 병합됨", len(merged))
-    except Exception:
-        logger.exception("클러스터 병합 실패 (무시)")
+    # 소규모 클러스터 병합은 tasks.py calculate_trending에서 별도 실행 (여기서 중복 호출하지 않음)
 
     logger.info("트렌딩 계산 완료: 클러스터 %d개 → scored %d개 (top %d개)", len(clusters), len(scored), len(top))
     return top

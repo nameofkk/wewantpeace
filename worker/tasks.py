@@ -833,10 +833,14 @@ def calculate_trending(self):
         _CROSS_TOPIC_WINDOW = timedelta(hours=6)
         _CROSS_TOPIC_SIM = 0.20
 
+        # 활성 + 최근 7일 클러스터만 대상 (전체 로드 시 수천 개 → DB 잠금 + OOM)
+        _recent_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         result = await db.execute(
             select(IssueCluster).where(
+                IssueCluster.is_active == True,  # noqa: E712
                 IssueCluster.severity > 0,
                 IssueCluster.topic.in_(_MERGE_TOPICS),
+                IssueCluster.last_event_at >= _recent_cutoff,
             ).order_by(
                 IssueCluster.cluster_key,
                 IssueCluster.kscore.desc(),
@@ -995,9 +999,17 @@ def calculate_trending(self):
 
     async def _run():
         from worker.processor.trending_engine import calculate_global_trending
+        # 병합과 트렌딩 계산을 별도 트랜잭션으로 분리 (장시간 잠금 방지)
+        merged = 0
+        try:
+            async with AsyncSessionLocal() as db:
+                async with db.begin():
+                    merged = await _merge_fragmented_clusters(db)
+        except Exception:
+            logger.exception("클러스터 병합 실패 (무시, 트렌딩 계산은 계속)")
+
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                merged = await _merge_fragmented_clusters(db)
                 results = await calculate_global_trending(db)
                 logger.info("트렌딩 계산 완료: %d개 (클러스터 %d개 병합)", len(results), merged)
                 return {"status": "ok", "count": len(results), "merged": merged}

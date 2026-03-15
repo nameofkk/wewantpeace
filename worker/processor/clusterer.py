@@ -770,19 +770,10 @@ async def merge_fragmented_clusters(
                 small.title, target.title,
                 ko_a=small.title_ko, ko_b=target.title_ko,
             )
-            # 병합용 완화된 임계값 (0.08) 또는 AI 판정
-            if sim >= 0.08 and sim > best_sim:
+            # 병합용 완화된 임계값 (0.10) — AI 호출 제거 (DB 트랜잭션 내 외부 API 호출 금지)
+            if sim >= 0.10 and sim > best_sim:
                 best_sim = sim
                 best_target = target
-            elif 0.04 <= sim < 0.08:
-                # AI 판정 시도
-                ai_result = _ai_same_event(
-                    small.title, target.title,
-                    small.topic, small.country_code,
-                )
-                if ai_result is True and sim > best_sim:
-                    best_sim = sim
-                    best_target = target
 
         if best_target is None:
             continue
