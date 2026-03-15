@@ -373,8 +373,8 @@ function ReportContent() {
                   />
                 </div>
 
-                <p className="text-[10px] text-foreground/60 leading-relaxed line-clamp-2 mb-2">
-                  {summary?.summary || (lang === "ko" ? "분석 데이터를 불러오는 중..." : "Loading analysis...")}
+                <p className="text-[10px] text-foreground/60 leading-snug line-clamp-1 mb-2">
+                  {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
                 </p>
               </div>
 

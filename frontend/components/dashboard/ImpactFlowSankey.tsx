@@ -317,21 +317,21 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   style={{ transition: "stroke-opacity 0.25s ease" }}
                 />
 
-                {/* 유휴 흐름 애니메이션 — 항상 흐르는 은은한 파티클 */}
+                {/* 유휴 흐름 애니메이션 — 항상 흐르는 파티클 */}
                 {!isHovering && (
                   <path
                     d={l.d}
                     fill="none"
-                    stroke={l.srcColor}
-                    strokeWidth={Math.max(l.thickness * 0.2, 1)}
-                    strokeOpacity={isPro ? 0.18 : 0.08}
-                    strokeDasharray="3 14"
+                    stroke="rgba(255,255,255,0.5)"
+                    strokeWidth={Math.max(l.thickness * 0.3, 1.5)}
+                    strokeOpacity={isPro ? 0.4 : 0.2}
+                    strokeDasharray="4 12"
                     strokeLinecap="round"
                   >
                     <animate
                       attributeName="stroke-dashoffset"
                       from="0"
-                      to="-17"
+                      to="-16"
                       dur={`${idleDur}s`}
                       repeatCount="indefinite"
                     />

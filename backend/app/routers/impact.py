@@ -474,22 +474,22 @@ async def get_impact_summary(
 
     if lang == "ko":
         top1 = top_issues[0] if top_issues else None
-        parts = [f"{'글로벌 종합' if is_global else '종합'} 영향도 {overall_score}점 ({level_ko.get(level, level)})"]
+        parts = []
         if top1:
-            parts.append(f"'{top1.title[:30]}' 이슈가 가장 큰 영향")
+            parts.append(f"'{top1.title[:20]}' 이슈 영향 가장 큼")
         if critical_count > 0:
-            parts.append(f"고영향 이슈 {critical_count}건")
-        parts.append(f"최근 7일 활성 이슈 {total_active}건 모니터링 중" if total_active else "현재 주요 위기 이슈 없음")
-        summary = ". ".join(parts) + "."
+            parts.append(f"고영향 {critical_count}건")
+        parts.append(f"활성 이슈 {total_active}건" if total_active else "주요 위기 없음")
+        summary = " · ".join(parts)
     else:
         top1_en = top_issues[0] if top_issues else None
-        parts_en = [f"{'Global impact' if is_global else 'Overall impact'} {overall_score} ({level_en.get(level, level)})"]
+        parts_en = []
         if top1_en:
-            parts_en.append(f"'{top1_en.title[:30]}' has the highest impact")
+            parts_en.append(f"'{top1_en.title[:20]}' has highest impact")
         if critical_count > 0:
-            parts_en.append(f"{critical_count} high-impact issue(s)")
-        parts_en.append(f"{total_active} active issues monitored over 7 days" if total_active else "No major crisis issues at this time")
-        summary = ". ".join(parts_en) + "."
+            parts_en.append(f"{critical_count} high-impact")
+        parts_en.append(f"{total_active} active issues" if total_active else "No major crisis")
+        summary = " · ".join(parts_en)
 
     # Pro 이상: 상세 분석 (economy/trade/travel)
     economy = None
