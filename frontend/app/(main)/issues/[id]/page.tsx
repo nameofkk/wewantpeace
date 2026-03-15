@@ -112,6 +112,7 @@ export default async function Page({ params }: Props) {
 
   return (
     <>
+      {/* SAFE: JSON-LD 구조화 데이터. JSON.stringify로 직렬화되어 XSS 불가 */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

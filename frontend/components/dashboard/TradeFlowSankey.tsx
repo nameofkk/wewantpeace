@@ -135,12 +135,8 @@ export function TradeFlowSankey() {
         >
           <span className="text-xs font-medium text-foreground/80">
             {expanded
-              ? lang === "ko"
-                ? "접기"
-                : "Collapse"
-              : lang === "ko"
-                ? "교역 흐름 시각화 보기"
-                : "View trade flow visualization"}
+              ? t(lang, "trade_collapse")
+              : t(lang, "trade_expand")}
           </span>
           {expanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -161,18 +157,14 @@ export function TradeFlowSankey() {
               <div className="text-center py-6 space-y-2">
                 <Lock className="h-6 w-6 mx-auto text-muted-foreground" />
                 <p className="text-xs text-muted-foreground">
-                  {lang === "ko"
-                    ? "교역 흐름 시각화는 Pro+ 전용입니다"
-                    : "Trade flow visualization is Pro+ only"}
+                  {t(lang, "trade_pro_only")}
                 </p>
               </div>
             )}
 
             {isError && !is403 && (
               <p className="text-xs text-red-400 text-center py-4">
-                {lang === "ko"
-                  ? "데이터를 불러올 수 없습니다"
-                  : "Failed to load data"}
+                {t(lang, "trade_load_error")}
               </p>
             )}
 
@@ -208,12 +200,8 @@ export function TradeFlowSankey() {
                             ? `$${(value / 1000).toFixed(1)}B`
                             : `$${value}M`,
                           name === "export"
-                            ? lang === "ko"
-                              ? "수출"
-                              : "Export"
-                            : lang === "ko"
-                              ? "수입"
-                              : "Import",
+                            ? t(lang, "dash_trade_export")
+                            : t(lang, "dash_trade_import"),
                         ]}
                       />
                       <Legend
@@ -221,12 +209,8 @@ export function TradeFlowSankey() {
                         iconSize={6}
                         formatter={(value: any) =>
                           value === "export"
-                            ? lang === "ko"
-                              ? "수출"
-                              : "Export"
-                            : lang === "ko"
-                              ? "수입"
-                              : "Import"
+                            ? t(lang, "dash_trade_export")
+                            : t(lang, "dash_trade_import")
                         }
                         wrapperStyle={{ fontSize: 10 }}
                       />
@@ -280,9 +264,7 @@ export function TradeFlowSankey() {
                 <div className="flex items-start gap-1.5 text-[9px] text-muted-foreground/60 px-1 pt-2 border-t border-border/30">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
                   <span>
-                    {lang === "ko"
-                      ? "데이터: UN Comtrade / World Bank. 실제 교역 데이터 기반이며 투자 자문이 아닙니다."
-                      : "Data: UN Comtrade / World Bank. Based on actual trade data, not investment advice."}
+                    {t(lang, "trade_data_source")}
                   </span>
                 </div>
               </>
@@ -290,9 +272,7 @@ export function TradeFlowSankey() {
 
             {data && partnerFlows.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-4">
-                {lang === "ko"
-                  ? "교역 데이터가 아직 없습니다"
-                  : "No trade data available yet"}
+                {t(lang, "trade_no_data")}
               </p>
             )}
           </div>

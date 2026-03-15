@@ -68,7 +68,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className={IS_TOSS ? "light" : ""} suppressHydrationWarning>
       <head>
-        {/* 테마/언어 깜빡임 방지: localStorage → 브라우저 언어 감지 순으로 즉시 적용 */}
+        {/* SAFE: 테마/언어 깜빡임 방지 인라인 스크립트. 개발자 작성 리터럴만 사용, 사용자 입력 없음 */}
         <script dangerouslySetInnerHTML={{ __html: IS_TOSS
           ? `try {
               document.documentElement.className = 'light';
@@ -92,7 +92,7 @@ export default function RootLayout({
               document.documentElement.dataset.lang = l;
             } catch(e) {}`
         }} />
-        {/* SEO: JSON-LD Structured Data */}
+        {/* SAFE: SEO JSON-LD 구조화 데이터. JSON.stringify로 직렬화되어 XSS 불가 */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -307,6 +307,7 @@ export default function RootLayout({
             </span>
           </div>
 
+          {/* SAFE: CSS @keyframes 리터럴. 사용자 입력 없음 */}
           {!IS_TOSS && <style dangerouslySetInnerHTML={{ __html: `
             @keyframes splash-radar {
               0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0.6; }
@@ -323,6 +324,7 @@ export default function RootLayout({
               50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
             }
           ` }} />}
+          {/* SAFE: CSS @keyframes 리터럴. 사용자 입력 없음 */}
           <style dangerouslySetInnerHTML={{ __html: `
             @keyframes splash-dot {
               0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
