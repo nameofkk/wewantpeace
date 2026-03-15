@@ -9,8 +9,9 @@ import { getFlag } from "@/lib/countries";
 import { ChevronRight, X } from "lucide-react";
 import type { ImpactFlowOut } from "@/lib/api";
 
-const ResponsiveSankey = dynamic(
-  () => import("@nivo/sankey").then((m) => m.ResponsiveSankey),
+// 고정 크기 Sankey 사용 — ResponsiveSankey는 내부 ResizeObserver 의존으로 모바일 인앱 브라우저에서 실패
+const Sankey = dynamic(
+  () => import("@nivo/sankey").then((m) => m.Sankey),
   {
     ssr: false,
     loading: () => <div className="h-[220px] animate-pulse bg-muted/20 rounded" />,
@@ -52,42 +53,32 @@ function truncateLabel(label: string, category: string, compact: boolean): strin
 export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(
-    typeof window !== "undefined" ? Math.min(window.innerWidth - 32, 600) : 400
-  );
+  const [chartWidth, setChartWidth] = useState(0);
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
 
+  // 컨테이너 실제 너비 측정 — 직접 DOM 측정 (ResizeObserver 미사용)
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    // 초기 크기 즉시 설정 (ResizeObserver 콜백 대기 없이)
-    const initialWidth = containerRef.current.clientWidth || containerRef.current.offsetWidth;
-    if (initialWidth > 0) setContainerWidth(initialWidth);
-
-    // ResizeObserver 지원 시 동적 리사이즈 감지
-    if (typeof ResizeObserver !== "undefined") {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const w = entry.contentRect.width;
-          if (w > 0) setContainerWidth(w);
-        }
-      });
-      ro.observe(containerRef.current);
-      return () => ro.disconnect();
-    }
-
-    // ResizeObserver 미지원 (구형 인앱 브라우저 등): window resize 폴백
-    const handleResize = () => {
+    function measure() {
       if (containerRef.current) {
-        const w = containerRef.current.clientWidth || containerRef.current.offsetWidth;
-        if (w > 0) setContainerWidth(w);
+        const w = containerRef.current.clientWidth || containerRef.current.offsetWidth || containerRef.current.getBoundingClientRect().width;
+        if (w > 0) setChartWidth(Math.floor(w));
       }
+    }
+    // 즉시 + 약간의 딜레이 후 재측정 (레이아웃 완료 보장)
+    measure();
+    const t1 = setTimeout(measure, 100);
+    const t2 = setTimeout(measure, 500);
+
+    window.addEventListener("resize", measure);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", measure);
     };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const isCompact = containerWidth < 380;
+  const isCompact = chartWidth < 380;
+  const chartHeight = 220;
 
   // conflict nodes: use number labels like ①②③
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
@@ -124,11 +115,13 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
     <div className="relative" ref={containerRef}>
       {/* Sankey 차트 */}
       <div className={cn(
-        "h-[220px]",
+        "relative",
         !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
-      )}>
-        {containerWidth > 0 && (
-          <ResponsiveSankey
+      )} style={{ height: chartHeight }}>
+        {chartWidth > 0 && (
+          <Sankey
+            width={chartWidth}
+            height={chartHeight}
             data={sankeyData}
             margin={{ top: 6, right: isCompact ? 55 : 80, bottom: 6, left: isCompact ? 20 : 24 }}
             align="justify"
@@ -210,7 +203,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       </div>
 
       {!isPro && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ top: chartHeight / 2 }}>
           <span className="text-[10px] text-muted-foreground/40 bg-background/60 px-3 py-1 rounded-full pointer-events-auto">
             {t(lang, "dash_pro_demo_flow" as TranslationKey)}
           </span>

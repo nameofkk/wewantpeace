@@ -684,6 +684,9 @@ async def get_impact_summary(
             if sector_details:
                 econ_parts.append(f"Exposed sectors: {', '.join(sector_details[:3])} — elevated volatility expected")
             # Economic indicator insights
+            inflation_val = econ_extras.get("inflation")
+            trade_open_val = econ_extras.get("trade_openness")
+            ca_val = econ_extras.get("current_account")
             if inflation_val and inflation_val > 5:
                 econ_parts.append(f"Inflation {inflation_val:.1f}% — commodity spikes add further price pressure")
             if trade_open_val and trade_open_val > 80:

@@ -447,26 +447,28 @@ function ReportContent() {
 
             {/* #1 Issue: SmartSummaryCard Full */}
             {topIssue && (
-              <div className="mt-5 mb-2">
-                <SectionHeader
-                  icon={AlertTriangle}
-                  title={lang === "ko" ? "가장 영향이 큰 이슈" : "Top Impact Issue"}
-                  desc={lang === "ko" ? "종합 영향도 1위" : "#1 by impact score"}
-                  tooltip={lang === "ko"
-                    ? "현재 활성 이슈 중 설정한 기준국가에 가장 영향이 큰 이슈의 요약입니다. 무슨 일인지, 나에게 어떤 영향이 있는지, 언제 영향이 올지를 3줄로 보여줍니다."
-                    : "Summary of the issue with highest impact on your home country. Shows what happened, how it affects you, and when to expect effects."}
-                />
+              <div className="rounded-xl border border-border bg-card mt-5">
+                <div className="px-4 pt-3 pb-1">
+                  <SectionHeader
+                    icon={AlertTriangle}
+                    title={lang === "ko" ? "가장 영향이 큰 이슈" : "Top Impact Issue"}
+                    desc={lang === "ko" ? "종합 영향도 1위" : "#1 by impact score"}
+                    tooltip={lang === "ko"
+                      ? "현재 활성 이슈 중 설정한 기준국가에 가장 영향이 큰 이슈의 요약입니다. 무슨 일인지, 나에게 어떤 영향이 있는지, 언제 영향이 올지를 3줄로 보여줍니다."
+                      : "Summary of the issue with highest impact on your home country. Shows what happened, how it affects you, and when to expect effects."}
+                  />
+                </div>
+                <div className="px-4 pb-4">
+                  <SmartSummaryCardFull
+                    item={topIssue}
+                    homeCountry={homeCountry ?? ""}
+                    lang={lang}
+                    market={summary?.market_snapshot}
+                    topIssueRaw={summary?.top_issues?.[0]}
+                    isPro={isPro}
+                  />
+                </div>
               </div>
-            )}
-            {topIssue && (
-              <SmartSummaryCardFull
-                item={topIssue}
-                homeCountry={homeCountry ?? ""}
-                lang={lang}
-                market={summary?.market_snapshot}
-                topIssueRaw={summary?.top_issues?.[0]}
-                isPro={isPro}
-              />
             )}
 
             {/* #2-#5 Issues: Compact */}
