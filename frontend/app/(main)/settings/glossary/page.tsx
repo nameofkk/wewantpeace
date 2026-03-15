@@ -140,7 +140,7 @@ export default function GlossaryPage() {
     <div className="flex flex-col">
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
-        <div className="grid grid-cols-3 items-center mb-1">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
           <button
             onClick={() => router.back()}
             className="flex items-center gap-0.5 text-sm text-primary -ml-1"

@@ -806,30 +806,14 @@ function FeedPageContent() {
       <TourHelpButton tourId="feed" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
-        <div className="grid grid-cols-3 items-center mb-3">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
           {/* 왼쪽 */}
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <h1 className="text-sm font-bold truncate">{t(lang, "home_title")}</h1>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-sm font-bold whitespace-nowrap">{t(lang, "home_title")}</h1>
             <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-600 dark:text-red-400">LIVE</span>
             </span>
-          </div>
-          {/* 중앙 — 로고 (항상 정중앙) */}
-          <div className="flex justify-center">
-            <LogoIcon height={26} hideText />
-          </div>
-          {/* 오른쪽 */}
-          <div className="flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => setShowCountryPicker(true)}
-              className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
-              data-tour="feed-country-picker"
-            >
-              <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
-              <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>
-              <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
-            </button>
             {extremeCount > 0 && (
               <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
                 <AlertTriangle className="h-2.5 w-2.5" />
@@ -850,6 +834,13 @@ function FeedPageContent() {
                   : `🔴 ${extremeCount} Extreme (KScore 8+)\n🟠 ${crisisCount} Severe (KScore 6-8)`}
               />
             )}
+          </div>
+          {/* 중앙 — 로고 */}
+          <div className="flex justify-center">
+            <LogoIcon height={26} hideText />
+          </div>
+          {/* 오른쪽 — 시간 + 새로고침 */}
+          <div className="flex items-center justify-end gap-1.5">
             <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button
               onClick={handleRefresh}
@@ -861,9 +852,21 @@ function FeedPageContent() {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground mb-3 -mt-1">
-          {t(lang, "home_subtitle")}
-        </p>
+        {/* 2번째 줄: 서브타이틀(왼) + 국가 선택(오) */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] text-muted-foreground">
+            {t(lang, "home_subtitle")}
+          </p>
+          <button
+            onClick={() => setShowCountryPicker(true)}
+            className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
+            data-tour="feed-country-picker"
+          >
+            <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+            <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>
+            <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+          </button>
+        </div>
 
         {/* 탭 + 정렬 */}
         <div className="flex items-end gap-0" data-tour="feed-tabs">

@@ -326,10 +326,10 @@ function ReportContent() {
       <TourHelpButton tourId="dashboard" onStartTour={() => setTourRun(true)} />
       {/* ═══════════════ Header ═══════════════ */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-3">
-        <div className="grid grid-cols-3 items-center">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           {/* 왼쪽 — 타이틀 + LIVE */}
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <h1 className="text-sm font-bold truncate">{t(lang, "dash_title")}</h1>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-sm font-bold whitespace-nowrap">{t(lang, "dash_title")}</h1>
             <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-600 dark:text-red-400">LIVE</span>

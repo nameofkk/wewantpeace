@@ -668,10 +668,10 @@ export default function TensionPage() {
       <TourHelpButton tourId="tension" onStartTour={() => setTourRun(true)} />
       {/* ── 헤더 ─────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-0">
-        <div className="grid grid-cols-3 items-center mb-3">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-3">
           {/* 왼쪽 */}
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <h1 className="text-sm font-bold truncate">{t(lang, "tension_title")}</h1>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-sm font-bold whitespace-nowrap">{t(lang, "tension_title")}</h1>
             <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-400">LIVE</span>

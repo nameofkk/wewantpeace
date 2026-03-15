@@ -521,9 +521,9 @@ export default function SettingsPage() {
       <TourHelpButton tourId="settings" onStartTour={() => setTourRun(true)} />
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
-        <div className="grid grid-cols-3 items-center mb-1">
-          <div className="flex items-center min-w-0 overflow-hidden">
-            <h1 className="text-sm font-bold truncate">{t(lang, "settings_title")}</h1>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mb-1">
+          <div className="flex items-center min-w-0">
+            <h1 className="text-sm font-bold whitespace-nowrap">{t(lang, "settings_title")}</h1>
           </div>
           <div className="flex justify-center">
             <LogoIcon height={26} hideText />
