@@ -42,15 +42,15 @@ function truncLabel(s: string, max: number) {
 }
 
 /** 3단 Sankey 레이아웃 계산 */
-function computeLayout(data: ImpactFlowOut, width: number, height: number, isDesktop: boolean) {
-  const margin = {
-    top: 8,
-    right: isDesktop ? 140 : 100,
-    bottom: 8,
-    left: isDesktop ? 28 : 22,
+function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeClass: "sm" | "md" | "lg") {
+  const sizeCfg = {
+    sm:  { top: 8, right: 100, bottom: 8, left: 22, nodeW: 10, colGap: 40, nodePad: 6, minNodeH: 12, maxLinkH: 20, minLink: 2 },
+    md:  { top: 8, right: 140, bottom: 8, left: 28, nodeW: 14, colGap: 60, nodePad: 10, minNodeH: 18, maxLinkH: 28, minLink: 3 },
+    lg:  { top: 10, right: 160, bottom: 10, left: 36, nodeW: 16, colGap: 80, nodePad: 14, minNodeH: 22, maxLinkH: 34, minLink: 4 },
   };
-  const nodeW = isDesktop ? 14 : 10;
-  const colGap = isDesktop ? 60 : 40;
+  const cfg = sizeCfg[sizeClass];
+  const margin = { top: cfg.top, right: cfg.right, bottom: cfg.bottom, left: cfg.left };
+  const nodeW = cfg.nodeW;
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
 
@@ -64,19 +64,18 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, isDes
 
   const colX = {
     conflict: margin.left,
-    commodity: margin.left + (innerW - nodeW) / 2 - colGap / 2,
+    commodity: margin.left + (innerW - nodeW) / 2 - cfg.colGap / 2,
     impact: margin.left + innerW - nodeW,
   };
 
   // 각 노드에 y위치 계산 (균등 분배)
-  const nodePad = isDesktop ? 10 : 6;
   const nodePositions = new Map<string, { x: number; y: number; h: number; color: string; label: string; category: string }>();
 
   for (const cat of ["conflict", "commodity", "impact"] as const) {
     const nodes = cols[cat];
     if (!nodes.length) continue;
-    const totalPad = Math.max(0, (nodes.length - 1) * nodePad);
-    const nodeH = Math.max(isDesktop ? 18 : 12, (innerH - totalPad) / nodes.length);
+    const totalPad = Math.max(0, (nodes.length - 1) * cfg.nodePad);
+    const nodeH = Math.max(cfg.minNodeH, (innerH - totalPad) / nodes.length);
     let y = margin.top;
     for (const n of nodes) {
       nodePositions.set(n.id, {
@@ -87,7 +86,7 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, isDes
         label: n.label,
         category: cat,
       });
-      y += nodeH + nodePad;
+      y += nodeH + cfg.nodePad;
     }
   }
 
@@ -117,7 +116,7 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, isDes
 
     const srcH = (val / srcTotal) * src.h;
     const tgtH = (val / tgtTotal) * tgt.h;
-    const linkThickness = Math.max(isDesktop ? 3 : 2, Math.min(srcH, tgtH, isDesktop ? 28 : 20));
+    const linkThickness = Math.max(cfg.minLink, Math.min(srcH, tgtH, cfg.maxLinkH));
 
     const srcOff = nodeOutOffset.get(l.source) ?? 0;
     const tgtOff = nodeInOffset.get(l.target) ?? 0;
@@ -246,8 +245,9 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
     }
   }, []);
 
-  const isDesktop = chartWidth > 640;
-  const chartHeight = isDesktop ? 260 : 200;
+  const sizeClass: "sm" | "md" | "lg" = chartWidth > 1024 ? "lg" : chartWidth > 640 ? "md" : "sm";
+  const chartHeight = sizeClass === "lg" ? 300 : sizeClass === "md" ? 260 : 200;
+  const isDesktop = sizeClass !== "sm";
 
   // SSR에서 렌더링하지 않음 — hydration mismatch 방지
   if (chartWidth <= 0) {
@@ -264,7 +264,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
   const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 
-  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight, isDesktop);
+  const { nodePositions, links, nodeW } = computeLayout(data, effectiveWidth, chartHeight, sizeClass);
 
   // 호버 시 연결 계산
   const { connectedLinks, connectedNodes } = hoveredNodeId
@@ -301,6 +301,8 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const linkOpacity = isHovering
               ? isConnected ? 0.55 : 0.06
               : baseOpacity;
+            // 유휴 흐름 애니메이션 속도: 링크별 약간 다르게 (자연스러운 비동기 흐름)
+            const idleDur = 2.5 + (i % 3) * 0.6;
 
             return (
               <g key={i}>
@@ -315,7 +317,28 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   style={{ transition: "stroke-opacity 0.25s ease" }}
                 />
 
-                {/* 호버 시 흐르는 파티클 애니메이션 */}
+                {/* 유휴 흐름 애니메이션 — 항상 흐르는 은은한 파티클 */}
+                {!isHovering && (
+                  <path
+                    d={l.d}
+                    fill="none"
+                    stroke={l.srcColor}
+                    strokeWidth={Math.max(l.thickness * 0.2, 1)}
+                    strokeOpacity={isPro ? 0.18 : 0.08}
+                    strokeDasharray="3 14"
+                    strokeLinecap="round"
+                  >
+                    <animate
+                      attributeName="stroke-dashoffset"
+                      from="0"
+                      to="-17"
+                      dur={`${idleDur}s`}
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                )}
+
+                {/* 호버 시 강조 흐름 애니메이션 */}
                 {isHovering && isConnected && (
                   <path
                     d={l.d}
@@ -411,7 +434,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const isConflict = pos.category === "conflict";
             const isImpact = pos.category === "impact";
             const idx = conflictIdxMap.get(id) ?? -1;
-            const maxLen = effectiveWidth < 380 ? 6 : isDesktop ? 16 : 10;
+            const maxLen = effectiveWidth < 380 ? 6 : sizeClass === "lg" ? 22 : sizeClass === "md" ? 16 : 10;
             const isNodeConnected = !isHovering || connectedNodes.has(id);
 
             const labelText = isConflict
@@ -431,7 +454,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                 dy="0.35em"
                 textAnchor={textAnchor}
                 fill={isConflict ? pos.color : "rgba(156,163,175,0.9)"}
-                fontSize={isDesktop ? 12 : effectiveWidth < 380 ? 9 : 11}
+                fontSize={sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11}
                 fontWeight={isHovering && isNodeConnected ? 700 : 600}
                 opacity={isHovering && !isNodeConnected ? 0.25 : 1}
                 style={{ transition: "opacity 0.25s ease, font-weight 0.25s ease" }}
