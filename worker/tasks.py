@@ -1912,6 +1912,7 @@ def send_daily_engagement(self):
         skipped_quiet = 0
         failed = 0
         total_eligible = 0
+        sent_user_ids: list[tuple] = []  # (user_id, tz_name)
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -2039,19 +2040,19 @@ def send_daily_engagement(self):
                             {"type": "engagement", "action": "open_home"},
                         )
                         sent += 1
+                        sent_user_ids.append((user_id, tz_name))
                     except Exception as e:
                         logger.warning("engagement FCM 발송 실패 (user=%s): %s", user_id, e)
                         failed += 1
 
-        # 일일 푸시 카운터에 engagement 발송분 반영
-        if sent > 0:
+        # 일일 푸시 카운터에 실제 발송 성공 유저만 반영
+        if sent_user_ids:
             try:
                 from backend.app.core.redis import get_redis
-                redis = await get_redis()
+                redis = get_redis()
                 from worker.push.push_service import _increment_daily_push
-                for row in users:
-                    tz = row.timezone or "Asia/Seoul"
-                    await _increment_daily_push(str(row.id), redis, tz_name=tz)
+                for uid, tz in sent_user_ids:
+                    await _increment_daily_push(str(uid), redis, tz_name=tz)
             except Exception as e:
                 logger.warning("engagement 일일 카운터 증가 실패: %s", e)
 

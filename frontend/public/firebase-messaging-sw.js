@@ -26,7 +26,13 @@ messaging.onBackgroundMessage((payload) => {
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-96.png",
     tag: data.cluster_id || "wwp-notification",
-    data: { url: data.cluster_id && data.cluster_id !== "test" ? `/issues/${data.cluster_id}` : "/" },
+    data: {
+      url: data.type === "engagement"
+        ? "/"
+        : data.cluster_id && data.cluster_id !== "test"
+          ? `/issues/${data.cluster_id}`
+          : "/",
+    },
     actions: [
       { action: "view", title: "자세히 보기" },
       { action: "dismiss", title: "닫기" },

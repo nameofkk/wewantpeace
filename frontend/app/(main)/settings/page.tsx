@@ -881,8 +881,8 @@ export default function SettingsPage() {
         </section>
         )}
 
-        {/* ── 알림 설정 ─────────────────────────────────────────────── */}
-        <section data-tour="settings-notifications">
+        {/* ── 알림 설정 (토스 미니앱에서는 숨김) ────────────────────── */}
+        {!isTossMiniApp() && <section data-tour="settings-notifications">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             {t(lang, "settings_notifications")}
           </h2>
@@ -1231,7 +1231,7 @@ export default function SettingsPage() {
             </div>
 
           </div>
-        </section>
+        </section>}
 
         {/* ── 플랜 ──────────────────────────────────────────────────── */}
         <section data-tour="settings-plan">
