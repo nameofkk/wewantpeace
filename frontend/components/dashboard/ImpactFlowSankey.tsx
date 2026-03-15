@@ -42,7 +42,7 @@ function truncLabel(s: string, max: number) {
 
 /** 3단 Sankey 레이아웃 계산 */
 function computeLayout(data: ImpactFlowOut, width: number, height: number) {
-  const margin = { top: 8, right: 8, bottom: 8, left: 8 };
+  const margin = { top: 8, right: 70, bottom: 8, left: 22 };
   const nodeW = 10;
   const colGap = 40;
   const innerW = width - margin.left - margin.right;
@@ -214,30 +214,62 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           style={{ display: "block" }}
         >
           {/* 링크 (곡선) */}
-          {links.map((l, i) => (
-            <path
-              key={i}
-              d={l.d}
-              fill="none"
-              stroke={l.srcColor}
-              strokeWidth={l.thickness}
-              strokeOpacity={isPro ? 0.3 : 0.12}
-              strokeLinecap="round"
-            />
-          ))}
+          {links.map((l, i) => {
+            const srcIdx = conflictIdxMap.get(l.sourceId) ?? -1;
+            return (
+              <g key={i}>
+                <path
+                  d={l.d}
+                  fill="none"
+                  stroke={l.srcColor}
+                  strokeWidth={l.thickness}
+                  strokeOpacity={isPro ? 0.3 : 0.12}
+                  strokeLinecap="round"
+                />
+                {/* 넓은 투명 터치 영역 (모바일 탭용) */}
+                {srcIdx >= 0 && (
+                  <path
+                    d={l.d}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={Math.max(l.thickness, 20)}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setPopupIdx(srcIdx)}
+                  />
+                )}
+              </g>
+            );
+          })}
 
-          {/* 노드 (사각형) */}
-          {Array.from(nodePositions.entries()).map(([id, pos]) => (
-            <rect
-              key={id}
-              x={pos.x}
-              y={pos.y}
-              width={nodeW}
-              height={pos.h}
-              rx={3}
-              fill={pos.color}
-            />
-          ))}
+          {/* 노드 (사각형) + 터치 영역 */}
+          {Array.from(nodePositions.entries()).map(([id, pos]) => {
+            const isConflict = pos.category === "conflict";
+            const cIdx = conflictIdxMap.get(id) ?? -1;
+            return (
+              <g key={id}>
+                <rect
+                  x={pos.x}
+                  y={pos.y}
+                  width={nodeW}
+                  height={pos.h}
+                  rx={3}
+                  fill={pos.color}
+                />
+                {/* 넓은 투명 터치 영역 (모바일용) */}
+                {isConflict && cIdx >= 0 && (
+                  <rect
+                    x={pos.x - 16}
+                    y={pos.y - 4}
+                    width={nodeW + 32}
+                    height={pos.h + 8}
+                    fill="transparent"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setPopupIdx(cIdx)}
+                  />
+                )}
+              </g>
+            );
+          })}
 
           {/* 라벨 */}
           {Array.from(nodePositions.entries()).map(([id, pos]) => {
@@ -319,7 +351,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       {popupIdx !== null && popupIssue && (
         <>
           <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setPopupIdx(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card px-5 py-4 shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto">
+          <div className="fixed bottom-[60px] left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card px-5 py-4 shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto">
             <div className="flex items-start gap-3">
               <span className="text-lg font-bold text-red-400 shrink-0">{NUM_LABELS[popupIdx]}</span>
               <div className="flex-1 min-w-0">
