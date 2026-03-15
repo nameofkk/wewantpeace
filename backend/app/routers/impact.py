@@ -1753,65 +1753,58 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     affected_ccs = {c.country_code for c, _ in top3 if c.country_code}
     affected_trade = sum(trade_map.get(cc, 0) for cc in affected_ccs)
 
-    # sector → impact category 매핑
-    _SECTOR_TO_IMPACT: dict[str, str] = {
-        "energy": "energy_cost",
-        "agriculture": "food_cost",
-        "shipping": "shipping_cost",
-        "semiconductor": "electronics_cost",
-        "electronics": "electronics_cost",
-        "technology": "electronics_cost",
-        "manufacturing": "mfg_cost",
-        "automotive": "auto_cost",
-        "tourism": "travel_cost",
-        "defense": "energy_cost",
+    # sector → impact categories (1:다 — 현실적 교차 연결)
+    _SECTOR_IMPACTS: dict[str, list[str]] = {
+        "energy":        ["energy_cost", "shipping_cost"],      # 유가 → 에너지비 + 물류비
+        "agriculture":   ["food_cost"],
+        "shipping":      ["shipping_cost", "food_cost"],        # 해운 → 물류비 + 식료품
+        "semiconductor": ["electronics_cost"],
+        "electronics":   ["electronics_cost"],
+        "technology":    ["electronics_cost"],
+        "manufacturing": ["mfg_cost", "electronics_cost"],      # 제조 → 제조원가 + 전자제품
+        "automotive":    ["auto_cost"],
+        "tourism":       ["travel_cost"],
+        "defense":       ["energy_cost"],
     }
 
-    # seen_commodities에서 impact 그룹 + 연결 섹터 수집
-    impact_groups: dict[str, list[str]] = {}  # imp_id → [sector_ids]
+    # seen_commodities에서 필요한 impact ID + 연결 섹터 수집
+    impact_sources: dict[str, list[str]] = {}   # imp_id → [sector_ids that link to it]
     for sector_id in seen_commodities:
-        imp_id = _SECTOR_TO_IMPACT.get(sector_id, "inflation")
-        impact_groups.setdefault(imp_id, []).append(sector_id)
+        for imp_id in _SECTOR_IMPACTS.get(sector_id, ["inflation"]):
+            impact_sources.setdefault(imp_id, []).append(sector_id)
 
-    if not impact_groups:
-        impact_groups["inflation"] = list(seen_commodities) if seen_commodities else ["energy"]
+    if not impact_sources:
+        impact_sources["inflation"] = list(seen_commodities) if seen_commodities else ["energy"]
 
-    # 각 impact에 대해 데이터 기반 라벨 생성 + 노드/링크 추가
-    for imp_id, sector_ids in impact_groups.items():
-        # 관련 섹터 중 가장 큰 GDP 비중 사용
-        max_gdp = max((sectors_data.get(s, {}).get("gdp_pct", 0) for s in sector_ids), default=0)
+    # impact 라벨 생성 함수
+    def _impact_label(imp_id: str, source_sectors: list[str]) -> str:
+        max_gdp = max((sectors_data.get(s, {}).get("gdp_pct", 0) for s in source_sectors), default=0)
+        _labels: dict[str, tuple[str, str]] = {
+            "energy_cost":     ("에너지 비용", "Energy"),
+            "food_cost":       ("식료품", "Food"),
+            "shipping_cost":   ("물류비", "Logistics"),
+            "electronics_cost":("전자제품", "Electronics"),
+            "auto_cost":       ("자동차", "Auto"),
+            "mfg_cost":        ("제조 원가", "Manufacturing"),
+            "travel_cost":     ("여행 경비", "Travel"),
+            "inflation":       ("물가 상승", "Inflation"),
+        }
+        base_ko, base_en = _labels.get(imp_id, ("영향", "Impact"))
 
-        if imp_id == "energy_cost":
-            if oil_change != 0:
-                lbl = f"에너지 비용 {oil_change:+.1f}%" if lang == "ko" else f"Energy {oil_change:+.1f}%"
-            elif max_gdp > 0:
-                lbl = f"에너지 GDP {max_gdp:.1f}%" if lang == "ko" else f"Energy GDP {max_gdp:.1f}%"
-            else:
-                lbl = "에너지 비용 영향" if lang == "ko" else "Energy affected"
-        elif imp_id == "food_cost":
-            lbl = f"식료품 GDP {max_gdp:.1f}%" if lang == "ko" else f"Food GDP {max_gdp:.1f}%" if max_gdp > 0 else ("식료품 영향" if lang == "ko" else "Food affected")
-        elif imp_id == "shipping_cost":
-            if affected_trade > 0:
-                t_b = affected_trade / 1e9
-                lbl = f"물류비 · 교역 ${t_b:.1f}B" if lang == "ko" else f"Logistics · trade ${t_b:.1f}B"
-            elif max_gdp > 0:
-                lbl = f"물류비 GDP {max_gdp:.1f}%" if lang == "ko" else f"Shipping GDP {max_gdp:.1f}%"
-            else:
-                lbl = "물류비 영향" if lang == "ko" else "Shipping affected"
-        elif imp_id == "electronics_cost":
-            lbl = f"전자제품 GDP {max_gdp:.1f}%" if lang == "ko" else f"Electronics GDP {max_gdp:.1f}%" if max_gdp > 0 else ("전자제품 영향" if lang == "ko" else "Electronics affected")
-        elif imp_id == "auto_cost":
-            lbl = f"자동차 GDP {max_gdp:.1f}%" if lang == "ko" else f"Auto GDP {max_gdp:.1f}%" if max_gdp > 0 else ("자동차 영향" if lang == "ko" else "Auto affected")
-        elif imp_id == "mfg_cost":
-            lbl = f"제조 원가 GDP {max_gdp:.1f}%" if lang == "ko" else f"Mfg GDP {max_gdp:.1f}%" if max_gdp > 0 else ("제조 원가 영향" if lang == "ko" else "Mfg affected")
-        elif imp_id == "travel_cost":
-            lbl = f"여행 경비 GDP {max_gdp:.1f}%" if lang == "ko" else f"Travel GDP {max_gdp:.1f}%" if max_gdp > 0 else ("여행 경비 영향" if lang == "ko" else "Travel affected")
-        else:
-            lbl = "물가 상승 압력" if lang == "ko" else "Inflation pressure"
+        if imp_id == "energy_cost" and oil_change != 0:
+            return f"{base_ko} {oil_change:+.1f}%" if lang == "ko" else f"{base_en} {oil_change:+.1f}%"
+        if imp_id == "shipping_cost" and affected_trade > 0:
+            t_b = affected_trade / 1e9
+            return f"{base_ko} · ${t_b:.1f}B" if lang == "ko" else f"{base_en} · ${t_b:.1f}B"
+        if max_gdp > 0:
+            return f"{base_ko} GDP {max_gdp:.1f}%" if lang == "ko" else f"{base_en} GDP {max_gdp:.1f}%"
+        return f"{base_ko} 영향" if lang == "ko" else f"{base_en} affected"
 
+    # impact 노드 + 링크 생성
+    for imp_id, source_sectors in impact_sources.items():
+        lbl = _impact_label(imp_id, source_sectors)
         nodes.append(ImpactFlowNode(id=imp_id, label=lbl, color="#3b82f6", category="impact"))
-        # 관련 섹터에서만 링크 연결 (GDP 비중 기반 가중치)
-        for sid in sector_ids:
+        for sid in source_sectors:
             gdp = sectors_data.get(sid, {}).get("gdp_pct", 1)
             link_val = max(1, round(gdp * 2))
             links.append(ImpactFlowLink(source=sid, target=imp_id, value=link_val))
