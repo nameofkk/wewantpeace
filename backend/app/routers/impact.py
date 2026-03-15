@@ -730,7 +730,9 @@ async def get_impact_summary(
     # ── 교역 노출도 — Free: top 3 (dependency만), Pro: top 5 (full) ──
     trade_exposure = None
     try:
-        trade_exposure_data = await _get_trade_exposure(home, db)
+        # 글로벌 모드면 US 기준으로 fallback
+        trade_home = home if home else "US"
+        trade_exposure_data = await _get_trade_exposure(trade_home, db)
         if trade_exposure_data:
             if not is_pro:
                 # Free: top 3 partners, dependency_pct only

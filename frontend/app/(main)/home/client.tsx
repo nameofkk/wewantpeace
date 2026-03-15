@@ -706,7 +706,9 @@ function ReportContent() {
                       </ProDemoWrapper>
                     ) : (
                       <p className="text-[11px] text-muted-foreground text-center py-4">
-                        {lang === "ko" ? "교역 데이터를 불러오는 중..." : "Loading trade data..."}
+                        {!summary
+                          ? (lang === "ko" ? "교역 데이터를 불러오는 중..." : "Loading trade data...")
+                          : (lang === "ko" ? "교역 데이터가 없습니다" : "No trade data available")}
                       </p>
                     )}
                   </div>
@@ -885,7 +887,7 @@ function ReportContent() {
           <div className="fixed bottom-[60px] left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[60vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
               <h3 className="text-sm font-bold">
-                {lang === "ko" ? "기준 국가 선택" : "Select Home Country"}
+                {lang === "ko" ? "기준 국가 선택" : "Select Base Country"}
               </h3>
               <button
                 onClick={() => setShowCountryPicker(false)}

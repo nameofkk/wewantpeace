@@ -931,9 +931,23 @@ export default function SettingsPage() {
                   {plan === "free" ? (
                     <option value="KR">{getFlag("KR")} {getCountryName("KR", lang)}</option>
                   ) : (
-                    SUPPORTED_HOME_COUNTRIES.map((cc) => (
-                      <option key={cc} value={cc}>{getFlag(cc)} {getCountryName(cc, lang)}</option>
-                    ))
+                    ([
+                      { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
+                      { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
+                      { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
+                      { label: lang === "ko" ? "유럽" : "Europe", codes: ["DE", "GB", "FR", "PL", "RU"] },
+                      { label: lang === "ko" ? "아메리카" : "Americas", codes: ["US", "CA", "MX", "BR"] },
+                    ] as { label: string; codes: string[] }[]).map((group) => {
+                      const groupCountries = group.codes.filter((c) => SUPPORTED_HOME_COUNTRIES.includes(c));
+                      if (!groupCountries.length) return null;
+                      return (
+                        <optgroup key={group.label} label={group.label}>
+                          {groupCountries.map((cc) => (
+                            <option key={cc} value={cc}>{getFlag(cc)} {getCountryName(cc, lang)}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    })
                   )}
                 </select>
               </div>
