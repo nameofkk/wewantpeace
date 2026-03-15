@@ -146,6 +146,6 @@ class UserPreference(Base):
     quiet_hours_start: Mapped[time | None] = mapped_column(Time, nullable=True)
     quiet_hours_end: Mapped[time | None] = mapped_column(Time, nullable=True)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Seoul")
-    min_kscore: Mapped[float] = mapped_column(nullable=False, default=3.0)
+    min_kscore: Mapped[float] = mapped_column(nullable=False, default=4.0)
     intent: Mapped[str] = mapped_column(String(16), nullable=False, default="general")
     home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="KR")

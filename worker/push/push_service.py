@@ -1043,6 +1043,7 @@ async def send_alert(
     redis,
     spike_event_id: Optional[str] = None,
     cluster_title_ko: Optional[str] = None,
+    signal_corroboration_count: int = 0,
 ) -> dict:
     """
     v7 통합 알림 발송.
@@ -1133,6 +1134,10 @@ async def send_alert(
         else:
             _vbody_ko = f"심각도 {severity} · KScore {kscore:.1f} · 신뢰 알림"
             _vbody_en = f"Severity {severity} · KScore {kscore:.1f} · Verified Alert"
+        # 시그널 교차검증 정보 추가
+        if signal_corroboration_count > 0:
+            _vbody_ko += f"\n🛡️ 신뢰 확인 + 시그널 {signal_corroboration_count}건 교차검증"
+            _vbody_en += f"\n🛡️ Verified + {signal_corroboration_count} signal(s) corroborated"
         sent_verified, invalid_v, failures_v = _split_and_send_with_context(
             token_infos=target_v.tokens,
             title=_title_en,
@@ -1231,6 +1236,7 @@ async def send_spike_alert(
     db: AsyncSession,
     redis,
     spike_event_id: Optional[str] = None,
+    signal_corroboration_count: int = 0,
 ) -> dict:
     """하위호환 wrapper: send_alert()로 위임."""
     alert_kind = "combined" if is_verified else "fast"
@@ -1246,6 +1252,7 @@ async def send_spike_alert(
         db=db,
         redis=redis,
         spike_event_id=spike_event_id,
+        signal_corroboration_count=signal_corroboration_count,
     )
 
 
@@ -1259,6 +1266,7 @@ async def send_verified_alert(
     db: AsyncSession,
     redis,
     spike_event_id: Optional[str] = None,
+    signal_corroboration_count: int = 0,
 ) -> dict:
     """하위호환 wrapper: send_alert(alert_kind="verified")로 위임."""
     return await send_alert(
@@ -1273,6 +1281,7 @@ async def send_verified_alert(
         db=db,
         redis=redis,
         spike_event_id=spike_event_id,
+        signal_corroboration_count=signal_corroboration_count,
     )
 
 

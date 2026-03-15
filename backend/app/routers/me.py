@@ -338,9 +338,9 @@ async def update_preferences(
     if body.min_severity is not None:
         pref.min_severity = body.min_severity
     if body.min_kscore is not None:
-        # Free 플랜은 3.0 고정, Pro는 3.0~10.0, Pro+는 1.5~10.0 (0-10 스케일)
+        # Free 플랜은 4.0 고정, Pro는 3.0~10.0, Pro+는 1.5~10.0 (0-10 스케일)
         plan_lower = current_user.plan.lower()
-        min_allowed = 3.0 if plan_lower == "free" else (1.5 if plan_lower == "pro_plus" else 3.0)
+        min_allowed = 4.0 if plan_lower == "free" else (1.5 if plan_lower == "pro_plus" else 3.0)
         pref.min_kscore = max(min_allowed, min(body.min_kscore, 10.0))
     if body.topics is not None:
         # 토픽 필터는 Pro 이상만 허용

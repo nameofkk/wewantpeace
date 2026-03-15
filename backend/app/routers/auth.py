@@ -86,6 +86,7 @@ class ProfilePatch(BaseModel):
     display_name: Optional[str] = None
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
+    marketing_agreed_at: Optional[str] = None  # ISO datetime or "" to revoke
 
     @field_validator("nickname")
     @classmethod
@@ -478,6 +479,22 @@ async def update_profile(
         current_user.bio = body.bio
     if body.profile_image_url is not None:
         current_user.profile_image_url = body.profile_image_url
+    if body.marketing_agreed_at is not None:
+        if body.marketing_agreed_at == "":
+            # 마케팅 동의 철회
+            current_user.marketing_agreed_at = None
+        else:
+            # 마케팅 동의: ISO datetime 문자열 또는 "now"
+            from datetime import datetime, timezone
+            if body.marketing_agreed_at.lower() == "now":
+                current_user.marketing_agreed_at = datetime.now(timezone.utc)
+            else:
+                try:
+                    current_user.marketing_agreed_at = datetime.fromisoformat(
+                        body.marketing_agreed_at.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    raise HTTPException(422, detail="marketing_agreed_at: 올바른 ISO datetime 형식이 아닙니다.")
     await db.flush()
     return _user_to_out(current_user)
 

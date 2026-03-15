@@ -137,6 +137,9 @@ async def correlate_signals(db: AsyncSession) -> dict:
             )
 
     # 3. 클러스터 보정
+    # 새 시그널 교차검증이 추가된 verified 클러스터 → 알림 재발송 후보
+    clusters_for_alert: list[tuple] = []  # (cluster_id, signal_corroboration_count)
+
     for cid, info in cluster_updates.items():
         cluster = info["cluster"]
         types = info["types"]
@@ -145,11 +148,12 @@ async def correlate_signals(db: AsyncSession) -> dict:
         # signal_types 업데이트
         existing_types = set(cluster.signal_types or [])
         new_types = existing_types | types
+        newly_added = types - existing_types
         cluster.signal_types = list(new_types)
         cluster.signal_corroboration_count = len(new_types)
 
         # independent_sources 보정
-        new_sources = cluster.independent_sources + len(types - existing_types)
+        new_sources = cluster.independent_sources + len(newly_added)
         cluster.independent_sources = min(SPREAD_SATURATION, new_sources)
 
         # confidence 보정
@@ -158,15 +162,33 @@ async def correlate_signals(db: AsyncSession) -> dict:
             boost = avg_weighted * 0.15
             cluster.confidence = min(1.0, cluster.confidence + boost)
 
+        # 새 시그널 유형이 추가된 verified 클러스터 → 알림 재발송 후보
+        if newly_added and getattr(cluster, "is_verified", False):
+            clusters_for_alert.append((cid, len(new_types)))
+
+    # 4. 시그널 교차검증으로 보강된 verified 클러스터에 대해 알림 트리거
+    if clusters_for_alert:
+        try:
+            from worker.tasks import push_alert
+            for cid, corr_count in clusters_for_alert:
+                logger.info(
+                    "시그널 교차검증 → verified 알림 트리거: cluster=%s, corroboration=%d",
+                    cid, corr_count,
+                )
+                push_alert.delay(cid, "verified")
+        except Exception:
+            logger.debug("시그널 교차검증 알림 트리거 실패 (무시)", exc_info=True)
+
     logger.info(
-        "시그널 교차검증 완료: matched=%d, unmatched=%d, clusters_updated=%d",
-        matched, len(unmatched_signals) - matched, len(cluster_updates),
+        "시그널 교차검증 완료: matched=%d, unmatched=%d, clusters_updated=%d, alerts_triggered=%d",
+        matched, len(unmatched_signals) - matched, len(cluster_updates), len(clusters_for_alert),
     )
 
     return {
         "matched": matched,
         "unmatched": len(unmatched_signals) - matched,
         "clusters_updated": len(cluster_updates),
+        "alerts_triggered": len(clusters_for_alert),
     }
 
 

@@ -322,6 +322,15 @@ export const translations = {
     glossary_source_t2_desc: "CNN, NYT, Guardian 등 주요 언론사 및 정부 공식 발표.",
     glossary_source_t3: "Tier 3 (일반 출처)",
     glossary_source_t3_desc: "지역 언론, 전문 매체, 기타 확인 가능한 출처.",
+    glossary_cat_intel: "인텔리전스",
+    glossary_firms: "FIRMS (화재·열점)",
+    glossary_firms_desc: "NASA FIRMS 위성 데이터로 전 세계 화재·열점을 실시간 감지합니다. 군사 활동, 산불, 산업 시설 화재 등을 조기에 포착할 수 있습니다.",
+    glossary_ioda: "IODA (인터넷 장애)",
+    glossary_ioda_desc: "Internet Outage Detection and Analysis. 특정 국가/지역의 인터넷 연결이 비정상적으로 차단되거나 감소하는 것을 감지합니다.",
+    glossary_gps_jam: "GPS 재밍",
+    glossary_gps_jam_desc: "GPS 신호 교란(재밍/스푸핑) 감지. 분쟁 지역에서 군사 작전이나 전자전의 징후로 활용됩니다.",
+    glossary_cross_verify: "교차검증",
+    glossary_cross_verify_desc: "뉴스 + 위성 + 센서 데이터를 교차 대조하여 정보의 신뢰성을 높이는 과정. 단일 출처 의존을 줄이고 오보를 걸러냅니다.",
     settings_save: "저장",
     settings_cancel: "취소",
     settings_nickname: "닉네임",
@@ -674,7 +683,7 @@ export const translations = {
     notif_saved: "저장됨",
     notif_kscore_title: "KScore 최소 기준",
     notif_kscore_desc: "이 수치 이상 이슈만 알림 수신 (낮을수록 더 많은 알림)",
-    notif_kscore_free_hint: "Free 플랜 고정값 (3.0)",
+    notif_kscore_free_hint: "Free 플랜 고정값 (4.0)",
     notif_kscore_low: "낮음",
     notif_kscore_high: "높음",
     notif_area_hint: "Verified / Fast 알림은 관심 국가별로 설정할 수 있어요 ↑",
@@ -1143,7 +1152,6 @@ export const translations = {
     ob_hero_title: "전 세계 분쟁·위기를\nAI가 실시간으로 감지합니다",
     ob_hero_signal_1: "100+ RSS 출처 실시간 수집",
     ob_hero_signal_2: "AI 자동 분류 · 심각도 분석",
-    ob_hero_signal_3: "관심 국가 맞춤 알림",
     ob_hero_monitoring: "현재 50+개국 모니터링 중",
     ob_hero_cta: "시작하기",
     ob_step_countries: "관심 국가 선택",
@@ -1160,6 +1168,8 @@ export const translations = {
     ob_login_apple: "Apple로 계속하기",
     ob_login_later: "나중에 할게요",
     ob_login_later_sub: "설정에서 언제든 로그인 가능",
+    marketing_consent_label: "마케팅 정보 수신 동의 (선택)",
+    marketing_consent_desc: "새로운 기능, 이벤트 소식 등을 이메일로 받아보실 수 있습니다. 동의하지 않아도 서비스 이용에 제한이 없습니다.",
     ob_next: "다음",
     ob_skip: "건너뛰기",
     ob_start: "시작하기",
@@ -1322,8 +1332,8 @@ export const translations = {
     welcome_feat_1: "전 세계 분쟁 지역을 실시간으로 추적합니다",
     welcome_feat_2: "뉴스 데이터 기반 긴장도 분석을 제공합니다",
     welcome_feat_3: "위기 상황 발생 시 즉시 알림을 보내드립니다",
-    welcome_trust_1: "다국적 뉴스 소스 실시간 수집",
-    welcome_trust_2: "AI 기반 심각도 분석",
+    welcome_trust_1: "다국적 뉴스 + 위성·센서 데이터 수집",
+    welcome_trust_2: "AI 기반 심각도 분석 · 교차검증",
     welcome_trust_3: "무료 이용 가능",
     welcome_cta: "시작하기",
 
@@ -1517,6 +1527,52 @@ export const translations = {
     // 시그널 넛지 배너
     signal_nudge: "지금 이 지역에 위성 열점 {firms}건, GPS 교란 {gps}건이 감지되었습니다",
     signal_nudge_cta: "Pro로 확인하기",
+
+    // 기준국가 글로벌
+    settings_home_country_global: "글로벌 (모든 국가 동일 가중치)",
+
+    // 온보딩 Trust Signals
+    ob_hero_signal_3_v2: "위성 · 인터넷 장애 · GPS 재밍 감지",
+    ob_hero_signal_4: "관심 국가 맞춤 알림",
+
+    // Free 유저 데모 배너/CTA
+    demo_banner_intel: "샘플 데이터입니다. Pro 구독 시 실시간 인텔리전스를 확인할 수 있습니다.",
+    demo_banner_impact: "데모 데이터입니다. Pro 구독 시 실제 영향 분석을 확인할 수 있습니다.",
+    demo_banner_weekly: "데모 데이터입니다. Pro+ 구독 시 실제 주간 리포트를 받아볼 수 있습니다.",
+    demo_cta_pro: "Pro 구독하기",
+    demo_cta_proplus: "Pro+ 구독하기",
+
+    // Paywall Intel
+    paywall_pro_feature_intel: "위성·센서 인텔리전스 레이어",
+
+    // 투어 새 스텝
+    tour_map_markers_toggle: "마커 버튼으로 이슈 마커를 표시/숨김할 수 있습니다.",
+    tour_map_intel_panel: "인텔리전스 패널에서 위성 열점, 인터넷 단절, GPS 교란 레이어를 켤 수 있습니다. (Pro 전용)",
+    tour_settings_intel_alerts: "인텔리전스 시그널 감지 시 알림을 받을 수 있습니다. (Pro 전용)",
+
+    // 용어사전 인텔리전스
+    glossary_cat_intel: "인텔리전스",
+    glossary_firms: "FIRMS 열점",
+    glossary_firms_desc: "NASA FIRMS 위성이 감지한 열점. 대규모 화재, 폭격, 시설 파괴 탐지에 사용.",
+    glossary_ioda: "IODA 인터넷 단절",
+    glossary_ioda_desc: "분쟁 지역의 인터넷 트래픽 급감 감지. 높은 단절률은 심각한 인프라 피해를 의미.",
+    glossary_gps_jam: "GPS 교란",
+    glossary_gps_jam_desc: "항공기 ADS-B 데이터 분석으로 GPS 신호 교란 지역 탐지. 전자전 관련 가능성.",
+    glossary_cross_verify: "교차검증",
+    glossary_cross_verify_desc: "뉴스 이슈와 시그널(FIRMS/IODA/GPS)을 지리·시간적으로 매칭하여 신뢰도를 높이는 과정.",
+
+    // 시그널 교차확인
+    verified_with_signals: "시그널 {count}건 교차확인됨",
+
+    // 주간 PDF 섹션
+    weekly_pdf_section_intel: "인텔리전스 요약",
+    weekly_pdf_section_country_risk: "국가별 위기 수준",
+
+    // 마케팅 수신 동의
+    marketing_consent_label: "주간 리포트 및 뉴스레터 수신 동의 (선택)",
+    marketing_consent_desc: "주간 분쟁 모니터링 리포트를 이메일로 받아보세요. 언제든 설정에서 해제할 수 있습니다.",
+    settings_marketing_toggle: "주간 리포트 이메일 수신",
+    settings_marketing_desc: "매주 월요일 09:00 (KST) 주간 리포트를 이메일로 발송합니다.",
   },
   en: {
     // bottom nav
@@ -1837,6 +1893,15 @@ export const translations = {
     glossary_source_t2_desc: "Major outlets: CNN, NYT, Guardian, and official government statements.",
     glossary_source_t3: "Tier 3 (General Sources)",
     glossary_source_t3_desc: "Regional media, specialized outlets, and other verifiable sources.",
+    glossary_cat_intel: "Intelligence",
+    glossary_firms: "FIRMS (Fire/Hotspots)",
+    glossary_firms_desc: "Detects fires and thermal hotspots worldwide in real-time using NASA FIRMS satellite data. Can identify military activity, wildfires, and industrial fires early.",
+    glossary_ioda: "IODA (Internet Outage)",
+    glossary_ioda_desc: "Internet Outage Detection and Analysis. Detects abnormal internet connectivity disruptions or drops in specific countries/regions.",
+    glossary_gps_jam: "GPS Jamming",
+    glossary_gps_jam_desc: "Detects GPS signal interference (jamming/spoofing). Used as an indicator of military operations or electronic warfare in conflict zones.",
+    glossary_cross_verify: "Cross-verification",
+    glossary_cross_verify_desc: "The process of cross-referencing news + satellite + sensor data to improve information reliability. Reduces reliance on single sources and filters out misinformation.",
     settings_save: "Save",
     settings_cancel: "Cancel",
     settings_nickname: "Nickname",
@@ -2189,7 +2254,7 @@ export const translations = {
     notif_saved: "Saved",
     notif_kscore_title: "Minimum KScore",
     notif_kscore_desc: "Only receive alerts at or above this KScore (lower = more alerts)",
-    notif_kscore_free_hint: "Fixed at 3.0 on Free plan",
+    notif_kscore_free_hint: "Fixed at 4.0 on Free plan",
     notif_kscore_low: "Low",
     notif_kscore_high: "High",
     notif_area_hint: "Verified / Fast alerts can be configured per country above ↑",
@@ -2658,7 +2723,6 @@ export const translations = {
     ob_hero_title: "AI-powered real-time\nconflict & crisis monitoring",
     ob_hero_signal_1: "100+ RSS sources, real-time",
     ob_hero_signal_2: "AI classification & severity",
-    ob_hero_signal_3: "Custom alerts for your countries",
     ob_hero_monitoring: "Monitoring 50+ countries",
     ob_hero_cta: "Get started",
     ob_step_countries: "Select countries",
@@ -2675,6 +2739,8 @@ export const translations = {
     ob_login_apple: "Continue with Apple",
     ob_login_later: "Maybe later",
     ob_login_later_sub: "You can always sign in from Settings",
+    marketing_consent_label: "Agree to receive marketing info (optional)",
+    marketing_consent_desc: "Get updates on new features, events, and more via email. You can use the service without agreeing.",
     ob_next: "Next",
     ob_skip: "Skip",
     ob_start: "Get started",
@@ -2837,8 +2903,8 @@ export const translations = {
     welcome_feat_1: "Track conflict zones worldwide in real-time",
     welcome_feat_2: "AI-powered tension analysis from news data",
     welcome_feat_3: "Instant alerts when crises emerge",
-    welcome_trust_1: "Multi-source global news aggregation",
-    welcome_trust_2: "AI-powered severity analysis",
+    welcome_trust_1: "Multinational news + satellite & sensor data",
+    welcome_trust_2: "AI severity analysis & cross-verification",
     welcome_trust_3: "Free to use",
     welcome_cta: "Get Started",
 
@@ -3032,6 +3098,52 @@ export const translations = {
     // Signal nudge banner
     signal_nudge: "{firms} satellite hotspots and {gps} GPS jamming zones detected in this area",
     signal_nudge_cta: "View with Pro",
+
+    // Home country global
+    settings_home_country_global: "Global (equal weight for all)",
+
+    // Onboarding Trust Signals
+    ob_hero_signal_3_v2: "Satellite · Internet outage · GPS jamming detection",
+    ob_hero_signal_4: "Custom alerts for your countries",
+
+    // Free user demo banners/CTA
+    demo_banner_intel: "Sample data. Subscribe to Pro for real-time intelligence.",
+    demo_banner_impact: "Demo data. Subscribe to Pro for real impact analysis.",
+    demo_banner_weekly: "Demo data. Subscribe to Pro+ for real weekly reports.",
+    demo_cta_pro: "Subscribe to Pro",
+    demo_cta_proplus: "Subscribe to Pro+",
+
+    // Paywall Intel
+    paywall_pro_feature_intel: "Satellite & sensor intelligence layers",
+
+    // Tour new steps
+    tour_map_markers_toggle: "Toggle issue markers on/off with the marker button.",
+    tour_map_intel_panel: "Enable satellite, outage, and GPS jamming layers in the Intelligence panel. (Pro only)",
+    tour_settings_intel_alerts: "Get notified when intelligence signals are detected. (Pro only)",
+
+    // Glossary Intelligence
+    glossary_cat_intel: "Intelligence",
+    glossary_firms: "FIRMS Hotspots",
+    glossary_firms_desc: "Thermal hotspots from NASA FIRMS satellites. Detects fires, bombardments, facility destruction.",
+    glossary_ioda: "IODA Internet Outages",
+    glossary_ioda_desc: "Internet traffic drops in conflict zones. High outage rates indicate infrastructure damage.",
+    glossary_gps_jam: "GPS Jamming",
+    glossary_gps_jam_desc: "GPS interference zones from aircraft ADS-B analysis. May indicate electronic warfare.",
+    glossary_cross_verify: "Cross-Verification",
+    glossary_cross_verify_desc: "Matching news with signals geographically and temporally to increase reliability.",
+
+    // Signal cross-verification
+    verified_with_signals: "{count} signal(s) corroborated",
+
+    // Weekly PDF sections
+    weekly_pdf_section_intel: "Intelligence Summary",
+    weekly_pdf_section_country_risk: "Country Risk Levels",
+
+    // Marketing consent
+    marketing_consent_label: "Weekly report & newsletter opt-in (optional)",
+    marketing_consent_desc: "Receive weekly conflict reports by email. You can opt out anytime in settings.",
+    settings_marketing_toggle: "Weekly report email",
+    settings_marketing_desc: "Weekly report delivered every Monday at 09:00 KST.",
   },
 } as const;
 

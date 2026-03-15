@@ -1115,6 +1115,7 @@ def push_alert(self, cluster_id: str, alert_kind: str = "fast"):
                     db=db,
                     redis=redis,
                     cluster_title_ko=cluster.title_ko,
+                    signal_corroboration_count=getattr(cluster, "signal_corroboration_count", 0) or 0,
                 )
 
                 # 인앱 알림 저장

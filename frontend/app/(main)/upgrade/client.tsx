@@ -32,11 +32,11 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "기준국가",                labelEn: "Home country",
-    free: { ko: "BASIC 고정", en: "BASIC only" }, pro: true,              proplus: true,
+    free: { ko: "글로벌", en: "Global" }, pro: { ko: "개인화", en: "Personalized" }, proplus: { ko: "개인화", en: "Personalized" },
   },
   {
     labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
-    free: false,                       pro: true,                       proplus: true,
+    free: true,                        pro: true,                       proplus: true,
   },
   {
     labelKo: "글로벌 트렌딩",          labelEn: "Global trending",
@@ -60,7 +60,7 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "KScore 필터",             labelEn: "KScore filter",
-    free: { ko: "3.0 고정", en: "3.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
+    free: { ko: "4.0 고정", en: "4.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
   },
   {
     labelKo: "토픽 필터",              labelEn: "Topic filter",
@@ -77,6 +77,26 @@ const FEATURES: Feature[] = [
   {
     labelKo: "KScore 히스토리",        labelEn: "KScore history",
     free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
+  },
+  {
+    labelKo: "위성 열점 (FIRMS)",      labelEn: "Satellite hotspots",
+    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "인터넷 단절 (IODA)",     labelEn: "Internet outages",
+    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "GPS 교란 감지",          labelEn: "GPS jamming",
+    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "시그널 교차검증",        labelEn: "Cross-verification",
+    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "주간 PDF 리포트",        labelEn: "Weekly PDF report",
+    free: false,                       pro: false,                      proplus: true,
   },
 ];
 
