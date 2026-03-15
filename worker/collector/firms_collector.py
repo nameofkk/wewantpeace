@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 FIRMS_MAP_KEY = os.environ.get("FIRMS_MAP_KEY", "")
 
 # 센서별 API URL
-FIRMS_CSV_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{map_key}/{source}/world/1"
+FIRMS_CSV_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{map_key}/{source}/world/2"
 
 # 필터 기준
 MIN_FRP = 10  # MW
