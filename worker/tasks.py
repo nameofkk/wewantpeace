@@ -515,6 +515,53 @@ def pregenerate_impact_briefs(self):
 
 
 @app.task(
+    name="worker.tasks.prewarm_impact_summaries",
+    queue="process",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=120,
+)
+def prewarm_impact_summaries(self):
+    """Impact Summary 캐시 사전 워밍 — 인기 국가 × plan × lang 조합.
+
+    /impact/summary 엔드포인트의 캐시를 사전 생성하여
+    사용자 요청 시 항상 캐시 히트를 보장합니다.
+    캐시 TTL 30분 → 25분마다 실행.
+    """
+    _record_heartbeat("prewarm_impact_summaries")
+
+    async def _run():
+        from backend.app.routers.impact import _build_impact_summary
+
+        HOME_COUNTRIES = ["KR", "US", "JP", "CN", "DE", "GB", "AU", "IN", "BR", "TW", ""]
+        PLANS = ["free", "pro"]
+        LANGS = ["ko", "en"]
+        generated = 0
+
+        async with AsyncSessionLocal() as db:
+            for home in HOME_COUNTRIES:
+                for plan in PLANS:
+                    for lang in LANGS:
+                        try:
+                            await _build_impact_summary(home, plan, lang, db)
+                            generated += 1
+                        except Exception as e:
+                            logger.warning(
+                                "prewarm_summary_error home=%s plan=%s lang=%s: %s",
+                                home or "global", plan, lang, e,
+                            )
+
+        logger.info("prewarm_impact_summaries 완료: generated=%d", generated)
+        return {"generated": generated}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("prewarm_impact_summaries 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.process_raw_event",
     queue="process",
     bind=True,

@@ -235,38 +235,11 @@ class ImpactSummaryOut(BaseModel):
     impact_flow: ImpactFlowOut | None = None
 
 
-@router.get("/summary", response_model=ImpactSummaryOut)
-async def get_impact_summary(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    home_country: str | None = Query(None, description="홈 국가 코드 (빈 문자열=글로벌)"),
-    lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
-):
-    """홀리스틱 종합 영향도 (모든 플랜).
-
-    사용자 홈 국가에 영향을 미치는 모든 활성 클러스터를 종합하여
-    안정적인 영향도 점수와 요약을 반환합니다.
-    - Free: score + summary + top_issues_count
-    - Pro/Pro+: economy/trade/travel 상세 분석 포함
-    """
-    # 프론트엔드에서 home_country 파라미터를 보내면 우선 사용
-    if home_country is not None:
-        home = home_country  # 빈 문자열 = 글로벌 모드
-    else:
-        home = user.home_country or ""
+async def _build_impact_summary(
+    home: str, user_plan: str, lang: str, db: AsyncSession,
+) -> "ImpactSummaryOut":
+    """캐시 워밍에서도 호출 가능한 impact summary 핵심 로직."""
     is_global = not home
-    user_plan = user.plan or "free"
-
-    # 사용자 언어 결정 (쿼리 파라미터 > DB 설정 > 기본값)
-    resolved_lang = lang  # 쿼리 파라미터
-    if not resolved_lang:
-        from backend.app.models.user import UserPreference
-        pref_q = await db.execute(
-            select(UserPreference.language).where(UserPreference.user_id == user.id)
-        )
-        pref_lang = pref_q.scalar_one_or_none()
-        resolved_lang = pref_lang or "ko"
-    lang = resolved_lang
 
     # 캐시 확인 (plan + lang별)
     redis = get_redis()
@@ -513,7 +486,7 @@ async def get_impact_summary(
     trade = None
     travel = None
 
-    is_pro = user_plan in ("pro", "pro_plus") or getattr(user, "admin_plan_override", False)
+    is_pro = user_plan in ("pro", "pro_plus")
 
     if is_pro and top_10:
         from backend.app.models.economic_data import CommodityPrice as CP2, MarketIndex as MI2, TradeBilateral as TB2, TravelAdvisory
@@ -846,6 +819,35 @@ async def get_impact_summary(
         await redis.set(cache_key, json.dumps(response_data), ex=30 * 60)
 
     return ImpactSummaryOut(**response_data)
+
+
+@router.get("/summary", response_model=ImpactSummaryOut)
+async def get_impact_summary(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    home_country: str | None = Query(None, description="홈 국가 코드 (빈 문자열=글로벌)"),
+    lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
+):
+    """홀리스틱 종합 영향도 (모든 플랜)."""
+    if home_country is not None:
+        home = home_country
+    else:
+        home = user.home_country or ""
+    user_plan = user.plan or "free"
+    # admin_plan_override 반영
+    if getattr(user, "admin_plan_override", False) and user_plan == "free":
+        user_plan = "pro"
+
+    resolved_lang = lang
+    if not resolved_lang:
+        from backend.app.models.user import UserPreference
+        pref_q = await db.execute(
+            select(UserPreference.language).where(UserPreference.user_id == user.id)
+        )
+        pref_lang = pref_q.scalar_one_or_none()
+        resolved_lang = pref_lang or "ko"
+
+    return await _build_impact_summary(home, user_plan, resolved_lang, db)
 
 
 # ── Phase 2: Impact Brief (per-cluster, legacy) ─────────────────────────

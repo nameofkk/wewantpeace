@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useSectorAnalysis, useSectorOverview, useImpactSummary } from "@/lib/api";
@@ -218,7 +218,20 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
   const isDark = useAppStore((s) => s.theme) === "dark";
   const [expanded, setExpanded] = useState(false);
 
-  const shouldFetch = embedded || expanded;
+  // embedded 모드: 뷰포트 진입 시에만 API 호출 (홈 초기 로드 최적화)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(!embedded); // embedded 아니면 즉시 true
+  useEffect(() => {
+    if (!embedded || !containerRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); observer.disconnect(); } },
+      { rootMargin: "200px" },
+    );
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [embedded]);
+
+  const shouldFetch = (embedded ? inView : expanded);
   const useOverview = embedded && !clusterId; // 홈: 전체 이슈 기반 overview
 
   // clusterId가 있으면 직접 사용, 없으면 Impact Summary에서 top issue 가져오기
@@ -250,9 +263,9 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
   // ── Embedded mode: 탭 안에서 직접 표시 ──
   if (embedded) {
-    if (isLoading || (!effectiveClusterId && !is403 && !isError)) {
+    if (!inView || isLoading || (!effectiveClusterId && !is403 && !isError)) {
       return (
-        <div className="flex items-center justify-center py-6">
+        <div ref={containerRef} className="flex items-center justify-center py-6">
           <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
         </div>
       );

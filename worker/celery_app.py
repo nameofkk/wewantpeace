@@ -289,6 +289,12 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=30, hour="*/12"),  # 12시간마다 (캐시 TTL 맞춤)
         "options": {"queue": "process"},
     },
+    # ── Impact Summary 캐시 워밍 (25분마다) ──
+    "prewarm-impact-summaries": {
+        "task": "worker.tasks.prewarm_impact_summaries",
+        "schedule": 25 * 60,  # 25분마다 (캐시 TTL 30분보다 빠르게)
+        "options": {"queue": "process"},
+    },
     # ── Beat heartbeat ──
     "beat-heartbeat": {
         "task": "beat_heartbeat",
