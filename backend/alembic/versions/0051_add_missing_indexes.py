@@ -43,6 +43,14 @@ def upgrade() -> None:
     )
 
     # ── posts.cluster_id FK → issue_clusters.id ──
+    # 먼저 issue_clusters에 없는 고아 cluster_id를 NULL로 정리
+    op.execute(
+        sa.text(
+            "UPDATE posts SET cluster_id = NULL "
+            "WHERE cluster_id IS NOT NULL "
+            "AND cluster_id NOT IN (SELECT id FROM issue_clusters)"
+        )
+    )
     op.create_foreign_key(
         "fk_posts_cluster_id",
         "posts",
