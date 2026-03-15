@@ -1518,7 +1518,7 @@ export const translations = {
     signal_nudge_cta: "Pro로 확인하기",
 
     // 기준국가 글로벌
-    settings_home_country_global: "글로벌 (모든 국가 동일 가중치)",
+    settings_home_country_global: "글로벌",
 
     // 온보딩 Trust Signals
     ob_hero_signal_3_v2: "위성 · 인터넷 장애 · GPS 재밍 감지",
@@ -3078,7 +3078,7 @@ export const translations = {
     signal_nudge_cta: "View with Pro",
 
     // Home country global
-    settings_home_country_global: "Global (equal weight for all)",
+    settings_home_country_global: "Global",
 
     // Onboarding Trust Signals
     ob_hero_signal_3_v2: "Satellite · Internet outage · GPS jamming detection",

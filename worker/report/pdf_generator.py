@@ -44,11 +44,17 @@ _FONT_PATHS = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/noto-cjk/NotoSansCJKkr-Regular.otf",
+    os.path.expanduser("~/.fonts/NanumGothic-Regular.ttf"),
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
 ]
 _FONT_BOLD_PATHS = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/noto-cjk/NotoSansCJKkr-Bold.otf",
+    os.path.expanduser("~/.fonts/NanumGothic-Bold.ttf"),
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
 ]
 
 _fonts_registered = False
@@ -170,6 +176,16 @@ def _setup_matplotlib(lang: str = "ko"):
     font_family = "sans-serif"
     if lang == "ko":
         from matplotlib.font_manager import fontManager
+        # ~/.fonts 에 수동 설치된 폰트 추가 시도
+        for fpath in [
+            os.path.expanduser("~/.fonts/NanumGothic-Regular.ttf"),
+            os.path.expanduser("~/.fonts/NanumGothic-Bold.ttf"),
+        ]:
+            if os.path.exists(fpath):
+                try:
+                    fontManager.addfont(fpath)
+                except Exception:
+                    pass
         for name in ["Noto Sans CJK KR", "NanumGothic", "Malgun Gothic"]:
             if any(f.name == name for f in fontManager.ttflist):
                 font_family = name
@@ -596,9 +612,8 @@ def build_pdf(data: WeeklyReportData) -> io.BytesIO:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    # 표지는 Flowable 리스트로 추가
-    for item in cover_content:
-        story.append(item)
+    # 표지는 네이비 배경 테이블로 추가
+    story.append(cover_inner)
 
     story.append(PageBreak())
 

@@ -32,7 +32,7 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "기준국가",                labelEn: "Home country",
-    free: { ko: "글로벌", en: "Global" }, pro: { ko: "개인화", en: "Personalized" }, proplus: { ko: "개인화", en: "Personalized" },
+    free: { ko: "글로벌", en: "Global" }, pro: { ko: "개인화", en: "Custom" }, proplus: { ko: "개인화", en: "Custom" },
   },
   {
     labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
