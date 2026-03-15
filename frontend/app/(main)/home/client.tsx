@@ -75,7 +75,7 @@ function impactColor(score: number) {
 }
 
 function tensionColor(score: number) {
-  if (score >= 80) return { bar: "bg-red-900", text: "text-red-700 dark:text-red-300", dot: "bg-red-900 animate-pulse" };
+  if (score >= 80) return { bar: "bg-red-600 dark:bg-red-900", text: "text-red-700 dark:text-red-300", dot: "bg-red-600 dark:bg-red-900 animate-pulse" };
   if (score >= 60) return { bar: "bg-red-500", text: "text-red-600 dark:text-red-400", dot: "bg-red-500" };
   if (score >= 40) return { bar: "bg-orange-500", text: "text-orange-600 dark:text-orange-300", dot: "bg-orange-500" };
   if (score >= 20) return { bar: "bg-amber-500", text: "text-amber-600 dark:text-amber-300", dot: "bg-amber-500" };
@@ -437,24 +437,24 @@ function ReportContent() {
               <span className="text-muted-foreground/30">|</span>
               {extremeCount > 0 && (
                 <span className="flex items-center gap-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-900 animate-pulse" />
-                  <span className="text-[9px] text-red-300 font-medium">{extremeCount}</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-600 dark:bg-red-900 animate-pulse" />
+                  <span className="text-[9px] text-red-700 dark:text-red-300 font-medium">{extremeCount}</span>
                 </span>
               )}
               {severeCount > 0 && (
                 <span className="flex items-center gap-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  <span className="text-[9px] text-red-400 font-medium">{severeCount}</span>
+                  <span className="text-[9px] text-red-600 dark:text-red-400 font-medium">{severeCount}</span>
                 </span>
               )}
               {alertCount > 0 && (
                 <span className="flex items-center gap-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                  <span className="text-[9px] text-orange-300 font-medium">{alertCount}</span>
+                  <span className="text-[9px] text-orange-600 dark:text-orange-300 font-medium">{alertCount}</span>
                 </span>
               )}
               {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
-                <span className="text-[9px] text-emerald-400 font-medium">
+                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
                   {t(lang, "dash_global_stable")}
                 </span>
               )}
@@ -463,7 +463,7 @@ function ReportContent() {
             {/* Issue stats + time */}
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-3">
               <span>{lang === "ko" ? "이슈" : "Issues"} <strong>{summary?.total_active_issues ?? 0}</strong></span>
-              <span className="text-red-400">{t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong></span>
+              <span className="text-red-600 dark:text-red-400">{t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong></span>
               {updatedTime && <span className="ml-auto">{updatedTime}</span>}
             </div>
 
@@ -490,8 +490,8 @@ function ReportContent() {
                     >
                       <span className="text-xs">{getFlag(code)}</span>
                       <span className={cn("text-[10px] font-bold tabular-nums", tc.text)}>{score}</span>
-                      {isAnomaly && <span className="text-[7px] px-1 rounded bg-red-500/20 text-red-400 font-bold">{t(lang, "dash_badge_anomaly" as any)}</span>}
-                      {isConverging && <span className="text-[7px] px-1 rounded bg-purple-500/20 text-purple-400 font-bold">{t(lang, "dash_badge_convergence" as any)}</span>}
+                      {isAnomaly && <span className="text-[7px] px-1 rounded bg-red-500/20 text-red-600 dark:text-red-400 font-bold">{t(lang, "dash_badge_anomaly" as any)}</span>}
+                      {isConverging && <span className="text-[7px] px-1 rounded bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold">{t(lang, "dash_badge_convergence" as any)}</span>}
                     </div>
                   );
                 })}

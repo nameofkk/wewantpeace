@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { t, type TranslationKey } from "@/lib/i18n";
 import { getFlag } from "@/lib/countries";
+import { useAppStore } from "@/lib/store";
 import { ChevronRight, X } from "lucide-react";
 import type { ImpactFlowOut } from "@/lib/api";
 
@@ -202,6 +203,7 @@ function getConnectedSet(
 
 export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const router = useRouter();
+  const isDark = useAppStore((s) => s.theme) === "dark";
   const containerRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
@@ -328,8 +330,8 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                 {!isHovering && (
                   <circle
                     r={Math.max(l.thickness * 0.15, 1.5)}
-                    fill="white"
-                    opacity={isPro ? 0.35 : 0.18}
+                    fill={isDark ? "white" : l.srcColor}
+                    opacity={isPro ? (isDark ? 0.35 : 0.5) : (isDark ? 0.18 : 0.3)}
                     filter="url(#pg)"
                   >
                     <animateMotion
@@ -346,14 +348,14 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                     <path
                       d={l.d}
                       fill="none"
-                      stroke="rgba(255,255,255,0.08)"
+                      stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}
                       strokeWidth={l.thickness + 3}
                       strokeLinecap="round"
                     />
                     <circle
                       r={Math.max(l.thickness * 0.22, 2)}
-                      fill="white"
-                      opacity={0.6}
+                      fill={isDark ? "white" : l.srcColor}
+                      opacity={isDark ? 0.6 : 0.8}
                       filter="url(#pg)"
                     >
                       <animateMotion
@@ -460,7 +462,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                 y={pos.y + pos.h / 2}
                 dy="0.35em"
                 textAnchor={textAnchor}
-                fill={isConflict ? pos.color : "rgba(156,163,175,0.9)"}
+                fill={isConflict ? pos.color : isDark ? "rgba(156,163,175,0.9)" : "rgba(55,65,81,0.9)"}
                 fontSize={sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11}
                 fontWeight={isHovering && isNodeConnected ? 700 : 600}
                 opacity={isHovering && !isNodeConnected ? 0.25 : 1}

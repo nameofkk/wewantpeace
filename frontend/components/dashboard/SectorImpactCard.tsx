@@ -74,10 +74,12 @@ function SectorContent({
   data,
   chartData,
   lang,
+  isDark,
 }: {
   data: { sectors: { sector: string; exposure_pct: number; trade_dependency: number; risk_level: string; description: string }[]; overall_risk: string };
   chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
   lang: Lang;
+  isDark: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -109,22 +111,23 @@ function SectorContent({
               <XAxis
                 type="number"
                 domain={[0, 100]}
-                tick={{ fontSize: 9, fill: "#94a3b8" }}
+                tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
                 tickFormatter={(v: number) => `${v}%`}
               />
               <YAxis
                 type="category"
                 dataKey="name"
                 width={50}
-                tick={{ fontSize: 9, fill: "#94a3b8" }}
+                tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
               />
               <Tooltip
                 contentStyle={{
-                  background: "#1e293b",
-                  border: "none",
+                  background: isDark ? "#1e293b" : "#ffffff",
+                  border: isDark ? "none" : "1px solid #e2e8f0",
                   borderRadius: "8px",
                   fontSize: 11,
-                  color: "#e2e8f0",
+                  color: isDark ? "#e2e8f0" : "#1e293b",
+                  boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.08)",
                 }}
                 formatter={(value: any, _name: any, props: any) => [
                   `${value}%`,
@@ -212,6 +215,7 @@ interface SectorImpactCardProps {
 export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps) {
   const lang = useAppStore((s) => s.lang);
   const homeCountry = useAppStore((s) => s.homeCountry);
+  const isDark = useAppStore((s) => s.theme) === "dark";
   const [expanded, setExpanded] = useState(false);
 
   const shouldFetch = embedded || expanded;
@@ -279,7 +283,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
       );
     }
     if (!data) return null;
-    return <SectorContent data={data} chartData={chartData} lang={lang} />;
+    return <SectorContent data={data} chartData={chartData} lang={lang} isDark={isDark} />;
   }
 
   // ── Standalone mode: 이슈 상세 스타일 ──
@@ -336,7 +340,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
           {data && (
             <div className="mt-3">
-              <SectorContent data={data} chartData={chartData} lang={lang} />
+              <SectorContent data={data} chartData={chartData} lang={lang} isDark={isDark} />
             </div>
           )}
         </div>
