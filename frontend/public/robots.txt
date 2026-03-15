@@ -2,4 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+Disallow: /login
+Disallow: /onboarding
 Sitemap: https://www.wewantpeace.live/sitemap.xml

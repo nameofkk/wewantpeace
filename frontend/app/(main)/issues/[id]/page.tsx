@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchIssueServer } from "@/lib/server/issues";
+import { TOPIC_LABELS, TOPIC_LABELS_EN } from "@/lib/utils";
 import IssueDetailClient from "./client";
 
 export const revalidate = 120;
@@ -53,12 +54,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const langSuffix = isEn ? "?lang=en" : "";
   const ogImage = `${SITE_URL}/issues/${issue.id}/og${langSuffix}`;
   const pageUrl = `${SITE_URL}/issues/${issue.id}${langSuffix}`;
-  // 이슈별 구체적 description (generic 대신)
+  // 이슈별 구체적 description (토픽 + 브랜드명 포함)
   const severity = issue.severity ?? 0;
   const eventCount = issue.event_count ?? 0;
+  const topicLabel = isEn
+    ? (TOPIC_LABELS_EN[issue.topic] || issue.topic)
+    : (TOPIC_LABELS[issue.topic] || issue.topic);
   const desc = isEn
-    ? `Severity ${severity} | ${eventCount} reports — Real-time conflict monitoring`
-    : `위기지수 ${severity} | ${eventCount}건 보도 — 실시간 분쟁 모니터링`;
+    ? `[${topicLabel}] ${ogTitle} | Severity ${severity} | ${eventCount} reports — WeWantPeace`
+    : `[${topicLabel}] ${ogTitle} | 위기지수 ${severity} | ${eventCount}건 보도 — WeWantPeace`;
 
   const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
 
