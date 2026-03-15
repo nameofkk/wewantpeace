@@ -155,6 +155,14 @@ export default function SettingsPage() {
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState("23:00");
   const [quietEnd, setQuietEnd] = useState("07:00");
+  // 토스트 알림
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(null), 3000);
+  };
   // notifSaving/notifSaved 제거 — 자동 저장
 
   // debounce refs — 빠른 연속 토글 시 마지막 값만 서버에 전송
@@ -1160,13 +1168,32 @@ export default function SettingsPage() {
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_marketing_desc")}</p>
                 </div>
                 <button
+                  disabled={patchProfile.isPending}
                   onClick={() => {
-                    const value = me?.marketing_agreed_at ? "" : "now";
-                    patchProfile.mutate({ marketing_agreed_at: value });
+                    const turningOn = !me?.marketing_agreed_at;
+                    const value = turningOn ? "now" : "";
+                    patchProfile.mutate({ marketing_agreed_at: value }, {
+                      onSuccess: (data) => {
+                        if (turningOn) {
+                          const d = new Date();
+                          const dateStr = lang === "ko"
+                            ? `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`
+                            : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                          showToast(lang === "ko"
+                            ? `${dateStr}자로 마케팅 수신에 동의하셨습니다.`
+                            : `Marketing consent agreed on ${dateStr}.`);
+                        } else {
+                          showToast(lang === "ko"
+                            ? "마케팅 수신 동의를 철회하셨습니다."
+                            : "Marketing consent has been withdrawn.");
+                        }
+                      },
+                    });
                   }}
                   className={cn(
                     "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-                    me?.marketing_agreed_at ? "bg-primary" : "bg-secondary"
+                    me?.marketing_agreed_at ? "bg-primary" : "bg-secondary",
+                    patchProfile.isPending && "opacity-50"
                   )}
                 >
                   <span className={cn(
@@ -1651,6 +1678,16 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        {/* 토스트 알림 */}
+        {toastMsg && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
+              <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+              <p className="text-sm">{toastMsg}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
