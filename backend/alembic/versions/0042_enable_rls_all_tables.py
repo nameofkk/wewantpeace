@@ -53,9 +53,11 @@ _TABLES = [
 
 def upgrade():
     for table in _TABLES:
+        # SAFE: table names are internal constants, not user input
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade():
     for table in _TABLES:
+        # SAFE: table names are internal constants, not user input
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")

@@ -27,7 +27,7 @@ if _disable_auth_raw and _environment == "production":
         "🚨 DISABLE_AUTH=true detected in PRODUCTION environment — "
         "forcing auth back on. Set DISABLE_AUTH=false in production!"
     )
-    DISABLE_AUTH = False
+    raise RuntimeError("DISABLE_AUTH=true is not allowed in production")
 else:
     DISABLE_AUTH = _disable_auth_raw
 

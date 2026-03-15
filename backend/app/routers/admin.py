@@ -2,6 +2,7 @@
 /admin/* 어드민 전용 API (role=admin만 접근 가능)
 """
 from __future__ import annotations
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -28,6 +29,8 @@ from backend.app.models.short_link import ShortLink, LinkClick
 from backend.app.models.weekly_kpi_snapshot import WeeklyKpiSnapshot
 from backend.app.models.social_post import SocialPost, SocialPostPlatform
 from backend.app.services.area_activation import sync_area_activation
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -423,8 +426,8 @@ async def handle_report(
             post = pr.scalar_one_or_none()
             if post:
                 post.status = "hidden"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("admin: %s", e)
 
     await db.flush()
     await _log_action(db, admin, "handle_report", "report", str(report_id), {"status": body.status})
@@ -578,8 +581,8 @@ async def get_settings(admin: User = Depends(require_admin)):
         cached = await redis.get(ADMIN_SETTINGS_KEY)
         if cached:
             return json.loads(cached)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     return AppSettings().dict()
 
 
@@ -593,8 +596,8 @@ async def update_settings(
     try:
         redis = get_redis()
         await redis.set(ADMIN_SETTINGS_KEY, json.dumps(body.dict()))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     await _log_action(db, admin, "update_settings", detail=body.dict())
     return body
 
@@ -762,8 +765,8 @@ async def update_cluster(
                 if translated:
                     cluster.title = translated[:200]
                     changes["title"] = cluster.title
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("admin: %s", e)
     if body.title is not None and cluster.title != body.title:
         change_logs.append(ClusterChangeLog(
             cluster_id=cluster.id, field="title",
@@ -792,8 +795,8 @@ async def update_cluster(
         try:
             redis = get_redis()
             await redis.delete("trending:global:v1")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("admin: %s", e)
 
     await _log_action(db, admin, "update_cluster", "cluster", cluster_id, changes)
     return {"status": "ok"}
@@ -1183,8 +1186,8 @@ async def list_sources(
             for ch, val in zip(channels, values):
                 if val:
                     collect_statuses[ch.id] = _json.loads(val)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     return {
         "total": total,
@@ -1833,8 +1836,8 @@ async def pipeline_stats(
                     st = _json.loads(val)
                     if st.get("status") == "error":
                         error_sources += 1
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     # RSS / Telegram 비율
     rss_count = (await db.execute(
@@ -1940,15 +1943,15 @@ async def pipeline_stats(
             elif row.decision == 'failed': alert_failed_6h = row.cnt
             elif row.decision == 'pending': alert_pending += row.cnt
             elif row.decision == 'suppressed': alert_suppressed_6h = row.cnt
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     # pending은 전체 시간에서
     try:
         _q2 = await db.execute(text("SELECT COUNT(*) FROM alert_delivery_log WHERE decision = 'pending'"))
         alert_pending = _q2.scalar() or 0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     # ── spike delivery 통계 (최근 6시간) ──
     spike_total_6h = 0
@@ -1968,8 +1971,8 @@ async def pipeline_stats(
         """))
         spike_delivered_6h = _q4.scalar() or 0
         spike_undelivered_6h = spike_total_6h - spike_delivered_6h
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     # ── SNS 소셜 포스트 통계 ──
     sns_pending_review = 0
@@ -1995,8 +1998,8 @@ async def pipeline_stats(
         for row in _q6.fetchall():
             if row.status == 'published': sns_published_24h = row.cnt
             elif row.status == 'failed': sns_failed_24h = row.cnt
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
 
     return {
         "total_sources": total_sources,
@@ -2694,8 +2697,8 @@ async def update_link(
     try:
         redis = get_redis()
         await redis.delete(f"sl:{link.code}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     await _log_action(db, admin, "update_link", "link", link_id)
     return {"status": "ok"}
 
@@ -2714,8 +2717,8 @@ async def delete_link(
     try:
         redis = get_redis()
         await redis.delete(f"sl:{link.code}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     await db.execute(delete(LinkClick).where(LinkClick.link_id == link.id))
     await db.delete(link)
     await db.flush()
@@ -3015,8 +3018,8 @@ async def get_auto_approve_rules(
         cached = await redis.get(SOCIAL_AUTO_APPROVE_KEY)
         if cached:
             return json.loads(cached)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     return DEFAULT_AUTO_APPROVE_RULES
 
 
@@ -3033,8 +3036,8 @@ async def update_auto_approve_rules(
     try:
         redis = get_redis()
         await redis.set(SOCIAL_AUTO_APPROVE_KEY, json.dumps(rules))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("admin: %s", e)
     await _log_action(db, admin, "update_auto_approve_rules", detail=rules)
     return rules
 

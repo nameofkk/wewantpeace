@@ -197,7 +197,7 @@ function KScoreHistorySection({
             className="ml-3 shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold text-white"
             style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
           >
-            {lang === "ko" ? "구독" : "Upgrade"}
+            {t(lang, "btn_upgrade")}
           </a>
         </div>
       )}
