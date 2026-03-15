@@ -52,19 +52,39 @@ function truncateLabel(label: string, category: string, compact: boolean): strin
 export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(400);
+  const [containerWidth, setContainerWidth] = useState(
+    typeof window !== "undefined" ? Math.min(window.innerWidth - 32, 600) : 400
+  );
   const [popupIdx, setPopupIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+
+    // 초기 크기 즉시 설정 (ResizeObserver 콜백 대기 없이)
+    const initialWidth = containerRef.current.clientWidth || containerRef.current.offsetWidth;
+    if (initialWidth > 0) setContainerWidth(initialWidth);
+
+    // ResizeObserver 지원 시 동적 리사이즈 감지
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) setContainerWidth(w);
+        }
+      });
+      ro.observe(containerRef.current);
+      return () => ro.disconnect();
+    }
+
+    // ResizeObserver 미지원 (구형 인앱 브라우저 등): window resize 폴백
+    const handleResize = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth || containerRef.current.offsetWidth;
+        if (w > 0) setContainerWidth(w);
       }
-    });
-    ro.observe(containerRef.current);
-    setContainerWidth(containerRef.current.clientWidth);
-    return () => ro.disconnect();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const isCompact = containerWidth < 380;

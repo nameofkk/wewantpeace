@@ -145,7 +145,7 @@ function ReportContent() {
   const userPlan = meObj?.plan ?? "free";
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
-  const { data: summary, isLoading: summaryLoading } = useImpactSummary(homeCountry ?? "", lang);
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj } = useImpactSummary(homeCountry ?? "", lang);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
@@ -212,6 +212,26 @@ function ReportContent() {
 
   if (summaryLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
+  }
+
+  if (summaryError && !summary) {
+    return (
+      <div className="p-6 text-center">
+        <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm font-medium text-foreground mb-1">
+          {lang === "ko" ? "데이터를 불러올 수 없습니다" : "Failed to load data"}
+        </p>
+        <p className="text-xs text-muted-foreground mb-3">
+          {lang === "ko" ? "잠시 후 다시 시도해주세요" : "Please try again later"}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
+        >
+          {lang === "ko" ? "새로고침" : "Refresh"}
+        </button>
+      </div>
+    );
   }
 
   const topIssue = topItems[0];
