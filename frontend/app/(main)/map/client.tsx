@@ -645,51 +645,55 @@ export default function MapPage() {
       cleanup();
       map.addSource("firms-source", { type: "geojson", data: firmsData });
 
-      // 히트맵 레이어 (저줌)
+      // 히트맵 레이어 (저줌) — intensity 평균 0.05이므로 weight 곡선 보정
       map.addLayer({
         id: "firms-heat",
         type: "heatmap",
         source: "firms-source",
-        maxzoom: 8,
+        maxzoom: 10,
         paint: {
-          "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
-          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 0.5, 9, 1.5],
+          // 낮은 intensity도 잘 보이도록 sqrt 스타일 보정
+          "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 0.02, 0.3, 0.1, 0.6, 0.5, 0.85, 1, 1],
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 5, 2, 10, 3],
           "heatmap-color": [
             "interpolate", ["linear"], ["heatmap-density"],
-            0, "rgba(100,0,0,0)",
-            0.2, "rgb(139,0,0)",
-            0.4, "rgb(178,34,34)",
-            0.6, "rgb(220,80,20)",
-            0.8, "rgb(255,165,0)",
-            1, "rgb(255,255,220)",
+            0, "rgba(0,0,0,0)",
+            0.1, "rgba(178,34,34,0.4)",
+            0.3, "rgb(220,60,20)",
+            0.5, "rgb(255,100,0)",
+            0.7, "rgb(255,165,0)",
+            0.9, "rgb(255,220,80)",
+            1, "rgb(255,255,200)",
           ],
-          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 2, 8, 8, 25],
-          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.7, 9, 0.5],
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 1, 15, 4, 25, 8, 35, 12, 50],
+          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.8, 11, 0.4],
         },
       }, map.getLayer("choropleth-line") ? "choropleth-line" : undefined);
 
-      // 서클 레이어 (고줌)
+      // 서클 레이어 (고줌) — 개별 열점 표시
       map.addLayer({
         id: "firms-circle",
         type: "circle",
         source: "firms-source",
-        minzoom: 6,
+        minzoom: 7,
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 2, 12, 6],
-          "circle-color": "#ff4500",
-          "circle-opacity": 0.7,
-          "circle-stroke-width": 1,
-          "circle-stroke-color": "#fff",
-          "circle-stroke-opacity": 0.3,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 3, 12, 8],
+          "circle-color": ["interpolate", ["linear"], ["get", "intensity"], 0, "#ff6b35", 0.3, "#ff4500", 0.7, "#cc0000", 1, "#8b0000"],
+          "circle-opacity": 0.8,
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "#ffd700",
+          "circle-stroke-opacity": 0.6,
         },
       });
 
-      // 펄스 애니메이션 (breathing)
+      // 펄스 애니메이션 (breathing) — 줌 레벨에 맞춰 base intensity 조정
       let phase = 0;
       const animate = () => {
-        phase += 0.03;
-        const intensity = 0.85 + 0.15 * Math.sin(phase);
-        try { map.setPaintProperty("firms-heat", "heatmap-intensity", intensity); } catch {}
+        phase += 0.025;
+        const z = map.getZoom?.() ?? 3;
+        const base = z < 5 ? 1.5 : z < 8 ? 2.5 : 3;
+        const val = base * (0.9 + 0.1 * Math.sin(phase));
+        try { map.setPaintProperty("firms-heat", "heatmap-intensity", val); } catch {}
         firmsAnimRef.current = requestAnimationFrame(animate);
       };
       firmsAnimRef.current = requestAnimationFrame(animate);
