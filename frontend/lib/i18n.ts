@@ -2944,8 +2944,8 @@ export const translations = {
     dash_trade_deficit: "Deficit",
 
     // Smart Summary
-    dash_smart_what: "What happened?",
-    dash_smart_so_what: "Impact on me?",
+    dash_smart_what: "What?",
+    dash_smart_so_what: "Impact?",
     dash_smart_when: "When?",
     dash_smart_detail: "Details",
 

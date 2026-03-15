@@ -267,8 +267,8 @@ function ReportContent() {
               onClick={() => setShowCountryPicker(true)}
               className="flex items-center gap-0.5 rounded-full bg-muted/20 border border-border px-1.5 py-0.5 hover:bg-muted/40 transition-colors"
             >
-              <span className="text-xs">{getFlag(homeCountry || "KR")}</span>
-              <span className="text-[9px] font-bold text-foreground">{homeCountry || "KR"}</span>
+              <span className="text-xs">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+              <span className="text-[9px] font-bold text-foreground">{homeCountry || (lang === "ko" ? "전체" : "ALL")}</span>
               <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
             </button>
             {updatedTime && (
@@ -874,6 +874,22 @@ function ReportContent() {
               </button>
             </div>
             <div className="overflow-y-auto flex-1 py-2">
+              {/* 글로벌 옵션 */}
+              <button
+                onClick={() => {
+                  setHomeCountry("");
+                  setShowCountryPicker(false);
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                  !homeCountry && "bg-primary/5"
+                )}
+              >
+                <span className="text-lg">🌐</span>
+                <span className="text-sm flex-1">{lang === "ko" ? "글로벌 (전체)" : "Global (All)"}</span>
+                <span className="text-[10px] text-muted-foreground">ALL</span>
+                {!homeCountry && <Check className="h-4 w-4 text-primary" />}
+              </button>
               {availableCountries.map((cc) => (
                 <button
                   key={cc}

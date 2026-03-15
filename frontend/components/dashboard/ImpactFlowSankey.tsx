@@ -152,24 +152,42 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
         const w = containerRef.current.clientWidth || containerRef.current.offsetWidth || containerRef.current.getBoundingClientRect().width;
         if (w > 0) setChartWidth(Math.floor(w));
       }
+      // fallback: DOM에서 못 읽으면 window.innerWidth 사용
+      if (chartWidth <= 0 && typeof window !== "undefined") {
+        setChartWidth(Math.min(window.innerWidth - 32, 600));
+      }
     }
+    // 즉시 + 지연 측정 (모바일 인앱 브라우저 대응)
     measure();
     const t1 = setTimeout(measure, 50);
-    const t2 = setTimeout(measure, 200);
-    const t3 = setTimeout(measure, 500);
+    const t2 = setTimeout(measure, 150);
+    const t3 = setTimeout(measure, 400);
+    const t4 = setTimeout(measure, 1000);
     window.addEventListener("resize", measure);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(t4);
       window.removeEventListener("resize", measure);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // fallback: window.innerWidth 기반
-  const effectiveWidth = chartWidth > 0 ? chartWidth : (typeof window !== "undefined" ? Math.min(window.innerWidth - 32, 600) : 360);
   const chartHeight = 200;
 
+  // SSR에서 렌더링하지 않음 — hydration mismatch 방지
+  if (chartWidth <= 0) {
+    return (
+      <div ref={containerRef} className="relative" style={{ minHeight: chartHeight }}>
+        <div className="flex items-center justify-center py-8">
+          <div className="h-4 w-4 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  const effectiveWidth = chartWidth;
   const conflictNodes = data.nodes.filter((n) => n.category === "conflict");
   const conflictIdxMap = new Map(conflictNodes.map((n, i) => [n.id, i]));
 

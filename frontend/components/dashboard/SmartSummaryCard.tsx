@@ -110,7 +110,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
       <div className="px-3 py-2.5 space-y-1.5">
         {whatLine && (
           <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-red-400 shrink-0 mt-0.5 w-9">
+            <span className="text-[8px] font-bold text-red-400 shrink-0 mt-0.5 min-w-[28px]">
               {t(lang, "dash_smart_what" as TranslationKey)}
             </span>
             <span className="text-[10px] text-foreground/80 leading-snug line-clamp-2">{whatLine}</span>
@@ -118,7 +118,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
         )}
         {soWhatLine && (
           <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-orange-400 shrink-0 mt-0.5 w-9">
+            <span className="text-[8px] font-bold text-orange-400 shrink-0 mt-0.5 min-w-[28px]">
               {t(lang, "dash_smart_so_what" as TranslationKey)}
             </span>
             <span className="text-[10px] text-foreground/80 leading-snug font-medium line-clamp-2">{soWhatLine}</span>
@@ -126,7 +126,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
         )}
         {whenLine && (
           <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-blue-400 shrink-0 mt-0.5 w-9">
+            <span className="text-[8px] font-bold text-blue-400 shrink-0 mt-0.5 min-w-[28px]">
               {t(lang, "dash_smart_when" as TranslationKey)}
             </span>
             <span className="text-[10px] text-foreground/60 leading-snug">{whenLine}</span>
