@@ -2,15 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { isTossMiniApp } from "@/lib/platform";
-
 interface SplashScreenProps {
   visible: boolean;
 }
 
 export function SplashScreen({ visible }: SplashScreenProps) {
   const [mounted, setMounted] = useState(true);
-  const toss = isTossMiniApp();
 
   useEffect(() => {
     if (!visible) {
@@ -34,12 +31,10 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         visible ? "" : "splash-fade-out"
       }`}
       style={{
-        background: toss
-          ? "#f9fafb"
-          : "linear-gradient(160deg, #0a0f1e 0%, #0f172a 35%, #121d36 65%, #0d1425 100%)",
+        background: "linear-gradient(160deg, #0a0f1e 0%, #0f172a 35%, #121d36 65%, #0d1425 100%)",
       }}
     >
-      {!toss && <>
+      <>
         {/* 배경 그리드 패턴 */}
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -71,7 +66,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
 
       {/* 로고 + 레이더 영역 */}
       <div className="relative flex items-center justify-center w-[184px] h-20">
-        {!toss && <>
+        <>
           {/* 레이더 파동 3겹 */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50px] h-[50px] rounded-full border border-blue-500/25 splash-radar" />
           <div
@@ -89,35 +84,35 @@ export function SplashScreen({ visible }: SplashScreenProps) {
           width={184}
           height={80}
           className="relative z-[1] h-20 w-auto object-contain"
-          style={{ filter: toss ? "none" : "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
+          style={{ filter: "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
           priority
         />
       </div>
 
       {/* 타이틀 */}
-      <p className={`mt-4 text-[22px] font-black tracking-tight ${toss ? "text-slate-800" : "text-slate-100"}`}>
+      <p className="mt-4 text-[22px] font-black tracking-tight text-slate-100">
         WeWantPeace
       </p>
 
       {/* 서브타이틀 */}
-      <p className={`mt-1.5 text-xs font-medium tracking-widest uppercase ${toss ? "text-slate-400/80" : "text-slate-400/80"}`}>
+      <p className="mt-1.5 text-xs font-medium tracking-widest uppercase text-slate-400/80">
         Real-time Global Conflict Monitor
       </p>
 
       {/* 로딩 인디케이터 */}
       <div className="mt-8 flex items-center gap-2">
         <div className="flex gap-[3px]">
-          <span className={`splash-dot h-1 w-1 rounded-full ${toss ? "bg-blue-500/50" : "bg-blue-500/70"}`} />
+          <span className={"splash-dot h-1 w-1 rounded-full bg-blue-500/70"} />
           <span
-            className={`splash-dot h-1 w-1 rounded-full ${toss ? "bg-blue-500/50" : "bg-blue-500/70"}`}
+            className={"splash-dot h-1 w-1 rounded-full bg-blue-500/70"}
             style={{ animationDelay: "200ms" }}
           />
           <span
-            className={`splash-dot h-1 w-1 rounded-full ${toss ? "bg-blue-500/50" : "bg-blue-500/70"}`}
+            className={"splash-dot h-1 w-1 rounded-full bg-blue-500/70"}
             style={{ animationDelay: "400ms" }}
           />
         </div>
-        <span className={`text-[11px] font-medium tracking-wide ${toss ? "text-slate-400/60" : "text-slate-400/60"}`}>
+        <span className="text-[11px] font-medium tracking-wide text-slate-400/60">
           Connecting sources
         </span>
       </div>

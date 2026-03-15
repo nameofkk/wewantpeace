@@ -167,15 +167,14 @@ function ReportContent() {
   const [tourRun, setTourRun] = useState(false);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
-  // 온보딩 완료 후 tour=1 파라미터로 자동 시작
+  // 온보딩 완료 후 tour=1 파라미터로 자동 시작 (데이터 로딩 완료 후)
   useEffect(() => {
-    if (searchParams.get("tour") === "1" && !completedTours.includes("dashboard")) {
-      // 데이터 로딩 후 투어 시작 (1.5초 대기)
-      const timer = setTimeout(() => setTourRun(true), 1500);
+    if (searchParams.get("tour") === "1" && !completedTours.includes("dashboard") && !summaryLoading && summary) {
+      const timer = setTimeout(() => setTourRun(true), 500);
       window.history.replaceState({}, "", "/home");
       return () => clearTimeout(timer);
     }
-  }, [searchParams, completedTours]);
+  }, [searchParams, completedTours, summaryLoading, summary]);
 
   const dashTourSteps: Step[] = useMemo(() => [
     {

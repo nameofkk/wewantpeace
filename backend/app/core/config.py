@@ -102,8 +102,11 @@ class Settings(BaseSettings):
     apple_bundle_id: str = "com.wewantpeace.app"
     apple_environment: str = "Sandbox"  # "Production" when live
 
-    # 토스 앱인토스 (Toss Apps-in-Toss)
-    toss_app_secret: str = ""          # 토스 콘솔에서 발급받은 앱 시크릿
+    # 토스 앱인토스 (Toss Apps-in-Toss) — mTLS 인증
+    toss_client_cert_b64: str = ""     # mTLS 인증서 (base64, Railway용)
+    toss_client_key_b64: str = ""      # mTLS 개인키 (base64, Railway용)
+    toss_client_cert_path: str = ""    # mTLS 인증서 파일 경로 (로컬 개발용)
+    toss_client_key_path: str = ""     # mTLS 개인키 파일 경로 (로컬 개발용)
     toss_decryption_key: str = ""      # 유저 정보 복호화 키 (AES-256-GCM)
     toss_decryption_aad: str = ""      # 복호화 AAD
 

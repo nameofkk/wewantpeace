@@ -4,7 +4,6 @@ import { Providers } from "./providers";
 import { OnboardingGuard } from "@/components/ui/onboarding-guard";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.live";
-const IS_TOSS = process.env.NEXT_PUBLIC_IS_TOSS_MINIAPP === "true";
 
 export const metadata: Metadata = {
   title: {
@@ -53,7 +52,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: IS_TOSS ? "#f9fafb" : "#0f1729",
+  themeColor: "#0f1729",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -66,17 +65,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={IS_TOSS ? "light" : ""} suppressHydrationWarning>
+    <html lang="ko" className="" suppressHydrationWarning>
       <head>
         {/* SAFE: 테마/언어 깜빡임 방지 인라인 스크립트. 개발자 작성 리터럴만 사용, 사용자 입력 없음 */}
-        <script dangerouslySetInnerHTML={{ __html: IS_TOSS
-          ? `try {
-              document.documentElement.className = 'light';
-              var l = (navigator.language || '').startsWith('ko') ? 'ko' : 'en';
-              document.documentElement.lang = l;
-              document.documentElement.dataset.lang = l;
-            } catch(e) {}`
-          : `try {
+        {/* SAFE: 테마/언어 깜빡임 방지 인라인 스크립트. 개발자 작성 리터럴만 사용, 사용자 입력 없음 */}
+        <script dangerouslySetInnerHTML={{ __html: `try {
               var s = JSON.parse(localStorage.getItem('wwp-store') || '{}');
               var t = (s.state && s.state.theme) || 'dark';
               document.documentElement.className = t;
@@ -252,63 +245,61 @@ export default function RootLayout({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: IS_TOSS
-              ? "#f9fafb"
-              : "linear-gradient(160deg, #0a0f1e 0%, #0f172a 35%, #121d36 65%, #0d1425 100%)",
+            background: "linear-gradient(160deg, #0a0f1e 0%, #0f172a 35%, #121d36 65%, #0d1425 100%)",
             overflow: "hidden",
           }}
         >
-          {!IS_TOSS && <>
+          <>
             {/* 배경 그리드 패턴 */}
             <div style={{ position: "absolute", inset: 0, opacity: 0.04, backgroundImage: "linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
             {/* 배경 글로우 오브 */}
             <div style={{ position: "absolute", top: "30%", left: "50%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", transform: "translate(-50%, -50%)", animation: "splash-glow 4s ease-in-out infinite" }} />
             {/* 수평 스캔 라인 */}
             <div style={{ position: "absolute", left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.4) 20%, rgba(59,130,246,0.6) 50%, rgba(59,130,246,0.4) 80%, transparent 100%)", animation: "splash-scan 3s ease-in-out infinite", boxShadow: "0 0 12px 2px rgba(59,130,246,0.15)" }} />
-          </>}
+          </>
 
           {/* 로고 + 레이더 영역 */}
           <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: 184, height: 80 }}>
-            {!IS_TOSS && <>
+            <>
               {/* 레이더 파동 3겹 */}
               <div style={{ position: "absolute", top: "50%", left: "50%", width: 50, height: 50, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.25)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out infinite" }} />
               <div style={{ position: "absolute", top: "50%", left: "50%", width: 50, height: 50, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.2)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out 1s infinite" }} />
               <div style={{ position: "absolute", top: "50%", left: "50%", width: 50, height: 50, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.15)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out 2s infinite" }} />
-            </>}
+            </>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-eye.png"
               alt=""
               width={184}
               height={80}
-              style={{ position: "relative", zIndex: 1, height: 80, width: "auto", objectFit: "contain", filter: IS_TOSS ? "none" : "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
+              style={{ position: "relative", zIndex: 1, height: 80, width: "auto", objectFit: "contain", filter: "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
             />
           </div>
 
           {/* 타이틀 */}
-          <p style={{ marginTop: 16, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", color: IS_TOSS ? "#1a1a2e" : "#f1f5f9" }}>
+          <p style={{ marginTop: 16, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", color: "#f1f5f9" }}>
             WeWantPeace
           </p>
 
           {/* 서브타이틀 — 서비스 설명 */}
-          <p style={{ marginTop: 6, fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", color: IS_TOSS ? "rgba(100,116,139,0.8)" : "rgba(148,163,184,0.8)", textTransform: "uppercase" }}>
+          <p style={{ marginTop: 6, fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", color: "rgba(148,163,184,0.8)", textTransform: "uppercase" }}>
             Real-time Global Conflict Monitor
           </p>
 
           {/* 로딩 인디케이터 */}
           <div style={{ marginTop: 32, display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ display: "flex", gap: 3 }}>
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: IS_TOSS ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out infinite" }} />
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: IS_TOSS ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out 0.2s infinite" }} />
-              <span style={{ width: 4, height: 4, borderRadius: "50%", background: IS_TOSS ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out 0.4s infinite" }} />
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out infinite" }} />
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out 0.2s infinite" }} />
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(59,130,246,0.7)", animation: "splash-dot 1.4s ease-in-out 0.4s infinite" }} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 500, color: IS_TOSS ? "rgba(100,116,139,0.6)" : "rgba(148,163,184,0.6)", letterSpacing: "0.02em" }}>
+            <span style={{ fontSize: 11, fontWeight: 500, color: "rgba(148,163,184,0.6)", letterSpacing: "0.02em" }}>
               Connecting sources
             </span>
           </div>
 
           {/* SAFE: CSS @keyframes 리터럴. 사용자 입력 없음 */}
-          {!IS_TOSS && <style dangerouslySetInnerHTML={{ __html: `
+          <style dangerouslySetInnerHTML={{ __html: `
             @keyframes splash-radar {
               0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0.6; }
               100% { transform: translate(-50%,-50%) scale(4); opacity: 0; }
@@ -323,7 +314,7 @@ export default function RootLayout({
               0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
               50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
             }
-          ` }} />}
+          ` }} />
           {/* SAFE: CSS @keyframes 리터럴. 사용자 입력 없음 */}
           <style dangerouslySetInnerHTML={{ __html: `
             @keyframes splash-dot {

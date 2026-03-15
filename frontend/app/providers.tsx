@@ -5,18 +5,11 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/lib/store";
 import { setupForegroundListener } from "@/lib/fcm";
-import { isTossMiniApp } from "@/lib/platform";
 
 function ThemeSync() {
   const theme = useAppStore((s) => s.theme);
   useEffect(() => {
     const html = document.documentElement;
-    if (isTossMiniApp()) {
-      // 토스 미니앱: 라이트 모드 강제 (앱인토스 심사 요구사항)
-      html.classList.remove("dark");
-      html.classList.add("light");
-      return;
-    }
     html.classList.toggle("dark", theme === "dark");
     html.classList.toggle("light", theme === "light");
   }, [theme]);

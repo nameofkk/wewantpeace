@@ -147,23 +147,47 @@ class TossLoginOut(BaseModel):
 TOSS_API_BASE = "https://apps-in-toss-api.toss.im"
 
 
+def _get_toss_cert() -> tuple[str, str]:
+    """mTLS 인증서 파일 경로 반환. base64 환경변수 우선, 없으면 파일 경로 사용."""
+    import base64
+    import tempfile
+    import os
+
+    # base64 환경변수 (Railway 배포용)
+    if settings.toss_client_cert_b64 and settings.toss_client_key_b64:
+        cert_dir = os.path.join(tempfile.gettempdir(), "toss_certs")
+        os.makedirs(cert_dir, exist_ok=True)
+        cert_path = os.path.join(cert_dir, "client.crt")
+        key_path = os.path.join(cert_dir, "client.key")
+        if not os.path.exists(cert_path):
+            with open(cert_path, "wb") as f:
+                f.write(base64.b64decode(settings.toss_client_cert_b64))
+            with open(key_path, "wb") as f:
+                f.write(base64.b64decode(settings.toss_client_key_b64))
+            os.chmod(key_path, 0o600)
+        return cert_path, key_path
+
+    # 파일 경로 (로컬 개발용)
+    cert_path = settings.toss_client_cert_path or "backend/certs/wewantpeace_public.crt"
+    key_path = settings.toss_client_key_path or "backend/certs/wewantpeace_private.key"
+    if not os.path.exists(cert_path):
+        raise HTTPException(503, detail="토스 mTLS 인증서가 설정되지 않았습니다.")
+    return cert_path, key_path
+
+
 async def _exchange_toss_code(authorization_code: str) -> dict:
-    """Toss authorizationCode → accessToken 교환."""
+    """Toss authorizationCode → accessToken 교환 (mTLS 인증)."""
     import json as _json
     import httpx
 
-    if not settings.toss_app_secret:
-        raise HTTPException(503, detail="토스 로그인이 설정되지 않았습니다. (TOSS_APP_SECRET 필요)")
+    cert = _get_toss_cert()
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(cert=cert, timeout=10) as client:
             resp = await client.post(
                 f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
                 json={"authorizationCode": authorization_code},
-                headers={
-                    "Authorization": f"Bearer {settings.toss_app_secret}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Content-Type": "application/json"},
             )
             resp.raise_for_status()
             return resp.json()
@@ -179,14 +203,16 @@ async def _exchange_toss_code(authorization_code: str) -> dict:
 
 
 async def _get_toss_user_key(access_token: str) -> str:
-    """Toss accessToken → userKey 조회."""
+    """Toss accessToken → userKey 조회 (mTLS 인증)."""
     import json as _json
     import httpx
 
+    cert = _get_toss_cert()
+
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(cert=cert, timeout=10) as client:
             resp = await client.get(
-                f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/login-me",
+                f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/login-me",
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             resp.raise_for_status()
