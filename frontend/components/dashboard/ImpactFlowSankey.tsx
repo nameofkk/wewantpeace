@@ -463,7 +463,11 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const isConflict = pos.category === "conflict";
             const isImpact = pos.category === "impact";
             const idx = conflictIdxMap.get(id) ?? -1;
-            const maxLen = effectiveWidth < 380 ? 6 : sizeClass === "lg" ? 22 : sizeClass === "md" ? 16 : 10;
+            const maxLen = effectiveWidth < 380
+              ? (lang === "en" ? 10 : 6)
+              : sizeClass === "lg" ? 22
+              : sizeClass === "md" ? 16
+              : (lang === "en" ? 14 : 10);
             const isNodeConnected = !isHovering || connectedNodes.has(id);
 
             const labelText = isConflict
