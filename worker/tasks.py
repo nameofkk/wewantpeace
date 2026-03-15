@@ -773,8 +773,14 @@ def process_raw_event(self, raw_event_id: str):
     max_retries=2,
 )
 def calculate_tension(self):
-    """긴장도 지수 계산 (15분마다)."""
+    """긴장도 지수 계산 (5분마다)."""
     _record_heartbeat("calculate_tension")
+    # 동시 실행 방지 (Redis lock)
+    r = _get_sync_redis()
+    lock_key = "lock:calculate_tension"
+    if not r.set(lock_key, "1", nx=True, ex=300):
+        logger.info("calculate_tension 이미 실행 중, 스킵")
+        return {"status": "skipped", "reason": "already_running"}
 
     async def _run():
         from worker.processor.tension_calculator import calculate_all_tensions
@@ -789,6 +795,11 @@ def calculate_tension(self):
     except Exception as exc:
         logger.error("긴장도 계산 오류: %s", exc)
         raise self.retry(exc=exc)
+    finally:
+        try:
+            r.delete(lock_key)
+        except Exception:
+            pass
 
 
 @app.task(
@@ -798,7 +809,13 @@ def calculate_tension(self):
     max_retries=2,
 )
 def calculate_trending(self):
-    """트렌딩 키워드 계산 (15분마다). 분산 클러스터 자동 병합 포함."""
+    """트렌딩 키워드 계산 (5분마다). 분산 클러스터 자동 병합 포함."""
+    # 동시 실행 방지 (Redis lock)
+    r = _get_sync_redis()
+    lock_key = "lock:calculate_trending"
+    if not r.set(lock_key, "1", nx=True, ex=300):
+        logger.info("calculate_trending 이미 실행 중, 스킵")
+        return {"status": "skipped", "reason": "already_running"}
 
     async def _merge_fragmented_clusters(db):
         """같은 cluster_key 또는 같은 국가+관련토픽의 분산된 클러스터를 병합 (보수적).
@@ -1019,6 +1036,11 @@ def calculate_trending(self):
     except Exception as exc:
         logger.error("트렌딩 계산 오류: %s", exc)
         raise self.retry(exc=exc)
+    finally:
+        try:
+            r.delete(lock_key)
+        except Exception:
+            pass
 
 
 @app.task(
