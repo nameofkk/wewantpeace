@@ -1620,6 +1620,20 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     """Impact Flow Sankey 3단 데이터"""
     if not scored:
         return None
+
+    # 글로벌 모드(home="")면 모든 SECTOR_DATA의 key_partners를 합산
+    if not home:
+        merged: dict[str, dict] = {}
+        for _country_code, country_sectors in SECTOR_DATA.items():
+            for sector, info in country_sectors.items():
+                if sector not in merged:
+                    merged[sector] = {"gdp_pct": info["gdp_pct"], "key_partners": list(info.get("key_partners", []))}
+                else:
+                    for p in info.get("key_partners", []):
+                        if p not in merged[sector]["key_partners"]:
+                            merged[sector]["key_partners"].append(p)
+        sectors_data = merged
+
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     nodes = []
     links = []

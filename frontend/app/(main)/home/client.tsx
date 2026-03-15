@@ -186,7 +186,10 @@ function ReportContent() {
 
   const globalAvgScore = useMemo(() => {
     if (!isGlobalMode || !allItems.length) return 0;
-    return Math.round(allItems.reduce((s, i) => s + i.raw_score, 0) / allItems.length);
+    // Top 15 국가 평균 — 안정 국가가 평균을 희석하는 문제 해결
+    const sorted = [...allItems].sort((a, b) => b.raw_score - a.raw_score);
+    const top15 = sorted.slice(0, 15);
+    return Math.round(top15.reduce((s, i) => s + i.raw_score, 0) / top15.length);
   }, [isGlobalMode, allItems]);
 
   const homeScore = isGlobalMode ? globalAvgScore : singleCountryScore;

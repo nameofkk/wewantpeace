@@ -14,6 +14,7 @@ import {
   Lock,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { Cell } from "recharts";
 
 const BarChart = dynamic(
   () => import("recharts").then((m) => m.BarChart),
@@ -33,10 +34,6 @@ const YAxis = dynamic(
 );
 const ResponsiveContainer = dynamic(
   () => import("recharts").then((m) => m.ResponsiveContainer),
-  { ssr: false },
-);
-const Cell = dynamic(
-  () => import("recharts").then((m) => m.Cell),
   { ssr: false },
 );
 const Tooltip = dynamic(

@@ -37,12 +37,13 @@ const CATEGORY_COLORS: Record<string, string> = {
 const NUM_LABELS = ["①", "②", "③", "④", "⑤"];
 
 function truncLabel(s: string, max: number) {
+  if (max >= 999) return s; // no truncation
   return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 /** 3단 Sankey 레이아웃 계산 */
 function computeLayout(data: ImpactFlowOut, width: number, height: number) {
-  const margin = { top: 8, right: 70, bottom: 8, left: 22 };
+  const margin = { top: 8, right: 100, bottom: 8, left: 22 };
   const nodeW = 10;
   const colGap = 40;
   const innerW = width - margin.left - margin.right;
@@ -280,7 +281,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
 
             const labelText = isConflict
               ? NUM_LABELS[idx] ?? ""
-              : truncLabel(pos.label, isImpact ? maxLen + 4 : maxLen);
+              : truncLabel(pos.label, isImpact ? 999 : maxLen);
 
             const textX = isConflict
               ? pos.x - 4
