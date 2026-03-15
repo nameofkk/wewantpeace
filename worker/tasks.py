@@ -2920,7 +2920,7 @@ def generate_kscore_social(self):
                         SocialPost.created_at >= dedup_cutoff,
                     )
                 )
-                already_posted = {r[0] for r in existing_ids_result.fetchall()}
+                already_posted = {r[0] for r in existing_ids_result.fetchall() if r[0] is not None}
 
                 query = (
                     select(IssueCluster)
