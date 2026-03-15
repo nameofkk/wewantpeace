@@ -117,7 +117,7 @@ function SectorContent({
               <YAxis
                 type="category"
                 dataKey="name"
-                width={50}
+                width={lang === "en" ? 85 : 50}
                 tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
               />
               <Tooltip
@@ -239,8 +239,9 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
   const is403 = (error as any)?.status === 403;
 
+  const maxLabel = lang === "en" ? 12 : 5;
   const chartData = data?.sectors.map((s) => ({
-    name: s.sector.length > 5 ? s.sector.slice(0, 5) + ".." : s.sector,
+    name: s.sector.length > maxLabel ? s.sector.slice(0, maxLabel) + ".." : s.sector,
     fullName: s.sector,
     dependency: Math.round(s.trade_dependency * 100),
     gdp: s.exposure_pct,
