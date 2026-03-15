@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3, ArrowUpDown } from "lucide-react";
+import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3, ArrowUpDown, Search } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
@@ -839,8 +839,11 @@ function FeedPageContent() {
           <div className="flex justify-center">
             <LogoIcon height={26} hideText />
           </div>
-          {/* 오른쪽 — 시간 + 새로고침 */}
+          {/* 오른쪽 — 검색 + 시간 + 새로고침 */}
           <div className="flex items-center justify-end gap-1.5">
+            <Link href="/search" className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+              <Search className="h-3.5 w-3.5" />
+            </Link>
             <span className="text-[9px] text-muted-foreground whitespace-nowrap">{elapsed}</span>
             <button
               onClick={handleRefresh}

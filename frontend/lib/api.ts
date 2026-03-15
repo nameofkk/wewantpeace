@@ -111,6 +111,32 @@ export function useClusterDetail(id: string) {
   });
 }
 
+// --- 이슈 검색 훅 ---
+export interface SearchResult {
+  id: string;
+  title: string;
+  title_ko: string | null;
+  topic: string;
+  country_code: string | null;
+  severity: number;
+  event_count: number;
+  kscore: number;
+  first_event_at: string;
+  last_event_at: string;
+  image_url: string | null;
+}
+
+export function useSearchIssues(q: string, limit = 20) {
+  return useQuery({
+    queryKey: ["issues", "search", q, limit],
+    queryFn: () =>
+      apiFetch<SearchResult[]>("/issues/search", { q, limit: String(limit) }),
+    enabled: q.length >= 2,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
 // --- 긴장도 훅 ---
 export function useTensionMine(countries?: string[] | null) {
   const param = countries && countries.length > 0 ? countries.join(",") : undefined;

@@ -2292,10 +2292,14 @@ async def _calc_sector_exposure(
             trade_dep = 0.85
         elif partner_rank == 2:
             trade_dep = 0.6
-        elif partner_rank <= 3:
-            trade_dep = 0.4
+        elif partner_rank == 3:
+            trade_dep = 0.35
+        elif partner_rank == 4:
+            trade_dep = 0.25
+        elif partner_rank == 5:
+            trade_dep = 0.18
         elif is_partner:
-            trade_dep = 0.2
+            trade_dep = 0.12
         else:
             trade_dep = 0.05 if real_trade_dep is None else min(0.15, real_trade_dep * 2)
 

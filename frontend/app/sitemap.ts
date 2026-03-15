@@ -32,18 +32,18 @@ interface Issue {
   slug?: string;
   severity: number;
   updated_at?: string;
+  last_event_at?: string;
 }
 
 async function fetchIssues(): Promise<Issue[]> {
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   try {
-    const res = await fetch(`${apiUrl}/issues?limit=500`, {
+    const res = await fetch(`${apiUrl}/issues?limit=2000`, {
       next: { revalidate: 120 },
     });
     if (!res.ok) return [];
     const data = await res.json();
-    // API may return { items: [...] } or directly an array
     return Array.isArray(data) ? data : (data.items ?? data.results ?? []);
   } catch {
     return [];
@@ -51,21 +51,31 @@ async function fetchIssues(): Promise<Issue[]> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date();
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: `${BASE_URL}/`,
+      lastModified: now,
       changeFrequency: "always",
       priority: 1.0,
     },
     {
       url: `${BASE_URL}/map`,
+      lastModified: now,
       changeFrequency: "always",
       priority: 0.9,
     },
     {
       url: `${BASE_URL}/tension`,
+      lastModified: now,
       changeFrequency: "daily",
       priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/search`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.6,
     },
     {
       url: `${BASE_URL}/terms`,
@@ -87,13 +97,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const issues = await fetchIssues();
   const issuePages: MetadataRoute.Sitemap = issues
-    .filter((issue) => issue.severity >= 30)
-    .map((issue) => ({
-      url: `${BASE_URL}/issues/${issue.slug ?? issue.id}`,
-      lastModified: issue.updated_at ? new Date(issue.updated_at) : undefined,
-      changeFrequency: "hourly" as const,
-      priority: 0.85,
-    }));
+    .filter((issue) => issue.severity >= 20)
+    .map((issue) => {
+      const mod = issue.updated_at || issue.last_event_at;
+      const priority = issue.severity >= 70 ? 0.9 : issue.severity >= 50 ? 0.8 : 0.7;
+      return {
+        url: `${BASE_URL}/issues/${issue.slug ?? issue.id}`,
+        lastModified: mod ? new Date(mod) : undefined,
+        changeFrequency: (issue.severity >= 60 ? "hourly" : "daily") as "hourly" | "daily",
+        priority,
+      };
+    });
 
   return [...staticPages, ...countryPages, ...issuePages];
 }

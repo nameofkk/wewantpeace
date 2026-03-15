@@ -2,6 +2,7 @@
 /community/* 커뮤니티 API
 """
 from __future__ import annotations
+import asyncio
 import os
 import uuid
 from datetime import datetime, date, timezone
@@ -21,11 +22,23 @@ from backend.app.models.issue_cluster import IssueCluster
 router = APIRouter(prefix="/community", tags=["community"])
 
 
-def _translate_to_en(text: str) -> str | None:
+def _translate_to_en_sync(text: str) -> str | None:
+    """동기 번역 (스레드풀에서 실행)."""
     try:
         from deep_translator import GoogleTranslator
         return GoogleTranslator(source="ko", target="en").translate(text[:5000])
     except Exception:
+        return None
+
+
+async def _translate_to_en(text: str) -> str | None:
+    """비동기 번역 — 별도 스레드 + 10초 타임아웃."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_translate_to_en_sync, text),
+            timeout=10.0,
+        )
+    except (asyncio.TimeoutError, Exception):
         return None
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
@@ -391,8 +404,8 @@ async def create_post(
         is_pinned=body.post_type == "notice",
         images=images_val,
     )
-    post.title_en = _translate_to_en(body.title[:200])
-    post.content_en = _translate_to_en(body.content[:5000])
+    post.title_en = await _translate_to_en(body.title[:200])
+    post.content_en = await _translate_to_en(body.content[:5000])
     db.add(post)
     await db.flush()
 
@@ -475,8 +488,8 @@ async def update_post(
 
     post.title = body.title[:200]
     post.content = body.content
-    post.title_en = _translate_to_en(body.title[:200])
-    post.content_en = _translate_to_en(body.content[:5000])
+    post.title_en = await _translate_to_en(body.title[:200])
+    post.content_en = await _translate_to_en(body.content[:5000])
     if body.images is not None:
         post.images = body.images[:5] if body.images else None
     post.updated_at = datetime.now(timezone.utc)
@@ -619,7 +632,7 @@ async def create_comment(
         parent_id=parent_uuid,
         content=body.content,
     )
-    comment.content_en = _translate_to_en(body.content[:5000])
+    comment.content_en = await _translate_to_en(body.content[:5000])
     db.add(comment)
     post.comment_count += 1
     await db.flush()
@@ -675,7 +688,7 @@ async def update_comment(
         raise HTTPException(403)
 
     comment.content = body.content
-    comment.content_en = _translate_to_en(body.content[:5000])
+    comment.content_en = await _translate_to_en(body.content[:5000])
     comment.updated_at = datetime.now(timezone.utc)
     await db.flush()
     return _comment_to_out(comment, current_user.nickname)

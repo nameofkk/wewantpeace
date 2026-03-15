@@ -305,8 +305,14 @@ def on_worker_process_init(**kwargs):
     fork된 자식 프로세스(ForkPoolWorker)에는 Firebase SDK가 전달되지 않음.
     worker_process_init은 각 자식 프로세스마다 호출됨.
     """
+    import logging
     from backend.app.core.firebase_init import init_firebase
-    init_firebase()
+    ok = init_firebase()
+    if not ok:
+        logging.getLogger(__name__).critical(
+            "Firebase 초기화 실패! FCM 알림 발송 불가. "
+            "FIREBASE_SERVICE_ACCOUNT_JSON 환경변수를 확인하세요."
+        )
 
 
 @worker_ready.connect

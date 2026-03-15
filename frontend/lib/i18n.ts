@@ -1357,6 +1357,17 @@ export const translations = {
     tour_home_rising: "최근 6시간 내 새로 등장하여 빠르게 확산 중인 이슈입니다.",
     tour_home_kscore_history: "카드 하단의 'KScore 히스토리 보기'를 눌러 시간별 변화를 추적할 수 있습니다.",
 
+    // 푸시 알림 온보딩 배너
+    push_prompt_title: "분쟁 속보 알림 받기",
+    push_prompt_desc: "위기 상황 발생 시 실시간 푸시 알림을 받아보세요.",
+    push_prompt_enable: "알림 켜기",
+
+    // 검색
+    search_title: "이슈 검색",
+    search_placeholder: "이슈 제목, 국가명 검색...",
+    search_no_results: "검색 결과가 없습니다",
+    search_min_chars: "2자 이상 입력하세요",
+
     // 가이드 투어 — Dashboard
     tour_dash_page_role: "내 대시보드입니다. 글로벌 분쟁이 나에게 미치는 영향을 한눈에 볼 수 있습니다.",
     tour_dash_risk: "영향도 점수와 5축 리스크 레이더입니다. 군사·에너지·무역·식량·금융 중 어디가 위험한지 한눈에 보입니다.",
@@ -2939,6 +2950,17 @@ export const translations = {
     tour_home_kscore_history: "Tap 'Show KScore history' at the bottom of a card to track changes over time.",
 
     // Guide Tour — Dashboard
+    // Push notification onboarding banner
+    push_prompt_title: "Get conflict alerts",
+    push_prompt_desc: "Receive real-time push notifications when crises occur.",
+    push_prompt_enable: "Enable alerts",
+
+    // Search
+    search_title: "Search Issues",
+    search_placeholder: "Search by title, country...",
+    search_no_results: "No results found",
+    search_min_chars: "Enter at least 2 characters",
+
     tour_dash_page_role: "Your personalized dashboard. See how global conflicts affect you at a glance.",
     tour_dash_risk: "Impact score and 5-axis risk radar. See which area — military, energy, trade, food, or finance — is most at risk.",
     tour_dash_country_picker: "Change the base country to recalculate all analyses from that country's perspective. More countries available with Pro.",

@@ -1,5 +1,6 @@
 """
 GET /issues  — 지도용 이슈 클러스터 목록.
+GET /issues/search — 이슈 클러스터 검색 (title/title_ko ILIKE).
 GET /issues/{id} — 이슈 상세 (타임라인 + 소스 이벤트).
 """
 from __future__ import annotations
@@ -10,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import AsyncSessionLocal
@@ -45,6 +46,22 @@ class ClusterOut(BaseModel):
     image_url: Optional[str] = None
     first_event_at: str
     last_event_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class SearchResultOut(BaseModel):
+    id: str
+    title: str
+    title_ko: Optional[str] = None
+    topic: str
+    country_code: Optional[str] = None
+    severity: int
+    event_count: int
+    kscore: float
+    first_event_at: str
+    last_event_at: str
+    image_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -212,6 +229,62 @@ async def list_clusters(
     result = await db.execute(stmt)
     clusters = result.scalars().all()
     return [_cluster_to_out(c) for c in clusters]
+
+
+@router.get("/search", response_model=list[SearchResultOut])
+async def search_clusters(
+    q: str = Query(..., min_length=1, description="검색어 (title/title_ko ILIKE)"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    이슈 클러스터 검색.
+    - q: 검색 키워드 (영문 title, 한글 title_ko 모두 ILIKE 매칭)
+    - limit: 최대 반환 수 (기본 20, 최대 50)
+    - offset: 페이지네이션 오프셋
+    """
+    # ILIKE 와일드카드 이스케이프
+    safe_q = q.replace("%", r"\%").replace("_", r"\_")
+    pattern = f"%{safe_q}%"
+    # country_code 정확 매칭 (2글자 대문자) 또는 title/title_ko ILIKE
+    conditions = [
+        IssueCluster.title.ilike(pattern),
+        IssueCluster.title_ko.ilike(pattern),
+    ]
+    if len(q) == 2 and q.isalpha():
+        conditions.append(IssueCluster.country_code == q.upper())
+    stmt = (
+        select(IssueCluster)
+        .where(
+            IssueCluster.is_active == True,  # noqa: E712
+            or_(*conditions),
+        )
+        .order_by(
+            IssueCluster.severity.desc(),
+            IssueCluster.event_count.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    clusters = result.scalars().all()
+    return [
+        SearchResultOut(
+            id=str(c.id),
+            title=c.title,
+            title_ko=c.title_ko,
+            topic=c.topic,
+            country_code=c.country_code,
+            severity=c.severity,
+            event_count=c.event_count,
+            kscore=round(c.kscore, 3),
+            first_event_at=c.first_event_at.isoformat(),
+            last_event_at=c.last_event_at.isoformat(),
+            image_url=c.image_url,
+        )
+        for c in clusters
+    ]
 
 
 @router.get("/{cluster_id}", response_model=ClusterDetailOut)

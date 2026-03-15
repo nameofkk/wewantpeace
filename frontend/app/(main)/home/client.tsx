@@ -53,6 +53,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
+import { PushPromptBanner } from "@/components/dashboard/PushPromptBanner";
 import type { Step } from "react-joyride";
 
 export default function HomePage() {
@@ -365,6 +366,7 @@ function ReportContent() {
       </div>
 
       <NoticeTicker />
+      <PushPromptBanner lang={lang} isLoggedIn={!!meObj} />
 
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-4 space-y-5">

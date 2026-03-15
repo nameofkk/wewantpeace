@@ -399,7 +399,7 @@ export default function IssueDetailClient({ initialData }: Props) {
   return (
     <div className="flex flex-col min-h-screen">
       {/* 헤더 */}
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
+      <div className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
         <div className="flex items-center gap-3">
           <button onClick={() => window.history.length > 1 ? router.back() : router.push("/")} className="rounded-lg p-1.5 hover:bg-secondary transition-colors">
             <ArrowLeft className="h-5 w-5" />

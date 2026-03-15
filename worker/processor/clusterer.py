@@ -14,7 +14,7 @@ import re
 import logging
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
@@ -24,7 +24,7 @@ from worker.processor.ai_title import generate_ai_title
 logger = logging.getLogger(__name__)
 
 WINDOW_MINUTES = 1440  # 24시간 — 국제 뉴스 시차 고려, Filtered Jaccard로 오병합 방지
-MAX_CLUSTER_AGE_HOURS = 72  # 클러스터 절대 수명 상한 — window_start 기준 72시간 초과 시 새 클러스터 생성
+MAX_CLUSTER_AGE_HOURS = 120  # 클러스터 절대 수명 상한 — 72→120h, 주요 이벤트는 5일간 지속
 
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2
@@ -33,11 +33,11 @@ MAX_EVENTS_UNKNOWN_GEO = 2
 MAX_EVENTS_PER_CLUSTER = 50
 
 # 제목 유사도 임계값 (Filtered Jaccard 기준 — 노이즈 단어 제거 후)
-MIN_TITLE_OVERLAP = 0.15           # 일반 이벤트 (0.25→0.15, 필터링이 노이즈 제거)
-MIN_TITLE_OVERLAP_HIGH_SEV = 0.13  # 고심각도 (severity >= 50 양쪽) — 0.08에서 상향
+MIN_TITLE_OVERLAP = 0.12           # 0.15→0.12, 필터링 후 잔존 단어가 적어 더 낮은 임계값 필요
+MIN_TITLE_OVERLAP_HIGH_SEV = 0.08  # 0.13→0.08, 고심각도 이벤트는 더 적극적으로 병합
 # AI 판정 경계 영역: 이 구간에서만 GPT-4o-mini로 "같은 사건?" 확인
-AI_MATCH_LOW = 0.10   # 이 미만은 무조건 분리
-AI_MATCH_HIGH = 0.20  # 이 이상은 무조건 병합 (MIN_TITLE_OVERLAP보다 크면 의미 없음)
+AI_MATCH_LOW = 0.06   # 0.10→0.06, 더 많은 경계 케이스를 AI에게 위임
+AI_MATCH_HIGH = 0.25  # 0.20→0.25, AI 판정 상한 확장
 
 # 활성 클러스터 후보 최대 조회 수
 MAX_CANDIDATE_CLUSTERS = 10
@@ -104,11 +104,10 @@ _COUNTRY_STEMS: frozenset[str] = frozenset({
 })
 
 _TOPIC_FILTER_STEMS: frozenset[str] = frozenset({
-    # conflict
-    "conflict", "attack", "strike", "war", "bomb", "fight", "battl", "milit",
-    "arm", "forc", "shell", "airstrik", "troop", "soldier", "weapon",
+    # conflict — "arm"/"forc" 제거 (너무 공격적: "armed convoy" vs "forced evacuation" 구분 불가)
+    "conflict", "war", "milit",
     # terror
-    "terror", "violen", "explos", "extrem", "insurg",
+    "terror", "violen", "extrem",
     # coup
     "coup", "overthrow",
     # sanctions
@@ -116,15 +115,15 @@ _TOPIC_FILTER_STEMS: frozenset[str] = frozenset({
     # cyber
     "cyber", "hack",
     # protest
-    "protest", "demonstrat", "ralli", "riot",
+    "protest", "demonstrat",
     # diplomacy
-    "diplomacy", "diplomat", "negoti", "summit", "treat",
+    "diplomacy", "diplomat",
     # maritime
     "maritim", "naval",
     # disaster
-    "disast", "earthquak", "flood", "hurrican", "typhoon",
+    "disast",
     # health
-    "health", "pandem", "epidem", "outbreak", "virus",
+    "health", "pandem", "epidem",
     # generic news words (클러스터 키와 무관하지만 모든 뉴스에 나타나서 가짜 유사도 생성)
     "govern", "offici", "report", "state", "minist", "presid",
 })
@@ -699,3 +698,155 @@ async def assign_cluster(
         )
 
     return cluster, just_verified
+
+
+# ── Post-hoc 클러스터 병합 (소규모 → 대규모) ──────────────────────────────────
+
+async def merge_fragmented_clusters(
+    db: AsyncSession,
+    *,
+    dry_run: bool = False,
+    max_merges: int = 200,
+) -> list[tuple[str, str]]:
+    """
+    소규모 클러스터(event_count <= 2)를 같은 country:topic의
+    더 큰 클러스터에 병합하여 파편화 해소.
+
+    주기적으로 호출 (예: trending_engine의 5분 배치).
+
+    Returns: [(absorbed_cluster_id, target_cluster_id), ...]
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=7)
+
+    # 1) 소규모 활성 클러스터 조회 (event_count <= 2, 7일 이내)
+    small_q = (
+        select(IssueCluster)
+        .where(
+            IssueCluster.is_active == True,  # noqa: E712
+            IssueCluster.event_count <= 2,
+            IssueCluster.first_event_at >= cutoff,
+            IssueCluster.country_code.isnot(None),
+        )
+        .order_by(IssueCluster.event_count.asc(), IssueCluster.first_event_at.desc())
+        .limit(500)
+    )
+    small_result = await db.execute(small_q)
+    small_clusters = list(small_result.scalars().all())
+
+    if not small_clusters:
+        return []
+
+    merged: list[tuple[str, str]] = []
+
+    for small in small_clusters:
+        if len(merged) >= max_merges:
+            break
+
+        # 2) 같은 country_code + topic의 더 큰 활성 클러스터 찾기
+        target_q = (
+            select(IssueCluster)
+            .where(
+                IssueCluster.is_active == True,  # noqa: E712
+                IssueCluster.country_code == small.country_code,
+                IssueCluster.topic == small.topic,
+                IssueCluster.event_count > 2,
+                IssueCluster.id != small.id,
+                # 5일 이내 시간 근접성
+                IssueCluster.first_event_at >= small.first_event_at - timedelta(days=5),
+                IssueCluster.last_event_at <= small.last_event_at + timedelta(days=5),
+            )
+            .order_by(IssueCluster.event_count.desc())
+            .limit(5)
+        )
+        target_result = await db.execute(target_q)
+        targets = list(target_result.scalars().all())
+
+        best_target = None
+        best_sim = -1.0
+
+        for target in targets:
+            sim = _title_similarity(
+                small.title, target.title,
+                ko_a=small.title_ko, ko_b=target.title_ko,
+            )
+            # 병합용 완화된 임계값 (0.08) 또는 AI 판정
+            if sim >= 0.08 and sim > best_sim:
+                best_sim = sim
+                best_target = target
+            elif 0.04 <= sim < 0.08:
+                # AI 판정 시도
+                ai_result = _ai_same_event(
+                    small.title, target.title,
+                    small.topic, small.country_code,
+                )
+                if ai_result is True and sim > best_sim:
+                    best_sim = sim
+                    best_target = target
+
+        if best_target is None:
+            continue
+
+        if dry_run:
+            merged.append((str(small.id), str(best_target.id)))
+            logger.info(
+                "[DRY-RUN] 병합 후보: %s (events=%d) → %s (events=%d), sim=%.3f",
+                small.title[:40], small.event_count,
+                best_target.title[:40], best_target.event_count, best_sim,
+            )
+            continue
+
+        # 3) ClusterEvent 레코드 이동
+        await db.execute(
+            update(ClusterEvent)
+            .where(ClusterEvent.cluster_id == small.id)
+            .values(cluster_id=best_target.id)
+        )
+
+        # 4) 타겟 클러스터 업데이트
+        total_events = best_target.event_count + small.event_count
+        best_target.event_count = total_events
+        best_target.severity = max(best_target.severity, small.severity)
+        if small.last_event_at and (not best_target.last_event_at or small.last_event_at > best_target.last_event_at):
+            best_target.last_event_at = small.last_event_at
+            best_target.window_end = small.last_event_at + timedelta(minutes=WINDOW_MINUTES)
+        if small.first_event_at and (not best_target.first_event_at or small.first_event_at < best_target.first_event_at):
+            best_target.first_event_at = small.first_event_at
+        # confidence 가중 평균
+        best_target.confidence = round(
+            (best_target.confidence * (total_events - small.event_count)
+             + small.confidence * small.event_count) / total_events, 3
+        )
+        # source_tiers 합치기
+        existing_tiers = list(best_target.source_tiers or [])
+        existing_tiers.extend(small.source_tiers or [])
+        best_target.source_tiers = existing_tiers
+        # KScore 재계산
+        age_hours = (now - best_target.last_event_at).total_seconds() / 3600 if best_target.last_event_at else 0.0
+        best_target.kscore, _ = _calc_kscore(
+            event_count=best_target.event_count,
+            is_spike=best_target.is_spike or False,
+            confidence=best_target.confidence,
+            severity=best_target.severity,
+            independent_sources=best_target.independent_sources or 1,
+            source_tiers=best_target.source_tiers or [],
+            age_hours=age_hours,
+        )
+        best_target.updated_at = now
+
+        # 5) 소규모 클러스터 비활성화
+        small.is_active = False
+        small.updated_at = now
+
+        merged.append((str(small.id), str(best_target.id)))
+        logger.info(
+            "클러스터 병합: %s (events=%d) → %s (events=%d), sim=%.3f",
+            small.title[:40], small.event_count,
+            best_target.title[:40], best_target.event_count, best_sim,
+        )
+
+    if merged and not dry_run:
+        await db.flush()
+        logger.info("총 %d개 클러스터 병합 완료", len(merged))
+
+    return merged

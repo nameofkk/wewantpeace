@@ -103,11 +103,16 @@ async def send_review_message(post: SocialPost) -> bool:
                 f"{hashtag_str}"
             )
             summary_keyboard = {
-                "inline_keyboard": [[
-                    {"text": "\u2705 \uc804\uccb4 \uc2b9\uc778", "callback_data": f"approve_all:{post_id_str}"},
-                    {"text": "\u270f\ufe0f \uc218\uc815", "callback_data": f"edit:{post_id_str}"},
-                    {"text": "\u274c \uc804\uccb4 \uac70\uc808", "callback_data": f"reject:{post_id_str}"},
-                ]]
+                "inline_keyboard": [
+                    [
+                        {"text": "\u2705 \uc774 \uac8c\uc2dc\ubb3c \uc2b9\uc778", "callback_data": f"approve_all:{post_id_str}"},
+                        {"text": "\u270f\ufe0f \uc218\uc815", "callback_data": f"edit:{post_id_str}"},
+                        {"text": "\u274c \uac70\uc808", "callback_data": f"reject:{post_id_str}"},
+                    ],
+                    [
+                        {"text": "\U0001f4e6 \ub300\uae30 \uc804\uccb4 \uc2b9\uc778", "callback_data": "approve_all_pending"},
+                    ],
+                ]
             }
 
             image_sent = False
@@ -160,8 +165,32 @@ async def send_review_message(post: SocialPost) -> bool:
         return False
 
 
+async def approve_all_pending(username: str) -> str:
+    """pending_review 상태의 모든 포스트를 일괄 승인."""
+    async with AsyncSessionLocal() as db:
+        async with db.begin():
+            result = await db.execute(
+                select(SocialPost).where(SocialPost.status == "pending_review")
+            )
+            posts = result.scalars().all()
+            if not posts:
+                return "대기 중인 포스트가 없습니다"
+
+            now = datetime.now(timezone.utc)
+            for post in posts:
+                post.status = "approved"
+                post.approved_at = now
+                post.approved_by = username
+
+            return f"✅ 대기 중 포스트 {len(posts)}건 전체 승인 완료"
+
+
 async def handle_callback(callback_data: str, username: str) -> str:
-    """Telegram 콜백 처리 — approve_all/approve_x/approve_threads/reject/reject_x/reject_threads/edit."""
+    """Telegram 콜백 처리 — approve_all/approve_x/approve_threads/reject/reject_x/reject_threads/edit/approve_all_pending."""
+    # 특수 액션: post_id 없는 콜백
+    if callback_data == "approve_all_pending":
+        return await approve_all_pending(username)
+
     parts = callback_data.split(":", 1)
     if len(parts) != 2:
         return "\uc798\ubabb\ub41c \ucf5c\ubc31 \ub370\uc774\ud130"
