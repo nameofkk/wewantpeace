@@ -59,6 +59,29 @@ function impactColor(score: number) {
   return "#10b981";
 }
 
+const DEMO_WEEKLY = {
+  ko: {
+    period: "3월 9일 ~ 3월 15일",
+    tension: { score: 72, trend: "up" as const, delta: "+5" },
+    topIssues: [
+      { title: "우크라이나 동부 전선 교착", impact: 85, cc: "UA" },
+      { title: "가자 휴전 협상 난항", impact: 78, cc: "PS" },
+      { title: "수단 내전 인도적 위기", impact: 71, cc: "SD" },
+    ],
+    chartData: [62, 58, 65, 70, 68, 75, 72],
+  },
+  en: {
+    period: "Mar 9 – Mar 15",
+    tension: { score: 72, trend: "up" as const, delta: "+5" },
+    topIssues: [
+      { title: "Eastern Ukraine front stalemate", impact: 85, cc: "UA" },
+      { title: "Gaza ceasefire talks stall", impact: 78, cc: "PS" },
+      { title: "Sudan civil war humanitarian crisis", impact: 71, cc: "SD" },
+    ],
+    chartData: [62, 58, 65, 70, 68, 75, 72],
+  },
+};
+
 export function WeeklyReportCard() {
   const lang = useAppStore((s) => s.lang);
   const router = useRouter();
@@ -114,25 +137,112 @@ export function WeeklyReportCard() {
               </div>
             )}
 
-            {is403 && (
-              <div className="py-4 text-center">
-                <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground mb-2">
-                  {lang === "ko"
-                    ? "Pro+ 플랜에서 이용 가능합니다"
-                    : "Available for Pro+ plan"}
-                </p>
-                <a
-                  href="/upgrade"
-                  className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                  style={{
-                    background: "linear-gradient(to right, #7c3aed, #6366f1)",
-                  }}
-                >
-                  {t(lang, "dash_unlock_pro_plus")}
-                </a>
-              </div>
-            )}
+            {is403 && (() => {
+              const demo = DEMO_WEEKLY[lang === "ko" ? "ko" : "en"];
+              const dayLabels = lang === "ko"
+                ? ["월", "화", "수", "목", "금", "토", "일"]
+                : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+              return (
+                <div className="py-3 relative overflow-hidden">
+                  {/* Demo banner */}
+                  <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 mb-3">
+                    <span className="text-[10px] font-medium text-amber-400">
+                      {t(lang, "demo_banner_weekly")}
+                    </span>
+                  </div>
+
+                  {/* Blurred demo content */}
+                  <div className="relative">
+                    <div className="select-none pointer-events-none opacity-40 space-y-4" style={{ filter: "blur(2px)" }}>
+                      {/* Period */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {demo.period}
+                      </div>
+
+                      {/* Tension score */}
+                      <div className="flex items-center gap-3 rounded-lg bg-muted/20 p-3">
+                        <div className="flex-1">
+                          <p className="text-[10px] text-muted-foreground mb-0.5">
+                            {lang === "ko" ? "홈 국가 긴장도" : "Home Tension"}
+                          </p>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-xl font-bold tabular-nums">{demo.tension.score}</span>
+                            <span className="text-[10px] text-muted-foreground">/100</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <TrendingUp className="h-4 w-4 text-red-400" />
+                          <span className="text-sm font-bold tabular-nums text-red-400">{demo.tension.delta}</span>
+                        </div>
+                      </div>
+
+                      {/* Bar chart placeholder */}
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground mb-2">
+                          {lang === "ko" ? "일별 긴장도 추이" : "Daily Tension Trend"}
+                        </p>
+                        <div className="flex items-end gap-1 h-[80px]">
+                          {demo.chartData.map((val, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                              <div
+                                className="w-full rounded-t"
+                                style={{
+                                  height: `${(val / 100) * 70}px`,
+                                  backgroundColor: impactColor(val),
+                                  opacity: 0.7,
+                                }}
+                              />
+                              <span className="text-[8px] text-muted-foreground">{dayLabels[idx]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Top 3 issues */}
+                      <div>
+                        <p className="text-[10px] font-bold text-muted-foreground mb-1.5">
+                          {lang === "ko" ? "이번 주 주요 이슈" : "Top Issues This Week"}
+                        </p>
+                        <div className="space-y-1">
+                          {demo.topIssues.map((issue, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 rounded-lg bg-muted/10 px-2.5 py-2"
+                            >
+                              <span className="text-[10px] font-bold text-muted-foreground w-4">{idx + 1}</span>
+                              <span className="text-[11px]">{getFlag(issue.cc)}</span>
+                              <span className="flex-1 text-[11px] font-medium truncate">{issue.title}</span>
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                style={{
+                                  color: impactColor(issue.impact),
+                                  backgroundColor: `${impactColor(issue.impact)}15`,
+                                }}
+                              >
+                                {issue.impact}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-card/90 pointer-events-none" />
+                  </div>
+
+                  {/* CTA button */}
+                  <a
+                    href="/upgrade?source=demo_weekly"
+                    className="flex items-center justify-center gap-1.5 mt-3 rounded-full py-2 text-xs font-bold text-white w-full relative z-10"
+                    style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
+                  >
+                    {t(lang, "demo_cta_proplus")}
+                  </a>
+                </div>
+              );
+            })()}
 
             {isError && !is403 && (
               <p className="py-4 text-xs text-muted-foreground text-center">

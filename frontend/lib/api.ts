@@ -190,6 +190,7 @@ interface MeData {
   display_name: string | null;
   bio: string | null;
   agreed_terms_at: string | null;
+  marketing_agreed_at: string | null;
 }
 
 export function useMe() {

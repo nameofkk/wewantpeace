@@ -16,6 +16,40 @@ import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
 
+// ── 데모 시그널 데이터 (Free 유저용) ─────────────────────────────────────
+const DEMO_SIGNALS = {
+  firms: {
+    type: "FeatureCollection" as const,
+    features: [
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [31.17, 48.38] }, properties: { intensity: 0.72, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.52, 49.01] }, properties: { intensity: 0.45, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [36.23, 50.45] }, properties: { intensity: 0.88, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.47, 31.50] }, properties: { intensity: 0.65, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.26, 31.25] }, properties: { intensity: 0.55, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [32.53, 15.60] }, properties: { intensity: 0.60, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [33.43, 12.86] }, properties: { intensity: 0.50, signal_type: "firms_hotspot" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [96.17, 16.87] }, properties: { intensity: 0.40, signal_type: "firms_hotspot" } },
+    ],
+  },
+  outage: {
+    type: "FeatureCollection" as const,
+    features: [
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [30.52, 50.45] }, properties: { severity: 0.75, intensity: 0.75, signal_type: "ioda_outage" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.78, 31.25] }, properties: { severity: 0.60, intensity: 0.60, signal_type: "ioda_outage" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [32.53, 15.50] }, properties: { severity: 0.55, intensity: 0.55, signal_type: "ioda_outage" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [96.20, 19.76] }, properties: { severity: 0.45, intensity: 0.45, signal_type: "ioda_outage" } },
+    ],
+  },
+  gps_jam: {
+    type: "FeatureCollection" as const,
+    features: [
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [35.22, 48.52] }, properties: { strength: 0.80, intensity: 0.80, signal_type: "gps_jamming" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.89, 31.95] }, properties: { strength: 0.65, intensity: 0.65, signal_type: "gps_jamming" } },
+      { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [44.37, 33.31] }, properties: { strength: 0.50, intensity: 0.50, signal_type: "gps_jamming" } },
+    ],
+  },
+};
+
 // ── 실시간 경과 시간 훅 ───────────────────────────────────────────────────
 function useElapsed(isoString?: string, lang: Lang = "ko") {
   const [elapsed, setElapsed] = useState(0);
@@ -410,10 +444,18 @@ export default function MapPage() {
   const outageAnimRef = useRef<number | null>(null);
   const gpsJamAnimRef = useRef<number | null>(null);
   const isPro = !meLoading && !authLoading && (plan === "pro" || plan === "pro_plus");
+  const [intelDemoMode, setIntelDemoMode] = useState(false);
   const { data: firmsData } = useFirmsSignals(firmsEnabled && isPro);
   const { data: outageData } = useOutageSignals(outageEnabled && isPro);
   const { data: gpsJamData } = useGpsJamSignals(gpsJamEnabled && isPro);
   const { data: signalSummary } = useSignalSummary();
+
+  // ── 데모 모드: 모든 Intel 레이어 OFF 시 자동 해제 ──
+  useEffect(() => {
+    if (intelDemoMode && !firmsEnabled && !outageEnabled && !gpsJamEnabled) {
+      setIntelDemoMode(false);
+    }
+  }, [intelDemoMode, firmsEnabled, outageEnabled, gpsJamEnabled]);
 
   // ── 매칭 연결선 (아크) ──
   const { data: matchedGeo } = useMatchedSignals(selectedCluster?.id);
@@ -435,6 +477,14 @@ export default function MapPage() {
     {
       target: "[data-tour='map-filters']",
       content: t(lang, "tour_map_filters"),
+    },
+    {
+      target: "[data-tour='map-markers-toggle']",
+      content: t(lang, "tour_map_markers_toggle"),
+    },
+    {
+      target: "[data-tour='map-intel-panel']",
+      content: t(lang, "tour_map_intel_panel"),
     },
   ], [lang]);
 
@@ -637,14 +687,15 @@ export default function MapPage() {
       try { if (map.getSource("firms-source")) map.removeSource("firms-source"); } catch {}
     };
 
-    if (!firmsEnabled || !firmsData || firmsData.features.length === 0) {
+    const effectiveFirmsData = intelDemoMode ? DEMO_SIGNALS.firms : firmsData;
+    if (!firmsEnabled || !effectiveFirmsData || effectiveFirmsData.features.length === 0) {
       cleanup();
       return;
     }
 
     try {
       cleanup();
-      map.addSource("firms-source", { type: "geojson", data: firmsData });
+      map.addSource("firms-source", { type: "geojson", data: effectiveFirmsData });
 
       // 히트맵 레이어 (저줌) — intensity 평균 0.05이므로 weight 곡선 보정
       map.addLayer({
@@ -701,7 +752,7 @@ export default function MapPage() {
     } catch {}
 
     return cleanup;
-  }, [firmsEnabled, firmsData, isMapReady]);
+  }, [firmsEnabled, firmsData, isMapReady, intelDemoMode]);
 
   // ── Outage Bubble WebGL 레이어 ──────────────────────────────────────────
   useEffect(() => {
@@ -716,7 +767,8 @@ export default function MapPage() {
       try { if (map.getSource("outage-source")) map.removeSource("outage-source"); } catch {}
     };
 
-    if (!outageEnabled || !outageData || outageData.features.length === 0) {
+    const effectiveOutageData = intelDemoMode ? DEMO_SIGNALS.outage : outageData;
+    if (!outageEnabled || !effectiveOutageData || effectiveOutageData.features.length === 0) {
       cleanup();
       return;
     }
@@ -726,8 +778,8 @@ export default function MapPage() {
 
       // GeoJSON에 라벨 텍스트 추가
       const enriched = {
-        ...outageData,
-        features: outageData.features.map((f: any) => {
+        ...effectiveOutageData,
+        features: effectiveOutageData.features.map((f: any) => {
           const pct = Math.round((f.properties.intensity ?? 0) * 100);
           const cc = f.properties.country_code ?? "";
           return { ...f, properties: { ...f.properties, label: `${cc} ▼${pct}%` } };
@@ -801,7 +853,7 @@ export default function MapPage() {
     } catch {}
 
     return cleanup;
-  }, [outageEnabled, outageData, isMapReady]);
+  }, [outageEnabled, outageData, isMapReady, intelDemoMode]);
 
   // ── GPS Jamming Zone WebGL 레이어 ───────────────────────────────────────
   useEffect(() => {
@@ -815,7 +867,8 @@ export default function MapPage() {
       try { if (map.getSource("gpsjam-source")) map.removeSource("gpsjam-source"); } catch {}
     };
 
-    if (!gpsJamEnabled || !gpsJamData || gpsJamData.features.length === 0) {
+    const effectiveGpsJamData = intelDemoMode ? DEMO_SIGNALS.gps_jam : gpsJamData;
+    if (!gpsJamEnabled || !effectiveGpsJamData || effectiveGpsJamData.features.length === 0) {
       cleanup();
       return;
     }
@@ -823,7 +876,7 @@ export default function MapPage() {
     try {
       cleanup();
       // 포인트를 원형 폴리곤으로 변환 (반경 ~100km 근사)
-      const polygonFeatures = gpsJamData.features.map((f) => {
+      const polygonFeatures = effectiveGpsJamData.features.map((f) => {
         const [lon, lat] = f.geometry.coordinates;
         const intensity = f.properties.intensity || 0.3;
         const steps = 24;
@@ -880,7 +933,7 @@ export default function MapPage() {
     } catch {}
 
     return cleanup;
-  }, [gpsJamEnabled, gpsJamData, isMapReady]);
+  }, [gpsJamEnabled, gpsJamData, isMapReady, intelDemoMode]);
 
   // ── 매칭 연결선 (Arc) — 클러스터 선택 시 시그널 포인트와의 아크 표시 ──
   useEffect(() => {
@@ -1115,6 +1168,7 @@ export default function MapPage() {
           {/* Row 3: 마커 + 히트맵 + Intel 토글 (오른쪽 정렬) */}
           <div className="flex items-center justify-end gap-1.5">
             <button
+              data-tour="map-markers-toggle"
               onClick={() => setMarkersVisible((v) => !v)}
               className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap",
@@ -1147,7 +1201,7 @@ export default function MapPage() {
               {lang === "ko" ? "히트맵" : "Heatmap"}
             </button>
             {/* Intel Layer Toggle */}
-            <div className="relative">
+            <div className="relative" data-tour="map-intel-panel">
               <button
                 onClick={() => { setShowIntelPanel((v) => !v); setIntelTooltip(null); }}
                 className={cn(
@@ -1176,22 +1230,31 @@ export default function MapPage() {
                   )}
                   <LayerToggleRow
                     icon="🔥" label={t(lang, "layer_firms")} tooltip={t(lang, "layer_firms_tooltip")}
-                    enabled={firmsEnabled} isPro={isPro} count={signalSummary?.firms_hotspot}
-                    onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setFirmsEnabled((v) => !v); }}
+                    enabled={firmsEnabled} isPro={isPro || intelDemoMode} count={signalSummary?.firms_hotspot}
+                    onToggle={() => {
+                      if (!isPro) { setIntelDemoMode(true); }
+                      setFirmsEnabled((v) => !v);
+                    }}
                     onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
                   <LayerToggleRow
                     icon="🌐" label={t(lang, "layer_outage")} tooltip={t(lang, "layer_outage_tooltip")}
-                    enabled={outageEnabled} isPro={isPro} count={signalSummary?.ioda_outage}
-                    onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setOutageEnabled((v) => !v); }}
+                    enabled={outageEnabled} isPro={isPro || intelDemoMode} count={signalSummary?.ioda_outage}
+                    onToggle={() => {
+                      if (!isPro) { setIntelDemoMode(true); }
+                      setOutageEnabled((v) => !v);
+                    }}
                     onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
                   <LayerToggleRow
                     icon="📡" label={t(lang, "layer_gps_jam")} tooltip={t(lang, "layer_gps_jam_tooltip")}
-                    enabled={gpsJamEnabled} isPro={isPro} count={signalSummary?.gps_jam}
-                    onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setGpsJamEnabled((v) => !v); }}
+                    enabled={gpsJamEnabled} isPro={isPro || intelDemoMode} count={signalSummary?.gps_jam}
+                    onToggle={() => {
+                      if (!isPro) { setIntelDemoMode(true); }
+                      setGpsJamEnabled((v) => !v);
+                    }}
                     onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
@@ -1504,8 +1567,24 @@ export default function MapPage() {
         </div>
       )}
 
+      {/* ── Intel Demo Banner (Free 유저 데모 모드) ──────────────── */}
+      {intelDemoMode && (
+        <div className="absolute left-3 right-3 z-20" style={{ top: "calc(120px + env(safe-area-inset-top, 0px))" }}>
+          <div className="rounded-xl border border-cyan-500/40 bg-cyan-950/90 backdrop-blur-sm px-4 py-2.5 flex items-center gap-3">
+            <Shield className="h-4 w-4 text-cyan-400 shrink-0" />
+            <p className="text-[11px] text-slate-300 flex-1">{t(lang, "demo_banner_intel")}</p>
+            <a
+              href="/upgrade?source=demo_intel"
+              className="shrink-0 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-[10px] font-bold text-white no-underline"
+            >
+              {t(lang, "demo_cta_pro")}
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* ── Signal Nudge Banner (Free 유저) ──────────────────────── */}
-      {isFree && signalSummary && signalSummary.total > 0 && (
+      {isFree && signalSummary && signalSummary.total > 0 && !intelDemoMode && (
         <SignalNudgeBanner summary={signalSummary} lang={lang} onUpgrade={() => mapPaywall.show()} />
       )}
 

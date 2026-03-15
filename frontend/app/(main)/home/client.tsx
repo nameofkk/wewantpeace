@@ -51,6 +51,9 @@ import {
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
+import AppTour from "@/components/ui/AppTour";
+import TourHelpButton from "@/components/ui/TourHelpButton";
+import type { Step } from "react-joyride";
 
 export default function HomePage() {
   return (
@@ -158,8 +161,30 @@ function ReportContent() {
 
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel" | "detail">("market");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [tourRun, setTourRun] = useState(false);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
-  const availableCountries = isPro ? SUPPORTED_HOME_COUNTRIES : ["KR"];
+
+  const dashTourSteps: Step[] = useMemo(() => [
+    {
+      target: "[data-tour='dash-page']",
+      content: t(lang, "tour_dash_page_role"),
+      placement: "center" as const,
+      disableBeacon: true,
+    },
+    {
+      target: "[data-tour='dash-risk']",
+      content: t(lang, "tour_dash_risk"),
+    },
+    {
+      target: "[data-tour='dash-watchlist']",
+      content: t(lang, "tour_dash_watchlist"),
+    },
+    {
+      target: "[data-tour='dash-top-issues']",
+      content: t(lang, "tour_dash_top_issues"),
+    },
+  ], [lang]);
+  const availableCountries = isPro ? SUPPORTED_HOME_COUNTRIES : [];
   const prefetchSummary = usePrefetchImpactSummary();
 
   const trackBehavior = useTrackBehavior();
@@ -261,7 +286,9 @@ function ReportContent() {
   const restIssues = topItems.slice(1);
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
+    <div className="flex flex-col" data-tour="dash-page" style={{ height: "calc(100dvh - 60px)" }}>
+      <AppTour tourId="dashboard" steps={dashTourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
+      <TourHelpButton tourId="dashboard" onStartTour={() => setTourRun(true)} />
       {/* ═══════════════ Header ═══════════════ */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-3">
         <div className="grid grid-cols-3 items-center">
@@ -312,6 +339,7 @@ function ReportContent() {
             animate="visible"
             variants={sectionVariants}
             className="rounded-xl border border-border bg-card p-4"
+            data-tour="dash-risk"
           >
             <SectionHeader
               icon={BarChart3}
@@ -405,7 +433,7 @@ function ReportContent() {
 
             {/* Watchlist chips */}
             {myCountries.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-1" data-tour="dash-watchlist">
               <span className="text-[9px] text-muted-foreground/60 font-medium">
                 {lang === "ko" ? "관심 국가 긴장도" : "Watchlist Tension"}
               </span>
@@ -483,7 +511,7 @@ function ReportContent() {
 
             {/* #1 Issue: SmartSummaryCard Full */}
             {topIssue && (
-              <div className="rounded-xl border border-border bg-card mt-5">
+              <div className="rounded-xl border border-border bg-card mt-5" data-tour="dash-top-issues">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={AlertTriangle}
@@ -949,12 +977,12 @@ function ReportContent() {
                   </div>
                 );
               })}
-              {!isPro && availableCountries.length <= 1 && (
+              {!isPro && availableCountries.length === 0 && (
                 <div className="px-5 py-4 text-center border-t border-border/30 mt-2">
                   <p className="text-[10px] text-muted-foreground mb-2">
                     {lang === "ko"
-                      ? "Pro 플랜에서 다른 국가를 기준으로 분석할 수 있습니다"
-                      : "Analyze from other countries' perspective with Pro"}
+                      ? "Pro 플랜에서 특정 국가를 기준으로 개인화된 분석을 받을 수 있습니다"
+                      : "Get personalized analysis from specific countries' perspective with Pro"}
                   </p>
                   <a
                     href="/upgrade?source=home_country_picker"

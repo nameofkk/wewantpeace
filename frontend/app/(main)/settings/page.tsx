@@ -217,6 +217,11 @@ export default function SettingsPage() {
       placement: "bottom" as const,
     },
     {
+      target: "[data-tour='settings-marketing-email']",
+      content: t(lang, "tour_settings_intel_alerts"),
+      placement: "bottom" as const,
+    },
+    {
       target: "[data-tour='settings-plan']",
       content: t(lang, "tour_settings_plan"),
       placement: "bottom" as const,
@@ -827,7 +832,7 @@ export default function SettingsPage() {
             {(["ko", "en"] as const).map((l) => (
               <button
                 key={l}
-                onClick={() => setLang(l)}
+                onClick={() => { setLang(l); saveNotifPatch({ language: l }); }}
                 className={cn(
                   "flex-1 py-2 rounded-lg text-sm font-medium transition-colors",
                   lang === l
@@ -918,20 +923,20 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">{t(lang, "settings_home_country")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_home_country_desc")}</p>
                 </div>
-                <select
-                  value={homeCountry}
-                  onChange={(e) => {
-                    const code = e.target.value;
-                    setHomeCountry(code);
-                    saveNotifPatch({ home_country: code });
-                  }}
-                  className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
-                >
-                  <option value="">{t(lang, "home_country_basic_label")}</option>
-                  {plan === "free" ? (
-                    <option value="KR">{getFlag("KR")} {getCountryName("KR", lang)}</option>
-                  ) : (
-                    ([
+                {plan === "free" ? (
+                  <span className="text-sm text-muted-foreground">{t(lang, "settings_home_country_global")}</span>
+                ) : (
+                  <select
+                    value={homeCountry}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setHomeCountry(code);
+                      saveNotifPatch({ home_country: code });
+                    }}
+                    className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
+                  >
+                    <option value="">{t(lang, "home_country_basic_label")}</option>
+                    {([
                       { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
                       { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
                       { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
@@ -947,9 +952,9 @@ export default function SettingsPage() {
                           ))}
                         </optgroup>
                       );
-                    })
-                  )}
-                </select>
+                    })}
+                  </select>
+                )}
               </div>
               {plan === "free" && (
                 <p className="text-[9px] text-muted-foreground mt-1">{t(lang, "settings_home_country_pro_hint")}</p>
@@ -1144,6 +1149,37 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* 5. 주간 리포트 이메일 수신 (Pro+) */}
+            <div className="p-4 border-t border-border" data-tour="settings-marketing-email">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{t(lang, "settings_marketing_toggle")}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(lang, "settings_marketing_desc")}</p>
+                </div>
+                {plan !== "pro_plus" ? (
+                  <Link href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
+                    Pro+ →
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const now = me?.marketing_agreed_at ? null : new Date().toISOString();
+                      saveNotifPatch({ marketing_agreed_at: now } as any);
+                    }}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                      me?.marketing_agreed_at ? "bg-primary" : "bg-secondary"
+                    )}
+                  >
+                    <span className={cn(
+                      "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform",
+                      me?.marketing_agreed_at ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </button>
+                )}
+              </div>
             </div>
 
           </div>

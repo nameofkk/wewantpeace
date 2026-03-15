@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Rss,
   Brain,
+  Satellite,
   Bell,
   BellOff,
   Lock,
@@ -22,7 +23,7 @@ import {
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { ALL_COUNTRIES, getCountryName, getFlag } from "@/lib/countries";
-import { useMe } from "@/lib/api";
+import { useMe, API_BASE } from "@/lib/api";
 import { signInWithGoogle, signInWithApple, signInWithToss, getIdToken } from "@/lib/auth";
 import { isTossMiniApp } from "@/lib/platform";
 import { trackEvent } from "@/lib/analytics";
@@ -103,6 +104,7 @@ export default function OnboardingPage() {
   const [proBannerHighlight, setProBannerHighlight] = useState(false);
   const [loginLoading, setLoginLoading] = useState<"google" | "apple" | "toss" | null>(null);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   const scanCount = useScanCounter();
 
@@ -180,7 +182,25 @@ export default function OnboardingPage() {
     router.push(returnUrl || "/home");
   }
 
-  function finishOnboarding() {
+  async function finishOnboarding() {
+    // 마케팅 수신 동의 시 PATCH /me
+    if (marketingConsent) {
+      try {
+        const token = await getIdToken();
+        if (token) {
+          await fetch(`${API_BASE}/me`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ marketing_agreed_at: new Date().toISOString() }),
+          });
+        }
+      } catch {
+        // 실패해도 온보딩은 계속 진행
+      }
+    }
     localStorage.setItem("onboarding_done", "true");
     localStorage.setItem("wwp_welcome_seen", String(Date.now()));
     const returnUrl = sessionStorage.getItem("wwp_return_url");
@@ -381,7 +401,8 @@ export default function OnboardingPage() {
                 {[
                   { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
                   { icon: Brain, key: "ob_hero_signal_2" as const, delay: "0.1s" },
-                  { icon: Bell, key: "ob_hero_signal_3" as const, delay: "0.2s" },
+                  { icon: Satellite, key: "ob_hero_signal_3_v2" as const, delay: "0.2s" },
+                  { icon: Bell, key: "ob_hero_signal_4" as const, delay: "0.3s" },
                 ].map(({ icon: Icon, key, delay }) => (
                   <div
                     key={key}
@@ -603,6 +624,22 @@ export default function OnboardingPage() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 마케팅 수신 동의 */}
+              <div className="border-t border-border/30 pt-3 mt-2">
+                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={marketingConsent}
+                    onChange={(e) => setMarketingConsent(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>{t(lang, "marketing_consent_label")}</span>
+                </label>
+                <p className="text-[10px] text-muted-foreground/70 ml-6">
+                  {t(lang, "marketing_consent_desc")}
+                </p>
               </div>
             </div>
           )}

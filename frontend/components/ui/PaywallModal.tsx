@@ -13,7 +13,7 @@ import { getSessionId } from "@/lib/session";
 import { useRouter } from "next/navigation";
 
 interface PaywallModalProps {
-  trigger: "map_locked" | "verified_locked" | "kscore_threshold_locked" | "watch_country_limit_locked";
+  trigger: "map_locked" | "verified_locked" | "kscore_threshold_locked" | "watch_country_limit_locked" | "intel_locked";
   isOpen: boolean;
   onClose: () => void;
 }
@@ -35,6 +35,10 @@ const TRIGGER_TITLES: Record<string, { ko: string; en: string }> = {
     ko: "더 많은 관심 국가",
     en: "More Countries",
   },
+  intel_locked: {
+    ko: "인텔리전스 레이어",
+    en: "Intelligence Layers",
+  },
 };
 
 const TRIGGER_DESCRIPTIONS: Record<string, { ko: string; en: string }> = {
@@ -53,6 +57,10 @@ const TRIGGER_DESCRIPTIONS: Record<string, { ko: string; en: string }> = {
   watch_country_limit_locked: {
     ko: "Pro에서 5개 국가까지, Pro+에서 무제한으로 추적하세요",
     en: "Track up to 5 countries with Pro, unlimited with Pro+",
+  },
+  intel_locked: {
+    ko: "위성 열점, 인터넷 단절, GPS 교란 등 실시간 인텔리전스를 확인하세요",
+    en: "Access real-time satellite hotspots, internet outages, and GPS jamming data",
   },
 };
 
@@ -112,6 +120,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
     t(lang, "paywall_pro_feature_countries"),
     t(lang, "paywall_pro_feature_kscore"),
     t(lang, "paywall_pro_feature_quiet"),
+    t(lang, "paywall_pro_feature_intel"),
   ];
 
   return (

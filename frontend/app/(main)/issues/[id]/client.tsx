@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText, Flame, Globe, Radio, Activity } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText, Flame, Globe, Radio, Activity, Lock } from "lucide-react";
 import {
   LineChart as RCLineChart,
   Line as RCLine,
@@ -14,7 +14,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
-import { useClusterDetail, useKScoreHistory, useTrackBehavior, useClusterSignals, useClusterContext, type KScoreHistoryPoint, type ClusterSignalMatch, type HistoricalContext } from "@/lib/api";
+import { useClusterDetail, useKScoreHistory, useTrackBehavior, useClusterSignals, useClusterContext, useMe, type KScoreHistoryPoint, type ClusterSignalMatch, type HistoricalContext } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { SourceBadge } from "@/components/issue/SourceBadge";
@@ -172,9 +173,27 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
   );
 }
 
+// ── 교차검증 데모 데이터 (Free 유저용) ──
+const DEMO_CROSS_MATCHES = [
+  { signal_type: "firms_hotspot", count: 3, avg_distance_km: 12, avg_time_gap: "2h" },
+  { signal_type: "ioda_outage", count: 1, avg_distance_km: 0, avg_time_gap: "4h" },
+];
+
 // ── 교차검증 증거 섹션 ──
 function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
   const { data: signals, isPending } = useClusterSignals(clusterId);
+  const { data: me, isLoading: meLoading } = useMe();
+  const { loading: authLoading } = useAuth();
+  const userPlan = useAppStore((s) => s.userPlan);
+  const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
+  const isPro = !meLoading && !authLoading && (plan === "pro" || plan === "pro_plus");
+
+  const ICONS: Record<string, React.ReactNode> = {
+    firms_hotspot: <Flame className="h-3.5 w-3.5 text-orange-400" />,
+    ioda_outage: <Globe className="h-3.5 w-3.5 text-indigo-400" />,
+    cf_anomaly: <Activity className="h-3.5 w-3.5 text-purple-400" />,
+    gps_jam: <Radio className="h-3.5 w-3.5 text-cyan-400" />,
+  };
 
   if (isPending) {
     return (
@@ -186,63 +205,99 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
     );
   }
 
-  if (!signals || signals.length === 0) {
-    return null;
-  }
+  // Pro 유저: 실제 데이터 표시 (기존 로직)
+  if (isPro && signals && signals.length > 0) {
+    const grouped: Record<string, ClusterSignalMatch[]> = {};
+    for (const s of signals) {
+      (grouped[s.signal_type] ??= []).push(s);
+    }
 
-  const ICONS: Record<string, React.ReactNode> = {
-    firms_hotspot: <Flame className="h-3.5 w-3.5 text-orange-400" />,
-    ioda_outage: <Globe className="h-3.5 w-3.5 text-indigo-400" />,
-    cf_anomaly: <Activity className="h-3.5 w-3.5 text-purple-400" />,
-    gps_jam: <Radio className="h-3.5 w-3.5 text-cyan-400" />,
-  };
-
-  // 시그널 유형별 그룹핑
-  const grouped: Record<string, ClusterSignalMatch[]> = {};
-  for (const s of signals) {
-    (grouped[s.signal_type] ??= []).push(s);
-  }
-
-  return (
-    <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
-      <div className="flex items-center gap-2 mb-3">
-        <Shield className="h-3.5 w-3.5 text-indigo-400" />
-        <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+    return (
+      <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="h-3.5 w-3.5 text-indigo-400" />
+          <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+        </div>
+        <div className="space-y-2">
+          {Object.entries(grouped).map(([type, items]) => {
+            const avgDist = items.reduce((s, i) => s + (i.distance_km ?? 0), 0) / items.length;
+            const avgDelta = items.reduce((s, i) => s + (i.time_delta_h ?? 0), 0) / items.length;
+            const timeLabel = avgDelta < 1 ? `${Math.round(avgDelta * 60)}m` : `${avgDelta.toFixed(1)}h`;
+            return (
+              <div key={type} className="flex items-start gap-2 text-[11px]">
+                {ICONS[type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
+                <div>
+                  {type === "firms_hotspot" && (
+                    <span>{t(lang, "cross_validation_firms_match", { count: items.length, distance: Math.round(avgDist), time: timeLabel })}</span>
+                  )}
+                  {type === "ioda_outage" && (
+                    <span>{t(lang, "cross_validation_outage_match", { country: items[0]?.country_code ?? "?", impact: Math.round(items[0].intensity * 100) })}</span>
+                  )}
+                  {type === "cf_anomaly" && (
+                    <span>{t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}</span>
+                  )}
+                  {type === "gps_jam" && (
+                    <span>{t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}</span>
+                  )}
+                  {items.length > 1 && type !== "firms_hotspot" && (
+                    <span className="text-muted-foreground ml-1">({items.length}건)</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
+          {t(lang, "cross_validation_boost", { boost: Math.min(15, Object.keys(grouped).length * 5) })}
+        </div>
       </div>
-      <div className="space-y-2">
-        {Object.entries(grouped).map(([type, items]) => {
-          const avgDist = items.reduce((s, i) => s + (i.distance_km ?? 0), 0) / items.length;
-          const avgDelta = items.reduce((s, i) => s + (i.time_delta_h ?? 0), 0) / items.length;
-          const timeLabel = avgDelta < 1 ? `${Math.round(avgDelta * 60)}m` : `${avgDelta.toFixed(1)}h`;
-          return (
-            <div key={type} className="flex items-start gap-2 text-[11px]">
-              {ICONS[type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
+    );
+  }
+
+  // Free 유저: 데모 데이터 + blur 오버레이
+  if (!isPro) {
+    return (
+      <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up relative overflow-hidden">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="h-3.5 w-3.5 text-indigo-400" />
+          <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+        </div>
+        {/* 데모 카드 (블러 처리) */}
+        <div className="space-y-2" style={{ filter: "blur(2px)" }}>
+          {DEMO_CROSS_MATCHES.map((demo) => (
+            <div key={demo.signal_type} className="flex items-start gap-2 text-[11px]">
+              {ICONS[demo.signal_type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
               <div>
-                {type === "firms_hotspot" && (
-                  <span>{t(lang, "cross_validation_firms_match", { count: items.length, distance: Math.round(avgDist), time: timeLabel })}</span>
+                {demo.signal_type === "firms_hotspot" && (
+                  <span>{t(lang, "cross_validation_firms_match", { count: demo.count, distance: demo.avg_distance_km, time: demo.avg_time_gap })}</span>
                 )}
-                {type === "ioda_outage" && (
-                  <span>{t(lang, "cross_validation_outage_match", { country: items[0]?.country_code ?? "?", impact: Math.round(items[0].intensity * 100) })}</span>
-                )}
-                {type === "cf_anomaly" && (
-                  <span>{t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}</span>
-                )}
-                {type === "gps_jam" && (
-                  <span>{t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}</span>
-                )}
-                {items.length > 1 && type !== "firms_hotspot" && (
-                  <span className="text-muted-foreground ml-1">({items.length}건)</span>
+                {demo.signal_type === "ioda_outage" && (
+                  <span>{t(lang, "cross_validation_outage_match", { country: "UA", impact: 75 })}</span>
                 )}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+        <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70" style={{ filter: "blur(2px)" }}>
+          {t(lang, "cross_validation_boost", { boost: 10 })}
+        </div>
+        {/* 그래디언트 오버레이 + CTA */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.8) 100%)" }}>
+          <Lock className="h-4 w-4 text-slate-400 mb-1.5" />
+          <p className="text-[11px] text-slate-300 text-center px-4 mb-2">{t(lang, "demo_banner_intel")}</p>
+          <a
+            href="/upgrade?source=demo_cross"
+            className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 text-[10px] font-bold text-white no-underline"
+          >
+            {t(lang, "demo_cta_pro")}
+          </a>
+        </div>
       </div>
-      <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
-        {t(lang, "cross_validation_boost", { boost: Math.min(15, Object.keys(grouped).length * 5) })}
-      </div>
-    </div>
-  );
+    );
+  }
+
+  // Pro 유저이지만 시그널 데이터 없음
+  return null;
 }
 
 // ── 역사적 맥락 섹션 ──

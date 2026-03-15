@@ -79,6 +79,17 @@ function getCategories(lang: Lang): GlossaryCategory[] {
         { key: "t3", label: t(lang, "glossary_source_t3"), desc: t(lang, "glossary_source_t3_desc") },
       ],
     },
+    {
+      title: t(lang, "glossary_cat_intel"),
+      color: "border-l-cyan-500",
+      icon: "🛰️",
+      items: [
+        { key: "firms", label: t(lang, "glossary_firms"), desc: t(lang, "glossary_firms_desc") },
+        { key: "ioda", label: t(lang, "glossary_ioda"), desc: t(lang, "glossary_ioda_desc") },
+        { key: "gps_jam", label: t(lang, "glossary_gps_jam"), desc: t(lang, "glossary_gps_jam_desc") },
+        { key: "cross_verify", label: t(lang, "glossary_cross_verify"), desc: t(lang, "glossary_cross_verify_desc") },
+      ],
+    },
   ];
 }
 

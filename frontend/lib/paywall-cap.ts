@@ -12,7 +12,8 @@ type PaywallTrigger =
   | "map_locked"
   | "verified_locked"
   | "kscore_threshold_locked"
-  | "watch_country_limit_locked";
+  | "watch_country_limit_locked"
+  | "intel_locked";
 
 function getSessionCapKey(trigger: string): string {
   return `wwp_paywall_session_${getSessionId()}_${trigger}`;
