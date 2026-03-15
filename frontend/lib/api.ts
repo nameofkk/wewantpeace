@@ -622,11 +622,14 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     staleTime: 30 * 60 * 1000,
     placeholderData: keepPreviousData,
     retry: (count, error) => {
+      const status = (error as any)?.status;
       // 401은 auth 복원 지연일 수 있으므로 2회까지 재시도
-      if ((error as any)?.status === 401 && count < 2) return true;
+      if (status === 401 && count < 2) return true;
+      // 일시적 서버 에러 (429 rate limit, 500, 503) 1회 재시도
+      if ([429, 500, 503].includes(status) && count < 1) return true;
       return false;
     },
-    retryDelay: 2000,
+    retryDelay: 1500,
   });
 }
 

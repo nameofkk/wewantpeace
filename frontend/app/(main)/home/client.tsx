@@ -156,7 +156,7 @@ function ReportContent() {
   const userPlan = meObj?.plan ?? "free";
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
-  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj } = useImpactSummary(homeCountry ?? "", lang);
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
@@ -298,7 +298,7 @@ function ReportContent() {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
-  if (summaryError && !summary) {
+  if (summaryError && !summary && !summaryFetching) {
     return (
       <div className="p-6 text-center">
         <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
