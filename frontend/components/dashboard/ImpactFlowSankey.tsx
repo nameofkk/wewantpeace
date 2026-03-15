@@ -293,6 +293,17 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           style={{ display: "block" }}
           onMouseLeave={() => setHoveredNodeId(null)}
         >
+          {/* 글로우 필터 */}
+          <defs>
+            <filter id="particle-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
           {/* 링크 (곡선) */}
           {links.map((l, i) => {
             const srcIdx = conflictIdxMap.get(l.sourceId) ?? -1;
@@ -301,8 +312,9 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const linkOpacity = isHovering
               ? isConnected ? 0.55 : 0.06
               : baseOpacity;
-            // 유휴 흐름 애니메이션 속도: 링크별 약간 다르게 (자연스러운 비동기 흐름)
-            const idleDur = 2.5 + (i % 3) * 0.6;
+            // 유휴 파티클 속도: 링크별 비동기
+            const idleDur = 2.8 + (i % 4) * 0.7;
+            const idleDur2 = 3.2 + ((i + 2) % 4) * 0.6;
 
             return (
               <g key={i}>
@@ -317,45 +329,73 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   style={{ transition: "stroke-opacity 0.25s ease" }}
                 />
 
-                {/* 유휴 흐름 애니메이션 — 항상 흐르는 파티클 */}
+                {/* 유휴: 빛나는 점이 경로를 따라 이동 (2개 비동기) */}
                 {!isHovering && (
-                  <path
-                    d={l.d}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.5)"
-                    strokeWidth={Math.max(l.thickness * 0.3, 1.5)}
-                    strokeOpacity={isPro ? 0.4 : 0.2}
-                    strokeDasharray="4 12"
-                    strokeLinecap="round"
-                  >
-                    <animate
-                      attributeName="stroke-dashoffset"
-                      from="0"
-                      to="-16"
-                      dur={`${idleDur}s`}
-                      repeatCount="indefinite"
-                    />
-                  </path>
+                  <>
+                    <circle
+                      r={Math.max(l.thickness * 0.25, 2)}
+                      fill="white"
+                      opacity={isPro ? 0.6 : 0.3}
+                      filter="url(#particle-glow)"
+                    >
+                      <animateMotion
+                        dur={`${idleDur}s`}
+                        repeatCount="indefinite"
+                        path={l.d}
+                      />
+                    </circle>
+                    <circle
+                      r={Math.max(l.thickness * 0.18, 1.5)}
+                      fill={l.srcColor}
+                      opacity={isPro ? 0.45 : 0.2}
+                      filter="url(#particle-glow)"
+                    >
+                      <animateMotion
+                        dur={`${idleDur2}s`}
+                        repeatCount="indefinite"
+                        path={l.d}
+                        begin={`${idleDur2 * 0.5}s`}
+                      />
+                    </circle>
+                  </>
                 )}
 
-                {/* 호버 시 강조 흐름 애니메이션 */}
+                {/* 호버 시: 밝은 점 빠르게 + 경로 글로우 */}
                 {isHovering && isConnected && (
-                  <path
-                    d={l.d}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.55)"
-                    strokeWidth={Math.max(l.thickness * 0.35, 1.5)}
-                    strokeDasharray="5 10"
-                    strokeLinecap="round"
-                  >
-                    <animate
-                      attributeName="stroke-dashoffset"
-                      from="0"
-                      to="-15"
-                      dur="0.7s"
-                      repeatCount="indefinite"
+                  <>
+                    <path
+                      d={l.d}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.15)"
+                      strokeWidth={l.thickness + 4}
+                      strokeLinecap="round"
                     />
-                  </path>
+                    <circle
+                      r={Math.max(l.thickness * 0.35, 2.5)}
+                      fill="white"
+                      opacity={0.8}
+                      filter="url(#particle-glow)"
+                    >
+                      <animateMotion
+                        dur="1s"
+                        repeatCount="indefinite"
+                        path={l.d}
+                      />
+                    </circle>
+                    <circle
+                      r={Math.max(l.thickness * 0.25, 2)}
+                      fill="white"
+                      opacity={0.5}
+                      filter="url(#particle-glow)"
+                    >
+                      <animateMotion
+                        dur="1s"
+                        repeatCount="indefinite"
+                        path={l.d}
+                        begin="0.5s"
+                      />
+                    </circle>
+                  </>
                 )}
 
                 {/* 넓은 투명 터치 영역 (모바일 탭용) */}
