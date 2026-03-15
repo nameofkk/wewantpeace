@@ -6,7 +6,8 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   const devUid = typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
   if (devUid) return { "X-Dev-UID": devUid };
   try {
-    const { getIdToken } = await import("./auth");
+    const { waitForAuth, getIdToken } = await import("./auth");
+    await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 5초)
     const token = await getIdToken();
     if (token) return { Authorization: `Bearer ${token}` };
   } catch {
@@ -851,5 +852,45 @@ export function useMatchedSignals(clusterId: string | null | undefined) {
     queryFn: () => apiFetch<SignalGeoJSON>(`/signals/matched/${clusterId}`),
     enabled: !!clusterId,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ── 이슈 상세 — 교차검증 시그널 + 역사적 맥락 ──
+
+export interface ClusterSignalMatch {
+  signal_type: string;
+  intensity: number;
+  raw_value: number | null;
+  distance_km: number | null;
+  time_delta_h: number | null;
+  country_code: string | null;
+  observed_at: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface HistoricalContext {
+  total_events: number;
+  period_start: string | null;
+  period_end: string | null;
+  top_actors: string[];
+  recent_fatalities: number;
+  yearly_trend: Record<string, unknown>[];
+}
+
+export function useClusterSignals(clusterId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["issues", clusterId, "signals"],
+    queryFn: () => apiFetch<ClusterSignalMatch[]>(`/issues/${clusterId}/signals`),
+    enabled: !!clusterId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useClusterContext(clusterId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["issues", clusterId, "context"],
+    queryFn: () => apiFetch<HistoricalContext>(`/issues/${clusterId}/context`),
+    enabled: !!clusterId,
+    staleTime: 10 * 60 * 1000,
   });
 }

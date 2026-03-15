@@ -1480,6 +1480,40 @@ export const translations = {
     ob_home_country_title: "나의 국가",
     ob_home_country_desc: "글로벌 이슈가 내 나라에 미치는 영향을 확인하세요",
     ob_home_country_other: "다른 국가 선택",
+
+    // Intelligence Layers
+    layer_panel_title: "인텔리전스",
+    layer_firms: "위성 열점",
+    layer_outage: "인터넷 단절",
+    layer_gps_jam: "GPS 교란",
+    layer_cf_anomaly: "트래픽 이상",
+    layer_count: "{count}건",
+    layer_countries: "{count}개국",
+    layer_updated: "{time} 전",
+    layer_coming_soon: "곧 출시",
+    layer_pro_only: "Pro 전용",
+    layer_on: "켜짐",
+    layer_off: "꺼짐",
+
+    // 교차검증 (이슈 상세)
+    cross_validation_title: "교차검증 증거",
+    cross_validation_firms_match: "위성 열점 {count}건 매칭 ({distance}km, {time})",
+    cross_validation_outage_match: "인터넷 단절 감지 ({country}, {impact}% 영향)",
+    cross_validation_gps_match: "GPS 교란 감지 ({region})",
+    cross_validation_cf_match: "트래픽 이상 감지 ({country})",
+    cross_validation_boost: "교차검증으로 신뢰도 +{boost}% 상승",
+    cross_validation_none: "아직 매칭된 시그널이 없습니다",
+
+    // UCDP 역사적 맥락
+    historical_context_title: "역사적 맥락 (UCDP)",
+    historical_context_events: "이 지역의 분쟁 역사:",
+    historical_context_recorded: "{start}~{end}: {count}건의 기록된 분쟁 이벤트",
+    historical_context_actors: "주요 행위자: {actors}",
+    historical_context_fatalities: "최근 12개월 사망자: {count}명",
+
+    // 시그널 넛지 배너
+    signal_nudge: "지금 이 지역에 위성 열점 {firms}건, GPS 교란 {gps}건이 감지되었습니다",
+    signal_nudge_cta: "Pro로 확인하기",
   },
   en: {
     // bottom nav
@@ -2958,6 +2992,40 @@ export const translations = {
     ob_home_country_title: "My Country",
     ob_home_country_desc: "See how global issues impact your country",
     ob_home_country_other: "Choose another country",
+
+    // Intelligence Layers
+    layer_panel_title: "Intelligence",
+    layer_firms: "Satellite Hotspots",
+    layer_outage: "Internet Outage",
+    layer_gps_jam: "GPS Jamming",
+    layer_cf_anomaly: "Traffic Anomaly",
+    layer_count: "{count}",
+    layer_countries: "{count} countries",
+    layer_updated: "{time} ago",
+    layer_coming_soon: "Coming soon",
+    layer_pro_only: "Pro only",
+    layer_on: "On",
+    layer_off: "Off",
+
+    // Cross-validation (Issue detail)
+    cross_validation_title: "Cross-validation Evidence",
+    cross_validation_firms_match: "{count} satellite hotspot(s) matched ({distance}km, {time})",
+    cross_validation_outage_match: "Internet outage detected ({country}, {impact}% affected)",
+    cross_validation_gps_match: "GPS jamming detected ({region})",
+    cross_validation_cf_match: "Traffic anomaly detected ({country})",
+    cross_validation_boost: "Confidence increased by +{boost}% via cross-validation",
+    cross_validation_none: "No matched signals yet",
+
+    // UCDP historical context
+    historical_context_title: "Historical Context (UCDP)",
+    historical_context_events: "Conflict history in this region:",
+    historical_context_recorded: "{start}-{end}: {count} recorded conflict events",
+    historical_context_actors: "Key actors: {actors}",
+    historical_context_fatalities: "Fatalities in last 12 months: {count}",
+
+    // Signal nudge banner
+    signal_nudge: "{firms} satellite hotspots and {gps} GPS jamming zones detected in this area",
+    signal_nudge_cta: "View with Pro",
   },
 } as const;
 

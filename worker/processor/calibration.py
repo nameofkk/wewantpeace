@@ -345,3 +345,10 @@ DECAY_FLOOR: float = 0.30
 # 트렌딩 키워드 유효 시간 (분)
 KSCORE_VALID_HOURS: int = 24
 KSCORE_VALID_MINUTES: int = KSCORE_VALID_HOURS * 60
+
+
+# ── Signal Corroboration (v7) ────────────────────────────────────────────────
+# 시그널(열점/단절/교란) 교차검증 시 긴장도 보너스
+SIGNAL_BONUS_PER_TYPE: float = 5.0     # 시그널 유형당 tension 보너스
+SIGNAL_BONUS_MAX: float = 15.0         # 최대 보너스
+SIGNAL_CONFIDENCE_BOOST: float = 0.15  # confidence 최대 상승폭

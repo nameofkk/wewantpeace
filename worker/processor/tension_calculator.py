@@ -421,6 +421,28 @@ async def calculate_country_tension(
             country_code, convergence_bonus, raw_score,
         )
 
+    # ── Signal corroboration bonus (v7): 센서 교차검증 보너스 ──
+    try:
+        from worker.processor.calibration import SIGNAL_BONUS_PER_TYPE, SIGNAL_BONUS_MAX
+        signal_types_count = sum(
+            1 for c in all_clusters
+            if hasattr(c, "signal_corroboration_count") and c.signal_corroboration_count > 0
+        )
+        if signal_types_count > 0:
+            # 고유 시그널 유형 수 집계
+            unique_signal_types: set[str] = set()
+            for c in all_clusters:
+                if hasattr(c, "signal_types") and c.signal_types:
+                    unique_signal_types.update(c.signal_types)
+            signal_bonus = min(SIGNAL_BONUS_MAX, SIGNAL_BONUS_PER_TYPE * len(unique_signal_types))
+            raw_score = min(100.0, raw_score + signal_bonus)
+            logger.debug(
+                "signal bonus: %s types=%s +%.1f → raw=%.1f",
+                country_code, unique_signal_types, signal_bonus, raw_score,
+            )
+    except ImportError:
+        pass
+
     # percentile은 clean raw_score로 계산 (floor 적용 전!)
     percentile = await _get_percentile_30d(country_code, raw_score, db)
 

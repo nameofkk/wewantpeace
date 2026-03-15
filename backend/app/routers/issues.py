@@ -269,3 +269,121 @@ async def get_cluster(
         ],
     )
     return detail
+
+
+# ── Signal 관련 엔드포인트 ──────────────────────────────────────────────────
+
+
+class SignalMatchOut(BaseModel):
+    signal_type: str
+    intensity: float
+    raw_value: float | None = None
+    distance_km: float | None = None
+    time_delta_h: float | None = None
+    country_code: str | None = None
+    observed_at: str | None = None
+    metadata: dict | None = None
+
+
+@router.get("/{cluster_id}/signals", response_model=list[SignalMatchOut])
+async def get_cluster_signals(
+    cluster_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """특정 클러스터에 매칭된 시그널 목록 (교차검증 증거)."""
+    try:
+        uid = uuid.UUID(cluster_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid cluster_id")
+
+    from backend.app.models.signal_point import SignalPoint
+
+    result = await db.execute(
+        select(SignalPoint)
+        .where(SignalPoint.matched_cluster_id == uid)
+        .order_by(SignalPoint.observed_at.desc())
+        .limit(50)
+    )
+    signals = result.scalars().all()
+
+    return [
+        SignalMatchOut(
+            signal_type=s.signal_type,
+            intensity=s.intensity,
+            raw_value=s.raw_value,
+            distance_km=s.match_distance_km,
+            time_delta_h=s.match_time_delta_h,
+            country_code=s.country_code,
+            observed_at=s.observed_at.isoformat() if s.observed_at else None,
+            metadata=s.metadata,
+        )
+        for s in signals
+    ]
+
+
+class HistoricalContextOut(BaseModel):
+    total_events: int = 0
+    period_start: str | None = None
+    period_end: str | None = None
+    top_actors: list[str] = []
+    recent_fatalities: int = 0
+    yearly_trend: list[dict] = []
+
+
+@router.get("/{cluster_id}/context", response_model=HistoricalContextOut)
+async def get_cluster_context(
+    cluster_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """UCDP 기반 역사적 맥락 정보."""
+    try:
+        uid = uuid.UUID(cluster_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid cluster_id")
+
+    # 클러스터의 국가 코드 확인
+    cluster_result = await db.execute(
+        select(IssueCluster.country_code).where(IssueCluster.id == uid)
+    )
+    row = cluster_result.first()
+    if not row or not row[0]:
+        return HistoricalContextOut()
+
+    cc = row[0]
+
+    # UCDP 이벤트 집계 (raw_events에서 external_id가 'ucdp:'로 시작하는 것)
+    from sqlalchemy import func, text
+
+    # 해당 국가의 UCDP 이벤트 수
+    count_result = await db.execute(
+        select(func.count(NormalizedEvent.id))
+        .where(
+            NormalizedEvent.country_code == cc,
+            NormalizedEvent.source_tier == "A",
+        )
+    )
+    total = count_result.scalar() or 0
+
+    if total == 0:
+        return HistoricalContextOut()
+
+    # 기간 범위
+    range_result = await db.execute(
+        select(
+            func.min(NormalizedEvent.event_time),
+            func.max(NormalizedEvent.event_time),
+        )
+        .where(
+            NormalizedEvent.country_code == cc,
+            NormalizedEvent.source_tier == "A",
+        )
+    )
+    range_row = range_result.first()
+    period_start = range_row[0].isoformat() if range_row and range_row[0] else None
+    period_end = range_row[1].isoformat() if range_row and range_row[1] else None
+
+    return HistoricalContextOut(
+        total_events=total,
+        period_start=period_start,
+        period_end=period_end,
+    )

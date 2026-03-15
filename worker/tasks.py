@@ -3581,6 +3581,221 @@ def health_check(self):
 # 독립 getUpdates polling이 불필요하며 409 Conflict만 유발함
 
 
+# ── Intelligence Layers: 시그널 수집 + 교차검증 ──────────────────────────────
+
+@app.task(
+    name="worker.tasks.collect_firms",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def collect_firms(self):
+    """NASA FIRMS 위성 열점 수집 (15분마다)."""
+    _record_heartbeat("collect_firms")
+
+    async def _run():
+        from worker.collector.firms_collector import FIRMSCollector
+        async with AsyncSessionLocal() as db:
+            collector = FIRMSCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.commit()
+                logger.info("FIRMS 수집 완료: 총 %d개 저장", total)
+            else:
+                logger.info("FIRMS 수집 완료: 새 열점 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("FIRMS 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_outage",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def collect_outage(self):
+    """IODA 인터넷 단절 수집 (15분마다)."""
+    _record_heartbeat("collect_outage")
+
+    async def _run():
+        from worker.collector.outage_collector import OutageCollector
+        async with AsyncSessionLocal() as db:
+            collector = OutageCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.commit()
+                logger.info("IODA 수집 완료: 총 %d개 저장", total)
+            else:
+                logger.info("IODA 수집 완료: 새 단절 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("IODA 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_cloudflare_radar",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=120,
+)
+def collect_cloudflare_radar(self):
+    """Cloudflare Radar 트래픽 이상 수집 (30분마다)."""
+    _record_heartbeat("collect_cloudflare_radar")
+
+    async def _run():
+        from worker.collector.cloudflare_radar_collector import CloudflareRadarCollector
+        async with AsyncSessionLocal() as db:
+            collector = CloudflareRadarCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.commit()
+                logger.info("Cloudflare Radar 수집 완료: 총 %d개 저장", total)
+            else:
+                logger.info("Cloudflare Radar 수집 완료: 새 이상 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("Cloudflare Radar 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_gps_jam",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=120,
+)
+def collect_gps_jam(self):
+    """GPS 교란 탐지 수집 (15분마다)."""
+    _record_heartbeat("collect_gps_jam")
+
+    async def _run():
+        from worker.collector.gps_jam_collector import GpsJamCollector
+        async with AsyncSessionLocal() as db:
+            collector = GpsJamCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.commit()
+                logger.info("GPS 교란 수집 완료: 총 %d개 저장", total)
+            else:
+                logger.info("GPS 교란 수집 완료: 감지 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("GPS 교란 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.collect_ucdp",
+    queue="collect",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+def collect_ucdp(self):
+    """UCDP 역사적 분쟁 데이터 수집 (매일 06:00 UTC)."""
+    _record_heartbeat("collect_ucdp")
+
+    async def _run():
+        from worker.collector.ucdp_collector import UCDPCollector
+        async with AsyncSessionLocal() as db:
+            collector = UCDPCollector()
+            results = await collector.collect_all(db)
+            total = sum(r.collected for r in results)
+            if total > 0:
+                await db.flush()
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                await db.commit()
+                for raw_id in all_ids:
+                    process_raw_event.delay(raw_id)
+                logger.info("UCDP 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
+            else:
+                logger.info("UCDP 수집 완료: 새 이벤트 없음")
+            return {"total_collected": total}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("UCDP 수집 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.correlate_signals",
+    queue="process",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def correlate_signals(self):
+    """시그널 ↔ 이슈 클러스터 교차검증 (5분마다)."""
+    _record_heartbeat("correlate_signals")
+
+    async def _run():
+        from worker.processor.signal_correlator import correlate_signals as _correlate
+        async with AsyncSessionLocal() as db:
+            result = await _correlate(db)
+            await db.commit()
+            return result
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("시그널 교차검증 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    name="worker.tasks.cleanup_expired_signals",
+    queue="process",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+)
+def cleanup_expired_signals(self):
+    """만료된 시그널 정리 (6시간마다)."""
+    _record_heartbeat("cleanup_expired_signals")
+
+    async def _run():
+        from worker.processor.signal_correlator import cleanup_expired_signals as _cleanup
+        async with AsyncSessionLocal() as db:
+            count = await _cleanup(db)
+            await db.commit()
+            return {"deleted": count}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("시그널 정리 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
 # ── Beat heartbeat ────────────────────────────────────────────────────────────
 
 @app.task(name="beat_heartbeat")

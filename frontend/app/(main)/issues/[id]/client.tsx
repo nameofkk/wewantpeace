@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, ExternalLink, ChevronDown, ChevronUp, Shield, FileText, Flame, Globe, Radio, Activity } from "lucide-react";
 import {
   LineChart as RCLineChart,
   Line as RCLine,
@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
-import { useClusterDetail, useKScoreHistory, useTrackBehavior, type KScoreHistoryPoint } from "@/lib/api";
+import { useClusterDetail, useKScoreHistory, useTrackBehavior, useClusterSignals, useClusterContext, type KScoreHistoryPoint, type ClusterSignalMatch, type HistoricalContext } from "@/lib/api";
 import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { SourceBadge } from "@/components/issue/SourceBadge";
@@ -167,6 +167,111 @@ function KScoreHistoryChart({ data, lang }: { data: KScoreHistoryPoint[]; lang: 
             />
           </RCLineChart>
         </RCContainer>
+      </div>
+    </div>
+  );
+}
+
+// ── 교차검증 증거 섹션 ──
+function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
+  const { data: signals, isPending } = useClusterSignals(clusterId);
+
+  if (isPending) {
+    return (
+      <div className="rounded-xl border border-indigo-500/20 bg-card p-4">
+        <div className="h-16 flex items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!signals || signals.length === 0) {
+    return null;
+  }
+
+  const ICONS: Record<string, React.ReactNode> = {
+    firms_hotspot: <Flame className="h-3.5 w-3.5 text-orange-400" />,
+    ioda_outage: <Globe className="h-3.5 w-3.5 text-indigo-400" />,
+    cf_anomaly: <Activity className="h-3.5 w-3.5 text-purple-400" />,
+    gps_jam: <Radio className="h-3.5 w-3.5 text-cyan-400" />,
+  };
+
+  // 시그널 유형별 그룹핑
+  const grouped: Record<string, ClusterSignalMatch[]> = {};
+  for (const s of signals) {
+    (grouped[s.signal_type] ??= []).push(s);
+  }
+
+  return (
+    <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
+      <div className="flex items-center gap-2 mb-3">
+        <Shield className="h-3.5 w-3.5 text-indigo-400" />
+        <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+      </div>
+      <div className="space-y-2">
+        {Object.entries(grouped).map(([type, items]) => {
+          const avgDist = items.reduce((s, i) => s + (i.distance_km ?? 0), 0) / items.length;
+          const avgDelta = items.reduce((s, i) => s + (i.time_delta_h ?? 0), 0) / items.length;
+          const timeLabel = avgDelta < 1 ? `${Math.round(avgDelta * 60)}m` : `${avgDelta.toFixed(1)}h`;
+          return (
+            <div key={type} className="flex items-start gap-2 text-[11px]">
+              {ICONS[type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
+              <div>
+                {type === "firms_hotspot" && (
+                  <span>{t(lang, "cross_validation_firms_match", { count: items.length, distance: Math.round(avgDist), time: timeLabel })}</span>
+                )}
+                {type === "ioda_outage" && (
+                  <span>{t(lang, "cross_validation_outage_match", { country: items[0]?.country_code ?? "?", impact: Math.round(items[0].intensity * 100) })}</span>
+                )}
+                {type === "cf_anomaly" && (
+                  <span>{t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}</span>
+                )}
+                {type === "gps_jam" && (
+                  <span>{t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}</span>
+                )}
+                {items.length > 1 && type !== "firms_hotspot" && (
+                  <span className="text-muted-foreground ml-1">({items.length}건)</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
+        {t(lang, "cross_validation_boost", { boost: Math.min(15, Object.keys(grouped).length * 5) })}
+      </div>
+    </div>
+  );
+}
+
+// ── 역사적 맥락 섹션 ──
+function HistoricalContextSection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
+  const { data: ctx, isPending } = useClusterContext(clusterId);
+
+  if (isPending || !ctx || ctx.total_events === 0) return null;
+
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+  const startYear = ctx.period_start ? new Date(ctx.period_start).getFullYear() : "?";
+  const endYear = ctx.period_end ? new Date(ctx.period_end).getFullYear() : "?";
+
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-card p-4 fade-in-up">
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="h-3.5 w-3.5 text-emerald-400" />
+        <h3 className="text-xs font-semibold text-emerald-400">{t(lang, "historical_context_title")}</h3>
+      </div>
+      <div className="space-y-1.5 text-[11px] text-muted-foreground">
+        <p>{t(lang, "historical_context_events")}</p>
+        <p className="text-foreground">
+          {t(lang, "historical_context_recorded", { start: startYear, end: endYear, count: ctx.total_events })}
+        </p>
+        {ctx.top_actors.length > 0 && (
+          <p>{t(lang, "historical_context_actors", { actors: ctx.top_actors.join(", ") })}</p>
+        )}
+        {ctx.recent_fatalities > 0 && (
+          <p>{t(lang, "historical_context_fatalities", { count: ctx.recent_fatalities })}</p>
+        )}
       </div>
     </div>
   );
@@ -333,6 +438,12 @@ export default function IssueDetailClient({ initialData }: Props) {
 
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
+
+        {/* 교차검증 증거 */}
+        <CrossValidationSection clusterId={id} lang={lang} />
+
+        {/* 역사적 맥락 (UCDP) */}
+        <HistoricalContextSection clusterId={id} lang={lang} />
 
         {/* Impact Analysis — 요약 바로 아래 배치 */}
         <ImpactBriefCard clusterId={id} />

@@ -199,6 +199,29 @@ export async function signOut(): Promise<void> {
   await firebaseSignOut(auth);
 }
 
+// ── Auth 준비 완료 Promise (apiFetch가 auth 복원을 기다리는 용도) ──
+let _authReadyResolve: (() => void) | null = null;
+const _authReadyPromise: Promise<void> = IS_FIREBASE_CONFIGURED
+  ? new Promise<void>((resolve) => {
+      _authReadyResolve = resolve;
+      // 안전장치: 5초 후 강제 resolve (Firebase 장애 대비)
+      setTimeout(resolve, 5000);
+    })
+  : Promise.resolve();
+
+/** auth 모듈 초기화 시 onIdTokenChanged 최초 콜백에서 호출 */
+export function _markAuthReady() {
+  if (_authReadyResolve) {
+    _authReadyResolve();
+    _authReadyResolve = null;
+  }
+}
+
+/** API 호출 전 auth 준비 완료를 기다림 */
+export function waitForAuth(): Promise<void> {
+  return _authReadyPromise;
+}
+
 // Firebase ID Token 가져오기 (API 호출용)
 export async function getIdToken(): Promise<string | null> {
   const auth = getFirebaseAuth();
@@ -238,6 +261,7 @@ export function useAuth() {
         queryClient.invalidateQueries({ queryKey: ["trending"] });
       }
       setLoading(false);
+      _markAuthReady(); // auth 복원 완료 알림
     });
     return () => unsubscribe();
   }, [queryClient]);

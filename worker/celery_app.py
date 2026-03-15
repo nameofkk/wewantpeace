@@ -224,6 +224,42 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
         "options": {"queue": "process"},
     },
+    # ── Intelligence Layers: 시그널 수집 + 교차검증 ──
+    "collect-firms": {
+        "task": "worker.tasks.collect_firms",
+        "schedule": crontab(minute="*/15"),  # 15분마다 (NASA FIRMS)
+        "options": {"queue": "collect"},
+    },
+    "collect-outage": {
+        "task": "worker.tasks.collect_outage",
+        "schedule": crontab(minute="*/15"),  # 15분마다 (IODA)
+        "options": {"queue": "collect"},
+    },
+    "collect-cloudflare-radar": {
+        "task": "worker.tasks.collect_cloudflare_radar",
+        "schedule": crontab(minute="*/30"),  # 30분마다
+        "options": {"queue": "collect"},
+    },
+    "collect-gps-jam": {
+        "task": "worker.tasks.collect_gps_jam",
+        "schedule": crontab(minute="*/15"),  # 15분마다
+        "options": {"queue": "collect"},
+    },
+    "collect-ucdp": {
+        "task": "worker.tasks.collect_ucdp",
+        "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC
+        "options": {"queue": "collect"},
+    },
+    "correlate-signals": {
+        "task": "worker.tasks.correlate_signals",
+        "schedule": crontab(minute="4,9,14,19,24,29,34,39,44,49,54,59"),  # 5분마다 (+4분 오프셋)
+        "options": {"queue": "process"},
+    },
+    "cleanup-expired-signals": {
+        "task": "worker.tasks.cleanup_expired_signals",
+        "schedule": crontab(minute=0, hour="*/6"),  # 6시간마다
+        "options": {"queue": "process"},
+    },
     # "process-health-approvals" 제거됨 (2026-03-10)
     # telegram_bot.py의 _poll_updates()가 이미 hfix:/hskip: 콜백을 처리하므로
     # 독립 getUpdates polling은 409 Conflict만 유발함

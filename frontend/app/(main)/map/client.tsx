@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary } from "@/lib/api";
+import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary, useMatchedSignals } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
@@ -402,6 +402,10 @@ export default function MapPage() {
   const { data: outageData } = useOutageSignals(outageEnabled && isPro);
   const { data: gpsJamData } = useGpsJamSignals(gpsJamEnabled && isPro);
   const { data: signalSummary } = useSignalSummary();
+
+  // ── 매칭 연결선 (아크) ──
+  const { data: matchedGeo } = useMatchedSignals(selectedCluster?.id);
+  const arcAnimRef = useRef<number | null>(null);
 
   // ── 가이드 투어 ──────────────────────────────────────────
   const [tourRun, setTourRun] = useState(false);
@@ -809,6 +813,78 @@ export default function MapPage() {
 
     return cleanup;
   }, [gpsJamEnabled, gpsJamData, isMapReady]);
+
+  // ── 매칭 연결선 (Arc) — 클러스터 선택 시 시그널 포인트와의 아크 표시 ──
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    const cleanup = () => {
+      if (arcAnimRef.current) { cancelAnimationFrame(arcAnimRef.current); arcAnimRef.current = null; }
+      try { if (map.getLayer("match-arcs")) map.removeLayer("match-arcs"); } catch {}
+      try { if (map.getSource("match-arcs")) map.removeSource("match-arcs"); } catch {}
+    };
+    cleanup();
+
+    if (!selectedCluster || !matchedGeo || !matchedGeo.features || matchedGeo.features.length === 0) return;
+    if (!selectedCluster.lat || !selectedCluster.lon) return;
+
+    // 대원호 근사 (Bezier 곡선)
+    const greatCircleArc = (from: [number, number], to: [number, number], steps = 20): [number, number][] => {
+      const pts: [number, number][] = [];
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps;
+        const lng = from[0] + (to[0] - from[0]) * f;
+        const lat = from[1] + (to[1] - from[1]) * f;
+        // 위도 방향으로 볼록하게 (중간점에서 최대 곡률)
+        const bulge = Math.sin(f * Math.PI) * Math.min(5, Math.abs(to[0] - from[0]) * 0.15 + 1);
+        pts.push([lng, lat + bulge]);
+      }
+      return pts;
+    };
+
+    const clusterCoord: [number, number] = [selectedCluster.lon, selectedCluster.lat];
+    const lineFeatures = matchedGeo.features.map((f: any) => {
+      const coords = f.geometry?.coordinates;
+      if (!coords || coords.length < 2) return null;
+      const signalCoord: [number, number] = [coords[0], coords[1]];
+      return {
+        type: "Feature" as const,
+        properties: { score: f.properties?.match_score ?? 0.5 },
+        geometry: { type: "LineString" as const, coordinates: greatCircleArc(signalCoord, clusterCoord) },
+      };
+    }).filter(Boolean);
+
+    if (lineFeatures.length === 0) return;
+
+    map.addSource("match-arcs", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: lineFeatures },
+    });
+    map.addLayer({
+      id: "match-arcs",
+      type: "line",
+      source: "match-arcs",
+      paint: {
+        "line-color": ["interpolate", ["linear"], ["get", "score"], 0, "#6366f150", 0.5, "#818cf8", 1, "#a5b4fc"],
+        "line-width": 2,
+        "line-dasharray": [4, 4],
+        "line-opacity": 0.7,
+      },
+    });
+
+    // Dash 애니메이션
+    let offset = 0;
+    const animate = () => {
+      offset = (offset + 0.3) % 8;
+      try { map.setPaintProperty("match-arcs", "line-dasharray", [4, 4]); } catch {}
+      arcAnimRef.current = requestAnimationFrame(animate);
+    };
+    arcAnimRef.current = requestAnimationFrame(animate);
+
+    return cleanup;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCluster, matchedGeo, isMapReady]);
 
   const renderMarkers = useCallback(() => {
     const map = mapRef.current;
