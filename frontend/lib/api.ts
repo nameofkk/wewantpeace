@@ -613,6 +613,31 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
   });
 }
 
+/** 국가 선택기 열릴 때 호출 — 모든 국가 데이터를 미리 캐시 */
+export function usePrefetchImpactSummary() {
+  const qc = useQueryClient();
+  return (countries: string[], lang: string) => {
+    for (const cc of countries) {
+      const key = ["impact", "summary", cc || "db", lang];
+      // 이미 캐시돼 있으면 스킵
+      if (qc.getQueryData(key)) continue;
+      qc.prefetchQuery({
+        queryKey: key,
+        queryFn: () => {
+          const params: Record<string, string> = {};
+          if (cc) params.home_country = cc;
+          params.lang = lang;
+          return apiFetch<ImpactSummary>("/impact/summary", params);
+        },
+        staleTime: 30 * 60 * 1000,
+      });
+    }
+  };
+}
+
+// 비hook 버전 (호환용)
+export const prefetchImpactSummary = () => {};
+
 // Per-cluster impact brief (legacy, Pro)
 export interface ImpactBrief {
   cluster_id: string;
