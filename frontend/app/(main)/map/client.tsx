@@ -325,63 +325,50 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
 
 // ── LayerToggleRow ──────────────────────────────────────────────────────────
 function LayerToggleRow({
-  icon, label, tooltip, enabled, isPro, count, onToggle, lang,
+  icon, label, tooltip, enabled, isPro, count, onToggle, onShowTooltip, lang,
 }: {
   icon: string; label: string; tooltip?: string; enabled: boolean; isPro: boolean;
-  count?: number; onToggle: () => void; lang: Lang;
+  count?: number; onToggle: () => void; onShowTooltip?: (text: string) => void; lang: Lang;
 }) {
-  const [showInfo, setShowInfo] = useState(false);
   return (
-    <div className="relative">
-      <div className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors">
-        <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-          <span className="text-sm shrink-0">{icon}</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-medium truncate">{label}</div>
-            {count !== undefined && count > 0 && (
-              <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
-            )}
-          </div>
+    <div className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/50 transition-colors">
+      <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+        <span className="text-sm shrink-0">{icon}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-medium truncate">{label}</div>
+          {count !== undefined && count > 0 && (
+            <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
+          )}
+        </div>
+      </button>
+      {tooltip && onShowTooltip && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onShowTooltip(tooltip); }}
+          className="shrink-0 p-0.5 rounded-full hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          <Info className="h-3 w-3" />
         </button>
-        {tooltip && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }}
-            className="shrink-0 p-0.5 rounded-full hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
+      )}
+      {!isPro ? (
+        <button onClick={onToggle} className="text-[9px] text-amber-500 flex items-center gap-0.5 shrink-0">
+          <Lock className="h-2.5 w-2.5" /> Pro
+        </button>
+      ) : (
+        <button onClick={onToggle} className="shrink-0">
+          <div
+            className={cn(
+              "w-7 h-4 rounded-full transition-colors relative",
+              enabled ? "bg-cyan-500" : "bg-muted-foreground/30"
+            )}
           >
-            <Info className="h-3 w-3" />
-          </button>
-        )}
-        {!isPro ? (
-          <button onClick={onToggle} className="text-[9px] text-amber-500 flex items-center gap-0.5 shrink-0">
-            <Lock className="h-2.5 w-2.5" /> Pro
-          </button>
-        ) : (
-          <button onClick={onToggle} className="shrink-0">
             <div
               className={cn(
-                "w-7 h-4 rounded-full transition-colors relative",
-                enabled ? "bg-cyan-500" : "bg-muted-foreground/30"
+                "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform",
+                enabled ? "translate-x-3.5" : "translate-x-0.5"
               )}
-            >
-              <div
-                className={cn(
-                  "absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform",
-                  enabled ? "translate-x-3.5" : "translate-x-0.5"
-                )}
-              />
-            </div>
-          </button>
-        )}
-      </div>
-      {showInfo && tooltip && (
-        <div className="absolute left-0 right-0 bottom-full z-[60] mb-1 mx-1 rounded-lg border border-border bg-popover p-2.5 shadow-lg">
-          <div className="flex items-start gap-1.5">
-            <p className="text-[11px] text-muted-foreground leading-relaxed flex-1">{tooltip}</p>
-            <button onClick={() => setShowInfo(false)} className="shrink-0 p-0.5 rounded hover:bg-muted">
-              <X className="h-3 w-3 text-muted-foreground" />
-            </button>
+            />
           </div>
-        </div>
+        </button>
       )}
     </div>
   );
@@ -414,6 +401,7 @@ export default function MapPage() {
 
   // ── Intelligence Layers ──
   const [showIntelPanel, setShowIntelPanel] = useState(false);
+  const [intelTooltip, setIntelTooltip] = useState<string | null>(null);
   const [firmsEnabled, setFirmsEnabled] = useState(false);
   const [outageEnabled, setOutageEnabled] = useState(false);
   const [gpsJamEnabled, setGpsJamEnabled] = useState(false);
@@ -1112,8 +1100,8 @@ export default function MapPage() {
             ))}
             <InfoTooltip direction="down" text={t(lang, "map_kscore_legend")} />
           </div>
-          {/* Row 3: 히트맵 + Intel 토글 */}
-          <div className="flex items-center gap-1.5">
+          {/* Row 3: 히트맵 + Intel 토글 (오른쪽 정렬) */}
+          <div className="flex items-center justify-end gap-1.5">
             <button
               data-tour="map-heatmap"
               onClick={() => {
@@ -1137,7 +1125,7 @@ export default function MapPage() {
             {/* Intel Layer Toggle */}
             <div className="relative">
               <button
-                onClick={() => setShowIntelPanel((v) => !v)}
+                onClick={() => { setShowIntelPanel((v) => !v); setIntelTooltip(null); }}
                 className={cn(
                   "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap",
                   (firmsEnabled || outageEnabled || gpsJamEnabled)
@@ -1150,23 +1138,37 @@ export default function MapPage() {
                 <ChevronDown className={cn("h-2 w-2 transition-transform", showIntelPanel && "rotate-180")} />
               </button>
               {showIntelPanel && (
-                <div className="absolute left-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl p-2 space-y-1">
+                <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-xl p-2 space-y-1">
+                  {/* ⓘ 툴팁 (패널 최상단) */}
+                  {intelTooltip && (
+                    <div className="rounded-lg bg-muted/80 p-2 mb-1">
+                      <div className="flex items-start gap-1.5">
+                        <p className="text-[10px] text-muted-foreground leading-relaxed flex-1">{intelTooltip}</p>
+                        <button onClick={() => setIntelTooltip(null)} className="shrink-0 p-0.5 rounded hover:bg-background">
+                          <X className="h-2.5 w-2.5 text-muted-foreground" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <LayerToggleRow
                     icon="🔥" label={t(lang, "layer_firms")} tooltip={t(lang, "layer_firms_tooltip")}
                     enabled={firmsEnabled} isPro={isPro} count={signalSummary?.firms_hotspot}
                     onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setFirmsEnabled((v) => !v); }}
+                    onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
                   <LayerToggleRow
                     icon="🌐" label={t(lang, "layer_outage")} tooltip={t(lang, "layer_outage_tooltip")}
                     enabled={outageEnabled} isPro={isPro} count={signalSummary?.ioda_outage}
                     onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setOutageEnabled((v) => !v); }}
+                    onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
                   <LayerToggleRow
                     icon="📡" label={t(lang, "layer_gps_jam")} tooltip={t(lang, "layer_gps_jam_tooltip")}
                     enabled={gpsJamEnabled} isPro={isPro} count={signalSummary?.gps_jam}
                     onToggle={() => { if (!isPro) { mapPaywall.show(); return; } setGpsJamEnabled((v) => !v); }}
+                    onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
                 </div>

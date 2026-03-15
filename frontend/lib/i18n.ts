@@ -1482,7 +1482,7 @@ export const translations = {
     ob_home_country_other: "다른 국가 선택",
 
     // Intelligence Layers
-    layer_panel_title: "Intel",
+    layer_panel_title: "인텔리전스",
     layer_firms: "위성 열점",
     layer_firms_tooltip: "NASA 위성이 감지한 열점(화재/폭발). FRP 10MW 이상만 표시",
     layer_outage: "인터넷 단절",
