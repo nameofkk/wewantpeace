@@ -206,6 +206,18 @@ export function useMe() {
   });
 }
 
+export function usePatchProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiFetch<MeData>("/me", undefined, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
 export function useMyAreas() {
   return useQuery({
     queryKey: ["me", "areas"],

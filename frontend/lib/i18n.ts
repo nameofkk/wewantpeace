@@ -1560,8 +1560,8 @@ export const translations = {
     // 마케팅 수신 동의
     marketing_consent_label: "주간 리포트 및 뉴스레터 수신 동의 (선택)",
     marketing_consent_desc: "주간 분쟁 모니터링 리포트를 이메일로 받아보세요. 언제든 설정에서 해제할 수 있습니다.",
-    settings_marketing_toggle: "주간 리포트 이메일 수신",
-    settings_marketing_desc: "매주 월요일 09:00 (KST) 주간 리포트를 이메일로 발송합니다.",
+    settings_marketing_toggle: "마케팅 수신 동의",
+    settings_marketing_desc: "주간 리포트, 뉴스레터 등 마케팅 정보를 이메일로 수신합니다. 언제든 해제할 수 있습니다.",
   },
   en: {
     // bottom nav
@@ -3120,8 +3120,8 @@ export const translations = {
     // Marketing consent
     marketing_consent_label: "Weekly report & newsletter opt-in (optional)",
     marketing_consent_desc: "Receive weekly conflict reports by email. You can opt out anytime in settings.",
-    settings_marketing_toggle: "Weekly report email",
-    settings_marketing_desc: "Weekly report delivered every Monday at 09:00 KST.",
+    settings_marketing_toggle: "Marketing opt-in",
+    settings_marketing_desc: "Receive weekly reports, newsletters, and marketing emails. You can opt out anytime.",
   },
 } as const;
 

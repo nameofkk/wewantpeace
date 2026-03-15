@@ -5,7 +5,7 @@ import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
-import { useMe, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
+import { useMe, usePatchProfile, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
 import { requestAndGetFCMToken, getStoredFCMToken, clearStoredFCMToken, isPushSupported } from "@/lib/fcm";
 import { ALL_COUNTRIES, getCountryName, getRegionName, getFlag } from "@/lib/countries";
 import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
@@ -131,6 +131,7 @@ export default function SettingsPage() {
   const { data: prefs } = useMyPreferences();
   const { data: areas } = useMyAreas();
   const patchPrefs = usePatchPreferences();
+  const patchProfile = usePatchProfile();
   const addArea = useAddArea();
   const deleteArea = useDeleteArea();
   const patchArea = usePatchArea();
@@ -1151,34 +1152,28 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* 5. 주간 리포트 이메일 수신 (Pro+) */}
+            {/* 5. 마케팅 수신 동의 */}
             <div className="p-4 border-t border-border" data-tour="settings-marketing-email">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">{t(lang, "settings_marketing_toggle")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_marketing_desc")}</p>
                 </div>
-                {plan !== "pro_plus" ? (
-                  <Link href="/upgrade" className="rounded-full bg-primary/10 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/20 transition-colors pointer-events-auto">
-                    Pro+ →
-                  </Link>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const now = me?.marketing_agreed_at ? null : new Date().toISOString();
-                      saveNotifPatch({ marketing_agreed_at: now } as any);
-                    }}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-                      me?.marketing_agreed_at ? "bg-primary" : "bg-secondary"
-                    )}
-                  >
-                    <span className={cn(
-                      "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform",
-                      me?.marketing_agreed_at ? "translate-x-5" : "translate-x-0"
-                    )} />
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    const value = me?.marketing_agreed_at ? "" : "now";
+                    patchProfile.mutate({ marketing_agreed_at: value });
+                  }}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+                    me?.marketing_agreed_at ? "bg-primary" : "bg-secondary"
+                  )}
+                >
+                  <span className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform",
+                    me?.marketing_agreed_at ? "translate-x-5" : "translate-x-0"
+                  )} />
+                </button>
               </div>
             </div>
 
