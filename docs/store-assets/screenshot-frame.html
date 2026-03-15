@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WeWantPeace Screenshot Frames (1080x1920)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #111;
+    padding: 40px;
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .frame {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 40px;
+    flex-shrink: 0;
+  }
+  .frame-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  }
+  .frame-content {
+    position: relative;
+    z-index: 10;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 100px 60px 80px;
+  }
+  .frame-headline {
+    font-size: 52px;
+    font-weight: 800;
+    color: #F8FAFC;
+    text-align: center;
+    line-height: 1.35;
+    margin-bottom: 16px;
+  }
+  .frame-sub {
+    font-size: 26px;
+    color: #94A3B8;
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 60px;
+  }
+  .frame-sub em {
+    color: #60A5FA;
+    font-style: normal;
+    font-weight: 600;
+  }
+  /* 스크린샷 자리 */
+  .phone-placeholder {
+    flex: 1;
+    width: 100%;
+    max-width: 720px;
+    background: rgba(255,255,255,0.03);
+    border: 2px dashed rgba(255,255,255,0.1);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 24px;
+    font-weight: 500;
+  }
+
+  /* ── 프레임 1: 긴장도 ── */
+  .frame-tension .glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%);
+    top: 200px; right: -100px;
+  }
+
+  /* ── 프레임 2: 영향도 ── */
+  .frame-impact .glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
+    top: 300px; left: -100px;
+  }
+
+  /* ── 프레임 3: 지도 ── */
+  .frame-map .glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%);
+    top: 250px; right: -50px;
+  }
+
+  /* ── 프레임 4: 알림 ── */
+  .frame-alert .glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%);
+    top: 200px; left: -50px;
+  }
+
+  /* 미니 데모 카드들 */
+  .demo-card {
+    width: 100%;
+    max-width: 720px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 40px;
+    margin-bottom: 20px;
+  }
+  .demo-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .demo-card-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  .demo-card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #F8FAFC;
+  }
+  .demo-card-sub {
+    font-size: 16px;
+    color: #64748B;
+  }
+  /* 긴장도 바 */
+  .tension-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .tension-flag { font-size: 28px; }
+  .tension-name {
+    font-size: 20px;
+    color: #CBD5E1;
+    width: 120px;
+    font-weight: 500;
+  }
+  .tension-bar-bg {
+    flex: 1;
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tension-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+  }
+  .fill-red { background: linear-gradient(90deg, #EF4444, #F87171); }
+  .fill-orange { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+  .fill-green { background: linear-gradient(90deg, #10B981, #34D399); }
+  .tension-score {
+    font-size: 22px;
+    font-weight: 800;
+    width: 50px;
+    text-align: right;
+  }
+  .t-red { color: #F87171; }
+  .t-orange { color: #FBBF24; }
+  .t-green { color: #34D399; }
+  /* 알림 카드 */
+  .alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+  .alert-text {
+    font-size: 18px;
+    color: #E2E8F0;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  .alert-meta {
+    font-size: 14px;
+    color: #64748B;
+    margin-top: 4px;
+  }
+  /* KScore 큰 숫자 */
+  .big-score {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .big-score-num {
+    font-size: 120px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #F87171, #EF4444);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .big-score-label {
+    font-size: 20px;
+    color: #64748B;
+    margin-top: 8px;
+  }
+  .impact-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .impact-row:last-child { border-bottom: none; }
+  .impact-icon { font-size: 24px; }
+  .impact-label {
+    flex: 1;
+    font-size: 18px;
+    color: #CBD5E1;
+    font-weight: 500;
+  }
+  .impact-value {
+    font-size: 18px;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<!-- 프레임 1: 긴장도 -->
+<div class="frame frame-tension">
+  <div class="frame-bg"></div>
+  <div class="glow"></div>
+  <div class="frame-content">
+    <div class="frame-headline">
+      지금, 세계는<br>얼마나 위험한가
+    </div>
+    <div class="frame-sub">
+      국가별 <em>긴장도 지수</em>를<br>실시간으로 확인하세요
+    </div>
+    <div class="demo-card" style="flex:1;">
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1FA;&#x1F1E6;</span>
+        <span class="tension-name">Ukraine</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-red" style="width:89%"></div></div>
+        <span class="tension-score t-red">89</span>
+      </div>
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1F5;&#x1F1F8;</span>
+        <span class="tension-name">Palestine</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-red" style="width:82%"></div></div>
+        <span class="tension-score t-red">82</span>
+      </div>
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1F8;&#x1F1E9;</span>
+        <span class="tension-name">Sudan</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-orange" style="width:67%"></div></div>
+        <span class="tension-score t-orange">67</span>
+      </div>
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1F2;&#x1F1F2;</span>
+        <span class="tension-name">Myanmar</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-orange" style="width:58%"></div></div>
+        <span class="tension-score t-orange">58</span>
+      </div>
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1F8;&#x1F1FE;</span>
+        <span class="tension-name">Syria</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-orange" style="width:45%"></div></div>
+        <span class="tension-score t-orange">45</span>
+      </div>
+      <div class="tension-bar-wrap">
+        <span class="tension-flag">&#x1F1F0;&#x1F1F7;</span>
+        <span class="tension-name">South Korea</span>
+        <div class="tension-bar-bg"><div class="tension-bar-fill fill-green" style="width:18%"></div></div>
+        <span class="tension-score t-green">18</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 프레임 2: 영향도 -->
+<div class="frame frame-impact">
+  <div class="frame-bg"></div>
+  <div class="glow"></div>
+  <div class="frame-content">
+    <div class="frame-headline">
+      이 분쟁,<br>나에게 무슨 영향?
+    </div>
+    <div class="frame-sub">
+      내 나라 기준 <em>경제·무역·여행</em><br>영향도를 분석합니다
+    </div>
+    <div class="demo-card">
+      <div class="big-score">
+        <div class="big-score-num">72</div>
+        <div class="big-score-label">Global Impact Score</div>
+      </div>
+      <div class="impact-row">
+        <span class="impact-icon">&#9981;</span>
+        <span class="impact-label">에너지 리스크</span>
+        <span class="impact-value t-red">HIGH</span>
+      </div>
+      <div class="impact-row">
+        <span class="impact-icon">&#x1F6E1;</span>
+        <span class="impact-label">방위산업 영향</span>
+        <span class="impact-value t-orange">MED</span>
+      </div>
+      <div class="impact-row">
+        <span class="impact-icon">&#x1F4E6;</span>
+        <span class="impact-label">무역 리스크</span>
+        <span class="impact-value t-orange">MED</span>
+      </div>
+      <div class="impact-row">
+        <span class="impact-icon">&#x2708;</span>
+        <span class="impact-label">여행 안전도</span>
+        <span class="impact-value t-green">LOW</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 프레임 3: 지도 -->
+<div class="frame frame-map">
+  <div class="frame-bg"></div>
+  <div class="glow"></div>
+  <div class="frame-content">
+    <div class="frame-headline">
+      한눈에 보는<br>글로벌 분쟁 지도
+    </div>
+    <div class="frame-sub">
+      히트맵과 마커로<br><em>분쟁 현황</em>을 직관적으로
+    </div>
+    <div class="phone-placeholder" style="flex:1; font-size:20px;">
+      &#x1F30D; 여기에 실제 지도 스크린샷을 합성하세요<br><br>
+      Chrome DevTools에서<br>www.wewantpeace.live/map 캡처 후<br>이 영역에 배치
+    </div>
+  </div>
+</div>
+
+<!-- 프레임 4: 알림 -->
+<div class="frame frame-alert">
+  <div class="frame-bg"></div>
+  <div class="glow"></div>
+  <div class="frame-content">
+    <div class="frame-headline">
+      내 관심 국가<br>긴급 이슈 즉시 알림
+    </div>
+    <div class="frame-sub">
+      중요한 이슈만 골라서<br><em>실시간 푸시 알림</em>
+    </div>
+    <div class="demo-card" style="flex:1;">
+      <div class="alert-item">
+        <div class="alert-dot" style="background:#EF4444;"></div>
+        <div>
+          <div class="alert-text">&#x1F1FA;&#x1F1E6; 우크라이나 동부 전선 신규 교전 보고</div>
+          <div class="alert-meta">KScore 8.2 &middot; Severity 85 &middot; 3분 전</div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-dot" style="background:#F59E0B;"></div>
+        <div>
+          <div class="alert-text">&#x1F1F5;&#x1F1F8; 가자 지구 휴전 협상 재개</div>
+          <div class="alert-meta">KScore 6.5 &middot; Severity 72 &middot; 15분 전</div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-dot" style="background:#3B82F6;"></div>
+        <div>
+          <div class="alert-text">&#x1F1F8;&#x1F1E9; 수단 인도적 지원 통로 개방 합의</div>
+          <div class="alert-meta">KScore 5.1 &middot; Severity 60 &middot; 42분 전</div>
+        </div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-dot" style="background:#10B981;"></div>
+        <div>
+          <div class="alert-text">&#x1F1F0;&#x1F1F7; 한반도 긴장도 하락 추세 지속</div>
+          <div class="alert-meta">KScore 4.2 &middot; Severity 35 &middot; 1시간 전</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

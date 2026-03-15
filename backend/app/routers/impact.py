@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v6"
+_CACHE_VERSION = "v7"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -377,6 +377,22 @@ async def get_impact_summary(
         for row in trade_q.fetchall():
             if row[0] not in trade_map:
                 trade_map[row[0]] = row[1]
+
+        # Fallback: 직접 보고 없으면 역방향 (mirror trade)
+        missing = [cc for cc in top5_countries if cc not in trade_map]
+        if missing:
+            mirror_q = await db.execute(
+                select(TradeBilateral.reporter_code, TradeBilateral.total_trade_usd)
+                .where(
+                    TradeBilateral.partner_code == home,
+                    TradeBilateral.reporter_code.in_(missing),
+                    TradeBilateral.period_type == "A",
+                )
+                .order_by(TradeBilateral.period.desc())
+            )
+            for row in mirror_q.fetchall():
+                if row[0] not in trade_map:
+                    trade_map[row[0]] = row[1]
 
     # 배치 2: WTI 유가 (공유)
     oil_q = await db.execute(
@@ -1667,99 +1683,138 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     if not home:
         sectors_data = _build_merged_sectors()
 
+    # 토픽 → 관련 섹터 매핑 (key_partners 매칭 실패 시 fallback)
+    _TOPIC_SECTOR_MAP: dict[str, list[str]] = {
+        "conflict": ["energy", "shipping"],
+        "terror": ["energy", "shipping", "tourism"],
+        "military": ["energy", "shipping", "defense"],
+        "economy": ["energy", "manufacturing", "shipping"],
+        "trade": ["shipping", "manufacturing", "semiconductor"],
+        "cyber": ["technology", "semiconductor", "electronics"],
+        "diplomacy": ["energy", "shipping"],
+        "sanctions": ["energy", "shipping", "manufacturing"],
+        "humanitarian": ["agriculture"],
+        "nuclear": ["energy", "defense"],
+    }
+
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     nodes = []
     links = []
     seen_commodities = set()
 
+    def _add_sector_link(node_id: str, sector: str, severity: int, gdp_pct: float):
+        """섹터 노드 + 링크 추가 (중복 방지)"""
+        if sector not in seen_commodities:
+            seen_commodities.add(sector)
+            nodes.append(ImpactFlowNode(
+                id=sector, label=labels.get(sector, sector),
+                color="#f59e0b", category="commodity"
+            ))
+        link_value = round(severity * gdp_pct / 100, 2)
+        if link_value > 0:
+            links.append(ImpactFlowLink(source=node_id, target=sector, value=max(1, link_value)))
+
     top3 = scored[:3]
     for idx, (c, impact) in enumerate(top3):
         cc = c.country_code or ""
         severity = c.severity or 0
+        topic = c.topic or "unknown"
         title = c.title_ko if lang == "ko" and c.title_ko else c.title or f"Issue {idx+1}"
         title = title[:20]
         node_id = f"c{idx}"
         nodes.append(ImpactFlowNode(id=node_id, label=title, color="#dc2626", category="conflict"))
 
-        # Find affected commodities/sectors
-        for sector, info in sectors_data.items():
-            if cc in info.get("key_partners", []):
-                commodity_id = sector
-                if commodity_id not in seen_commodities:
-                    seen_commodities.add(commodity_id)
-                    nodes.append(ImpactFlowNode(
-                        id=commodity_id, label=labels.get(sector, sector),
-                        color="#f59e0b", category="commodity"
-                    ))
-                link_value = round(severity * info.get("gdp_pct", 1) / 100, 2)
-                if link_value > 0:
-                    links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
-
-    # Fallback: 매칭 실패 시 글로벌 합산 데이터로 재시도
-    if not links and home:
-        nodes = []
-        links = []
-        seen_commodities = set()
-        fallback_sectors = _build_merged_sectors()
-        for idx, (c, impact) in enumerate(top3):
-            cc = c.country_code or ""
-            severity = c.severity or 0
-            title = c.title_ko if lang == "ko" and c.title_ko else c.title or f"Issue {idx+1}"
-            title = title[:20]
-            node_id = f"c{idx}"
-            nodes.append(ImpactFlowNode(id=node_id, label=title, color="#dc2626", category="conflict"))
-            for sector, info in fallback_sectors.items():
+        linked = False
+        # 1차: key_partners 매칭 (이슈 국가가 기준 국가의 교역 파트너일 때)
+        if cc != home:
+            for sector, info in sectors_data.items():
                 if cc in info.get("key_partners", []):
-                    commodity_id = sector
-                    if commodity_id not in seen_commodities:
-                        seen_commodities.add(commodity_id)
-                        nodes.append(ImpactFlowNode(
-                            id=commodity_id, label=labels.get(sector, sector),
-                            color="#f59e0b", category="commodity"
-                        ))
-                    link_value = round(severity * info.get("gdp_pct", 1) / 100, 2)
-                    if link_value > 0:
-                        links.append(ImpactFlowLink(source=node_id, target=commodity_id, value=max(1, link_value)))
+                    _add_sector_link(node_id, sector, severity, info.get("gdp_pct", 1))
+                    linked = True
+
+        # 2차: 이슈 국가가 기준 국가 자체이거나 key_partners에 없을 때 → 토픽 기반 연결
+        if not linked:
+            topic_sectors = _TOPIC_SECTOR_MAP.get(topic, ["energy", "shipping"])
+            for sector in topic_sectors:
+                if sector in sectors_data:
+                    _add_sector_link(node_id, sector, severity, sectors_data[sector].get("gdp_pct", 1))
+                    linked = True
+
+        # 3차: 아직도 없으면 → 가장 큰 GDP 섹터에 연결
+        if not linked and sectors_data:
+            biggest = max(sectors_data.items(), key=lambda x: x[1].get("gdp_pct", 0))
+            _add_sector_link(node_id, biggest[0], severity, biggest[1].get("gdp_pct", 1))
 
     # Right column: impact categories — 실제 데이터 기반 라벨
     oil_change = oil_row[1] if oil_row else 0
     oil_price = oil_row[0] if oil_row else 0
-    h_name = _country_name(home, lang)
-    impact_items = []
-    if "energy" in seen_commodities:
-        if oil_change != 0:
-            lbl = f"에너지 비용 {oil_change:+.1f}%" if lang == "ko" else f"Energy costs {oil_change:+.1f}%"
+
+    # 영향받는 교역 총액 계산
+    affected_ccs = {c.country_code for c, _ in top3 if c.country_code}
+    affected_trade = sum(trade_map.get(cc, 0) for cc in affected_ccs)
+
+    # sector → impact category 매핑
+    _SECTOR_TO_IMPACT: dict[str, str] = {
+        "energy": "energy_cost",
+        "agriculture": "food_cost",
+        "shipping": "shipping_cost",
+        "semiconductor": "electronics_cost",
+        "electronics": "electronics_cost",
+        "technology": "electronics_cost",
+        "manufacturing": "mfg_cost",
+        "automotive": "auto_cost",
+        "tourism": "travel_cost",
+        "defense": "energy_cost",
+    }
+
+    # seen_commodities에서 impact 그룹 + 연결 섹터 수집
+    impact_groups: dict[str, list[str]] = {}  # imp_id → [sector_ids]
+    for sector_id in seen_commodities:
+        imp_id = _SECTOR_TO_IMPACT.get(sector_id, "inflation")
+        impact_groups.setdefault(imp_id, []).append(sector_id)
+
+    if not impact_groups:
+        impact_groups["inflation"] = list(seen_commodities) if seen_commodities else ["energy"]
+
+    # 각 impact에 대해 데이터 기반 라벨 생성 + 노드/링크 추가
+    for imp_id, sector_ids in impact_groups.items():
+        # 관련 섹터 중 가장 큰 GDP 비중 사용
+        max_gdp = max((sectors_data.get(s, {}).get("gdp_pct", 0) for s in sector_ids), default=0)
+
+        if imp_id == "energy_cost":
+            if oil_change != 0:
+                lbl = f"에너지 비용 {oil_change:+.1f}%" if lang == "ko" else f"Energy {oil_change:+.1f}%"
+            elif max_gdp > 0:
+                lbl = f"에너지 GDP {max_gdp:.1f}%" if lang == "ko" else f"Energy GDP {max_gdp:.1f}%"
+            else:
+                lbl = "에너지 비용 영향" if lang == "ko" else "Energy affected"
+        elif imp_id == "food_cost":
+            lbl = f"식료품 GDP {max_gdp:.1f}%" if lang == "ko" else f"Food GDP {max_gdp:.1f}%" if max_gdp > 0 else ("식료품 영향" if lang == "ko" else "Food affected")
+        elif imp_id == "shipping_cost":
+            if affected_trade > 0:
+                t_b = affected_trade / 1e9
+                lbl = f"물류비 · 교역 ${t_b:.1f}B" if lang == "ko" else f"Logistics · trade ${t_b:.1f}B"
+            elif max_gdp > 0:
+                lbl = f"물류비 GDP {max_gdp:.1f}%" if lang == "ko" else f"Shipping GDP {max_gdp:.1f}%"
+            else:
+                lbl = "물류비 영향" if lang == "ko" else "Shipping affected"
+        elif imp_id == "electronics_cost":
+            lbl = f"전자제품 GDP {max_gdp:.1f}%" if lang == "ko" else f"Electronics GDP {max_gdp:.1f}%" if max_gdp > 0 else ("전자제품 영향" if lang == "ko" else "Electronics affected")
+        elif imp_id == "auto_cost":
+            lbl = f"자동차 GDP {max_gdp:.1f}%" if lang == "ko" else f"Auto GDP {max_gdp:.1f}%" if max_gdp > 0 else ("자동차 영향" if lang == "ko" else "Auto affected")
+        elif imp_id == "mfg_cost":
+            lbl = f"제조 원가 GDP {max_gdp:.1f}%" if lang == "ko" else f"Mfg GDP {max_gdp:.1f}%" if max_gdp > 0 else ("제조 원가 영향" if lang == "ko" else "Mfg affected")
+        elif imp_id == "travel_cost":
+            lbl = f"여행 경비 GDP {max_gdp:.1f}%" if lang == "ko" else f"Travel GDP {max_gdp:.1f}%" if max_gdp > 0 else ("여행 경비 영향" if lang == "ko" else "Travel affected")
         else:
-            lbl = "에너지 비용 상승" if lang == "ko" else "Energy cost rise"
-        impact_items.append(("energy_cost", lbl))
-    if "agriculture" in seen_commodities:
-        lbl = "식료품 가격 상승" if lang == "ko" else "Food prices up"
-        impact_items.append(("food_cost", lbl))
-    if "shipping" in seen_commodities:
-        lbl = "물류비 상승" if lang == "ko" else "Shipping costs up"
-        impact_items.append(("shipping_cost", lbl))
-    if "semiconductor" in seen_commodities or "electronics" in seen_commodities or "technology" in seen_commodities:
-        lbl = "전자제품 가격 상승" if lang == "ko" else "Electronics prices up"
-        impact_items.append(("electronics_cost", lbl))
-    if "automotive" in seen_commodities:
-        lbl = "자동차 가격 영향" if lang == "ko" else "Auto prices affected"
-        impact_items.append(("auto_cost", lbl))
-    if "manufacturing" in seen_commodities:
-        lbl = "제조 원가 상승" if lang == "ko" else "Mfg costs up"
-        impact_items.append(("mfg_cost", lbl))
-    if "tourism" in seen_commodities:
-        lbl = "여행 경비 영향" if lang == "ko" else "Travel costs affected"
-        impact_items.append(("travel_cost", lbl))
+            lbl = "물가 상승 압력" if lang == "ko" else "Inflation pressure"
 
-    if not impact_items:
-        lbl = "물가 상승 압력" if lang == "ko" else "Inflation pressure"
-        impact_items.append(("inflation", lbl))
-
-    for imp_id, imp_label in impact_items:
-        nodes.append(ImpactFlowNode(id=imp_id, label=imp_label, color="#3b82f6", category="impact"))
-        # Link commodities to impacts
-        for commodity_id in seen_commodities:
-            links.append(ImpactFlowLink(source=commodity_id, target=imp_id, value=1))
+        nodes.append(ImpactFlowNode(id=imp_id, label=lbl, color="#3b82f6", category="impact"))
+        # 관련 섹터에서만 링크 연결 (GDP 비중 기반 가중치)
+        for sid in sector_ids:
+            gdp = sectors_data.get(sid, {}).get("gdp_pct", 1)
+            link_val = max(1, round(gdp * 2))
+            links.append(ImpactFlowLink(source=sid, target=imp_id, value=link_val))
 
     if not nodes or not links:
         return None
@@ -2003,6 +2058,27 @@ async def _get_trade_exposure(
         .order_by(TradeBilateral.period.desc(), TradeBilateral.total_trade_usd.desc())
     )
     rows = q.all()
+
+    # Fallback: 직접 보고 데이터 없으면 역방향 조회 (mirror trade)
+    # 다른 나라가 이 나라를 파트너로 보고한 데이터 활용 (TW, KP 등 UN 비가맹국)
+    is_mirror = False
+    if not rows:
+        q2 = await db.execute(
+            select(
+                TradeBilateral.reporter_code,    # 상대국이 "파트너" 역할
+                TradeBilateral.total_trade_usd,
+                TradeBilateral.import_value_usd,  # 상대국의 수입 = 우리 수출
+                TradeBilateral.export_value_usd,  # 상대국의 수출 = 우리 수입
+            )
+            .where(
+                TradeBilateral.partner_code == home_country,
+                TradeBilateral.period_type == "A",
+            )
+            .order_by(TradeBilateral.period.desc(), TradeBilateral.total_trade_usd.desc())
+        )
+        rows = q2.all()
+        is_mirror = True
+
     if not rows:
         return None
 
