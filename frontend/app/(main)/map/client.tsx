@@ -1103,7 +1103,7 @@ export default function MapPage() {
             </div>
           </div>
           {/* Row 2: 범례 + 히트맵 */}
-          <div className="flex items-center gap-1" data-tour="map-filters">
+          <div className="flex items-center gap-1 overflow-hidden" data-tour="map-filters">
             {LEGEND.map(([label, col]) => (
               <span key={label} className="flex items-center gap-0.5 text-[9px] text-muted-foreground whitespace-nowrap">
                 <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: col }} />
