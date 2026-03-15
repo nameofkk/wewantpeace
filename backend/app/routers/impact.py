@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v5"
+_CACHE_VERSION = "v6"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
