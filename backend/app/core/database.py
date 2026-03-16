@@ -64,7 +64,7 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    **({} if _is_sqlite else {"pool_size": 20, "max_overflow": 30, "pool_pre_ping": True, "pool_recycle": 3600}),
+    **({} if _is_sqlite else {"pool_size": 10, "max_overflow": 10, "pool_pre_ping": True, "pool_recycle": 3600}),
 )
 
 AsyncSessionLocal = async_sessionmaker(

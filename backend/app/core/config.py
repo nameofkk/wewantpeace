@@ -57,7 +57,22 @@ class Settings(BaseSettings):
             )
         return self
 
+    # 토스 앱인토스 + 프로덕션 도메인은 항상 허용 (환경변수 ALLOWED_ORIGINS와 병합됨)
+    extra_cors_origins: List[str] = [
+        "https://apps-in-toss.toss.im",
+        "https://apps-in-toss-api.toss.im",
+        "https://www.wewantpeace.live",
+        "https://wewantpeace.live",
+    ]
     allowed_origins: List[str] = ["http://localhost:3000"]
+
+    @model_validator(mode="after")
+    def merge_extra_cors_origins(self) -> "Settings":
+        """extra_cors_origins를 allowed_origins에 병합 (중복 제거)."""
+        for origin in self.extra_cors_origins:
+            if origin not in self.allowed_origins:
+                self.allowed_origins.append(origin)
+        return self
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

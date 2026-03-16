@@ -213,12 +213,7 @@ logger.info("CORS allowed_origins: %s", settings.allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins + [
-        "https://apps-in-toss.toss.im",
-        "https://apps-in-toss-api.toss.im",
-        "https://www.wewantpeace.live",
-        "https://wewantpeace.live",
-    ],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-UID", "X-Requested-With"],
@@ -232,6 +227,16 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "font-src 'self' data:; "
+        "frame-ancestors 'none'"
+    )
     return response
 
 
