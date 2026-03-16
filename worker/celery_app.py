@@ -30,6 +30,10 @@ app.conf.update(
     task_retry_jitter=True,       # jitter 추가
     # Celery 6.0 deprecation warning 제거
     broker_connection_retry_on_startup=True,
+    # 이벤트 루프/asyncpg 풀 누적 상태 정리를 위한 프로세스 재생성
+    worker_max_tasks_per_child=500,
+    # Redis 소켓 타임아웃 설정
+    broker_transport_options={"socket_timeout": 10, "socket_connect_timeout": 5},
 )
 
 app.conf.beat_schedule = {
@@ -212,13 +216,13 @@ app.conf.beat_schedule = {
     # ── 일일 접속 유도 푸시 ──
     "send-daily-engagement": {
         "task": "worker.tasks.send_daily_engagement",
-        "schedule": crontab(minute=0, hour=0),  # 00:00 UTC = 09:00 KST
+        "schedule": crontab(minute=5, hour=0),  # 00:05 UTC = 09:05 KST (시간 분산)
         "options": {"queue": "process"},
     },
     # ── Phase 1 마케팅 체크리스트 ──
     "send-daily-checklist": {
         "task": "worker.tasks.send_daily_checklist",
-        "schedule": crontab(minute=0, hour=0),  # UTC 00:00 = KST 09:00
+        "schedule": crontab(minute=10, hour=0),  # 00:10 UTC = 09:10 KST (시간 분산)
         "options": {"queue": "process"},
     },
     # ── 비활성 RSS 피드 자동 복구 ──

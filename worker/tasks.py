@@ -566,6 +566,8 @@ def prewarm_impact_summaries(self):
     queue="process",
     bind=True,
     max_retries=3,
+    default_retry_delay=120,
+    retry_backoff=True,
 )
 def process_raw_event(self, raw_event_id: str):
     """
@@ -785,12 +787,15 @@ def process_raw_event(self, raw_event_id: str):
                             except Exception as e:
                                 logger.warning("KScore 알림 트리거 체크 오류 (무시): %s", e)
 
+                        # 트랜잭션 밖에서 사용하기 위해 로컬 변수에 저장
+                        _is_verified = cluster.is_verified
+
                 # 7. 처리 완료 플래그
                 raw_event.processed = True
 
         # v7: KScore 기반 알림 태스크 체이닝 (트랜잭션 밖에서)
         if should_alert_fast and cluster_id:
-            alert_kind = "combined" if cluster.is_verified else "fast"
+            alert_kind = "combined" if _is_verified else "fast"
             push_alert.delay(cluster_id, alert_kind)
             # combined은 이미 verified 레인을 포함하므로 별도 verified 불필요
         elif just_verified and cluster_id:
@@ -1112,34 +1117,43 @@ def reprocess_orphans(self):
         skipped = 0
         zombie_count = 0
 
-        async with AsyncSessionLocal() as db:
-            async with db.begin():
-                # cluster_events에 없는 normalized_events (severity>=20, 7일 이내)
-                cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-                orphan_result = await db.execute(
-                    select(NormalizedEvent).where(
-                        NormalizedEvent.severity >= 20,
-                        NormalizedEvent.event_time >= cutoff,
-                        not_(
-                            exists().where(
-                                ClusterEvent.event_id == NormalizedEvent.id
-                            )
-                        ),
-                    ).order_by(NormalizedEvent.event_time.asc())
-                )
-                orphans = orphan_result.scalars().all()
-                logger.info("오펀 이벤트 %d개 발견, 재처리 시작", len(orphans))
+        BATCH_SIZE = 500
+        while True:
+            batch_count = 0
+            async with AsyncSessionLocal() as db:
+                async with db.begin():
+                    # cluster_events에 없는 normalized_events (severity>=20, 7일 이내)
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+                    orphan_result = await db.execute(
+                        select(NormalizedEvent).where(
+                            NormalizedEvent.severity >= 20,
+                            NormalizedEvent.event_time >= cutoff,
+                            not_(
+                                exists().where(
+                                    ClusterEvent.event_id == NormalizedEvent.id
+                                )
+                            ),
+                        ).order_by(NormalizedEvent.event_time.asc()).limit(BATCH_SIZE)
+                    )
+                    orphans = orphan_result.scalars().all()
+                    batch_count = len(orphans)
+                    if batch_count == 0:
+                        break
+                    logger.info("오펀 이벤트 %d개 배치 처리 시작", batch_count)
 
-                for ev in orphans:
-                    try:
-                        cluster, _ = await assign_cluster(ev, db)
-                        if cluster:
-                            reassigned += 1
-                        else:
+                    for ev in orphans:
+                        try:
+                            cluster, _ = await assign_cluster(ev, db)
+                            if cluster:
+                                reassigned += 1
+                            else:
+                                skipped += 1
+                        except Exception as e:
+                            logger.warning("오펀 재처리 실패 [%s]: %s", ev.id, e)
                             skipped += 1
-                    except Exception as e:
-                        logger.warning("오펀 재처리 실패 [%s]: %s", ev.id, e)
-                        skipped += 1
+
+            if batch_count < BATCH_SIZE:
+                break
 
         logger.info("오펀 재처리 완료: reassigned=%d, skipped=%d", reassigned, skipped)
 

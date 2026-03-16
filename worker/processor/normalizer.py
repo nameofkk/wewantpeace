@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 # ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
 
 _OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+if not _OPENAI_KEY:
+    logger.warning("OpenAI key not set — falling back to keyword classification")
 
 _VALID_TOPICS = frozenset([
     "conflict", "terror", "coup", "sanctions", "cyber",
