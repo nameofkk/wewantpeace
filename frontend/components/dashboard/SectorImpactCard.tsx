@@ -69,6 +69,17 @@ const RISK_LABELS: Record<string, Record<string, string>> = {
   en: { critical: "Critical", high: "High", medium: "Medium", low: "Low" },
 };
 
+const DEMO_SECTOR = {
+  sectors: [
+    { sector_ko: "에너지", sector_en: "Energy", exposure_pct: 35, trade_dependency: 0.72, risk_level: "critical", description_ko: "원유·천연가스 공급 불안정으로 가격 급등", description_en: "Price surge due to oil/gas supply instability" },
+    { sector_ko: "농업·식품", sector_en: "Agriculture", exposure_pct: 28, trade_dependency: 0.58, risk_level: "high", description_ko: "곡물 수출국 분쟁으로 공급 차질", description_en: "Grain supply disruption from conflict in exporting nations" },
+    { sector_ko: "반도체", sector_en: "Semiconductors", exposure_pct: 22, trade_dependency: 0.45, risk_level: "medium", description_ko: "희토류 공급망 다변화 필요", description_en: "Rare earth supply chain diversification needed" },
+    { sector_ko: "물류·운송", sector_en: "Logistics", exposure_pct: 18, trade_dependency: 0.38, risk_level: "medium", description_ko: "해운 경로 우회로 비용 증가", description_en: "Shipping cost increase due to route diversions" },
+    { sector_ko: "관광", sector_en: "Tourism", exposure_pct: 12, trade_dependency: 0.15, risk_level: "low", description_ko: "분쟁 인접 지역 여행 수요 감소", description_en: "Travel demand decline near conflict zones" },
+  ],
+  overall_risk: "high",
+};
+
 /** 섹터 분석 내부 콘텐츠 — embedded/standalone 모두에서 재사용 */
 function SectorContent({
   data,
@@ -206,6 +217,28 @@ function SectorContent({
   );
 }
 
+function buildDemoData(lang: Lang) {
+  const sectors = DEMO_SECTOR.sectors.map((s) => ({
+    sector: lang === "ko" ? s.sector_ko : s.sector_en,
+    exposure_pct: s.exposure_pct,
+    trade_dependency: s.trade_dependency,
+    risk_level: s.risk_level,
+    description: lang === "ko" ? s.description_ko : s.description_en,
+  }));
+  const maxLabel = lang === "en" ? 12 : 5;
+  const chartData = sectors.map((s) => ({
+    name: s.sector.length > maxLabel ? s.sector.slice(0, maxLabel) + ".." : s.sector,
+    fullName: s.sector,
+    dependency: Math.round(s.trade_dependency * 100),
+    gdp: s.exposure_pct,
+    risk: s.risk_level,
+  }));
+  return {
+    data: { sectors, overall_risk: DEMO_SECTOR.overall_risk },
+    chartData,
+  };
+}
+
 interface SectorImpactCardProps {
   clusterId?: string;
   /** embedded=true 이면 expand/collapse 없이 직접 표시 (홈 탭 내부용) */
@@ -271,21 +304,27 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
       );
     }
     if (is403) {
+      const demo = buildDemoData(lang);
       return (
-        <div className="py-4 text-center">
-          <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-          <p className="text-xs text-muted-foreground mb-2">
-            {lang === "ko"
-              ? "Pro 플랜에서 이용 가능합니다"
-              : "Available for Pro plan"}
-          </p>
-          <a
-            href="/upgrade?source=demo_sector"
-            className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-            style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
-          >
-            {t(lang, "dash_unlock_pro")}
-          </a>
+        <div className="relative">
+          <div className="opacity-60" style={{ filter: "blur(3px)" }}>
+            <SectorContent data={demo.data} chartData={demo.chartData} lang={lang} isDark={isDark} />
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
+            <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+            <p className="text-xs text-muted-foreground mb-2 font-medium">
+              {lang === "ko"
+                ? "Pro 플랜에서 이용 가능합니다"
+                : "Available for Pro plan"}
+            </p>
+            <a
+              href="/upgrade?source=demo_sector"
+              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+              style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+            >
+              {t(lang, "dash_unlock_pro")}
+            </a>
+          </div>
         </div>
       );
     }
@@ -328,23 +367,31 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
             </div>
           )}
 
-          {is403 && (
-            <div className="py-4 text-center">
-              <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground mb-2">
-                {lang === "ko"
-                  ? "Pro+ 플랜에서 이용 가능합니다"
-                  : "Available for Pro+ plan"}
-              </p>
-              <a
-                href="/upgrade"
-                className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
-              >
-                {t(lang, "dash_unlock_pro_plus")}
-              </a>
-            </div>
-          )}
+          {is403 && (() => {
+            const demo = buildDemoData(lang);
+            return (
+              <div className="relative mt-3">
+                <div className="opacity-60" style={{ filter: "blur(3px)" }}>
+                  <SectorContent data={demo.data} chartData={demo.chartData} lang={lang} isDark={isDark} />
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
+                  <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">
+                    {lang === "ko"
+                      ? "Pro+ 플랜에서 이용 가능합니다"
+                      : "Available for Pro+ plan"}
+                  </p>
+                  <a
+                    href="/upgrade"
+                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+                    style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
+                  >
+                    {t(lang, "dash_unlock_pro_plus")}
+                  </a>
+                </div>
+              </div>
+            );
+          })()}
 
           {isError && !is403 && (
             <p className="py-4 text-xs text-muted-foreground text-center">

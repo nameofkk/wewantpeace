@@ -61,6 +61,20 @@ const DIM_LABELS: Record<string, Record<string, string>> = {
   en: { economy: "Economy", trade: "Trade", travel: "Travel" },
 };
 
+const DEMO_BRIEF = {
+  score: 72,
+  level: "elevated",
+  summary_ko: "글로벌 분쟁 확산으로 에너지·곡물 공급망에 중대한 영향이 감지됩니다. 원유 및 천연가스 가격 상승 압력이 지속되고 있습니다.",
+  summary_en: "Significant supply chain impacts detected in energy and grain sectors due to escalating global conflicts. Upward pressure on oil and gas prices continues.",
+  economy_ko: "에너지 의존도가 높은 산업을 중심으로 비용 상승 우려",
+  economy_en: "Cost concerns rising in energy-dependent industries",
+  trade_ko: "곡물·원자재 수입 경로 다변화 필요성 증가",
+  trade_en: "Growing need for grain/commodity import route diversification",
+  travel_ko: "분쟁 지역 인접국 여행 경보 단계 상향 가능성",
+  travel_en: "Potential travel advisory upgrades for countries near conflict zones",
+  data_sources: ["AI Analysis", "World Bank", "UN Comtrade"],
+};
+
 export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
   const lang = useAppStore((s) => s.lang);
   const homeCountry = useAppStore((s) => s.homeCountry);
@@ -129,21 +143,85 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
             const errStatus = (activeQuery.error as any)?.status;
             const isAuthOrPlan = errStatus === 401 || errStatus === 403;
             if (isAuthOrPlan) {
+              const demoScore = DEMO_BRIEF.score;
+              const demoColor = scoreColor(demoScore);
+              const demoSummary = lang === "ko" ? DEMO_BRIEF.summary_ko : DEMO_BRIEF.summary_en;
+              const demoDims = {
+                economy: lang === "ko" ? DEMO_BRIEF.economy_ko : DEMO_BRIEF.economy_en,
+                trade: lang === "ko" ? DEMO_BRIEF.trade_ko : DEMO_BRIEF.trade_en,
+                travel: lang === "ko" ? DEMO_BRIEF.travel_ko : DEMO_BRIEF.travel_en,
+              };
               return (
-                <div className="py-4 text-center">
-                  <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {lang === "ko"
-                      ? "Pro 플랜에서 이용 가능합니다"
-                      : "Available for Pro plan"}
-                  </p>
-                  <a
-                    href="/upgrade?source=demo_impact"
-                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                    style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
-                  >
-                    {t(lang, "dash_unlock_pro")}
-                  </a>
+                <div className="relative mt-3">
+                  {/* Blurred demo content */}
+                  <div className="opacity-60" style={{ filter: "blur(3px)" }}>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-16 h-16 shrink-0">
+                          <RadialBarChart
+                            width={64} height={64} cx={32} cy={32}
+                            innerRadius={22} outerRadius={30} barSize={6}
+                            data={[{ value: demoScore, fill: demoColor }]}
+                            startAngle={90} endAngle={-270}
+                          >
+                            <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+                            <RadialBar background={{ fill: "hsl(var(--muted) / 0.3)" }} dataKey="value" cornerRadius={3} />
+                          </RadialBarChart>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-sm font-bold tabular-nums leading-none" style={{ color: demoColor }}>
+                              {demoScore}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: demoColor, backgroundColor: `${demoColor}15` }}>
+                              {scoreLabel(DEMO_BRIEF.level, lang)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-foreground/70 leading-relaxed">{demoSummary}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {DIM_CONFIG.map((dim, idx) => (
+                          <div key={dim.key} className={cn("rounded-lg p-2.5", dim.bg)}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <dim.icon className={cn("h-3 w-3 shrink-0", dim.color)} />
+                              <span className={cn("text-[10px] font-bold", dim.color)}>
+                                {DIM_LABELS[lang]?.[dim.key] || dim.key}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-foreground/70 leading-relaxed">
+                              {demoDims[dim.key]}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-start gap-1.5 pt-2 border-t border-border/30">
+                        <Info className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="text-[9px] text-muted-foreground">
+                          <span>{t(lang, "dash_ai_estimate")}</span>
+                          <span className="text-muted-foreground/60">{" · "}{DEMO_BRIEF.data_sources.join(", ")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Upgrade overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
+                    <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">
+                      {lang === "ko"
+                        ? "Pro 플랜에서 이용 가능합니다"
+                        : "Available for Pro plan"}
+                    </p>
+                    <a
+                      href="/upgrade?source=demo_impact"
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                    >
+                      {t(lang, "dash_unlock_pro")}
+                    </a>
+                  </div>
                 </div>
               );
             }
@@ -231,21 +309,46 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                 </div>
               )}
 
-              {/* Non-Pro: Upgrade CTA */}
+              {/* Non-Pro: Demo data + blur + Upgrade CTA */}
               {!hasPro && (
-                <div className="rounded-lg bg-gradient-to-r from-blue-500/5 to-indigo-500/5 border border-blue-500/10 p-3 text-center">
-                  <p className="text-[10px] text-muted-foreground mb-2">
-                    {lang === "ko"
-                      ? "경제/무역/여행 상세 분석은 Pro 플랜에서 이용 가능합니다"
-                      : "Detailed economy/trade/travel analysis available on Pro plan"}
-                  </p>
-                  <a
-                    href="/upgrade"
-                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                    style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
-                  >
-                    {t(lang, "dash_unlock_pro")}
-                  </a>
+                <div className="relative">
+                  <div className="opacity-60" style={{ filter: "blur(3px)" }}>
+                    <div className="space-y-2">
+                      {DIM_CONFIG.map((dim) => {
+                        const demoText = lang === "ko"
+                          ? DEMO_BRIEF[`${dim.key}_ko` as keyof typeof DEMO_BRIEF]
+                          : DEMO_BRIEF[`${dim.key}_en` as keyof typeof DEMO_BRIEF];
+                        return (
+                          <div key={dim.key} className={cn("rounded-lg p-2.5", dim.bg)}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <dim.icon className={cn("h-3 w-3 shrink-0", dim.color)} />
+                              <span className={cn("text-[10px] font-bold", dim.color)}>
+                                {DIM_LABELS[lang]?.[dim.key] || dim.key}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-foreground/70 leading-relaxed">
+                              {demoText}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
+                    <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+                    <p className="text-[10px] text-muted-foreground mb-2 font-medium">
+                      {lang === "ko"
+                        ? "경제/무역/여행 상세 분석은 Pro 플랜에서 이용 가능합니다"
+                        : "Detailed economy/trade/travel analysis available on Pro plan"}
+                    </p>
+                    <a
+                      href="/upgrade"
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                    >
+                      {t(lang, "dash_unlock_pro")}
+                    </a>
+                  </div>
                 </div>
               )}
 
