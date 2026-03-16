@@ -296,17 +296,25 @@ class TelegramCollector:
                 timeout=30,
             )
         except FloodWaitError as e:
-            wait = min(e.seconds, 60)  # 최대 60초만 대기
-            logger.warning("FloodWait %d초 (대기 %d초) - %s", e.seconds, wait, channel.display_name)
-            await asyncio.sleep(wait)
-            # 대기 후 재시도 1회
-            try:
-                messages = await asyncio.wait_for(
-                    client.get_messages(entity, limit=50, min_id=last_msg_id),
-                    timeout=30,
-                )
-            except Exception:
-                result.errors.append(f"FloodWait {e.seconds}s (retry failed)")
+            # 지수 백오프 재시도 (최대 2회)
+            for attempt in range(1, 3):
+                wait = min(e.seconds * attempt, 90)
+                logger.warning("FloodWait %d초 (대기 %d초, attempt %d/2) - %s", e.seconds, wait, attempt, channel.display_name)
+                await asyncio.sleep(wait)
+                try:
+                    messages = await asyncio.wait_for(
+                        client.get_messages(entity, limit=50, min_id=last_msg_id),
+                        timeout=30,
+                    )
+                    break  # 성공
+                except FloodWaitError as e2:
+                    e = e2  # 다음 루프에서 사용
+                    continue
+                except Exception:
+                    result.errors.append(f"FloodWait {e.seconds}s (retry {attempt} failed)")
+                    return result
+            else:
+                result.errors.append(f"FloodWait {e.seconds}s (all retries failed)")
                 return result
         except asyncio.TimeoutError:
             logger.warning("Timeout - %s 메시지 조회 30초 초과", channel.display_name)

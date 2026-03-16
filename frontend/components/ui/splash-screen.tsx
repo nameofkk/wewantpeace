@@ -17,6 +17,14 @@ export function SplashScreen({ visible }: SplashScreenProps) {
     }
   }, [visible]);
 
+  // 안전장치: 10초 후에도 visible이면 강제로 fade-out (느린 네트워크 대응)
+  useEffect(() => {
+    const failsafe = setTimeout(() => {
+      setMounted(false);
+    }, 10000);
+    return () => clearTimeout(failsafe);
+  }, []);
+
   useEffect(() => {
     // React 스플래시가 마운트되면 인라인 HTML 스플래시 제거
     const el = document.getElementById("__splash");

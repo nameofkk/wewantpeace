@@ -5,6 +5,7 @@ Threads access token은 60일 만료. 매주 갱신하여 만료 방지.
 실패 시 Telegram 어드민 알림.
 """
 
+import asyncio
 import logging
 import os
 
@@ -108,32 +109,34 @@ async def refresh_threads_token() -> dict:
         logger.info(detail)
         return {"status": "skipped", "detail": detail, "expires_in": None}
 
-    # Step 1: Meta Graph API로 토큰 갱신 요청
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(
-                THREADS_REFRESH_URL,
-                params={
-                    "grant_type": "th_refresh_token",
-                    "access_token": current_token,
-                },
-            )
-    except Exception as e:
-        detail = f"Threads 토큰 갱신 API 호출 실패: {e}"
+    # Step 1: Meta Graph API로 토큰 갱신 요청 (최대 3회 재시도)
+    resp = None
+    last_error = None
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    THREADS_REFRESH_URL,
+                    params={
+                        "grant_type": "th_refresh_token",
+                        "access_token": current_token,
+                    },
+                )
+            if resp.status_code == 200:
+                break
+            last_error = f"HTTP {resp.status_code}"
+            logger.warning("Threads 토큰 갱신 시도 %d/3 실패: %s", attempt + 1, last_error)
+        except Exception as e:
+            last_error = str(e)
+            logger.warning("Threads 토큰 갱신 시도 %d/3 오류: %s", attempt + 1, e)
+        if attempt < 2:
+            await asyncio.sleep(5 * (attempt + 1))  # 5초, 10초 대기
+
+    if resp is None or resp.status_code != 200:
+        detail = f"Threads 토큰 갱신 3회 시도 실패: {last_error}"
         logger.error(detail)
         await _send_admin_alert(
             f"<b>Threads 토큰 갱신 실패</b>\n\n{detail}\n\n수동 갱신 필요."
-        )
-        return {"status": "error", "detail": detail, "expires_in": None}
-
-    if resp.status_code != 200:
-        detail = f"Threads 토큰 갱신 HTTP {resp.status_code}: {resp.text[:300]}"
-        logger.error(detail)
-        await _send_admin_alert(
-            f"<b>Threads 토큰 갱신 실패</b>\n\n"
-            f"HTTP {resp.status_code}\n"
-            f"<code>{resp.text[:200]}</code>\n\n"
-            f"수동 갱신 필요."
         )
         return {"status": "error", "detail": detail, "expires_in": None}
 

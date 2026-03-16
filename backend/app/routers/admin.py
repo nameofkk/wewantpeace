@@ -273,10 +273,14 @@ async def get_user(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(400, detail="잘못된 사용자 ID 형식입니다.")
+    result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(404)
+        raise HTTPException(404, detail="사용자를 찾을 수 없습니다.")
     return {
         "id": str(user.id),
         "email": user.email,
@@ -288,7 +292,7 @@ async def get_user(
         "birth_year": user.birth_year,
         "bio": user.bio,
         "created_at": user.created_at.isoformat(),
-        "last_active": user.last_active.isoformat(),
+        "last_active": user.last_active.isoformat() if user.last_active else None,
         "agreed_terms_at": user.agreed_terms_at.isoformat() if user.agreed_terms_at else None,
         "suspend_reason": user.suspend_reason,
         "suspended_until": user.suspended_until.isoformat() if user.suspended_until else None,
@@ -302,10 +306,14 @@ async def update_user(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(400, detail="잘못된 사용자 ID 형식입니다.")
+    result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(404)
+        raise HTTPException(404, detail="사용자를 찾을 수 없습니다.")
 
     changes = {}
     if body.plan is not None:
@@ -350,10 +358,14 @@ async def delete_user(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(400, detail="잘못된 사용자 ID 형식입니다.")
+    result = await db.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(404)
+        raise HTTPException(404, detail="사용자를 찾을 수 없습니다.")
     user.status = "deleted"
     await db.flush()
     await _log_action(db, admin, "delete_user", "user", user_id)

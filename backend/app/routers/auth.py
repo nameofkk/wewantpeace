@@ -156,7 +156,7 @@ def _get_toss_cert() -> tuple[str, str]:
     # base64 환경변수 (Railway 배포용)
     if settings.toss_client_cert_b64 and settings.toss_client_key_b64:
         cert_dir = os.path.join(tempfile.gettempdir(), "toss_certs")
-        os.makedirs(cert_dir, exist_ok=True)
+        os.makedirs(cert_dir, mode=0o700, exist_ok=True)
         cert_path = os.path.join(cert_dir, "client.crt")
         key_path = os.path.join(cert_dir, "client.key")
         if not os.path.exists(cert_path):

@@ -94,8 +94,10 @@ export function useMineTrending(countries?: string[] | null) {
 
 // --- 이슈 클러스터 훅 ---
 export function useClusters(params?: Record<string, string>) {
+  // queryKey에 객체 직접 포함 시 참조가 매번 바뀌어 캐시 미스 발생 → 정렬된 문자열로 직렬화
+  const paramKey = params ? JSON.stringify(Object.entries(params).sort()) : "";
   return useQuery({
-    queryKey: ["issues", params],
+    queryKey: ["issues", paramKey],
     queryFn: () => apiFetch("/issues", params),
     staleTime: 2 * 60 * 1000,
     refetchInterval: 3 * 60 * 1000,
@@ -198,15 +200,14 @@ export function getTensionLevelColor(level: number): string {
   return colors[level] ?? "#6b7280";
 }
 
-export function getTensionLevelLabel(level: number): string {
-  const labels: Record<number, string> = {
-    0: "안정",
-    1: "주의",
-    2: "경계",
-    3: "심각",
-    4: "극심",
-  };
-  return labels[level] ?? "알 수 없음";
+/** @deprecated i18n.ts의 getTensionLevelLabel(level, lang) 사용 권장 */
+export function getTensionLevelLabel(level: number, lang?: string): string {
+  if (lang === "en") {
+    const en: Record<number, string> = { 0: "Stable", 1: "Caution", 2: "Elevated", 3: "Severe", 4: "Critical" };
+    return en[level] ?? "Unknown";
+  }
+  const ko: Record<number, string> = { 0: "안정", 1: "주의", 2: "경계", 3: "심각", 4: "극심" };
+  return ko[level] ?? "알 수 없음";
 }
 
 // --- 사용자 훅 ---
@@ -660,13 +661,14 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
   });
 }
 
-/** 국가 선택기 열릴 때 호출 — 모든 국가 데이터를 미리 캐시 */
+/** 국가 선택기 열릴 때 호출 — 선택된 국가만 prefetch (대역폭 최적화) */
 export function usePrefetchImpactSummary() {
   const qc = useQueryClient();
   return (countries: string[], lang: string) => {
-    for (const cc of countries) {
+    // 최대 3개국만 prefetch (현재 국가 + 인접 2개) — 25개 동시 요청 방지
+    const subset = countries.slice(0, 3);
+    for (const cc of subset) {
       const key = ["impact", "summary", cc || "db", lang];
-      // 이미 캐시돼 있으면 스킵
       if (qc.getQueryData(key)) continue;
       qc.prefetchQuery({
         queryKey: key,
@@ -681,9 +683,6 @@ export function usePrefetchImpactSummary() {
     }
   };
 }
-
-// 비hook 버전 (호환용)
-export const prefetchImpactSummary = () => {};
 
 // Per-cluster impact brief (legacy, Pro)
 export interface ImpactBrief {

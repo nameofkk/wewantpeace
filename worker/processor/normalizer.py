@@ -98,7 +98,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, int]]:
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=_OPENAI_KEY, timeout=10.0)
+        client = OpenAI(api_key=_OPENAI_KEY, timeout=30.0)
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
