@@ -242,9 +242,17 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
         )
         db.add(sub)
 
+    # admin 수동 설정된 유저는 웹훅으로 변경하지 않음
+    if user.admin_plan_override:
+        logger.info(
+            "DodoPayments 구독 활성화 스킵 (admin_plan_override): user=%s plan=%s",
+            user_id, plan,
+        )
+        await db.flush()
+        return
+
     # user.plan 변경
     user.plan = plan
-    user.admin_plan_override = False
     await sync_area_activation(user_id, plan, db)
     await db.flush()
 
