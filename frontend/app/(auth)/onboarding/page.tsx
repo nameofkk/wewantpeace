@@ -107,6 +107,7 @@ export default function OnboardingPage() {
   const [search, setSearch] = useState("");
   const [proBannerHighlight, setProBannerHighlight] = useState(false);
   const [loginLoading, setLoginLoading] = useState<"google" | "apple" | "toss" | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [marketingConsent, setMarketingConsent] = useState(false);
 
@@ -268,6 +269,7 @@ export default function OnboardingPage() {
   // --- 로그인 처리 ---
   async function handleOAuthLogin(provider: "google" | "apple") {
     setLoginLoading(provider);
+    setLoginError(null);
     try {
       const user = provider === "google"
         ? await signInWithGoogle()
@@ -289,7 +291,7 @@ export default function OnboardingPage() {
     } catch (err: any) {
       if (err?.message === "redirect") return;
       trackEvent("onboarding_login_error", { provider, error: String(err) });
-      finishOnboarding();
+      setLoginError(lang === "en" ? "Login failed. Please try again." : "로그인에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setLoginLoading(null);
     }
@@ -298,6 +300,7 @@ export default function OnboardingPage() {
   // --- Toss 로그인 처리 ---
   async function handleTossLogin() {
     setLoginLoading("toss");
+    setLoginError(null);
     try {
       const { user, isNewUser } = await signInWithToss();
       if (!user) throw new Error("Toss login failed");
@@ -318,7 +321,7 @@ export default function OnboardingPage() {
       router.push("/login?tab=google-register");
     } catch (err: any) {
       trackEvent("onboarding_login_error", { provider: "toss", error: String(err) });
-      finishOnboarding();
+      setLoginError(lang === "en" ? "Login failed. Please try again." : "로그인에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setLoginLoading(null);
     }
@@ -705,6 +708,13 @@ export default function OnboardingPage() {
                   </div>
                 ))}
               </div>
+
+              {/* 로그인 에러 메시지 */}
+              {loginError && (
+                <div className="w-full rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400 text-center">
+                  {loginError}
+                </div>
+              )}
 
               {/* OAuth 버튼들 */}
               <div className="w-full space-y-3">

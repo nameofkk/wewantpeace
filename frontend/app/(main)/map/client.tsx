@@ -432,6 +432,7 @@ export default function MapPage() {
   const maplibreRef = useRef<any>(null);   // 모듈 캐시 (동기 사용용)
   const markersRef = useRef<any[]>([]);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapLoadError, setMapLoadError] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   // 줌 레벨 <4 여부만 추적 — ref로 관리하여 불필요한 re-render 방지
   const isCountryZoomRef = useRef(true);
@@ -612,6 +613,8 @@ export default function MapPage() {
       });
       map.on("click", () => setSelectedCluster(null));
       map.on("load", () => { mapRef.current = map; setIsMapReady(true); });
+    }).catch(() => {
+      setMapLoadError(true);
     });
     return () => { if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current); mapRef.current?.remove(); mapRef.current = null; setIsMapReady(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1643,6 +1646,20 @@ export default function MapPage() {
       <AppTour tourId="map" steps={tourSteps} run={tourRun} onComplete={() => setTourRun(false)} />
       <TourHelpButton tourId="map" onStartTour={() => setTourRun(true)} />
       <div ref={mapContainerRef} className="h-full w-full" />
+      {mapLoadError && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 gap-3">
+          <AlertTriangle className="h-10 w-10 text-yellow-500" />
+          <p className="text-sm text-muted-foreground text-center px-6">
+            {lang === "en" ? "Unable to load the map. Please check your connection and try again." : "지도를 불러올 수 없습니다. 연결 상태를 확인하고 다시 시도해주세요."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+          >
+            {lang === "en" ? "Retry" : "다시 시도"}
+          </button>
+        </div>
+      )}
 
       {/* ── 상단 헤더 바 ─────────────────────────────────────────── */}
       <div className="absolute left-3 right-3 z-10" style={{ top: "calc(12px + env(safe-area-inset-top, 0px))" }}>

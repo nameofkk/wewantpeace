@@ -66,6 +66,7 @@ interface AppStore {
   setLang: (lang: Lang) => void;
   setTheme: (theme: Theme) => void;
   setHomeCountry: (code: string) => void;
+  reset: () => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -136,6 +137,22 @@ export const useAppStore = create<AppStore>()(
         if (typeof document !== "undefined") {
           document.documentElement.classList.toggle("dark", theme === "dark");
           document.documentElement.classList.toggle("light", theme === "light");
+        }
+      },
+      reset: () => {
+        set({
+          myCountries: [],
+          homeCountry: "",
+          userPlan: "free",
+          completedTours: [],
+          missedAlertCount: 0,
+          missedAlertDismissedAt: null,
+          trendingTab: "global",
+          selectedClusterId: null,
+        });
+        // persist 스토리지도 클리어
+        if (typeof window !== "undefined") {
+          try { localStorage.removeItem("wwp-store"); } catch {}
         }
       },
     }),

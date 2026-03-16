@@ -38,9 +38,14 @@ async function apiFetch<T>(
     },
   });
   if (!res.ok) {
-    // 401이면 Firebase auth 복원 대기 후 1회 재시도 (토큰이 있었을 때만)
+    // 401이면 토큰 강제 갱신 후 1회 재시도 (토큰이 있었을 때만)
     if (res.status === 401 && !_retried && hasAuth) {
-      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        const { getIdToken } = await import("./auth");
+        await getIdToken(true); // forceRefresh
+      } catch {
+        // 갱신 실패 시에도 재시도 (아래에서 에러 처리)
+      }
       return apiFetch<T>(path, params, options, true);
     }
     const body = await res.json().catch(() => ({}));

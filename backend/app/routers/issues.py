@@ -9,13 +9,14 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import plan_required
-from backend.app.core.database import AsyncSessionLocal
+from backend.app.core.database import AsyncSessionLocal, get_db
+from backend.app.core.limiter import limiter
 from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
 from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.raw_event import RawEvent
@@ -100,12 +101,6 @@ class ClusterDetailOut(ClusterOut):
     change_logs: list[ChangeLogOut] = []
 
 
-# ── DB 세션 의존성 ────────────────────────────────────────────────────────────
-
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
-
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
@@ -175,7 +170,9 @@ def _event_to_out(
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[ClusterOut])
+@limiter.limit("60/minute")
 async def list_clusters(
+    request: Request,
     response: Response,
     bbox: Optional[str] = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     topic: Optional[str] = Query(None),
@@ -233,7 +230,9 @@ async def list_clusters(
 
 
 @router.get("/search", response_model=list[SearchResultOut])
+@limiter.limit("60/minute")
 async def search_clusters(
+    request: Request,
     q: str = Query(..., min_length=1, description="검색어 (title/title_ko ILIKE)"),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
@@ -289,7 +288,9 @@ async def search_clusters(
 
 
 @router.get("/{cluster_id}", response_model=ClusterDetailOut)
+@limiter.limit("60/minute")
 async def get_cluster(
+    request: Request,
     cluster_id: str,
     db: AsyncSession = Depends(get_db),
 ):

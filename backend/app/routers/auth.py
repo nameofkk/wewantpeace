@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, _verify_firebase_token, _get_or_create_user
+from backend.app.core.limiter import limiter
 from backend.app.core.config import settings
 from backend.app.models.user import User, UserPreference
 from backend.app.models.terms import UserConsent
@@ -308,6 +309,7 @@ async def toss_login(
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserOut, status_code=201)
+@limiter.limit("10/minute")
 async def register(
     body: RegisterBody,
     request: Request,
@@ -451,13 +453,17 @@ async def check_nickname(nickname: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/find-email")
-async def find_email(nickname: str, birth_year: int, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def find_email(request: Request, nickname: str, birth_year: int, db: AsyncSession = Depends(get_db)):
     """닉네임+생년도로 이메일 찾기."""
+    import asyncio as _asyncio
     result = await db.execute(
         select(User).where(User.nickname == nickname.strip(), User.birth_year == birth_year)
     )
     user = result.scalar_one_or_none()
     if not user or not user.email:
+        # 타이밍 공격 방지: 존재하지 않아도 동일한 지연 + 동일한 응답 구조
+        await _asyncio.sleep(0.05)
         return {"found": False, "email": None}
     email = user.email
     # 이메일 마스킹: abc@gmail.com → a**@gmail.com

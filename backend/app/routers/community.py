@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db
 from backend.app.core.config import settings
+from backend.app.core.limiter import limiter
 from backend.app.models.user import User
 from backend.app.models.community import Post, Comment, CommentReaction, PostReaction, Report
 from backend.app.models.issue_cluster import IssueCluster
@@ -425,7 +426,9 @@ async def create_post(
 
 
 @router.get("/posts/{post_id}", response_model=PostOut)
+@limiter.limit("60/minute")
 async def get_post(
+    request: Request,
     post_id: str,
     db: AsyncSession = Depends(get_db),
 ):

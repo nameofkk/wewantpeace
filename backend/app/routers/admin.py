@@ -226,7 +226,8 @@ async def list_users(
 ):
     filters = []
     if search:
-        filters.append((User.email.ilike(f"%{search}%")) | (User.nickname.ilike(f"%{search}%")))
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filters.append((User.email.ilike(f"%{safe_search}%")) | (User.nickname.ilike(f"%{safe_search}%")))
     if status:
         filters.append(User.status == status)
     if exclude_status:
@@ -463,7 +464,8 @@ async def list_admin_posts(
     if status:
         filters.append(Post.status == status)
     if search:
-        filters.append(Post.title.ilike(f"%{search}%"))
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filters.append(Post.title.ilike(f"%{safe_search}%"))
     if filters:
         q = q.where(and_(*filters))
 
@@ -643,9 +645,10 @@ async def list_clusters(
     if active is not None:
         q = q.where(IssueCluster.is_active == active)
     if search:
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
         q = q.where(
-            (IssueCluster.title.ilike(f"%{search}%"))
-            | (IssueCluster.title_ko.ilike(f"%{search}%"))
+            (IssueCluster.title.ilike(f"%{safe_search}%"))
+            | (IssueCluster.title_ko.ilike(f"%{safe_search}%"))
         )
     if severity is not None:
         q = q.where(IssueCluster.severity == severity)
@@ -853,9 +856,10 @@ async def list_events(
     if severity is not None:
         q = q.where(NormalizedEvent.severity >= severity)
     if search:
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
         q = q.where(
-            (NormalizedEvent.title.ilike(f"%{search}%"))
-            | (NormalizedEvent.title_ko.ilike(f"%{search}%"))
+            (NormalizedEvent.title.ilike(f"%{safe_search}%"))
+            | (NormalizedEvent.title_ko.ilike(f"%{safe_search}%"))
         )
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
@@ -1411,7 +1415,8 @@ async def list_feedbacks(
     q = select(Feedback)
     filters = []
     if search:
-        filters.append(Feedback.message.ilike(f"%{search}%"))
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filters.append(Feedback.message.ilike(f"%{safe_search}%"))
     if date_from:
         filters.append(Feedback.created_at >= datetime.fromisoformat(date_from))
     if date_to:
@@ -2488,7 +2493,8 @@ async def list_partners(
     if channel:
         filters.append(Partner.channel == channel)
     if search:
-        filters.append((Partner.name.ilike(f"%{search}%")) | (Partner.contact_email.ilike(f"%{search}%")))
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filters.append((Partner.name.ilike(f"%{safe_search}%")) | (Partner.contact_email.ilike(f"%{safe_search}%")))
     if filters:
         q = q.where(and_(*filters))
 
@@ -2624,7 +2630,8 @@ async def list_links(
     q = select(ShortLink)
     filters = []
     if search:
-        filters.append((ShortLink.code.ilike(f"%{search}%")) | (ShortLink.title.ilike(f"%{search}%")))
+        safe_search = search.replace("%", r"\%").replace("_", r"\_")
+        filters.append((ShortLink.code.ilike(f"%{safe_search}%")) | (ShortLink.title.ilike(f"%{safe_search}%")))
     if is_active is not None:
         filters.append(ShortLink.is_active == is_active)
     if filters:

@@ -8,12 +8,13 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_optional_user, get_db, plan_required, require_admin
+from backend.app.core.limiter import limiter
 from backend.app.models.user import User
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.issue_cluster import IssueCluster
@@ -236,7 +237,9 @@ DEFAULT_COUNTRIES = [
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.get("/peek", response_model=list[TensionPeekItem])
+@limiter.limit("60/minute")
 async def peek_tension(
+    request: Request,
     since: Optional[str] = Query(None, description="ISO timestamp — 이 시각 이후 알림만 반환"),
 ):
     """
@@ -475,7 +478,9 @@ class TensionAllItem(BaseModel):
 
 
 @router.get("/all", response_model=list[TensionAllItem])
+@limiter.limit("60/minute")
 async def tension_all(
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):

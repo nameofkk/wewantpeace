@@ -1197,6 +1197,18 @@ class SectorExposure(BaseModel):
     trade_dependency: float = Field(description="Trade dependency 0-1")
     risk_level: str = Field(description="low|medium|high|critical")
     description: str
+    # v2 확장 필드 (nullable — 하위호환)
+    trade_volume_usd: float | None = Field(None, description="Total bilateral trade USD millions")
+    export_usd: float | None = Field(None, description="Export to affected USD millions")
+    import_usd: float | None = Field(None, description="Import from affected USD millions")
+    affected_countries: list[str] = Field(default_factory=list, description="Affected country codes")
+    risk_summary: str = Field("", description="1-line risk summary")
+    supply_disruption_weeks: str | None = Field(None, description="e.g. '2-4'")
+    cost_increase_pct: str | None = Field(None, description="e.g. '+12-18%'")
+    scenario_worst: str | None = None
+    scenario_base: str | None = None
+    scenario_best: str | None = None
+    action_point: str | None = None
 
 
 class SectorAnalysisOut(BaseModel):
@@ -2216,20 +2228,30 @@ async def _get_travel_advisories(
     return results[:10]
 
 
-async def _get_real_trade_dependency(
+class _TradeDetail:
+    """양자간 교역 상세 정보"""
+    __slots__ = ("dependency", "total_usd", "export_usd", "import_usd")
+    def __init__(self, dep: float, total: float, exp: float | None, imp: float | None):
+        self.dependency = dep
+        self.total_usd = total
+        self.export_usd = exp
+        self.import_usd = imp
+
+
+async def _get_real_trade_detail(
     home_country: str,
     affected_country: str,
     db: AsyncSession,
-) -> float | None:
-    """DB에서 실제 양자간 교역 비중 조회 (Tier 2)
-
-    Returns: 0-1 사이 교역 의존도 (데이터 없으면 None)
-    """
+) -> _TradeDetail | None:
+    """DB에서 실제 양자간 교역 상세 조회 (의존도 + 교역액)"""
     from backend.app.models.economic_data import TradeBilateral
 
-    # 1) reporter→partner 교역액 (최신 연도)
     pair_q = await db.execute(
-        select(TradeBilateral.total_trade_usd)
+        select(
+            TradeBilateral.total_trade_usd,
+            TradeBilateral.export_value_usd,
+            TradeBilateral.import_value_usd,
+        )
         .where(
             TradeBilateral.reporter_code == home_country,
             TradeBilateral.partner_code == affected_country,
@@ -2238,11 +2260,12 @@ async def _get_real_trade_dependency(
         .order_by(TradeBilateral.period.desc())
         .limit(1)
     )
-    pair_trade = pair_q.scalar_one_or_none()
-    if pair_trade is None:
+    row = pair_q.first()
+    if row is None or row[0] is None:
         return None
 
-    # 2) reporter 전체 교역액 (같은 연도) — 가용한 파트너 합계로 근사
+    pair_trade, export_val, import_val = row[0], row[1], row[2]
+
     total_q = await db.execute(
         select(func.sum(TradeBilateral.total_trade_usd))
         .where(
@@ -2254,10 +2277,18 @@ async def _get_real_trade_dependency(
     if not total_trade or total_trade <= 0:
         return None
 
-    # 교역 의존도 = 해당 파트너와의 교역 / 전체 교역 합계
-    # 이 값은 0-1 범위의 상대적 비중 (실제 전체 교역의 일부만 DB에 있으므로 근사치)
     dep = min(1.0, pair_trade / total_trade)
-    return round(dep, 3)
+    return _TradeDetail(round(dep, 3), pair_trade, export_val, import_val)
+
+
+async def _get_real_trade_dependency(
+    home_country: str,
+    affected_country: str,
+    db: AsyncSession,
+) -> float | None:
+    """하위호환 래퍼 — 의존도만 반환"""
+    detail = await _get_real_trade_detail(home_country, affected_country, db)
+    return detail.dependency if detail else None
 
 
 async def _calc_sector_exposure(

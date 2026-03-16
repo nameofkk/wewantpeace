@@ -251,12 +251,12 @@ if (typeof window !== "undefined" && IS_FIREBASE_CONFIGURED) {
 }
 
 // Firebase ID Token 가져오기 (API 호출용)
-export async function getIdToken(): Promise<string | null> {
+export async function getIdToken(forceRefresh?: boolean): Promise<string | null> {
   const auth = getFirebaseAuth();
   if (!auth) return null;
   const user = auth.currentUser;
   if (!user) return null;
-  return user.getIdToken();
+  return user.getIdToken(forceRefresh);
 }
 
 // useAuth hook

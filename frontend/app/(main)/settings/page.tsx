@@ -118,7 +118,7 @@ function CountryPickerPanel({
 export default function SettingsPage() {
   const router = useRouter();
   const { user: firebaseUser, loading: authLoading } = useAuth();
-  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme, homeCountry, setHomeCountry } = useAppStore();
+  const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme, homeCountry, setHomeCountry, reset } = useAppStore();
   const { data: me } = useMe();
 
   // 서버 plan → store 동기화 (Pro/Pro+ 관심국가 제한 반영)
@@ -300,6 +300,7 @@ export default function SettingsPage() {
 
   async function handleSignOut() {
     await signOut();
+    reset();
     router.push("/login");
   }
 

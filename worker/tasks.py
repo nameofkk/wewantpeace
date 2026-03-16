@@ -1408,20 +1408,32 @@ def expire_subscriptions(self):
                     if getattr(user, "admin_plan_override", False):
                         continue
 
-                    # 구독 레코드가 아예 없으면 어드민이 수동 부여한 플랜 → 건드리지 않음
+                    # 구독 레코드가 아예 없는 경우:
+                    # admin_plan_override=True면 수동 부여 → 건드리지 않음 (위에서 이미 처리)
+                    # admin_plan_override=False인데 구독 레코드 없음 → 비정상 상태, free로 다운그레이드
                     any_sub_result = await db.execute(
                         select(Subscription).where(
                             Subscription.user_id == user.id,
                         ).limit(1)
                     )
                     if any_sub_result.scalar_one_or_none() is None:
+                        # 구독 레코드 없이 유료 플랜 → 비정상, free로 롤백
+                        user.plan = "free"
+                        from backend.app.services.area_activation import sync_area_activation
+                        await sync_area_activation(user.id, "free", db)
+                        downgraded += 1
+                        logger.info(
+                            "expire_subscriptions: 구독 레코드 없는 유료 플랜 유저 다운그레이드 user=%s plan=%s→free",
+                            user.id, user.plan,
+                        )
                         continue
 
-                    # 아직 유효한(expires_at > now) 활성 구독이 있는지 확인
+                    # 아직 유효한(expires_at > now) 구독이 있는지 확인
+                    # active뿐 아니라 cancelled(만료일까지 유효)·grace_period·billing_retry도 포함
                     sub_result = await db.execute(
                         select(Subscription).where(
                             Subscription.user_id == user.id,
-                            Subscription.status == "active",
+                            Subscription.status.in_(["active", "cancelled", "grace_period", "billing_retry"]),
                             Subscription.expires_at > now,
                         ).limit(1)
                     )

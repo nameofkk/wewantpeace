@@ -7,13 +7,14 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.redis import get_redis
 from backend.app.core.auth import get_db, get_optional_user
+from backend.app.core.limiter import limiter
 from backend.app.models.user import User, UserPreference
 from backend.app.models.trending_keyword import TrendingKeyword
 from backend.app.models.issue_cluster import IssueCluster
@@ -128,7 +129,8 @@ async def _get_kscore_delta_24h(
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.get("/global", response_model=list[TrendingItem])
-async def global_trending(response: Response, db: AsyncSession = Depends(get_db)):
+@limiter.limit("60/minute")
+async def global_trending(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     response.headers["Cache-Control"] = "public, max-age=300"
     """
     글로벌 트렌딩 상위 20개 반환.
@@ -404,7 +406,9 @@ def _make_mine_reason(cluster: IssueCluster, kscore: float) -> str:
 
 
 @router.get("/peek", response_model=list[TrendingItem])
+@limiter.limit("60/minute")
 async def peek_trending(
+    request: Request,
     since: Optional[str] = Query(None, description="ISO timestamp — 이 시각 이후 신규 항목만 반환"),
     min_kscore: float = Query(3.0, ge=0.0, description="최소 KScore 임계값 (0-10 스케일)"),
     db: AsyncSession = Depends(get_db),
