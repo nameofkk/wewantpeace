@@ -79,7 +79,7 @@ const FEATURES: Feature[] = [
     free: false,                       pro: true,                        proplus: true,
   },
   {
-    labelKo: "Intel (FIRMS/IODA/GPS)", labelEn: "Intel (FIRMS/IODA/GPS)",
+    labelKo: "Intel (FIRMS/IODA/GPS/교역흐름)", labelEn: "Intel (FIRMS/IODA/GPS/Trade)",
     free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
@@ -97,10 +97,6 @@ const FEATURES: Feature[] = [
   {
     labelKo: "이슈별 산업 리스크",     labelEn: "Per-issue sector risk",
     free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
-  },
-  {
-    labelKo: "교역 흐름 분석",         labelEn: "Trade flow analysis",
-    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
     labelKo: "주간 리포트",            labelEn: "Weekly report",
