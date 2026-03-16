@@ -385,6 +385,40 @@
   animation: splash-dots 1.2s ease-in-out infinite;
 }
 
+/* ── 스플래시 이슈 핑 ─────────────────────────────── */
+@keyframes splash-issue-ping {
+  0%   { transform: scale(0); opacity: 0.9; }
+  50%  { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.splash-ping {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.4);
+  animation: splash-issue-ping 3s ease-out infinite;
+  z-index: 1;
+}
+.splash-ping::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  animation: splash-issue-ping 3s ease-out infinite;
+  animation-delay: 0.3s;
+}
+.splash-ping--2 { animation-delay: 0.7s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
+.splash-ping--2::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 1s; }
+.splash-ping--3 { animation-delay: 1.4s; }
+.splash-ping--3::after { animation-delay: 1.7s; }
+.splash-ping--4 { animation-delay: 2.1s; background: rgba(234, 179, 8, 0.6); box-shadow: 0 0 6px 2px rgba(234, 179, 8, 0.3); }
+.splash-ping--4::after { border-color: rgba(234, 179, 8, 0.4); animation-delay: 2.4s; }
+.splash-ping--5 { animation-delay: 0.3s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
+.splash-ping--5::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 0.6s; }
+
 /* ── LogoIcon 레이더 파동 ─────────────────────────── */
 @keyframes logo-radar-pulse {
   0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 0.7; }

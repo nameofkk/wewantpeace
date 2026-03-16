@@ -42,35 +42,38 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         background: "linear-gradient(160deg, #0a0f1e 0%, #0f172a 35%, #121d36 65%, #0d1425 100%)",
       }}
     >
-      <>
-        {/* 배경 그리드 패턴 */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(59,130,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.5) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        {/* 배경 글로우 오브 */}
-        <div
-          className="absolute top-[30%] left-1/2 w-[300px] h-[300px] rounded-full splash-glow"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)",
-            transform: "translate(-50%, -50%)",
-          }}
-        />
-        {/* 수평 스캔 라인 */}
-        <div
-          className="absolute left-0 right-0 h-px splash-scan"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.4) 20%, rgba(59,130,246,0.6) 50%, rgba(59,130,246,0.4) 80%, transparent 100%)",
-            boxShadow: "0 0 12px 2px rgba(59,130,246,0.15)",
-          }}
-        />
-      </>
+      {/* 배경: dotted 세계지도 */}
+      <div
+        className="absolute inset-0 opacity-50"
+        style={{
+          backgroundImage: "url(/dotted-world-map.svg)",
+          backgroundSize: "140% auto",
+          backgroundPosition: "center 40%",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
+      {/* 이슈 핑 애니메이션 */}
+      <span className="splash-ping" style={{ top: "25%", left: "55%" }} />
+      <span className="splash-ping splash-ping--2" style={{ top: "38%", left: "72%" }} />
+      <span className="splash-ping splash-ping--3" style={{ top: "45%", left: "48%" }} />
+      <span className="splash-ping splash-ping--4" style={{ top: "32%", left: "30%" }} />
+      <span className="splash-ping splash-ping--5" style={{ top: "55%", left: "60%" }} />
+      {/* 글로우 오버레이 */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(ellipse 70% 60% at 50% 45%, rgba(10,15,30,0.4) 0%, rgba(10,15,30,0.85) 70%, rgba(10,15,30,0.95) 100%)",
+        }}
+      />
+      {/* 수평 스캔 라인 */}
+      <div
+        className="absolute left-0 right-0 h-px splash-scan"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.4) 20%, rgba(59,130,246,0.6) 50%, rgba(59,130,246,0.4) 80%, transparent 100%)",
+          boxShadow: "0 0 12px 2px rgba(59,130,246,0.15)",
+        }}
+      />
 
       {/* 로고 + 레이더 영역 */}
       <div className="relative flex items-center justify-center w-[184px] h-20">

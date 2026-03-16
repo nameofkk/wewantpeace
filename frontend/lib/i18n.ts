@@ -1146,9 +1146,9 @@ export const translations = {
     settings_area_upgrade_hint: "Pro로 업그레이드하면 다시 활성화됩니다",
 
     // 온보딩 (3스텝: 히어로 → 국가+알림 → 로그인유도)
-    ob_hero_title: "전 세계 분쟁·위기를\nAI가 실시간으로 감지합니다",
-    ob_hero_signal_1: "100+ RSS 출처 실시간 수집",
-    ob_hero_signal_2: "자동 분류 · 심각도 분석",
+    ob_hero_title: "전 세계 분쟁·위기를\n실시간으로 모니터링합니다",
+    ob_hero_signal_1: "100+ 글로벌 뉴스 소스 실시간 수집",
+    ob_hero_signal_2: "심각도 분석 · 국가별 긴장도 추적",
     ob_hero_monitoring: "현재 50+개국 모니터링 중",
     ob_hero_cta: "시작하기",
     ob_step_countries: "관심 국가 선택",
@@ -2736,9 +2736,9 @@ export const translations = {
     settings_area_upgrade_hint: "Upgrade to Pro to reactivate",
 
     // Onboarding (3-step: hero → countries+alerts → login prompt)
-    ob_hero_title: "AI-powered real-time\nconflict & crisis monitoring",
-    ob_hero_signal_1: "100+ RSS sources, real-time",
-    ob_hero_signal_2: "Auto classification & severity",
+    ob_hero_title: "Real-time global\nconflict & crisis monitoring",
+    ob_hero_signal_1: "100+ global news sources, real-time",
+    ob_hero_signal_2: "Severity analysis · country tension tracking",
     ob_hero_monitoring: "Monitoring 50+ countries",
     ob_hero_cta: "Get started",
     ob_step_countries: "Select countries",

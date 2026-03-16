@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Rss,
-  Brain,
   Satellite,
   Bell,
   BellOff,
@@ -19,6 +18,7 @@ import {
   Activity,
   Shield,
   Globe,
+  BarChart3,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -311,14 +311,33 @@ export default function OnboardingPage() {
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-background overflow-hidden">
-      {/* 배경 그라디언트 */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 50% at 50% 0%, rgba(59,130,246,0.10) 0%, transparent 60%)",
-        }}
-      />
+      {/* 배경: dotted 세계지도 + 이슈 핑 애니메이션 */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* 지도 SVG */}
+        <div
+          className="absolute inset-0 opacity-60"
+          style={{
+            backgroundImage: "url(/dotted-world-map.svg)",
+            backgroundSize: "140% auto",
+            backgroundPosition: "center 40%",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+        {/* 이슈 발생 핑 애니메이션 */}
+        <span className="ob-ping" style={{ top: "28%", left: "52%" }} />
+        <span className="ob-ping ob-ping--2" style={{ top: "35%", left: "72%" }} />
+        <span className="ob-ping ob-ping--3" style={{ top: "42%", left: "58%" }} />
+        <span className="ob-ping ob-ping--4" style={{ top: "55%", left: "45%" }} />
+        <span className="ob-ping ob-ping--5" style={{ top: "30%", left: "30%" }} />
+        <span className="ob-ping ob-ping--6" style={{ top: "48%", left: "80%" }} />
+        {/* 어두운 오버레이 */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(15,23,42,0.5) 0%, rgba(15,23,42,0.85) 70%, rgba(15,23,42,0.95) 100%)",
+          }}
+        />
+      </div>
 
       {/* 헤더 */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-2">
@@ -405,7 +424,7 @@ export default function OnboardingPage() {
               <div className="w-full space-y-2.5 mb-6">
                 {[
                   { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
-                  { icon: Brain, key: "ob_hero_signal_2" as const, delay: "0.1s" },
+                  { icon: BarChart3, key: "ob_hero_signal_2" as const, delay: "0.1s" },
                   { icon: Satellite, key: "ob_hero_signal_3_v2" as const, delay: "0.2s" },
                   { icon: Bell, key: "ob_hero_signal_4" as const, delay: "0.3s" },
                 ].map(({ icon: Icon, key, delay }) => (
@@ -834,6 +853,41 @@ export default function OnboardingPage() {
           opacity: 0;
           animation: ob-flag-pop 0.3s ease-out both;
         }
+
+        /* 이슈 발생 핑 */
+        @keyframes ob-issue-ping {
+          0% { transform: scale(0); opacity: 0.9; }
+          50% { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+        .ob-ping {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: rgba(239, 68, 68, 0.7);
+          box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.4);
+          animation: ob-issue-ping 3s ease-out infinite;
+        }
+        .ob-ping::after {
+          content: "";
+          position: absolute;
+          inset: -2px;
+          border-radius: 50%;
+          border: 1px solid rgba(239, 68, 68, 0.5);
+          animation: ob-issue-ping 3s ease-out infinite;
+          animation-delay: 0.3s;
+        }
+        .ob-ping--2 { animation-delay: 0.8s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
+        .ob-ping--2::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 1.1s; }
+        .ob-ping--3 { animation-delay: 1.6s; }
+        .ob-ping--3::after { animation-delay: 1.9s; }
+        .ob-ping--4 { animation-delay: 2.2s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
+        .ob-ping--4::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 2.5s; }
+        .ob-ping--5 { animation-delay: 0.4s; background: rgba(234, 179, 8, 0.6); box-shadow: 0 0 6px 2px rgba(234, 179, 8, 0.3); }
+        .ob-ping--5::after { border-color: rgba(234, 179, 8, 0.4); animation-delay: 0.7s; }
+        .ob-ping--6 { animation-delay: 1.2s; }
+        .ob-ping--6::after { animation-delay: 1.5s; }
 
         .scrollbar-thin::-webkit-scrollbar { width: 4px; }
         .scrollbar-thin::-webkit-scrollbar-thumb {
