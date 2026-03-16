@@ -1340,6 +1340,13 @@ export default function MapPage() {
             .setLngLat(e.lngLat)
             .setHTML(html)
             .addTo(map);
+          const hEl = tradeFlowPopupRef.current.getElement();
+          if (hEl) {
+            const hContent = hEl.querySelector(".maplibregl-popup-content") as HTMLElement;
+            if (hContent) { hContent.style.cssText = "background:#1f2937!important;color:#e5e7eb!important;border:1px solid #374151!important;border-radius:8px!important;padding:0!important;box-shadow:0 4px 12px rgba(0,0,0,0.4)!important;"; }
+            const hTip = hEl.querySelector(".maplibregl-popup-tip") as HTMLElement;
+            if (hTip) { hTip.style.cssText = "border-top-color:#374151!important;"; }
+          }
         }
 
         // 하이라이트: 해당 아크 opacity 높이고 나머지 낮춤 + 글로우 강화
@@ -1419,6 +1426,16 @@ export default function MapPage() {
             .setLngLat(coords)
             .setHTML(html)
             .addTo(map);
+          // MapLibre 기본 흰색 배경 강제 오버라이드
+          const el = tradeFlowPopupRef.current.getElement();
+          if (el) {
+            const content = el.querySelector(".maplibregl-popup-content") as HTMLElement;
+            if (content) { content.style.cssText = "background:#1f2937!important;color:#e5e7eb!important;border:1px solid #374151!important;border-radius:8px!important;padding:0!important;box-shadow:0 4px 12px rgba(0,0,0,0.4)!important;"; }
+            const tip = el.querySelector(".maplibregl-popup-tip") as HTMLElement;
+            if (tip) { tip.style.cssText = "border-top-color:#374151!important;"; }
+            const closeBtn = el.querySelector(".maplibregl-popup-close-button") as HTMLElement;
+            if (closeBtn) { closeBtn.style.cssText = "color:#9ca3af!important;font-size:16px;"; }
+          }
         }
       };
 
