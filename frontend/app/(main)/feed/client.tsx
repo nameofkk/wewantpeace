@@ -814,26 +814,6 @@ function FeedPageContent() {
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-600 dark:text-red-400">LIVE</span>
             </span>
-            {extremeCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {extremeCount}
-              </span>
-            )}
-            {crisisCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-500/15 px-1.5 text-[9px] font-bold text-red-600 dark:text-red-400 border border-red-500/30">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {crisisCount}
-              </span>
-            )}
-            {(extremeCount > 0 || crisisCount > 0) && (
-              <InfoTooltip
-                direction="down"
-                text={lang === "ko"
-                  ? `🔴 극심 ${extremeCount}건 (KScore 8+)\n🟠 심각 ${crisisCount}건 (KScore 6~8)`
-                  : `🔴 ${extremeCount} Extreme (KScore 8+)\n🟠 ${crisisCount} Severe (KScore 6-8)`}
-              />
-            )}
           </div>
           {/* 중앙 — 로고 */}
           <div className="flex justify-center">

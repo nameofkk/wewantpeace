@@ -676,26 +676,6 @@ export default function TensionPage() {
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-red-500" />
               <span className="text-[9px] font-bold text-red-400">LIVE</span>
             </span>
-            {crisisCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-900/25 px-1.5 text-[9px] font-bold text-red-700 dark:text-red-300 border border-red-800/40">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {crisisCount}
-              </span>
-            )}
-            {severeCount - crisisCount > 0 && (
-              <span className="inline-flex items-center gap-0.5 h-5 rounded-full bg-red-500/15 px-1.5 text-[9px] font-bold text-red-600 dark:text-red-400 border border-red-500/30">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                {severeCount - crisisCount}
-              </span>
-            )}
-            {(crisisCount > 0 || severeCount > 0) && (
-              <InfoTooltip
-                direction="down"
-                text={lang === "ko"
-                  ? `🔴 극심 ${crisisCount}개국 (긴장도 80+)\n🟠 위기 ${severeCount - crisisCount}개국 (긴장도 60~80)`
-                  : `🔴 ${crisisCount} Extreme (Score 80+)\n🟠 ${severeCount - crisisCount} Severe (Score 60-80)`}
-              />
-            )}
           </div>
           {/* 중앙 — 로고 */}
           <div className="flex justify-center">
