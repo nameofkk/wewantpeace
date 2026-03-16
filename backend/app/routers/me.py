@@ -458,6 +458,7 @@ async def update_preferences(
         if new_hc == "":
             # BASIC 모드: 빈 문자열 허용 (raw KScore, 모든 플랜)
             pref.home_country = ""
+            current_user.home_country = ""
         else:
             if len(new_hc) != 2 or not new_hc.isalpha():
                 raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
@@ -469,6 +470,7 @@ async def update_preferences(
                     detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},
                 )
             pref.home_country = new_hc
+            current_user.home_country = new_hc
 
     await db.flush()
     return _pref_to_out(pref)
