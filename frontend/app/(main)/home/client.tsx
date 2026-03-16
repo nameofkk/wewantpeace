@@ -157,7 +157,9 @@ function ReportContent() {
   const userPlan = meObj?.plan ?? "free";
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
-  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang);
+  // 미인증 시 impact summary 비활성화 (401 반복 방지)
+  const isAuthenticated = !!meObj;
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang, !meLoading && isAuthenticated);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
@@ -294,11 +296,13 @@ function ReportContent() {
     } as TrendingItem));
   }, [summary, lang]);
 
-  if (summaryLoading) {
+  if (meLoading || (summaryLoading && isAuthenticated)) {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
-  if (summaryError && !summary && !summaryFetching) {
+  // 인증된 사용자의 서버 에러만 에러 페이지 표시 (미인증 401은 무시)
+  const isAuthError = (summaryErrorObj as any)?.status === 401;
+  if (summaryError && !summary && !summaryFetching && !isAuthError) {
     return (
       <div className="p-6 text-center">
         <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
