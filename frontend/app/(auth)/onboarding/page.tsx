@@ -19,6 +19,7 @@ import {
   Shield,
   Globe,
   BarChart3,
+  TrendingUp,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -30,8 +31,11 @@ import { trackEvent } from "@/lib/analytics";
 
 type Step = 0 | 1 | 2;
 
-// 주요 국기 (히어로 하단)
-const HERO_FLAGS = ["UA", "IL", "TW", "MM", "SD", "SY", "YE", "AF"];
+// 수집처 목록 (마퀴 스크롤)
+const DATA_SOURCES = [
+  "Reuters", "Associated Press", "ACLED", "GDELT", "NASA FIRMS",
+  "UCDP", "OCHA ReliefWeb", "IODA", "Al Jazeera", "BBC",
+];
 
 // 지역별 그룹핑
 function groupByRegion(lang: string) {
@@ -160,6 +164,11 @@ export default function OnboardingPage() {
       trackEvent("onboarding_hero_start");
       setStep(1);
     } else if (step === 1) {
+      if (selectedCountries.length < 2) {
+        setCountryWarning(true);
+        setTimeout(() => setCountryWarning(false), 3000);
+        return;
+      }
       setHomeCountry(homeCountryLocal);
       setMyCountries(selectedCountries);
       trackEvent("onboarding_countries_done", { count: selectedCountries.length, home: homeCountryLocal });
@@ -306,8 +315,11 @@ export default function OnboardingPage() {
     }
   }
 
-  // --- Next 버튼 활성화 ---
-  const canNext = step === 0 || (step === 1 && selectedCountries.length >= 2);
+  // --- 관심 국가 미선택 경고 ---
+  const [countryWarning, setCountryWarning] = useState(false);
+
+  // --- Next 버튼 활성화 (항상 활성) ---
+  const canNext = step === 0 || step === 1;
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-background overflow-hidden">
@@ -425,8 +437,9 @@ export default function OnboardingPage() {
                 {[
                   { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
                   { icon: BarChart3, key: "ob_hero_signal_2" as const, delay: "0.1s" },
-                  { icon: Satellite, key: "ob_hero_signal_3_v2" as const, delay: "0.2s" },
-                  { icon: Bell, key: "ob_hero_signal_4" as const, delay: "0.3s" },
+                  { icon: TrendingUp, key: "ob_hero_impact" as const, delay: "0.2s" },
+                  { icon: Satellite, key: "ob_hero_signal_3_v2" as const, delay: "0.3s" },
+                  { icon: Bell, key: "ob_hero_signal_4" as const, delay: "0.4s" },
                 ].map(({ icon: Icon, key, delay }) => (
                   <div
                     key={key}
@@ -461,17 +474,18 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* 국기 행진 */}
-              <div className="flex justify-center gap-2">
-                {HERO_FLAGS.map((code, i) => (
-                  <span
-                    key={code}
-                    className="text-lg ob-flag-pop"
-                    style={{ animationDelay: `${0.5 + i * 0.08}s` }}
-                  >
-                    {getFlag(code)}
-                  </span>
-                ))}
+              {/* 수집처 마퀴 */}
+              <div className="w-full overflow-hidden relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-8 z-10 bg-gradient-to-r from-background to-transparent" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 z-10 bg-gradient-to-l from-background to-transparent" />
+                <div className="ob-marquee flex gap-6 whitespace-nowrap">
+                  {[...DATA_SOURCES, ...DATA_SOURCES].map((src, i) => (
+                    <span key={`${src}-${i}`} className="text-[11px] font-medium text-muted-foreground/50 flex items-center gap-1.5">
+                      <span className="h-1 w-1 rounded-full bg-primary/30" />
+                      {src}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -479,28 +493,6 @@ export default function OnboardingPage() {
           {/* === Step 1: 국가 선택 + 알림 === */}
           {step === 1 && (
             <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
-              {/* 나의 국가 선택 */}
-              <div className="mb-4 pb-3 border-b border-border/30">
-                <h3 className="text-sm font-bold text-center mb-1">{t(lang, "ob_home_country_title" as any)}</h3>
-                <p className="text-xs text-muted-foreground text-center mb-3">{t(lang, "ob_home_country_desc" as any)}</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {["KR", "US", "JP", "CN", "GB", "DE"].map((code) => (
-                    <button
-                      key={code}
-                      onClick={() => setHomeCountryLocal(code)}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
-                        homeCountryLocal === code
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/30 hover:bg-muted/50"
-                      }`}
-                    >
-                      <span>{getFlag(code)}</span>
-                      <span>{getCountryName(code, lang)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="text-center mb-3">
                 <h2 className="text-xl font-bold mb-1">{t(lang, "ob_step_countries")}</h2>
                 <p className="text-sm text-muted-foreground">{t(lang, "ob_countries_desc")}</p>
@@ -652,18 +644,28 @@ export default function OnboardingPage() {
 
               {/* 마케팅 수신 동의 */}
               <div className="border-t border-border/30 pt-3 mt-2">
-                <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={marketingConsent}
-                    onChange={(e) => setMarketingConsent(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <span>{t(lang, "marketing_consent_label")}</span>
-                </label>
-                <p className="text-[10px] text-muted-foreground/70 ml-6">
-                  {t(lang, "marketing_consent_desc")}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Rss className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">
+                      {t(lang, "marketing_consent_label")}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setMarketingConsent(!marketingConsent)}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors active:scale-95 ${
+                      marketingConsent
+                        ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30"
+                        : "bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20"
+                    }`}
+                  >
+                    {marketingConsent ? (
+                      <><CheckCircle2 className="h-3.5 w-3.5" />{lang === "ko" ? "동의함" : "Agreed"}</>
+                    ) : (
+                      <>{lang === "ko" ? "동의하기" : "Agree"}</>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -766,6 +768,15 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {/* 관심 국가 미선택 경고 */}
+      {countryWarning && (
+        <div className="relative z-10 mx-4 mb-1 animate-fadeIn">
+          <div className="w-full max-w-md mx-auto text-center py-2 px-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+            {lang === "ko" ? "최소 2개 이상 관심 국가를 선택해주세요" : "Please select at least 2 countries"}
+          </div>
+        </div>
+      )}
+
       {/* 하단 버튼 (Step 0, 1만) */}
       {step < 2 && (
         <div className="relative z-10 px-4 pb-6 pt-3">
@@ -843,15 +854,13 @@ export default function OnboardingPage() {
           animation: ob-slide-in 0.4s ease-out both;
         }
 
-        /* 국기 팝 */
-        @keyframes ob-flag-pop {
-          0% { opacity: 0; transform: scale(0.5); }
-          60% { transform: scale(1.15); }
-          100% { opacity: 1; transform: scale(1); }
+        /* 수집처 마퀴 */
+        @keyframes ob-marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
-        .ob-flag-pop {
-          opacity: 0;
-          animation: ob-flag-pop 0.3s ease-out both;
+        .ob-marquee {
+          animation: ob-marquee 25s linear infinite;
         }
 
         /* 이슈 발생 핑 */
