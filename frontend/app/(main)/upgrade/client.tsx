@@ -104,10 +104,6 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "주간 리포트",            labelEn: "Weekly report",
-    free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
-  },
-  {
-    labelKo: "주간 PDF",               labelEn: "Weekly PDF",
     free: { ko: "준비중", en: "Soon" }, pro: { ko: "준비중", en: "Soon" }, proplus: { ko: "준비중", en: "Soon" },
   },
 ];
