@@ -2423,7 +2423,7 @@ async def get_sector_analysis(
 
 @router.get("/sector-overview", response_model=SectorAnalysisOut)
 async def get_sector_overview(
-    user: User = Depends(get_current_user),
+    user: User = Depends(plan_required("pro")),
     db: AsyncSession = Depends(get_db),
     lang: str | None = Query(None, description="응답 언어 (ko/en)"),
     home_country: str | None = Query(None, description="분석 기준 국가 (ISO2)"),

@@ -83,7 +83,11 @@ const FEATURES: Feature[] = [
     free: false,                       pro: true,                       proplus: true,
   },
   {
-    labelKo: "산업별 리스크 분석",     labelEn: "Sector risk analysis",
+    labelKo: "산업별 리스크 개요",     labelEn: "Sector risk overview",
+    free: false,                       pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "이슈별 산업 리스크",    labelEn: "Per-issue sector risk",
     free: false,                       pro: false,                      proplus: true,
   },
   {

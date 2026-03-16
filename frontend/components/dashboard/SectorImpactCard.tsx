@@ -276,15 +276,15 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
           <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
           <p className="text-xs text-muted-foreground mb-2">
             {lang === "ko"
-              ? "Pro+ 플랜에서 이용 가능합니다"
-              : "Available for Pro+ plan"}
+              ? "Pro 플랜에서 이용 가능합니다"
+              : "Available for Pro plan"}
           </p>
           <a
             href="/upgrade?source=demo_sector"
             className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-            style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
+            style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
           >
-            {t(lang, "dash_unlock_pro_plus")}
+            {t(lang, "dash_unlock_pro")}
           </a>
         </div>
       );
