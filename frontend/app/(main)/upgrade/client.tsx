@@ -27,44 +27,36 @@ interface Feature {
 
 const FEATURES: Feature[] = [
   {
+    labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
+    free: true,                        pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "글로벌 트렌딩",          labelEn: "Global trending",
+    free: true,                        pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "영향 흐름도",            labelEn: "Impact flow",
+    free: true,                        pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "종합 영향도",            labelEn: "Overall impact",
+    free: true,                        pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "속보 알림",              labelEn: "Fast alerts",
+    free: { ko: "5건", en: "5" },      pro: { ko: "20건", en: "20" },    proplus: { ko: "100건", en: "100" },
+  },
+  {
     labelKo: "관심 국가",              labelEn: "Monitored countries",
     free: { ko: "2개", en: "2" },      pro: { ko: "5개", en: "5" },      proplus: { ko: "무제한", en: "Unlimited" },
   },
   {
-    labelKo: "기준국가",                labelEn: "Home country",
+    labelKo: "기준국가",               labelEn: "Home country",
     free: { ko: "글로벌", en: "Global" }, pro: { ko: "개인화", en: "Custom" }, proplus: { ko: "개인화", en: "Custom" },
   },
   {
-    labelKo: "실시간 이슈 지도",       labelEn: "Real-time issue map",
-    free: true,                        pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "글로벌 트렌딩",          labelEn: "Global trending",
-    free: true,                        pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "속보 알림",               labelEn: "Fast alerts",
-    free: true,                        pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "신뢰 알림",              labelEn: "Verified alerts",
-    free: false,                       pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "일일 알림 상한",         labelEn: "Daily alert limit",
-    free: { ko: "5건", en: "5" },      pro: { ko: "20건", en: "20" },    proplus: { ko: "100건", en: "100" },
-  },
-  {
-    labelKo: "KScore 필터",             labelEn: "KScore filter",
+    labelKo: "KScore 필터",            labelEn: "KScore filter",
     free: { ko: "4.0 고정", en: "4.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
-  },
-  {
-    labelKo: "토픽 필터",              labelEn: "Topic filter",
-    free: false,                       pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "방해금지 시간",          labelEn: "Quiet hours",
-    free: false,                       pro: true,                       proplus: true,
   },
   {
     labelKo: "긴장도 히스토리",        labelEn: "Tension history",
@@ -75,39 +67,47 @@ const FEATURES: Feature[] = [
     free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
   {
-    labelKo: "영향 흐름도",             labelEn: "Impact flow",
-    free: true,                        pro: true,                       proplus: true,
+    labelKo: "신뢰 알림",              labelEn: "Verified alerts",
+    free: false,                       pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "토픽 필터",              labelEn: "Topic filter",
+    free: false,                       pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "방해금지 시간",          labelEn: "Quiet hours",
+    free: false,                       pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "Intel (FIRMS/IODA/GPS)", labelEn: "Intel (FIRMS/IODA/GPS)",
+    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
+  },
+  {
+    labelKo: "교차검증 시그널",        labelEn: "Cross-verification",
+    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
     labelKo: "AI 영향 분석",           labelEn: "AI impact analysis",
-    free: false,                       pro: true,                       proplus: true,
+    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
-    labelKo: "산업별 리스크 개요",     labelEn: "Sector risk overview",
-    free: false,                       pro: true,                       proplus: true,
+    labelKo: "홈 산업별 리스크 개요",  labelEn: "Sector risk overview",
+    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
-    labelKo: "이슈별 산업 리스크",    labelEn: "Per-issue sector risk",
-    free: false,                       pro: false,                      proplus: true,
+    labelKo: "이슈별 산업 리스크",     labelEn: "Per-issue sector risk",
+    free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
   },
   {
-    labelKo: "위성 열점 (FIRMS)",      labelEn: "Satellite hotspots",
-    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+    labelKo: "교역 흐름 분석",         labelEn: "Trade flow analysis",
+    free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
   },
   {
-    labelKo: "인터넷 단절 (IODA)",     labelEn: "Internet outages",
-    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
+    labelKo: "주간 리포트",            labelEn: "Weekly report",
+    free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
   },
   {
-    labelKo: "GPS 교란 감지",          labelEn: "GPS jamming",
-    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "시그널 교차검증",        labelEn: "Cross-verification",
-    free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
-  },
-  {
-    labelKo: "주간 PDF 리포트",        labelEn: "Weekly PDF report",
+    labelKo: "주간 PDF",               labelEn: "Weekly PDF",
     free: { ko: "준비중", en: "Soon" }, pro: { ko: "준비중", en: "Soon" }, proplus: { ko: "준비중", en: "Soon" },
   },
 ];
@@ -667,10 +667,10 @@ function UpgradeContent() {
               {/* 핵심 기능 */}
               <div className="mt-4 space-y-2.5">
                 {[
-                  lang === "ko" ? "실시간 글로벌 이슈 지도" : "Real-time global issue map",
-                  lang === "ko" ? "관심 국가 5개 · 신뢰 알림" : "5 countries · Verified alerts",
-                  lang === "ko" ? "내 국가 변경 · 토픽 필터" : "Home country · Topic filter",
-                  lang === "ko" ? "KScore 필터 · 30일 히스토리" : "KScore filter · 30-day history",
+                  lang === "ko" ? "관심 국가 5개 · 신뢰 알림 · 토픽 필터" : "5 countries · Verified alerts · Topic filter",
+                  lang === "ko" ? "AI 영향 분석 · 산업별 리스크 개요" : "AI impact analysis · Sector risk overview",
+                  lang === "ko" ? "Intel 레이어 (위성/IODA/GPS)" : "Intel layers (FIRMS/IODA/GPS)",
+                  lang === "ko" ? "KScore 3.0~ · 30일 히스토리" : "KScore 3.0+ · 30-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
@@ -838,8 +838,9 @@ function UpgradeContent() {
               <div className="mt-4 space-y-2.5">
                 {[
                   lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
-                  lang === "ko" ? "무제한 국가 · 일일 알림 100건" : "Unlimited countries · 100 daily alerts",
-                  lang === "ko" ? "KScore 1.5~10.0 · 90일 히스토리" : "KScore 1.5~10.0 · 90-day history",
+                  lang === "ko" ? "무제한 국가 · 일일 100건 · KScore 1.5~" : "Unlimited countries · 100/day · KScore 1.5+",
+                  lang === "ko" ? "이슈별 산업 리스크 · 교역 흐름 분석" : "Per-issue sector risk · Trade flow analysis",
+                  lang === "ko" ? "주간 리포트 · 90일 히스토리" : "Weekly report · 90-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-purple-500/15 flex items-center justify-center shrink-0">

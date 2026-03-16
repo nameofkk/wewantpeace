@@ -113,6 +113,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
     t(lang, "paywall_pro_feature_kscore"),
     t(lang, "paywall_pro_feature_quiet"),
     t(lang, "paywall_pro_feature_intel"),
+    t(lang, "paywall_pro_feature_sector"),
   ];
 
   return (
