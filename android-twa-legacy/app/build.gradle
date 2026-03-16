@@ -53,20 +53,20 @@ def twaManifest = [
 android {
     signingConfigs {
         release {
-            storeFile file('../wewantpeace-release.keystore')
-            storePassword '111111'
+            storeFile file('../signing-key.jks')
+            storePassword 'wewantpeace2024'
             keyAlias 'wewantpeace'
-            keyPassword '111111'
+            keyPassword 'wewantpeace2024'
         }
     }
-    compileSdkVersion 36
+    compileSdkVersion 34
     namespace "com.wewantpeace.app"
     defaultConfig {
         applicationId "com.wewantpeace.app"
         minSdkVersion 21
-        targetSdkVersion 35
-        versionCode 9
-        versionName "9"
+        targetSdkVersion 34
+        versionCode 12
+        versionName "12"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -219,6 +219,6 @@ dependencies {
     
         implementation 'com.google.androidbrowserhelper:billing:1.1.0'
     
-        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
     
 }
