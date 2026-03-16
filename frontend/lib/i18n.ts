@@ -1332,6 +1332,10 @@ export const translations = {
     welcome_trust_3: "무료 이용 가능",
     welcome_cta: "시작하기",
 
+    // 온보딩 CTA 배너 (공유 링크 진입 유저용)
+    onboarding_banner_text: "이 이슈가 나에게 미치는 영향 알아보기",
+    onboarding_banner_cta: "설정하기",
+
     // 배너 (new-event-banner)
     banner_tension_rise: "긴장도 상승",
     banner_new_event: "새 이슈 감지",
@@ -2917,6 +2921,10 @@ export const translations = {
     welcome_trust_2: "Severity analysis & cross-verification",
     welcome_trust_3: "Free to use",
     welcome_cta: "Get Started",
+
+    // Onboarding CTA banner (for share link visitors)
+    onboarding_banner_text: "See how this affects you",
+    onboarding_banner_cta: "Set up",
 
     // Banner (new-event-banner)
     banner_tension_rise: "Tension Rising",

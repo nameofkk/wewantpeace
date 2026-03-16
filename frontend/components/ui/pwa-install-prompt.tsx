@@ -32,6 +32,8 @@ export function PWAInstallPrompt() {
 
   useEffect(() => {
     if (isDismissed() || isTossMiniApp()) return;
+    // 온보딩 미완료 유저에게는 표시 안 함 (OnboardingBanner 우선)
+    if (!localStorage.getItem("onboarding_done")) return;
 
     const handler = (e: Event) => {
       e.preventDefault();

@@ -33,6 +33,8 @@ export function SmartAppBanner() {
   useEffect(() => {
     // 네이티브 앱(TWA/iOS), standalone, 토스 미니앱이면 표시 안 함
     if (isNativeApp() || isStandalone() || isTossMiniApp()) return;
+    // 온보딩 미완료 유저에게는 표시 안 함 (OnboardingBanner 우선)
+    if (!localStorage.getItem("onboarding_done")) return;
 
     // 72시간 내 닫은 적 있으면 무시
     const dismissed = localStorage.getItem(DISMISS_KEY);

@@ -5,9 +5,17 @@ import { useRouter } from "next/navigation";
 import { useAuth, getFirebaseAuth } from "@/lib/auth";
 import { SplashScreen } from "./splash-screen";
 
+/** 공유 링크로 접근 가능한 경로들 */
+const SHAREABLE_PATHS = ["/issues/", "/feed", "/map", "/tension"];
+
+function isShareablePage(pathname: string): boolean {
+  return SHAREABLE_PATHS.some((p) => pathname.startsWith(p));
+}
+
 /**
  * 온보딩 완료 여부를 localStorage로 체크하여
  * 미완료 시 /onboarding으로 리다이렉트.
+ * 단, 공유 페이지로 진입한 경우 리다이렉트를 스킵하고 콘텐츠를 먼저 보여줌.
  * 스플래시 화면을 오버레이로 표시하여 children은 항상 렌더링 (데이터 prefetch 가능).
  */
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
@@ -19,8 +27,9 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
-    const isOnboardingPage = window.location.pathname === "/onboarding";
-    const isAdminPage = window.location.pathname.startsWith("/admin");
+    const pathname = window.location.pathname;
+    const isOnboardingPage = pathname === "/onboarding";
+    const isAdminPage = pathname.startsWith("/admin");
 
     // 로그인 상태면 온보딩 자동 완료 처리 (이중 리다이렉트 방지)
     const auth = getFirebaseAuth();
@@ -28,6 +37,14 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       !!localStorage.getItem("dev_uid") || !!auth?.currentUser;
     if (!done && isLoggedIn) {
       localStorage.setItem("onboarding_done", "true");
+      setChecked(true);
+      return;
+    }
+
+    // 공유 페이지: 온보딩 미완료여도 리다이렉트 스킵, 플래그만 세팅
+    if (!done && isShareablePage(pathname) && !isOnboardingPage) {
+      sessionStorage.setItem("wwp_share_entry", "true");
+      sessionStorage.setItem("wwp_return_url", pathname + window.location.search);
       setChecked(true);
       return;
     }

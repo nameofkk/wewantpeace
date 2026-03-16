@@ -8,6 +8,7 @@ import { NewEventBanner } from "@/components/ui/new-event-banner";
 import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
 import { SmartAppBanner } from "@/components/ui/smart-app-banner";
 import WelcomeModal from "@/components/ui/WelcomeModal";
+import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
 import { useMe, useMyAreas } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -92,6 +93,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <WelcomeModal />
       <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[60px]"}>{children}</main>
       <BottomNav />
+      <OnboardingBanner />
       <PWAInstallPrompt />
       <SmartAppBanner />
     </>
