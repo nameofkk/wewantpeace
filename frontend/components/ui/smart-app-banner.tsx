@@ -12,7 +12,25 @@ const DISMISS_KEY = "smart_app_banner_dismissed";
 const DISMISS_HOURS = 72; // 3일
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
+const PLAY_STORE_MARKET = "market://details?id=com.wewantpeace.app";
 const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // TODO: 실제 ID로 교체
+
+/** Android에서 Play Store 앱으로 직접 열기, 실패 시 웹 폴백 */
+function openPlayStore() {
+  if (isAndroidBrowser()) {
+    // market:// 스킴으로 Play Store 앱 직접 실행 시도
+    const start = Date.now();
+    window.location.href = PLAY_STORE_MARKET;
+    // 500ms 안에 앱이 안 열리면 웹으로 폴백
+    setTimeout(() => {
+      if (Date.now() - start < 1500) {
+        window.open(PLAY_STORE_URL, "_blank");
+      }
+    }, 500);
+  } else {
+    window.open(PLAY_STORE_URL, "_blank");
+  }
+}
 
 /**
  * 앱 설치 유도 배너.
@@ -69,11 +87,11 @@ export function SmartAppBanner() {
 
   function handleStoreClick() {
     if (isAndroidBrowser()) {
-      window.open(PLAY_STORE_URL, "_blank");
+      openPlayStore();
     } else if (isIOSBrowser()) {
       window.open(APP_STORE_URL, "_blank");
     } else {
-      // PC: Play Store 우선
+      // PC: 웹 Play Store
       window.open(PLAY_STORE_URL, "_blank");
     }
     handleDismiss();
@@ -154,7 +172,7 @@ export function SmartAppBanner() {
       <div className="flex gap-2 mt-3">
         {(!isMobile || isAndroidBrowser()) && (
           <button
-            onClick={() => { window.open(PLAY_STORE_URL, "_blank"); handleDismiss(); }}
+            onClick={() => { openPlayStore(); handleDismiss(); }}
             className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.807 1.626a1 1 0 010 1.732l-2.807 1.626L15.206 12l2.492-2.492zM5.864 3.458L16.8 9.79l-2.302 2.302-8.635-8.635z"/></svg>
