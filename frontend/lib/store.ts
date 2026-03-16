@@ -85,9 +85,9 @@ export const useAppStore = create<AppStore>()(
       userPlan: "free",
       trendingTab: "global",
       myCountries: [],
-      lang: "ko",
+      lang: "en",
       theme: "dark",
-      homeCountry: "KR",
+      homeCountry: "",
       missedAlertCount: 0,
       missedAlertDismissedAt: null,
       incrementMissedAlertCount: () =>
@@ -141,7 +141,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: "wwp-store",
-      version: 8, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry, v6: completedTours, v7: spikeAlertCount, v8: missedAlertCount
+      version: 9, // v1→v2: 기본 8개국 → 빈 배열, v3: lang, v4: theme, v5: homeCountry, v6: completedTours, v7: spikeAlertCount, v8: missedAlertCount, v9: global defaults (lang=en, homeCountry="")
       migrate: (old: unknown, version: number) => {
         const s = old as Record<string, unknown>;
         if (version < 2) {
@@ -169,6 +169,10 @@ export const useAppStore = create<AppStore>()(
             missedAlertCount: (s as Record<string, unknown>).spikeAlertCount ?? 0,
             missedAlertDismissedAt: (s as Record<string, unknown>).spikeAlertDismissedAt ?? null,
           };
+        }
+        if (version < 9) {
+          // v9: 기존 유저는 설정 유지 (이미 개인화한 값이므로 변경하지 않음)
+          return s;
         }
         return s;
       },

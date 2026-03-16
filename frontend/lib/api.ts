@@ -27,6 +27,7 @@ async function apiFetch<T>(
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   const authHeaders = await getAuthHeaders();
+  const hasAuth = !!authHeaders.Authorization || !!authHeaders["X-Dev-UID"];
   const res = await fetch(url.toString(), {
     ...options,
     headers: {
@@ -36,8 +37,8 @@ async function apiFetch<T>(
     },
   });
   if (!res.ok) {
-    // 401이면 Firebase auth 복원 대기 후 1회 재시도
-    if (res.status === 401 && !_retried) {
+    // 401이면 Firebase auth 복원 대기 후 1회 재시도 (토큰이 있었을 때만)
+    if (res.status === 401 && !_retried && hasAuth) {
       await new Promise((r) => setTimeout(r, 1500));
       return apiFetch<T>(path, params, options, true);
     }
@@ -229,8 +230,9 @@ export function useMe() {
     queryKey: ["me"],
     queryFn: () => apiFetch<MeData>("/me"),
     retry: (count, error) => {
-      if ((error as any)?.status === 401 && count < 2) return true;
-      return false;
+      // 401은 재시도하지 않음 (apiFetch에서 이미 토큰 있을 때 1회 재시도함)
+      if ((error as any)?.status === 401) return false;
+      return count < 1;
     },
     retryDelay: 2000,
     staleTime: 5 * 60 * 1000,
@@ -651,9 +653,7 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     placeholderData: keepPreviousData,
     retry: (count, error) => {
       const status = (error as any)?.status;
-      // 401은 auth 복원 지연일 수 있으므로 2회까지 재시도
-      if (status === 401 && count < 2) return true;
-      // 일시적 서버 에러 (429 rate limit, 500, 503) 1회 재시도
+      if (status === 401) return false;
       if ([429, 500, 503].includes(status) && count < 1) return true;
       return false;
     },

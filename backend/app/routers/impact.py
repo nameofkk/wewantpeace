@@ -2814,10 +2814,12 @@ class RecommendationsOut(BaseModel):
 @router.post("/track")
 async def track_behavior(
     body: TrackEventIn,
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """사용자 행동 이벤트 기록 (모든 플랜)"""
+    """사용자 행동 이벤트 기록 (미인증 시 무시)"""
+    if not user:
+        return {"ok": True}
     from backend.app.models.app_event import AppEvent
     event = AppEvent(
         user_id=user.id,

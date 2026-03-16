@@ -78,7 +78,7 @@ export default function RootLayout({
                 l = (navigator.language || '').startsWith('ko') ? 'ko' : 'en';
                 if (!s.state) s.state = {};
                 s.state.lang = l;
-                s.version = 4;
+                s.version = 9;
                 localStorage.setItem('wwp-store', JSON.stringify(s));
               }
               document.documentElement.lang = l;

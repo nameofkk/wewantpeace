@@ -23,35 +23,58 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 
 
 public class LauncherActivity
         extends com.google.androidbrowserhelper.trusted.LauncherActivity {
 
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
 
-
+    private void applyTaskDescription() {
+        try {
+            int primaryColor = Color.parseColor("#0F1729");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                setTaskDescription(new ActivityManager.TaskDescription(
+                        "WeWantPeace", R.mipmap.ic_launcher, primaryColor));
+            } else {
+                Bitmap icon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
+                setTaskDescription(new ActivityManager.TaskDescription(
+                        "WeWantPeace", icon, primaryColor));
+            }
+        } catch (Exception ignored) {
+            // Activity may be destroyed
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Set task description BEFORE super.onCreate() which may call finish()
+        // in the restored case (savedInstanceState has BROWSER_WAS_LAUNCHED_KEY)
+        applyTaskDescription();
+
         super.onCreate(savedInstanceState);
+
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
         } else {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         }
 
-        // Fallback: set task description in case Chrome DAL verification fails
-        int primaryColor = Color.parseColor("#0F1729");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            setTaskDescription(new ActivityManager.TaskDescription(
-                    "WeWantPeace", R.mipmap.ic_launcher, primaryColor));
-        } else {
-            Bitmap icon = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
-            setTaskDescription(new ActivityManager.TaskDescription(
-                    "WeWantPeace", icon, primaryColor));
-        }
+        // Set again after super.onCreate() in case it was cleared
+        applyTaskDescription();
 
+        // Re-set after Chrome starts and clears our label with null.
+        // Chrome calls setTaskDescription(null, null, color) in performPostInflationStartup()
+        // which overwrites our label. These delayed calls re-assert our branding.
+        // Use post() to survive even if activity is finishing — setTaskDescription
+        // still works on the task as long as the token is valid.
+        Runnable branding = this::applyTaskDescription;
+        mHandler.postDelayed(branding, 1500);
+        mHandler.postDelayed(branding, 3000);
+        mHandler.postDelayed(branding, 6000);
     }
 
     @Override
@@ -59,7 +82,7 @@ public class LauncherActivity
         // Get the original launch Url.
         Uri uri = super.getLaunchingUrl();
 
-        
+
 
         return uri;
     }
