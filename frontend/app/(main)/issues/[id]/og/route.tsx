@@ -200,9 +200,16 @@ export async function GET(
   try {
     const res = await fetch(`${API_BASE}/issues/${params.id}`, {
       next: { revalidate: 120 },
+      signal: AbortSignal.timeout(10000),
     });
-    if (res.ok) issue = await res.json();
-  } catch {}
+    if (res.ok) {
+      issue = await res.json();
+    } else {
+      console.error(`[OG] issue ${params.id} → ${res.status}`);
+    }
+  } catch (e) {
+    console.error(`[OG] issue ${params.id} fetch error:`, e instanceof Error ? e.message : e);
+  }
 
   if (!issue) {
     return new ImageResponse(

@@ -41,15 +41,19 @@ export interface IssueServer {
 export async function fetchIssueServer(id: string): Promise<IssueServer | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(`${API_BASE}/issues/${id}`, {
       next: { revalidate: 120 },
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[fetchIssueServer] ${id} → ${res.status}`);
+      return null;
+    }
     return res.json();
-  } catch {
+  } catch (e) {
+    console.error(`[fetchIssueServer] ${id} error:`, e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -65,7 +69,7 @@ export interface TensionCountry {
 export async function fetchCountryTension(code: string): Promise<TensionCountry | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(`${API_BASE}/tension/country/${code}`, {
       next: { revalidate: 120 },
       signal: controller.signal,
@@ -73,7 +77,8 @@ export async function fetchCountryTension(code: string): Promise<TensionCountry 
     clearTimeout(timeout);
     if (!res.ok) return null;
     return res.json();
-  } catch {
+  } catch (e) {
+    console.error(`[fetchCountryTension] ${code} error:`, e instanceof Error ? e.message : e);
     return null;
   }
 }
