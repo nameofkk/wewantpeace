@@ -849,7 +849,7 @@ async def get_impact_summary(
         pref_lang = pref_q.scalar_one_or_none()
         resolved_lang = pref_lang or "ko"
     elif not resolved_lang:
-        resolved_lang = "ko"
+        resolved_lang = "en"
 
     return await _build_impact_summary(home, user_plan, resolved_lang, db)
 
