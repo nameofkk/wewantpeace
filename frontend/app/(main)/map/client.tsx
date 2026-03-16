@@ -956,25 +956,40 @@ export default function MapPage() {
     return cleanup;
   }, [gpsJamEnabled, gpsJamData, isMapReady, intelDemoMode]);
 
-  // ── Trade Flow Arc 레이어 ──────────────────────────────────────────────
+  // ── Trade Flow Arc 레이어 (v2 — 파티클 애니메이션 + 끝점 마커) ─────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isMapReady) return;
 
     // 이벤트 핸들러 참조를 저장 (cleanup에서 해제용)
-    let _handleMouseEnter: any = null;
-    let _handleMouseLeave: any = null;
-    let _handleClick: any = null;
+    let _handleArcEnter: any = null;
+    let _handleArcLeave: any = null;
+    let _handleArcClick: any = null;
+    let _handleEndpointClick: any = null;
+
+    const LAYER_IDS = [
+      "trade-flow-endpoint-labels",
+      "trade-flow-endpoints",
+      "trade-flow-particles",
+      "trade-flow-hit",
+      "trade-flow-arcs",
+      "trade-flow-glow",
+    ] as const;
+    const SOURCE_IDS = [
+      "trade-flow-endpoints-source",
+      "trade-flow-particles-source",
+      "trade-flow-source",
+    ] as const;
 
     const cleanup = () => {
       if (tradeFlowAnimRef.current) { cancelAnimationFrame(tradeFlowAnimRef.current); tradeFlowAnimRef.current = null; }
       if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} tradeFlowPopupRef.current = null; }
-      try { if (_handleMouseEnter) map.off("mouseenter", "trade-flow-hit", _handleMouseEnter); } catch {}
-      try { if (_handleMouseLeave) map.off("mouseleave", "trade-flow-hit", _handleMouseLeave); } catch {}
-      try { if (_handleClick) map.off("click", "trade-flow-hit", _handleClick); } catch {}
-      try { if (map.getLayer("trade-flow-hit")) map.removeLayer("trade-flow-hit"); } catch {}
-      try { if (map.getLayer("trade-flow-arcs")) map.removeLayer("trade-flow-arcs"); } catch {}
-      try { if (map.getSource("trade-flow-source")) map.removeSource("trade-flow-source"); } catch {}
+      try { if (_handleArcEnter) map.off("mouseenter", "trade-flow-hit", _handleArcEnter); } catch {}
+      try { if (_handleArcLeave) map.off("mouseleave", "trade-flow-hit", _handleArcLeave); } catch {}
+      try { if (_handleArcClick) map.off("click", "trade-flow-hit", _handleArcClick); } catch {}
+      try { if (_handleEndpointClick) map.off("click", "trade-flow-endpoints", _handleEndpointClick); } catch {}
+      for (const lid of LAYER_IDS) { try { if (map.getLayer(lid)) map.removeLayer(lid); } catch {} }
+      for (const sid of SOURCE_IDS) { try { if (map.getSource(sid)) map.removeSource(sid); } catch {} }
     };
 
     // 데모 모드 데이터 또는 실제 데이터
@@ -1016,11 +1031,12 @@ export default function MapPage() {
       }
     }
 
-    // ── Bezier 곡선 생성 (match-arcs 패턴 재사용) ──
-    const greatCircleArc = (from: [number, number], to: [number, number], steps = 20): [number, number][] => {
+    // ── Bezier 곡선 생성 (40 steps로 부드럽게) ──
+    const STEPS = 40;
+    const greatCircleArc = (from: [number, number], to: [number, number]): [number, number][] => {
       const pts: [number, number][] = [];
-      for (let i = 0; i <= steps; i++) {
-        const f = i / steps;
+      for (let i = 0; i <= STEPS; i++) {
+        const f = i / STEPS;
         const lng = from[0] + (to[0] - from[0]) * f;
         const lat = from[1] + (to[1] - from[1]) * f;
         const bulge = Math.sin(f * Math.PI) * Math.min(5, Math.abs(to[0] - from[0]) * 0.15 + 1);
@@ -1029,9 +1045,36 @@ export default function MapPage() {
       return pts;
     };
 
-    // ── GeoJSON 생성 ──
+    // ── 금액 포맷 헬퍼 ──
+    const fmtUsd = (v: number): string => v >= 1000 ? `$${(v / 1000).toFixed(1)}B` : `$${Math.round(v)}M`;
+
+    // ── 긴장도 라벨 ──
+    const tensionLabel = (score: number): string =>
+      score >= 80 ? (lang === "ko" ? "극심" : "Extreme")
+        : score >= 60 ? (lang === "ko" ? "심각" : "Severe")
+        : score >= 40 ? (lang === "ko" ? "경계" : "Alert")
+        : score >= 20 ? (lang === "ko" ? "주의" : "Caution")
+        : (lang === "ko" ? "안전" : "Stable");
+
+    // ── 긴장도 색상 ──
+    const getColor = (score: number): string =>
+      score >= 80 ? "#dc2626" : score >= 60 ? "#ef4444" : score >= 40 ? "#f97316" : score >= 20 ? "#f59e0b" : "#10b981";
+
+    // ── 아크 데이터 구조 ──
+    interface ArcData {
+      partner: string;
+      exportUsd: number;
+      importUsd: number;
+      totalUsd: number;
+      tensionScore: number;
+      coords: [number, number][];
+      toCoord: [number, number];
+    }
+
     const fromCoord: [number, number] = [homeCenter.lon, homeCenter.lat];
-    const features: any[] = [];
+    const arcs: ArcData[] = [];
+    const arcFeatures: any[] = [];
+
     for (const code of partnerCodes) {
       const center = COUNTRY_CENTERS[code];
       if (!center) continue;
@@ -1039,118 +1082,264 @@ export default function MapPage() {
       const exportUsd = exportMap.get(code) || 0;
       const importUsd = importMap.get(code) || 0;
       const totalUsd = exportUsd + importUsd;
-      features.push({
+      const tensionScore = tensionScores[code] || 0;
+      const coords = greatCircleArc(fromCoord, toCoord);
+
+      arcs.push({ partner: code, exportUsd, importUsd, totalUsd, tensionScore, coords, toCoord });
+      arcFeatures.push({
         type: "Feature",
         properties: {
           partner: code,
           export_usd: exportUsd,
           import_usd: importUsd,
           total_usd: totalUsd,
-          tension_score: tensionScores[code] || 0,
+          tension_score: tensionScore,
         },
-        geometry: {
-          type: "LineString",
-          coordinates: greatCircleArc(fromCoord, toCoord),
-        },
+        geometry: { type: "LineString", coordinates: coords },
       });
     }
 
-    if (features.length === 0) { cleanup(); return; }
+    if (arcs.length === 0) { cleanup(); return; }
 
-    const geojson = { type: "FeatureCollection", features };
+    // ── 끝점 GeoJSON ──
+    const endpointFeatures: any[] = [];
+    // Home 끝점
+    endpointFeatures.push({
+      type: "Feature",
+      properties: { code: home, is_home: 1, tension_score: 0, total_usd: 0, export_usd: 0, import_usd: 0 },
+      geometry: { type: "Point", coordinates: fromCoord },
+    });
+    // Partner 끝점
+    for (const arc of arcs) {
+      endpointFeatures.push({
+        type: "Feature",
+        properties: {
+          code: arc.partner,
+          is_home: 0,
+          tension_score: arc.tensionScore,
+          total_usd: arc.totalUsd,
+          export_usd: arc.exportUsd,
+          import_usd: arc.importUsd,
+        },
+        geometry: { type: "Point", coordinates: arc.toCoord },
+      });
+    }
+
+    // ── 파티클 초기화 ──
+    const PARTICLES_PER_ARC = 3;
+    const particles: { arcIdx: number; progress: number; speed: number }[] = [];
+    for (let i = 0; i < arcs.length; i++) {
+      for (let j = 0; j < PARTICLES_PER_ARC; j++) {
+        particles.push({
+          arcIdx: i,
+          progress: j / PARTICLES_PER_ARC,
+          speed: 0.003 + Math.min(0.004, (arcs[i].totalUsd / 50000) * 0.002),
+        });
+      }
+    }
+
+    const getParticleCoord = (arcIdx: number, progress: number): [number, number] => {
+      const coords = arcs[arcIdx].coords;
+      const t = progress * (coords.length - 1);
+      const idx = Math.min(Math.floor(t), coords.length - 2);
+      const frac = t - idx;
+      return [
+        coords[idx][0] + (coords[idx + 1][0] - coords[idx][0]) * frac,
+        coords[idx][1] + (coords[idx + 1][1] - coords[idx][1]) * frac,
+      ];
+    };
+
+    const buildParticleGeoJson = () => ({
+      type: "FeatureCollection" as const,
+      features: particles.map((p) => {
+        const coord = getParticleCoord(p.arcIdx, p.progress);
+        return {
+          type: "Feature" as const,
+          properties: {
+            tension_score: arcs[p.arcIdx].tensionScore,
+            progress: p.progress,
+          },
+          geometry: { type: "Point" as const, coordinates: coord },
+        };
+      }),
+    });
+
+    const arcGeojson = { type: "FeatureCollection", features: arcFeatures };
+    const endpointGeojson = { type: "FeatureCollection", features: endpointFeatures };
 
     try {
       cleanup();
-      map.addSource("trade-flow-source", { type: "geojson", data: geojson });
 
-      // 아크 레이어 (choropleth 위, cluster markers 아래)
+      // ── 소스 추가 ──
+      map.addSource("trade-flow-source", { type: "geojson", data: arcGeojson });
+      map.addSource("trade-flow-particles-source", { type: "geojson", data: buildParticleGeoJson() });
+      map.addSource("trade-flow-endpoints-source", { type: "geojson", data: endpointGeojson });
+
       const beforeLayer = map.getLayer("match-arcs") ? "match-arcs" : undefined;
+
+      const tensionColorExpr: any = [
+        "step", ["get", "tension_score"],
+        "#10b981", 20, "#f59e0b", 40, "#f97316", 60, "#ef4444", 80, "#dc2626",
+      ];
+
+      // ── 1. Glow 레이어 (아크 아래 은은한 빛) ──
+      map.addLayer({
+        id: "trade-flow-glow",
+        type: "line",
+        source: "trade-flow-source",
+        paint: {
+          "line-color": tensionColorExpr,
+          "line-width": [
+            "interpolate", ["linear"], ["get", "total_usd"],
+            100, 6, 1000, 10, 10000, 14, 50000, 18,
+          ],
+          "line-opacity": isDemoTrade ? 0.08 : 0.15,
+          "line-blur": 6,
+        },
+      }, beforeLayer);
+
+      // ── 2. 메인 아크 라인 ──
       map.addLayer({
         id: "trade-flow-arcs",
         type: "line",
         source: "trade-flow-source",
         paint: {
-          "line-color": [
-            "step", ["get", "tension_score"],
-            "#10b981",
-            20, "#f59e0b",
-            40, "#f97316",
-            60, "#ef4444",
-            80, "#dc2626",
-          ],
+          "line-color": tensionColorExpr,
           "line-width": [
             "interpolate", ["linear"], ["get", "total_usd"],
-            100, 1.5,
-            1000, 2.5,
-            10000, 4,
-            50000, 5.5,
+            100, 1.2, 1000, 2, 10000, 3, 50000, 4,
           ],
-          "line-dasharray": [4, 4],
-          "line-opacity": isDemoTrade ? 0.35 : 0.75,
+          "line-opacity": isDemoTrade ? 0.25 : 0.7,
         },
       }, beforeLayer);
 
-      // Hit 레이어 (투명, 넓은 width — 터치/호버 감지용)
+      // ── 3. Hit 레이어 (투명, 넓은 width — 터치/호버 감지용) ──
       map.addLayer({
         id: "trade-flow-hit",
         type: "line",
         source: "trade-flow-source",
         paint: {
           "line-color": "rgba(0,0,0,0)",
-          "line-width": 12,
+          "line-width": 14,
         },
       });
 
-      // 데모 모드일 때 blur + opacity 처리
-      if (isDemoTrade) {
-        map.setPaintProperty("trade-flow-arcs", "line-opacity", 0.35);
-      }
+      // ── 4. 파티클 레이어 (흐르는 원형 점) ──
+      map.addLayer({
+        id: "trade-flow-particles",
+        type: "circle",
+        source: "trade-flow-particles-source",
+        paint: {
+          "circle-radius": [
+            "interpolate", ["linear"], ["get", "progress"],
+            0, 2, 0.5, 4, 1, 2,
+          ],
+          "circle-color": tensionColorExpr,
+          "circle-opacity": isDemoTrade ? 0.3 : 0.85,
+          "circle-blur": 0.3,
+        },
+      });
 
-      // ── Dash 애니메이션 (기존 requestAnimationFrame 패턴) ──
-      let dashOffset = 0;
+      // ── 5. 끝점 마커 ──
+      map.addLayer({
+        id: "trade-flow-endpoints",
+        type: "circle",
+        source: "trade-flow-endpoints-source",
+        paint: {
+          "circle-radius": [
+            "case",
+            ["==", ["get", "is_home"], 1], 7,
+            ["interpolate", ["linear"], ["get", "total_usd"], 100, 4, 5000, 5, 20000, 6, 50000, 7],
+          ],
+          "circle-color": [
+            "case",
+            ["==", ["get", "is_home"], 1], "#3b82f6",
+            tensionColorExpr,
+          ],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": isDemoTrade ? 0.4 : 0.9,
+        },
+      });
+
+      // ── 6. 끝점 라벨 ──
+      map.addLayer({
+        id: "trade-flow-endpoint-labels",
+        type: "symbol",
+        source: "trade-flow-endpoints-source",
+        layout: {
+          "text-field": ["get", "code"],
+          "text-size": 10,
+          "text-offset": [0, 1.5],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+        },
+        paint: {
+          "text-color": "#e5e7eb",
+          "text-halo-color": "#1f2937",
+          "text-halo-width": 1,
+          "text-opacity": isDemoTrade ? 0.3 : 0.85,
+        },
+      });
+
+      // ── 파티클 애니메이션 (requestAnimationFrame) ──
       let pulsePhase = 0;
       const animate = () => {
-        dashOffset = (dashOffset + 0.3) % 8;
-        pulsePhase += 0.03;
+        // 파티클 이동
+        for (const p of particles) {
+          p.progress = (p.progress + p.speed) % 1;
+        }
         try {
-          map.setPaintProperty("trade-flow-arcs", "line-dasharray", [4, 4]);
+          const src = map.getSource("trade-flow-particles-source") as any;
+          if (src) src.setData(buildParticleGeoJson());
         } catch {}
-        // severity >= 80 아크: opacity 펄스
+
+        // 고긴장도 아크 opacity 펄스 (비데모)
+        pulsePhase += 0.03;
         if (!isDemoTrade) {
-          const basePulse = 0.55 + 0.2 * Math.sin(pulsePhase);
+          const basePulse = 0.55 + 0.15 * Math.sin(pulsePhase);
           try {
             map.setPaintProperty("trade-flow-arcs", "line-opacity", [
               "case",
               [">=", ["get", "tension_score"], 80], basePulse,
-              0.75,
+              0.7,
+            ]);
+            map.setPaintProperty("trade-flow-glow", "line-opacity", [
+              "case",
+              [">=", ["get", "tension_score"], 80], 0.1 + 0.08 * Math.sin(pulsePhase),
+              0.15,
             ]);
           } catch {}
         }
+
         tradeFlowAnimRef.current = requestAnimationFrame(animate);
       };
       tradeFlowAnimRef.current = requestAnimationFrame(animate);
 
-      // ── 호버 상호작용 ──
-      const handleMouseEnter = (e: any) => {
+      // ── 호버 상호작용 (아크) ──
+      const handleArcEnter = (e: any) => {
         map.getCanvas().style.cursor = "pointer";
         if (!e.features || e.features.length === 0) return;
         const props = e.features[0].properties;
-        const partnerCode = props.partner;
+        const partnerCode = String(props.partner);
         const flag = getFlag(partnerCode);
         const name = getCountryName(partnerCode, lang);
-        const expB = (props.export_usd / 1000).toFixed(1);
-        const impB = (props.import_usd / 1000).toFixed(1);
-        const score = props.tension_score;
-        const scoreLabel = score >= 80 ? (lang === "ko" ? "극심" : "Extreme")
-          : score >= 60 ? (lang === "ko" ? "심각" : "Severe")
-          : score >= 40 ? (lang === "ko" ? "경계" : "Alert")
-          : score >= 20 ? (lang === "ko" ? "주의" : "Caution")
-          : (lang === "ko" ? "안전" : "Stable");
+        const expUsd = Number(props.export_usd);
+        const impUsd = Number(props.import_usd);
+        const score = Number(props.tension_score);
+        const color = getColor(score);
+        const scoreText = tensionLabel(score);
 
-        const html = `<div style="font-size:12px;line-height:1.6;padding:4px 0;">
-          <strong>${flag} ${name}</strong><br/>
-          ${lang === "ko" ? "수출" : "Export"}: $${expB}B | ${lang === "ko" ? "수입" : "Import"}: $${impB}B<br/>
-          ${lang === "ko" ? "긴장도" : "Tension"}: ${score} (${scoreLabel})
+        const html = `<div style="font-size:13px;line-height:1.7;padding:6px 2px;min-width:180px;">
+          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${flag} ${name}</div>
+          <div style="display:flex;gap:12px;">
+            <span>${lang === "ko" ? "📤 수출" : "📤 Export"}: <b>${fmtUsd(expUsd)}</b></span>
+            <span>${lang === "ko" ? "📥 수입" : "📥 Import"}: <b>${fmtUsd(impUsd)}</b></span>
+          </div>
+          <div style="margin-top:4px;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>
+            ${lang === "ko" ? "긴장도" : "Tension"}: <b>${score}</b> (${scoreText})
+          </div>
         </div>`;
 
         if (maplibreRef.current) {
@@ -1161,46 +1350,96 @@ export default function MapPage() {
             .addTo(map);
         }
 
-        // 하이라이트: opacity 1.0, width +1px
+        // 하이라이트: 해당 아크 opacity 높이고 나머지 낮춤 + 글로우 강화
         try {
           map.setPaintProperty("trade-flow-arcs", "line-opacity", [
             "case",
             ["==", ["get", "partner"], partnerCode], 1.0,
-            isDemoTrade ? 0.25 : 0.6,
+            isDemoTrade ? 0.12 : 0.3,
           ]);
           map.setPaintProperty("trade-flow-arcs", "line-width", [
             "case",
             ["==", ["get", "partner"], partnerCode],
-            ["+", ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5], 1],
-            ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5],
+            ["+", ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.2, 1000, 2, 10000, 3, 50000, 4], 1.5],
+            ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.2, 1000, 2, 10000, 3, 50000, 4],
+          ]);
+          map.setPaintProperty("trade-flow-glow", "line-opacity", [
+            "case",
+            ["==", ["get", "partner"], partnerCode], 0.35,
+            0.05,
           ]);
         } catch {}
       };
 
-      const handleMouseLeave = () => {
+      const handleArcLeave = () => {
         map.getCanvas().style.cursor = "";
         if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} tradeFlowPopupRef.current = null; }
         // 원래 스타일 복원
         try {
-          map.setPaintProperty("trade-flow-arcs", "line-opacity", isDemoTrade ? 0.35 : 0.75);
+          map.setPaintProperty("trade-flow-arcs", "line-opacity", isDemoTrade ? 0.25 : 0.7);
           map.setPaintProperty("trade-flow-arcs", "line-width", [
             "interpolate", ["linear"], ["get", "total_usd"],
-            100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5,
+            100, 1.2, 1000, 2, 10000, 3, 50000, 4,
           ]);
+          map.setPaintProperty("trade-flow-glow", "line-opacity", isDemoTrade ? 0.08 : 0.15);
         } catch {}
       };
 
-      const handleClick = (e: any) => {
+      const handleArcClick = (e: any) => {
         // 모바일 터치용: enter와 동일한 팝업 표시
-        handleMouseEnter(e);
+        handleArcEnter(e);
       };
 
-      _handleMouseEnter = handleMouseEnter;
-      _handleMouseLeave = handleMouseLeave;
-      _handleClick = handleClick;
-      map.on("mouseenter", "trade-flow-hit", handleMouseEnter);
-      map.on("mouseleave", "trade-flow-hit", handleMouseLeave);
-      map.on("click", "trade-flow-hit", handleClick);
+      // ── 끝점 클릭 상호작용 ──
+      const handleEndpointClick = (e: any) => {
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties;
+        const isHome = Number(props.is_home);
+        if (isHome === 1) return; // Home 마커 클릭 무시
+
+        const code = String(props.code);
+        const flag = getFlag(code);
+        const name = getCountryName(code, lang);
+        const expUsd = Number(props.export_usd);
+        const impUsd = Number(props.import_usd);
+        const balance = expUsd - impUsd;
+        const score = Number(props.tension_score);
+        const color = getColor(score);
+        const scoreText = tensionLabel(score);
+        const balanceColor = balance >= 0 ? "#10b981" : "#ef4444";
+        const balanceSign = balance >= 0 ? "+" : "";
+
+        const html = `<div style="min-width:200px;padding:4px 0;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">${flag} ${name}</div>
+          <table style="width:100%;font-size:13px;line-height:1.8;border-collapse:collapse;">
+            <tr><td>${lang === "ko" ? "📤 수출" : "📤 Export"}</td><td style="text-align:right;font-weight:600;">${fmtUsd(expUsd)}</td></tr>
+            <tr><td>${lang === "ko" ? "📥 수입" : "📥 Import"}</td><td style="text-align:right;font-weight:600;">${fmtUsd(impUsd)}</td></tr>
+            <tr><td>${lang === "ko" ? "수지" : "Balance"}</td><td style="text-align:right;font-weight:600;color:${balanceColor}">${balanceSign}${fmtUsd(Math.abs(balance))}</td></tr>
+          </table>
+          <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:6px;padding-top:6px;font-size:13px;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>
+            ${lang === "ko" ? "긴장도" : "Tension"}: <b>${score}</b> (${scoreText})
+          </div>
+        </div>`;
+
+        if (maplibreRef.current) {
+          if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} }
+          const coords = e.features[0].geometry.coordinates.slice();
+          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: true, closeOnClick: true, offset: 12 })
+            .setLngLat(coords)
+            .setHTML(html)
+            .addTo(map);
+        }
+      };
+
+      _handleArcEnter = handleArcEnter;
+      _handleArcLeave = handleArcLeave;
+      _handleArcClick = handleArcClick;
+      _handleEndpointClick = handleEndpointClick;
+      map.on("mouseenter", "trade-flow-hit", handleArcEnter);
+      map.on("mouseleave", "trade-flow-hit", handleArcLeave);
+      map.on("click", "trade-flow-hit", handleArcClick);
+      map.on("click", "trade-flow-endpoints", handleEndpointClick);
     } catch {}
 
     return cleanup;
