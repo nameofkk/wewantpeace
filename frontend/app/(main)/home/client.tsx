@@ -255,7 +255,9 @@ function ReportContent() {
 
   const homeScore = isGlobalMode ? globalAvgScore : singleCountryScore;
   const animatedHomeScore = useCountUp(homeScore, 1000);
-
+  const extremeCount = allItems.filter((i) => i.raw_score >= 80).length;
+  const severeCount = allItems.filter((i) => i.raw_score >= 60 && i.raw_score < 80).length;
+  const alertCount = allItems.filter((i) => i.raw_score >= 40 && i.raw_score < 60).length;
 
   const updatedTime = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString(lang === "ko" ? "ko-KR" : "en-US", { hour: "2-digit", minute: "2-digit" })
@@ -419,8 +421,8 @@ function ReportContent() {
               )}
             </div>
 
-            {/* Home tension */}
-            <div className="flex items-center gap-1.5 text-[10px] mb-1.5">
+            {/* Home tension + global counts */}
+            <div className="flex items-center gap-1.5 text-[10px] mb-1.5 flex-wrap">
               <span className="text-sm">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
               <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
                 {Math.round(animatedHomeScore)}
@@ -434,6 +436,30 @@ function ReportContent() {
               <span className={cn("text-[9px]", tensionColor(homeScore).text)}>
                 {tensionLabelShort(homeScore, lang)}
               </span>
+              <span className="text-muted-foreground/30">|</span>
+              {extremeCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-600 dark:bg-red-900 animate-pulse" />
+                  <span className="text-[9px] text-red-700 dark:text-red-300 font-medium">{extremeCount}</span>
+                </span>
+              )}
+              {severeCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                  <span className="text-[9px] text-red-600 dark:text-red-400 font-medium">{severeCount}</span>
+                </span>
+              )}
+              {alertCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                  <span className="text-[9px] text-orange-600 dark:text-orange-300 font-medium">{alertCount}</span>
+                </span>
+              )}
+              {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
+                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
+                  {t(lang, "dash_global_stable")}
+                </span>
+              )}
             </div>
 
             {/* Issue stats + time */}

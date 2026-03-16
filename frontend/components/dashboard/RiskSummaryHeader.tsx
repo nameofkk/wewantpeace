@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { getFlag, getCountryName } from "@/lib/countries";
 import { useAppStore } from "@/lib/store";
-import { useTensionMine } from "@/lib/api";
+import { useTensionMine, useTensionAll, type TensionAllItem } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Shield, Radio } from "lucide-react";
 import { SectionHeader } from "./SectionHeader";
@@ -30,11 +30,19 @@ export function RiskSummaryHeader() {
   const homeCountry = useAppStore((s) => s.homeCountry);
 
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
+  const { data: allTension } = useTensionAll();
+
   const homeData = Array.isArray(homeTension) ? homeTension[0] : null;
   const homeScore = homeData?.raw_score ?? 0;
   const color = tensionColor(homeScore);
   const label = tensionLabel(homeScore, lang);
   const animatedScore = useCountUp(homeScore, 1000);
+
+  // 글로벌 현황 카운트
+  const allItems = (allTension as TensionAllItem[] | undefined) ?? [];
+  const extremeCount = allItems.filter((i) => i.raw_score >= 80).length;
+  const severeCount = allItems.filter((i) => i.raw_score >= 60 && i.raw_score < 80).length;
+  const alertCount = allItems.filter((i) => i.raw_score >= 40 && i.raw_score < 60).length;
 
   // 마지막 갱신 시간
   const updatedTime = dataUpdatedAt
@@ -83,15 +91,47 @@ export function RiskSummaryHeader() {
           />
         </div>
 
-        {/* Updated time */}
-        {updatedTime && (
-          <div className="flex items-center justify-end">
+        {/* Global Overview */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="text-muted-foreground">🌐</span>
+            {extremeCount > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-red-900 animate-pulse" />
+                <span className="text-red-700 dark:text-red-300 font-medium">
+                  {t(lang, "dash_extreme_count", { n: extremeCount })}
+                </span>
+              </span>
+            )}
+            {severeCount > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+                <span className="text-red-600 dark:text-red-400 font-medium">
+                  {t(lang, "dash_severe_count", { n: severeCount })}
+                </span>
+              </span>
+            )}
+            {alertCount > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-orange-500" />
+                <span className="text-orange-600 dark:text-orange-300 font-medium">
+                  {t(lang, "dash_alert_count", { n: alertCount })}
+                </span>
+              </span>
+            )}
+            {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                {lang === "ko" ? "글로벌 안정" : "Global Stable"}
+              </span>
+            )}
+          </div>
+          {updatedTime && (
             <span className="flex items-center gap-1 text-[9px] text-muted-foreground/60">
               <Radio className="h-2.5 w-2.5" />
               {t(lang, "dash_last_updated", { time: updatedTime })}
             </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
