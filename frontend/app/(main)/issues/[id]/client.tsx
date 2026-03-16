@@ -254,7 +254,7 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
     );
   }
 
-  // Free 유저: 데모 데이터 + blur 오버레이
+  // Free 유저: 데모 데이터 + blur 오버레이 (다른 화면과 동일 패턴)
   if (!isPro) {
     return (
       <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up relative overflow-hidden">
@@ -262,42 +262,57 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
           <Shield className="h-3.5 w-3.5 text-indigo-400" />
           <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
         </div>
-        {/* 데모 카드 (블러 처리) */}
-        <div className="space-y-2" style={{ filter: "blur(2px)" }}>
-          {DEMO_CROSS_MATCHES.map((demo) => (
-            <div key={demo.signal_type} className="flex items-start gap-2 text-[11px]">
-              {ICONS[demo.signal_type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
-              <div>
-                {demo.signal_type === "firms_hotspot" && (
-                  <span>{t(lang, "cross_validation_firms_match", { count: demo.count, distance: demo.avg_distance_km, time: demo.avg_time_gap })}</span>
-                )}
-                {demo.signal_type === "ioda_outage" && (
-                  <span>{t(lang, "cross_validation_outage_match", { country: "UA", impact: 75 })}</span>
-                )}
-              </div>
+        <div className="relative">
+          <div className="opacity-60 pointer-events-none select-none" style={{ filter: "blur(3px)" }}>
+            <div className="space-y-2">
+              {DEMO_CROSS_MATCHES.map((demo) => (
+                <div key={demo.signal_type} className="flex items-start gap-2 text-[11px]">
+                  {ICONS[demo.signal_type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
+                  <div>
+                    {demo.signal_type === "firms_hotspot" && (
+                      <span>{t(lang, "cross_validation_firms_match", { count: demo.count, distance: demo.avg_distance_km, time: demo.avg_time_gap })}</span>
+                    )}
+                    {demo.signal_type === "ioda_outage" && (
+                      <span>{t(lang, "cross_validation_outage_match", { country: "UA", impact: 75 })}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70" style={{ filter: "blur(2px)" }}>
-          {t(lang, "cross_validation_boost", { boost: 10 })}
-        </div>
-        {/* 그래디언트 오버레이 + CTA */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.8) 100%)" }}>
-          <Lock className="h-4 w-4 text-slate-400 mb-1.5" />
-          <p className="text-[11px] text-slate-300 text-center px-4 mb-2">{t(lang, "demo_banner_intel")}</p>
-          <a
-            href="/upgrade?source=demo_cross"
-            className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-1.5 text-[10px] font-bold text-white no-underline"
-          >
-            {t(lang, "demo_cta_pro")}
-          </a>
+            <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
+              {t(lang, "cross_validation_boost", { boost: 10 })}
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
+            <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+            <p className="text-xs text-muted-foreground mb-2 font-medium">
+              {lang === "ko"
+                ? "Pro 플랜에서 이용 가능합니다"
+                : "Available for Pro plan"}
+            </p>
+            <a
+              href="/upgrade?source=demo_cross"
+              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white no-underline"
+              style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+            >
+              {t(lang, "dash_unlock_pro")}
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
   // Pro 유저이지만 시그널 데이터 없음
-  return null;
+  return (
+    <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
+      <div className="flex items-center gap-2 mb-3">
+        <Shield className="h-3.5 w-3.5 text-indigo-400" />
+        <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{t(lang, "cross_validation_none")}</p>
+    </div>
+  );
 }
 
 // ── 역사적 맥락 섹션 ──
