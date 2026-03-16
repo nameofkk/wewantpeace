@@ -92,8 +92,8 @@ android {
         applicationId 'com.wewantpeace.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "2.1.0"
+        versionCode 13
+        versionName "3.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
@@ -105,10 +105,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('wewantpeace-release.keystore')
-            storePassword '111111'
+            storeFile file('signing-key.jks')
+            storePassword 'wewantpeace2024'
             keyAlias 'wewantpeace'
-            keyPassword '111111'
+            keyPassword 'wewantpeace2024'
         }
     }
     buildTypes {
