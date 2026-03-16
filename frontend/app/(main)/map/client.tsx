@@ -1789,11 +1789,10 @@ export default function MapPage() {
                       lang={lang}
                     />
                   ) : (
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground opacity-60">
+                    <a href="/settings" className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground opacity-60 hover:opacity-80 whitespace-nowrap">
                       <span>🚢</span>
-                      <span>{lang === "ko" ? "교역 흐름 — 기준국가를 설정하세요" : "Trade Flow — Set a home country"}</span>
-                      <a href="/settings" className="ml-auto text-blue-400 hover:underline text-[10px]">{lang === "ko" ? "설정" : "Settings"}</a>
-                    </div>
+                      <span>{lang === "ko" ? "교역 흐름 — 기준국가를 설정하세요 →" : "Trade Flow — Set a home country →"}</span>
+                    </a>
                   )}
                 </div>
               )}
