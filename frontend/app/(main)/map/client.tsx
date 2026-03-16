@@ -1330,21 +1330,13 @@ export default function MapPage() {
         const color = getColor(score);
         const scoreText = tensionLabel(score);
 
-        const html = `<div style="font-size:13px;line-height:1.7;padding:6px 2px;min-width:180px;">
-          <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${flag} ${name}</div>
-          <div style="display:flex;gap:12px;">
-            <span>${lang === "ko" ? "📤 수출" : "📤 Export"}: <b>${fmtUsd(expUsd)}</b></span>
-            <span>${lang === "ko" ? "📥 수입" : "📥 Import"}: <b>${fmtUsd(impUsd)}</b></span>
-          </div>
-          <div style="margin-top:4px;">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>
-            ${lang === "ko" ? "긴장도" : "Tension"}: <b>${score}</b> (${scoreText})
-          </div>
+        const html = `<div style="font-size:12px;line-height:1.5;padding:6px 8px;background:#1f2937;color:#e5e7eb;border-radius:8px;white-space:nowrap;">
+          <b style="font-size:13px;">${flag} ${name}</b>&nbsp;&nbsp;📤 ${fmtUsd(expUsd)}&nbsp;📥 ${fmtUsd(impUsd)}&nbsp;<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};vertical-align:middle;"></span> ${score}
         </div>`;
 
         if (maplibreRef.current) {
           if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} }
-          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: false, closeOnClick: false, offset: 10 })
+          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: false, closeOnClick: false, offset: 10, className: "trade-flow-popup" })
             .setLngLat(e.lngLat)
             .setHTML(html)
             .addTo(map);
@@ -1409,23 +1401,21 @@ export default function MapPage() {
         const balanceColor = balance >= 0 ? "#10b981" : "#ef4444";
         const balanceSign = balance >= 0 ? "+" : "";
 
-        const html = `<div style="min-width:200px;padding:4px 0;">
-          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">${flag} ${name}</div>
-          <table style="width:100%;font-size:13px;line-height:1.8;border-collapse:collapse;">
-            <tr><td>${lang === "ko" ? "📤 수출" : "📤 Export"}</td><td style="text-align:right;font-weight:600;">${fmtUsd(expUsd)}</td></tr>
-            <tr><td>${lang === "ko" ? "📥 수입" : "📥 Import"}</td><td style="text-align:right;font-weight:600;">${fmtUsd(impUsd)}</td></tr>
-            <tr><td>${lang === "ko" ? "수지" : "Balance"}</td><td style="text-align:right;font-weight:600;color:${balanceColor}">${balanceSign}${fmtUsd(Math.abs(balance))}</td></tr>
-          </table>
-          <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:6px;padding-top:6px;font-size:13px;">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle;"></span>
-            ${lang === "ko" ? "긴장도" : "Tension"}: <b>${score}</b> (${scoreText})
+        const balStr = `${balanceSign}${fmtUsd(Math.abs(balance))}`;
+        const html = `<div style="font-size:12px;line-height:1.6;padding:8px 10px;background:#1f2937;color:#e5e7eb;border-radius:8px;min-width:160px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${flag} ${name}</div>
+          <div style="display:flex;gap:10px;white-space:nowrap;">
+            <span>📤 ${fmtUsd(expUsd)}</span><span>📥 ${fmtUsd(impUsd)}</span><span style="color:${balanceColor};font-weight:600;">${balStr}</span>
+          </div>
+          <div style="margin-top:4px;padding-top:4px;border-top:1px solid #374151;">
+            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};vertical-align:middle;margin-right:3px;"></span>${lang === "ko" ? "긴장도" : "Tension"} <b>${score}</b> (${scoreText})
           </div>
         </div>`;
 
         if (maplibreRef.current) {
           if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} }
           const coords = e.features[0].geometry.coordinates.slice();
-          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: true, closeOnClick: true, offset: 12 })
+          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: true, closeOnClick: true, offset: 12, className: "trade-flow-popup" })
             .setLngLat(coords)
             .setHTML(html)
             .addTo(map);
@@ -1771,8 +1761,8 @@ export default function MapPage() {
                   />
                   {homeCountry ? (
                     <LayerToggleRow
-                      icon="🚢" label={`${lang === "ko" ? "교역 흐름" : "Trade Flow"} · ${getFlag(homeCountry)} ${getCountryName(homeCountry, lang)}`}
-                      tooltip={lang === "ko" ? `${getCountryName(homeCountry, lang)} 기준 주요 교역국과의 수출입 흐름. 색상은 파트너국 긴장도 기반.` : `Trade flows from ${getCountryName(homeCountry, lang)}. Color based on partner tension.`}
+                      icon="🚢" label={`${lang === "ko" ? "교역 흐름" : "Trade Flow"} ${getFlag(homeCountry)}`}
+                      tooltip={lang === "ko" ? `${getCountryName(homeCountry, lang)} 기준 교역 흐름. 색상은 파트너국 긴장도 기반.` : `Trade flows from ${getCountryName(homeCountry, lang)}. Color = partner tension.`}
                       enabled={tradeFlowEnabled} isPro={isPro || intelDemoMode}
                       onToggle={() => {
                         if (!isPro) { setIntelDemoMode(true); }

@@ -72,7 +72,8 @@
   font-family: inherit !important;
 }
 
-.mapboxgl-popup-content {
+.mapboxgl-popup-content,
+.maplibregl-popup-content {
   background: hsl(var(--card)) !important;
   color: hsl(var(--card-foreground)) !important;
   border: 1px solid hsl(var(--border)) !important;
@@ -80,8 +81,28 @@
   padding: 0 !important;
 }
 
-.mapboxgl-popup-tip {
+.mapboxgl-popup-tip,
+.maplibregl-popup-tip {
   border-top-color: hsl(var(--border)) !important;
+}
+
+/* Trade Flow 팝업 — 다크 배경 강제 */
+.trade-flow-popup .maplibregl-popup-content {
+  background: #1f2937 !important;
+  color: #e5e7eb !important;
+  border: 1px solid #374151 !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+}
+.trade-flow-popup .maplibregl-popup-tip {
+  border-top-color: #374151 !important;
+}
+.trade-flow-popup .maplibregl-popup-close-button {
+  color: #9ca3af !important;
+  font-size: 16px;
+  right: 4px;
+  top: 2px;
 }
 
 /* 하단 탭바 */
