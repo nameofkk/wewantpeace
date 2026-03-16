@@ -51,6 +51,7 @@ public class LauncherActivity
             setTaskDescription(new ActivityManager.TaskDescription(
                     "WeWantPeace", icon, primaryColor));
         }
+
     }
 
     @Override
