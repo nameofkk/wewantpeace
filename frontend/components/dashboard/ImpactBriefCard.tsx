@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Loader2,
   Info,
+  Lock,
   Briefcase,
   ShoppingCart,
   Plane,
@@ -124,11 +125,34 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
             </div>
           )}
 
-          {isError && (
-            <p className="py-4 text-xs text-muted-foreground text-center">
-              {lang === "ko" ? "분석을 불러올 수 없습니다" : "Failed to load analysis"}
-            </p>
-          )}
+          {isError && (() => {
+            const errStatus = (activeQuery.error as any)?.status;
+            const isAuthOrPlan = errStatus === 401 || errStatus === 403;
+            if (isAuthOrPlan) {
+              return (
+                <div className="py-4 text-center">
+                  <Lock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {lang === "ko"
+                      ? "Pro 플랜에서 이용 가능합니다"
+                      : "Available for Pro plan"}
+                  </p>
+                  <a
+                    href="/upgrade?source=demo_impact"
+                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
+                    style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                  >
+                    {t(lang, "dash_unlock_pro")}
+                  </a>
+                </div>
+              );
+            }
+            return (
+              <p className="py-4 text-xs text-muted-foreground text-center">
+                {lang === "ko" ? "분석을 불러올 수 없습니다" : "Failed to load analysis"}
+              </p>
+            );
+          })()}
 
           {data && (
             <div className="space-y-3 mt-3">

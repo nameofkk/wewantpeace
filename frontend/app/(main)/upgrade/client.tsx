@@ -75,6 +75,18 @@ const FEATURES: Feature[] = [
     free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
   {
+    labelKo: "영향 흐름도",             labelEn: "Impact flow",
+    free: true,                        pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "AI 영향 분석",           labelEn: "AI impact analysis",
+    free: false,                       pro: true,                       proplus: true,
+  },
+  {
+    labelKo: "산업별 리스크 분석",     labelEn: "Sector risk analysis",
+    free: false,                       pro: false,                      proplus: true,
+  },
+  {
     labelKo: "위성 열점 (FIRMS)",      labelEn: "Satellite hotspots",
     free: { ko: "데모", en: "Demo" },  pro: true,                       proplus: true,
   },

@@ -250,7 +250,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
   const activeQuery = useOverview ? overviewQuery : clusterQuery;
   const { data, isLoading, isError, error } = activeQuery;
 
-  const is403 = (error as any)?.status === 403;
+  const is403 = [401, 403].includes((error as any)?.status);
 
   const maxLabel = lang === "en" ? 12 : 5;
   const chartData = data?.sectors.map((s) => ({

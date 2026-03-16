@@ -304,7 +304,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       <div
         className={cn(
           "relative",
-          !isPro && "after:absolute after:inset-0 after:bg-gradient-to-r after:from-transparent after:via-transparent after:to-background/80"
+          false
         )}
         style={{ opacity: visible ? 1 : 0, transition: "opacity 0.25s ease-in-out" }}
       >
@@ -328,7 +328,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           {links.map((l, i) => {
             const srcIdx = conflictIdxMap.get(l.sourceId) ?? -1;
             const isConnected = connectedLinks.has(i);
-            const baseOpacity = isPro ? 0.3 : 0.12;
+            const baseOpacity = 0.3;
             const linkOpacity = isHovering
               ? isConnected ? 0.55 : 0.06
               : baseOpacity;
@@ -352,7 +352,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   <circle
                     r={Math.max(l.thickness * 0.15, 1.5)}
                     fill={isDark ? "white" : l.srcColor}
-                    opacity={isPro ? (isDark ? 0.35 : 0.5) : (isDark ? 0.18 : 0.3)}
+                    opacity={isDark ? 0.35 : 0.5}
                     filter="url(#pg)"
                   >
                     <animateMotion
@@ -538,13 +538,6 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
         ))}
       </div>
 
-      {!isPro && (
-        <div className="absolute pointer-events-none" style={{ top: chartHeight / 2, left: "50%", transform: "translate(-50%, -50%)" }}>
-          <span className="text-[10px] text-muted-foreground/40 bg-background/60 px-3 py-1 rounded-full pointer-events-auto">
-            {t(lang, "dash_pro_demo_flow" as TranslationKey)}
-          </span>
-        </div>
-      )}
 
       {/* 팝업 — 이슈 전체 제목 + 상세 보기 */}
       {popupIdx !== null && popupIssue && (
