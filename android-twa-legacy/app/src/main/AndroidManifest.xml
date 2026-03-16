@@ -40,7 +40,7 @@
         android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Translucent.NoTitleBar">
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
         <meta-data
             android:name="asset_statements"
