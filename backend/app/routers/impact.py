@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v9"
+_CACHE_VERSION = "v10"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -871,7 +871,7 @@ class ImpactBriefOut(BaseModel):
 
 
 def _brief_cache_key(cluster_id: str, home_country: str, lang: str = "ko") -> str:
-    return f"impact:brief:{cluster_id}:{home_country}:{lang}"
+    return f"impact:brief:{_CACHE_VERSION}:{cluster_id}:{home_country}:{lang}"
 
 
 async def _generate_impact_brief(
@@ -1017,7 +1017,7 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
                     {"role": "user", "content": user_prompt},
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3,
+                temperature=0,
                 max_tokens=800,
             )
 
@@ -2388,7 +2388,7 @@ async def get_sector_analysis(
     # 기준 국가 결정 (쿼리 파라미터 > 사용자 설정 > 기본값)
     redis = get_redis()
     home = home_country or user.home_country or "KR"
-    cache_key = f"impact:sector:{cluster_id}:{home}:{lang}"
+    cache_key = f"impact:sector:{_CACHE_VERSION}:{cluster_id}:{home}:{lang}"
 
     if redis:
         cached = await redis.get(cache_key)

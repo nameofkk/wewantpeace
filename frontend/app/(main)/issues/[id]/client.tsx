@@ -523,8 +523,8 @@ export default function IssueDetailClient({ initialData }: Props) {
         {/* 영향 분석 */}
         <ImpactBriefCard clusterId={id} />
 
-        {/* 산업별 리스크 분석 */}
-        <SectorImpactCard clusterId={id} />
+        {/* 산업별 리스크 분석 — Pro 이상만 표시 */}
+        {isPro && <SectorImpactCard clusterId={id} />}
 
         {/* T15: 정정/업데이트 이력 */}
         {issue.change_logs && issue.change_logs.length > 0 && (
