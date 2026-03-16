@@ -2291,24 +2291,164 @@ async def _get_real_trade_dependency(
     return detail.dependency if detail else None
 
 
+# ── 토픽×섹터 영향 서술 사전 ──────────────────────────────────────────────
+# (topic, sector) → {lang: {risk_level: description}}
+_SECTOR_NARRATIVES: dict[tuple[str, str], dict[str, dict[str, str]]] = {
+    # conflict
+    ("conflict", "energy"): {
+        "ko": {"critical": "원유·가스 공급 즉시 차질 — 유가 급등 압력, 정유·항공·물류 마진 급락",
+               "high": "주요 유전지역 불안정 — 유가 5-10% 변동성 확대, 난방·수송 비용 상승",
+               "medium": "공급 차질 제한적이나 유가 변동성 확대 모니터링 필요"},
+        "en": {"critical": "Oil/gas supply disruption imminent — fuel price spike, refinery & aviation margin collapse",
+               "high": "Instability in key oil regions — 5-10% price volatility, heating & transport cost rise",
+               "medium": "Limited supply impact but elevated price volatility warrants monitoring"},
+    },
+    ("conflict", "shipping"): {
+        "ko": {"critical": "주요 해운 경로 차단 위험 — 우회 비용 30-50% 증가, 납기 1-3주 지연",
+               "high": "해운 보험료 급등 + 항로 우회 — 물류 비용 15-25% 상승",
+               "medium": "해상 운송 리스크 상승 — 보험료 인상, 일부 선적 지연"},
+        "en": {"critical": "Major shipping route blockage risk — rerouting costs +30-50%, 1-3 week delays",
+               "high": "Shipping insurance surge + route diversion — logistics costs +15-25%",
+               "medium": "Elevated maritime risk — insurance hikes, selective shipment delays"},
+    },
+    ("conflict", "semiconductor"): {
+        "ko": {"critical": "희토류·특수가스 공급 중단 — 칩 생산 차질, 납기 4-6주 지연",
+               "high": "반도체 원자재 공급 불안 — 납기 2-3주 지연, 재고 확보 경쟁 심화",
+               "medium": "간접 영향 — 글로벌 공급망 불확실성으로 선제 재고 확보 움직임"},
+        "en": {"critical": "Rare earth / specialty gas supply cut — chip production halt, 4-6 week delays",
+               "high": "Semiconductor raw material instability — 2-3 week delays, inventory competition",
+               "medium": "Indirect impact — precautionary stockpiling amid global uncertainty"},
+    },
+    ("conflict", "agriculture"): {
+        "ko": {"critical": "곡물 수출국 분쟁 — 밀·옥수수 공급 차단, 식품 가격 급등",
+               "high": "식량 공급망 불안 — 곡물 가격 10-20% 상승 압력, 사료 비용 연동",
+               "medium": "식량 수급 모니터링 필요 — 가격 변동 확대"},
+        "en": {"critical": "Grain exporter conflict — wheat/corn supply blocked, food price surge",
+               "high": "Food supply chain stress — grain prices +10-20%, feed cost spillover",
+               "medium": "Food supply monitoring needed — price volatility widening"},
+    },
+    ("conflict", "defense"): {
+        "ko": {"critical": "방산 수요 폭증 — 군수품 납기 장기화, 방산주 급등",
+               "high": "군비 확장 압력 — 방산 부품 수급 긴장, 수출 기회 확대",
+               "medium": "지정학 리스크 반영 — 방위 예산 증액 논의 활발"},
+        "en": {"critical": "Defense demand surge — military supply backlogs, defense stocks spike",
+               "high": "Arms buildup pressure — defense parts supply tension, export opportunity",
+               "medium": "Geopolitical risk priced in — defense budget increase discussions active"},
+    },
+    ("conflict", "tourism"): {
+        "ko": {"critical": "분쟁 지역 전면 여행 금지 — 항공편 취소, 인접국 관광 수요 급감",
+               "high": "여행 경보 상향 — 해당 지역 예약 취소 급증, 항공사 노선 조정",
+               "medium": "여행 심리 위축 — 인접 지역 관광 수요 소폭 감소"},
+        "en": {"critical": "Full travel ban to conflict zone — flight cancellations, adjacent tourism collapse",
+               "high": "Travel advisory upgrade — mass cancellations, airline route adjustments",
+               "medium": "Travel sentiment weakened — slight decline in adjacent tourism demand"},
+    },
+    # sanctions
+    ("sanctions", "energy"): {
+        "ko": {"critical": "에너지 수출 제재 — 대체 조달처 확보 시급, 유가 $20+ 프리미엄",
+               "high": "에너지 제재 확대 — 우회 수입 비용 증가, 장기 계약 재협상 필요"},
+        "en": {"critical": "Energy export sanctions — urgent alternative sourcing, $20+ oil premium",
+               "high": "Expanded energy sanctions — circumvention costs rise, contract renegotiation needed"},
+    },
+    ("sanctions", "manufacturing"): {
+        "ko": {"critical": "제재 대상국 부품 즉시 수입 금지 — 생산 라인 2-4주 중단 위험",
+               "high": "제재 강화 시 부품 공급처 전환 필요 — 전환 비용 10-15% 증가"},
+        "en": {"critical": "Sanctioned parts import ban — production line shutdown risk for 2-4 weeks",
+               "high": "Sanctions escalation requires supplier switch — transition cost +10-15%"},
+    },
+    ("sanctions", "semiconductor"): {
+        "ko": {"critical": "칩 수출 통제 — 고성능 반도체 공급 차단, 국내 제조 역량 의존 불가피",
+               "high": "기술 제재 확대 — EDA 도구·장비 접근 제한, 차세대 공정 개발 지연"},
+        "en": {"critical": "Chip export controls — high-end semiconductor supply cut, domestic reliance forced",
+               "high": "Tech sanctions widening — EDA tool/equipment access restricted, next-gen process delays"},
+    },
+    # cyber
+    ("cyber", "technology"): {
+        "ko": {"critical": "대규모 사이버 공격 — 클라우드·금융 인프라 일시 마비, 기업 데이터 유출 위험",
+               "high": "사이버 위협 고조 — 보안 비용 급증, IT 서비스 일시 중단 가능"},
+        "en": {"critical": "Major cyberattack — cloud/financial infrastructure outage, corporate data breach risk",
+               "high": "Elevated cyber threat — security costs surge, IT service disruptions possible"},
+    },
+    ("cyber", "semiconductor"): {
+        "ko": {"critical": "반도체 설계 IP 탈취 위험 — 핵심 기술 유출, 수출 통제 강화 불가피",
+               "high": "사이버 스파이 활동 증가 — 설계 데이터 보호 강화 필요"},
+        "en": {"critical": "Chip design IP theft risk — core tech leakage, export controls inevitable",
+               "high": "Cyber espionage activity increase — design data protection reinforcement needed"},
+    },
+    # terror
+    ("terror", "tourism"): {
+        "ko": {"critical": "테러 발생 — 해당국 여행 전면 금지, 글로벌 관광 심리 급랭",
+               "high": "테러 위협 고조 — 여행 보험료 인상, 예약 취소율 30% 이상"},
+        "en": {"critical": "Terror attack — full travel ban, global tourism sentiment collapses",
+               "high": "Elevated terror threat — travel insurance hikes, cancellation rate >30%"},
+    },
+    ("terror", "energy"): {
+        "ko": {"critical": "에너지 시설 테러 — 정유·파이프라인 가동 중단, 유가 즉시 급등",
+               "high": "에너지 인프라 위협 — 시설 보안 강화 비용 증가, 보험료 인상"},
+        "en": {"critical": "Energy facility attack — refinery/pipeline shutdown, immediate oil price spike",
+               "high": "Energy infrastructure threat — facility security costs rise, insurance hikes"},
+    },
+}
+
+# 위험도별 요약 / 공급차질 / 비용증가 / 시나리오 템플릿
+_RISK_SUMMARY: dict[str, dict[str, str]] = {
+    "ko": {"critical": "공급 차질 즉시 우려", "high": "2-4주 내 영향 가능", "medium": "모니터링 필요", "low": "직접 영향 낮음"},
+    "en": {"critical": "Immediate supply disruption risk", "high": "Impact likely within 2-4 weeks", "medium": "Monitoring required", "low": "Low direct impact"},
+}
+
+_SUPPLY_DISRUPTION: dict[str, str] = {
+    "critical": "2-6", "high": "1-3", "medium": "0-1", "low": "",
+}
+
+_COST_INCREASE: dict[str, str] = {
+    "critical": "+20-40%", "high": "+10-20%", "medium": "+5-10%", "low": "",
+}
+
+_SCENARIO_TEMPLATES: dict[str, dict[str, dict[str, str]]] = {
+    "ko": {
+        "worst": {"prefix": "악화 시: ", "suffix": " — 대체 조달 4주+, 생산 차질 불가피"},
+        "base": {"prefix": "현 수준 유지 시: ", "suffix": " — 비용 부담 증가하나 관리 가능"},
+        "best": {"prefix": "급속 완화 시: ", "suffix": " — 72시간 내 정상화, 일시적 변동만"},
+    },
+    "en": {
+        "worst": {"prefix": "If worsened: ", "suffix": " — alternative sourcing 4+ weeks, production disruption inevitable"},
+        "base": {"prefix": "If status quo: ", "suffix": " — cost pressure up but manageable"},
+        "best": {"prefix": "If rapid resolution: ", "suffix": " — normalization within 72h, temporary volatility only"},
+    },
+}
+
+
+def _fmt_usd(val: float | None) -> str:
+    """USD millions → 읽기 좋은 형식"""
+    if val is None:
+        return "?"
+    if val >= 1000:
+        return f"${val / 1000:.1f}B"
+    return f"${val:.0f}M"
+
+
 async def _calc_sector_exposure(
     home_country: str,
     affected_country: str,
     severity: int,
     lang: str = "ko",
     db: AsyncSession | None = None,
+    topic: str = "",
 ) -> list[dict]:
-    """섹터 노출도 계산 (실 데이터 있으면 보정, 없으면 하드코딩 fallback)"""
+    """섹터 노출도 계산 v2 — 토픽별 설명 + 교역액 + 시나리오"""
     sectors_data = SECTOR_DATA.get(home_country, DEFAULT_SECTORS)
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
+    l = "ko" if lang == "ko" else "en"
 
-    # Tier 2: DB에서 실제 교역 의존도 조회 (옵셔널 보정)
-    real_trade_dep = None
+    # DB 교역 상세 조회
+    trade_detail: _TradeDetail | None = None
     if db:
         try:
-            real_trade_dep = await _get_real_trade_dependency(home_country, affected_country, db)
+            trade_detail = await _get_real_trade_detail(home_country, affected_country, db)
         except Exception:
-            pass  # 테이블 미생성 시 무시
+            pass
+
+    real_trade_dep = trade_detail.dependency if trade_detail else None
 
     result = []
 
@@ -2319,36 +2459,17 @@ async def _calc_sector_exposure(
         is_partner = affected_country in partners
         partner_rank = partners.index(affected_country) + 1 if is_partner else 0
 
-        # 교역 의존도: 실제 DB 데이터 우선, 없으면 key_partners 순위 기반
         if real_trade_dep is not None and real_trade_dep > 0.001:
-            # 실제 교역 데이터 있으면 key_partners 여부 무관하게 사용
             trade_dep = min(0.95, real_trade_dep * 3)
         elif is_partner:
-            if partner_rank == 1:
-                trade_dep = 0.85
-            elif partner_rank == 2:
-                trade_dep = 0.6
-            elif partner_rank == 3:
-                trade_dep = 0.35
-            elif partner_rank == 4:
-                trade_dep = 0.25
-            elif partner_rank == 5:
-                trade_dep = 0.18
-            else:
-                trade_dep = 0.12
+            rank_map = {1: 0.85, 2: 0.6, 3: 0.35, 4: 0.25, 5: 0.18}
+            trade_dep = rank_map.get(partner_rank, 0.12)
         else:
-            # 직접 교역 없을 때 섹터별 간접 노출도 차등 적용
             _SECTOR_INDIRECT_WEIGHT: dict[str, float] = {
-                "energy": 0.45,        # 에너지: 글로벌 유가/공급망 민감
-                "shipping": 0.35,      # 해운: 항로 차단 리스크
-                "agriculture": 0.25,   # 농업: 식량 공급 간접 영향
-                "manufacturing": 0.20, # 제조: 원자재/부품 간접 영향
-                "defense": 0.30,       # 방산: 지정학 민감
-                "semiconductor": 0.12, # 반도체: 간접 영향 낮음
-                "electronics": 0.10,   # 전자: 간접 영향 낮음
-                "automotive": 0.10,    # 자동차: 간접 영향 낮음
-                "technology": 0.12,    # 기술: 간접 영향 낮음
-                "tourism": 0.15,       # 관광: 여행 심리 영향
+                "energy": 0.45, "shipping": 0.35, "agriculture": 0.25,
+                "manufacturing": 0.20, "defense": 0.30, "semiconductor": 0.12,
+                "electronics": 0.10, "automotive": 0.10, "technology": 0.12,
+                "tourism": 0.15,
             }
             weight = _SECTOR_INDIRECT_WEIGHT.get(sector, 0.15)
             trade_dep = min(0.25, severity / 100 * weight)
@@ -2365,32 +2486,80 @@ async def _calc_sector_exposure(
 
         sector_label = labels.get(sector, sector)
 
-        if lang == "ko":
-            desc = f"GDP 대비 {gdp_pct}% 비중. "
-            if real_trade_dep is not None and real_trade_dep > 0.001:
-                desc += f"해당 지역과 교역 비중 {real_trade_dep * 100:.1f}%."
-            elif is_partner:
-                desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
-            else:
-                desc += "직접 교역 관계는 낮으나 글로벌 공급망 간접 영향 가능."
-        else:
-            desc = f"{gdp_pct}% of GDP. "
-            if real_trade_dep is not None and real_trade_dep > 0.001:
-                desc += f"Trade share with affected region: {real_trade_dep * 100:.1f}%."
-            elif is_partner:
-                desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
-            else:
-                desc += "Low direct trade exposure, but potential indirect impact via global supply chains."
+        # ── 설명 생성 (v2: 토픽×섹터 사전 우선) ──
+        narrative = _SECTOR_NARRATIVES.get((topic, sector), {}).get(l, {})
+        desc_from_narrative = narrative.get(risk_level) or narrative.get("high") or narrative.get("medium")
 
-        result.append({
+        if desc_from_narrative:
+            # 토픽별 구체 설명 + 교역 수치 보강
+            desc = desc_from_narrative
+            if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
+                vol = _fmt_usd(trade_detail.total_usd)
+                pct = f"{real_trade_dep * 100:.1f}%" if real_trade_dep else ""
+                if l == "ko":
+                    desc += f" (교역 {vol}, 비중 {pct})" if pct else f" (교역 {vol})"
+                else:
+                    desc += f" (trade {vol}, share {pct})" if pct else f" (trade {vol})"
+            elif is_partner:
+                if l == "ko":
+                    desc += f" ({sector_label} {partner_rank}위 파트너)"
+                else:
+                    desc += f" (#{partner_rank} {sector_label} partner)"
+        else:
+            # 폴백: 기존 템플릿 + 교역액 추가
+            if l == "ko":
+                desc = f"GDP 대비 {gdp_pct}% 비중. "
+                if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
+                    desc += f"해당 지역과 교역 {_fmt_usd(trade_detail.total_usd)} (비중 {real_trade_dep * 100:.1f}%)."
+                elif is_partner:
+                    desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
+                else:
+                    desc += "직접 교역 관계는 낮으나 글로벌 공급망 간접 영향 가능."
+            else:
+                desc = f"{gdp_pct}% of GDP. "
+                if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
+                    desc += f"Trade with affected region: {_fmt_usd(trade_detail.total_usd)} (share {real_trade_dep * 100:.1f}%)."
+                elif is_partner:
+                    desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
+                else:
+                    desc += "Low direct trade but potential indirect impact via global supply chains."
+
+        # ── 시나리오 + action (Pro+ 이슈 상세용) ──
+        s_tpl = _SCENARIO_TEMPLATES.get(l, _SCENARIO_TEMPLATES["en"])
+        scenario_worst = scenario_base = scenario_best = action_point = None
+        if risk_level in ("critical", "high"):
+            scenario_worst = s_tpl["worst"]["prefix"] + desc.split("—")[0].strip() if "—" in desc else s_tpl["worst"]["prefix"] + sector_label
+            scenario_worst += s_tpl["worst"]["suffix"]
+            scenario_base = s_tpl["base"]["prefix"] + sector_label + s_tpl["base"]["suffix"]
+            scenario_best = s_tpl["best"]["prefix"] + sector_label + s_tpl["best"]["suffix"]
+            if l == "ko":
+                action_point = f"대체 조달처 확보 및 재고 점검 필요" if trade_dep > 0.3 else f"공급망 모니터링 강화 권장"
+            else:
+                action_point = "Secure alternative sourcing and review inventory" if trade_dep > 0.3 else "Strengthen supply chain monitoring"
+
+        entry: dict = {
             "sector": sector_label,
             "exposure_pct": gdp_pct,
             "trade_dependency": round(trade_dep, 2),
             "risk_level": risk_level,
             "description": desc,
-        })
+            "risk_summary": _RISK_SUMMARY.get(l, _RISK_SUMMARY["en"]).get(risk_level, ""),
+            "affected_countries": [affected_country] if (is_partner or (real_trade_dep and real_trade_dep > 0.001)) else [],
+            "supply_disruption_weeks": _SUPPLY_DISRUPTION.get(risk_level) or None,
+            "cost_increase_pct": _COST_INCREASE.get(risk_level) or None,
+            "scenario_worst": scenario_worst,
+            "scenario_base": scenario_base,
+            "scenario_best": scenario_best,
+            "action_point": action_point,
+        }
 
-    # 리스크 높은 순 정렬
+        if trade_detail and trade_detail.total_usd:
+            entry["trade_volume_usd"] = round(trade_detail.total_usd, 1)
+            entry["export_usd"] = round(trade_detail.export_usd, 1) if trade_detail.export_usd else None
+            entry["import_usd"] = round(trade_detail.import_usd, 1) if trade_detail.import_usd else None
+
+        result.append(entry)
+
     risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     result.sort(key=lambda x: risk_order.get(x["risk_level"], 4))
     return result
@@ -2437,7 +2606,7 @@ async def get_sector_analysis(
 
     affected = cluster.country_code or "Unknown"
 
-    sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db)
+    sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db, topic=cluster.topic or "")
     critical_count = sum(1 for s in sectors if s["risk_level"] == "critical")
     high_count = sum(1 for s in sectors if s["risk_level"] == "high")
 
