@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
+import { MapPin, Shield, Plus, X, Search, ChevronUp, ChevronDown, Check, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -146,6 +146,7 @@ export default function SettingsPage() {
   }
 
   const [showPicker, setShowPicker] = useState(false);
+  const [showHomeCountryPicker, setShowHomeCountryPicker] = useState(false);
   const [notifStatus, setNotifStatus] = useState<"idle" | "loading" | "done" | "denied" | "unsupported">("idle");
   const [openInfo, setOpenInfo] = useState<string | null>(null); // "verified-KR" | "fast-KR" 형태
 
@@ -935,34 +936,14 @@ export default function SettingsPage() {
                 {plan === "free" ? (
                   <span className="text-sm text-muted-foreground">{t(lang, "settings_home_country_global")}</span>
                 ) : (
-                  <select
-                    value={homeCountry}
-                    onChange={(e) => {
-                      const code = e.target.value;
-                      setHomeCountry(code);
-                      saveNotifPatch({ home_country: code });
-                    }}
-                    className="text-sm bg-secondary border border-border rounded-md px-2 py-1"
+                  <button
+                    onClick={() => setShowHomeCountryPicker(true)}
+                    className="flex items-center gap-1.5 text-sm bg-secondary border border-border rounded-md px-3 py-1.5 hover:bg-secondary/80 transition-colors"
                   >
-                    <option value="">{t(lang, "home_country_basic_label")}</option>
-                    {([
-                      { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
-                      { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
-                      { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
-                      { label: lang === "ko" ? "유럽" : "Europe", codes: ["DE", "GB", "FR", "PL", "RU"] },
-                      { label: lang === "ko" ? "아메리카" : "Americas", codes: ["US", "CA", "MX", "BR"] },
-                    ] as { label: string; codes: string[] }[]).map((group) => {
-                      const groupCountries = group.codes.filter((c) => SUPPORTED_HOME_COUNTRIES.includes(c));
-                      if (!groupCountries.length) return null;
-                      return (
-                        <optgroup key={group.label} label={group.label}>
-                          {groupCountries.map((cc) => (
-                            <option key={cc} value={cc}>{getFlag(cc)} {getCountryName(cc, lang)}</option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
-                  </select>
+                    <span>{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+                    <span>{homeCountry ? getCountryName(homeCountry, lang) : (lang === "ko" ? "글로벌" : "Global")}</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </button>
                 )}
               </div>
               {plan === "free" && (
@@ -1706,6 +1687,82 @@ export default function SettingsPage() {
         </section>
 
         {/* 토스트 알림 */}
+        {/* ═══════════════ 기준 국가 선택 바텀시트 ═══════════════ */}
+        {showHomeCountryPicker && (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowHomeCountryPicker(false)} />
+            <div className="fixed bottom-[60px] left-0 right-0 z-50 rounded-t-2xl border-t border-border bg-card shadow-2xl animate-in slide-in-from-bottom duration-200 max-w-lg mx-auto max-h-[60vh] flex flex-col">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+                <h3 className="text-sm font-bold">
+                  {lang === "ko" ? "기준 국가 선택" : "Select Base Country"}
+                </h3>
+                <button
+                  onClick={() => setShowHomeCountryPicker(false)}
+                  className="p-1 rounded-full hover:bg-muted/50 transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 py-2 overscroll-contain">
+                {/* 글로벌 옵션 */}
+                <button
+                  onClick={() => {
+                    setHomeCountry("");
+                    saveNotifPatch({ home_country: "" });
+                    setShowHomeCountryPicker(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                    !homeCountry && "bg-primary/5"
+                  )}
+                >
+                  <span className="text-lg">🌐</span>
+                  <span className="text-sm flex-1">{lang === "ko" ? "글로벌 (전체)" : "Global (All)"}</span>
+                  <span className="text-[10px] text-muted-foreground">ALL</span>
+                  {!homeCountry && <Check className="h-4 w-4 text-primary" />}
+                </button>
+                {/* 대륙별 그룹 */}
+                {([
+                  { label: lang === "ko" ? "동아시아" : "East Asia", codes: ["KR", "JP", "CN", "TW"] },
+                  { label: lang === "ko" ? "동남아 · 오세아니아" : "SE Asia · Oceania", codes: ["TH", "VN", "SG", "ID", "PH", "AU"] },
+                  { label: lang === "ko" ? "남아시아 · 중동" : "South Asia · Middle East", codes: ["IN", "SA", "AE", "IL", "EG", "TR"] },
+                  { label: lang === "ko" ? "유럽" : "Europe", codes: ["DE", "GB", "FR", "PL", "RU"] },
+                  { label: lang === "ko" ? "아메리카" : "Americas", codes: ["US", "CA", "MX", "BR"] },
+                ] as { label: string; codes: string[] }[]).map((group) => {
+                  const groupCountries = group.codes.filter((c) => SUPPORTED_HOME_COUNTRIES.includes(c));
+                  if (!groupCountries.length) return null;
+                  return (
+                    <div key={group.label}>
+                      <div className="px-5 pt-3 pb-1">
+                        <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">{group.label}</span>
+                      </div>
+                      {groupCountries.map((cc) => (
+                        <button
+                          key={cc}
+                          onClick={() => {
+                            setHomeCountry(cc);
+                            saveNotifPatch({ home_country: cc });
+                            setShowHomeCountryPicker(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/10 transition-colors",
+                            homeCountry === cc && "bg-primary/5"
+                          )}
+                        >
+                          <span className="text-lg">{getFlag(cc)}</span>
+                          <span className="text-sm flex-1">{getCountryName(cc, lang)}</span>
+                          <span className="text-[10px] text-muted-foreground">{cc}</span>
+                          {homeCountry === cc && <Check className="h-4 w-4 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
         {toast && (
           <div className="fixed bottom-20 inset-x-4 z-50 flex justify-center animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className={cn(
