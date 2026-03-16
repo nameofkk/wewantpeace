@@ -30,7 +30,6 @@ import { RiskRadar } from "@/components/dashboard/RiskRadar";
 import { ImpactFlowSankey } from "@/components/dashboard/ImpactFlowSankey";
 import { ProDemoWrapper } from "@/components/dashboard/ProDemoWrapper";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
-import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
   MapPin,
@@ -923,10 +922,6 @@ function ReportContent() {
                       </div>
                     </ProDemoWrapper>
 
-                    {/* Weekly Report Card (주간 리포트) */}
-                    <div className="mt-4">
-                      <WeeklyReportCard />
-                    </div>
                   </div>
                 )}
               </m.div>
