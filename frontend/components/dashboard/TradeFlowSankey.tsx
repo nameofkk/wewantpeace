@@ -305,7 +305,7 @@ export function TradeFlowSankey() {
         icon={<GitBranch className="h-3.5 w-3.5 text-cyan-400" />}
         titleKey="dash_trade_flow"
         descKey="dash_trade_flow_desc"
-        badge={{ label: "Pro+", color: "bg-cyan-500/10 text-cyan-400" }}
+        badge={{ label: "Pro", color: "bg-cyan-500/10 text-cyan-400" }}
       />
       <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
         <button
@@ -342,15 +342,15 @@ export function TradeFlowSankey() {
                   <Lock className="h-6 w-6 text-muted-foreground mb-2" />
                   <p className="text-xs font-medium text-foreground/80 mb-2">
                     {lang === "ko"
-                      ? "Pro+ 플랜에서 이용 가능합니다"
-                      : "Available on Pro+ plan"}
+                      ? "Pro 플랜에서 이용 가능합니다"
+                      : "Available on Pro plan"}
                   </p>
                   <Link
                     href="/upgrade?source=trade_flow"
                     className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[10px] font-bold text-white transition-transform hover:scale-105"
                     style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
                   >
-                    {t(lang, "dash_unlock_pro_plus")}
+                    {t(lang, "dash_unlock_pro")}
                   </Link>
                 </div>
               </div>
