@@ -353,6 +353,11 @@ export default function IssueDetailClient({ initialData }: Props) {
   const { data, isPending, isError } = useClusterDetail(id);
   const issue = (data as ClusterDetail | undefined) ?? initialData;
   const lang = useAppStore((s) => s.lang);
+  const { data: me, isLoading: meLoading } = useMe();
+  const { loading: authLoading } = useAuth();
+  const userPlan = useAppStore((s) => s.userPlan);
+  const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
+  const isPro = !meLoading && !authLoading && (plan === "pro" || plan === "pro_plus");
   const [showHistory, setShowHistory] = useState(false);
   const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
   const [expandedFullBodies, setExpandedFullBodies] = useState<Record<string, boolean>>({});
@@ -509,14 +514,16 @@ export default function IssueDetailClient({ initialData }: Props) {
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
 
+        {/* 역사적 맥락 */}
+        <HistoricalContextSection clusterId={id} lang={lang} />
+
         {/* 교차검증 증거 */}
         <CrossValidationSection clusterId={id} lang={lang} />
 
-        {/* 역사적 맥락 (UCDP) */}
-        <HistoricalContextSection clusterId={id} lang={lang} />
-
-        {/* Impact Analysis — 요약 바로 아래 배치 */}
+        {/* 영향 분석 */}
         <ImpactBriefCard clusterId={id} />
+
+        {/* 산업별 리스크 분석 */}
         <SectorImpactCard clusterId={id} />
 
         {/* T15: 정정/업데이트 이력 */}

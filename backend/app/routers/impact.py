@@ -2306,8 +2306,21 @@ async def _calc_sector_exposure(
             else:
                 trade_dep = 0.12
         else:
-            # 직접 교역 없지만 간접 글로벌 파급 효과 반영 (severity 비례)
-            trade_dep = min(0.25, severity / 100 * 0.2)
+            # 직접 교역 없을 때 섹터별 간접 노출도 차등 적용
+            _SECTOR_INDIRECT_WEIGHT: dict[str, float] = {
+                "energy": 0.45,        # 에너지: 글로벌 유가/공급망 민감
+                "shipping": 0.35,      # 해운: 항로 차단 리스크
+                "agriculture": 0.25,   # 농업: 식량 공급 간접 영향
+                "manufacturing": 0.20, # 제조: 원자재/부품 간접 영향
+                "defense": 0.30,       # 방산: 지정학 민감
+                "semiconductor": 0.12, # 반도체: 간접 영향 낮음
+                "electronics": 0.10,   # 전자: 간접 영향 낮음
+                "automotive": 0.10,    # 자동차: 간접 영향 낮음
+                "technology": 0.12,    # 기술: 간접 영향 낮음
+                "tourism": 0.15,       # 관광: 여행 심리 영향
+            }
+            weight = _SECTOR_INDIRECT_WEIGHT.get(sector, 0.15)
+            trade_dep = min(0.25, severity / 100 * weight)
 
         risk_score = trade_dep * (severity / 100)
         if risk_score >= 0.6:
@@ -2560,11 +2573,18 @@ async def get_sector_overview(
                 max_risk_score = risk_score
 
         # 2차: 직접 교역 매칭이 없으면 토픽 기반 간접 영향 반영
+        _SECTOR_INDIRECT_W: dict[str, float] = {
+            "energy": 0.45, "shipping": 0.35, "agriculture": 0.25,
+            "manufacturing": 0.20, "defense": 0.30, "semiconductor": 0.12,
+            "electronics": 0.10, "automotive": 0.10, "technology": 0.12,
+            "tourism": 0.15,
+        }
         if not affected_countries:
             for tp, related_sectors in _topic_sector_map.items():
                 if sector in related_sectors and tp in topic_severity:
                     sev = topic_severity[tp]
-                    indirect_dep = 0.08 * (gdp_pct / 10)  # GDP 비중 높을수록 간접 영향 큼
+                    base_w = _SECTOR_INDIRECT_W.get(sector, 0.15)
+                    indirect_dep = base_w * (sev / 100)
                     indirect_dep = min(0.25, indirect_dep)
                     risk_score = indirect_dep * (sev / 100)
                     if indirect_dep > max_trade_dep:
