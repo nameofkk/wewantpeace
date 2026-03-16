@@ -19,49 +19,43 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── tension_index 복합 인덱스 ──
-    op.create_index(
-        "ix_tension_index_country_time",
-        "tension_index",
-        ["country_code", sa.text("time DESC")],
+    # ── tension_index 복합 인덱스 (DESC는 raw SQL 필요) ──
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_tension_index_country_time "
+        "ON tension_index (country_code, time DESC)"
     )
 
     # ── subscriptions 인덱스 ──
-    op.create_index(
-        "ix_subscriptions_user_id",
-        "subscriptions",
-        ["user_id"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_subscriptions_user_id "
+        "ON subscriptions (user_id)"
     )
-    op.create_index(
-        "ix_subscriptions_status",
-        "subscriptions",
-        ["status"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_subscriptions_status "
+        "ON subscriptions (status)"
     )
 
     # ── normalized_events 인덱스 ──
-    op.create_index(
-        "ix_normalized_events_event_time",
-        "normalized_events",
-        ["event_time"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_normalized_events_event_time "
+        "ON normalized_events (event_time)"
     )
-    op.create_index(
-        "ix_normalized_events_country",
-        "normalized_events",
-        ["country_code"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_normalized_events_country "
+        "ON normalized_events (country_code)"
     )
 
     # ── user_areas 인덱스 ──
-    op.create_index(
-        "ix_user_areas_user_id",
-        "user_areas",
-        ["user_id"],
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_user_areas_user_id "
+        "ON user_areas (user_id)"
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_areas_user_id", "user_areas")
-    op.drop_index("ix_normalized_events_country", "normalized_events")
-    op.drop_index("ix_normalized_events_event_time", "normalized_events")
-    op.drop_index("ix_subscriptions_status", "subscriptions")
-    op.drop_index("ix_subscriptions_user_id", "subscriptions")
-    op.drop_index("ix_tension_index_country_time", "tension_index")
+    op.execute("DROP INDEX IF EXISTS ix_user_areas_user_id")
+    op.execute("DROP INDEX IF EXISTS ix_normalized_events_country")
+    op.execute("DROP INDEX IF EXISTS ix_normalized_events_event_time")
+    op.execute("DROP INDEX IF EXISTS ix_subscriptions_status")
+    op.execute("DROP INDEX IF EXISTS ix_subscriptions_user_id")
+    op.execute("DROP INDEX IF EXISTS ix_tension_index_country_time")
