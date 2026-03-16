@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, plan_required, get_db
+from backend.app.core.auth import get_current_user, get_optional_user, plan_required, get_db
 from backend.app.core.redis import get_redis
 from backend.app.models.user import User
 from backend.app.models.issue_cluster import IssueCluster
@@ -823,29 +823,33 @@ async def _build_impact_summary(
 
 @router.get("/summary", response_model=ImpactSummaryOut)
 async def get_impact_summary(
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
     home_country: str | None = Query(None, description="홈 국가 코드 (빈 문자열=글로벌)"),
     lang: str | None = Query(None, description="응답 언어 (ko/en). 미지정 시 사용자 설정 사용"),
 ):
-    """홀리스틱 종합 영향도 (모든 플랜)."""
+    """홀리스틱 종합 영향도 (모든 플랜, 미인증 시 free 기본값)."""
     if home_country is not None:
         home = home_country
-    else:
+    elif user:
         home = user.home_country or ""
-    user_plan = user.plan or "free"
+    else:
+        home = ""
+    user_plan = (user.plan if user else None) or "free"
     # admin_plan_override 반영
-    if getattr(user, "admin_plan_override", False) and user_plan == "free":
+    if user and getattr(user, "admin_plan_override", False) and user_plan == "free":
         user_plan = "pro"
 
     resolved_lang = lang
-    if not resolved_lang:
+    if not resolved_lang and user:
         from backend.app.models.user import UserPreference
         pref_q = await db.execute(
             select(UserPreference.language).where(UserPreference.user_id == user.id)
         )
         pref_lang = pref_q.scalar_one_or_none()
         resolved_lang = pref_lang or "ko"
+    elif not resolved_lang:
+        resolved_lang = "ko"
 
     return await _build_impact_summary(home, user_plan, resolved_lang, db)
 
