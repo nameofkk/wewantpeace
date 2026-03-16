@@ -437,7 +437,7 @@ export default function MapPage() {
   const isCountryZoomRef = useRef(true);
   const [markerVersion, setMarkerVersion] = useState(0); // 국가줌 경계 변경 시만 증가
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { mapViewport, setMapViewport, lang, userPlan } = useAppStore();
+  const { mapViewport, setMapViewport, lang, userPlan, homeCountry } = useAppStore();
   const { data: me, isLoading: meLoading } = useMe();
   const { loading: authLoading } = useAuth();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
@@ -468,7 +468,7 @@ export default function MapPage() {
   const { data: firmsData } = useFirmsSignals(firmsEnabled && isPro);
   const { data: outageData } = useOutageSignals(outageEnabled && isPro);
   const { data: gpsJamData } = useGpsJamSignals(gpsJamEnabled && isPro);
-  const { data: tradeFlowData } = useTradeFlow(tradeFlowEnabled && isPro);
+  const { data: tradeFlowData } = useTradeFlow(tradeFlowEnabled && isPro && !!homeCountry);
   const { data: signalSummary } = useSignalSummary();
 
   // ── 데모 모드: 모든 Intel 레이어 OFF 시 자동 해제 ──
@@ -1769,17 +1769,25 @@ export default function MapPage() {
                     onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}
                   />
-                  <LayerToggleRow
-                    icon="🚢" label={lang === "ko" ? "교역 흐름" : "Trade Flow"}
-                    tooltip={lang === "ko" ? "주요 교역국과의 수출입 흐름을 아크로 표시합니다. 색상은 긴장도 기반." : "Shows export/import flows with major trade partners as arcs. Color is based on tension score."}
-                    enabled={tradeFlowEnabled} isPro={isPro || intelDemoMode}
-                    onToggle={() => {
-                      if (!isPro) { setIntelDemoMode(true); }
-                      setTradeFlowEnabled((v) => !v);
-                    }}
-                    onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
-                    lang={lang}
-                  />
+                  {homeCountry ? (
+                    <LayerToggleRow
+                      icon="🚢" label={`${lang === "ko" ? "교역 흐름" : "Trade Flow"} · ${getFlag(homeCountry)} ${getCountryName(homeCountry, lang)}`}
+                      tooltip={lang === "ko" ? `${getCountryName(homeCountry, lang)} 기준 주요 교역국과의 수출입 흐름. 색상은 파트너국 긴장도 기반.` : `Trade flows from ${getCountryName(homeCountry, lang)}. Color based on partner tension.`}
+                      enabled={tradeFlowEnabled} isPro={isPro || intelDemoMode}
+                      onToggle={() => {
+                        if (!isPro) { setIntelDemoMode(true); }
+                        setTradeFlowEnabled((v) => !v);
+                      }}
+                      onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
+                      lang={lang}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground opacity-60">
+                      <span>🚢</span>
+                      <span>{lang === "ko" ? "교역 흐름 — 기준국가를 설정하세요" : "Trade Flow — Set a home country"}</span>
+                      <a href="/settings" className="ml-auto text-blue-400 hover:underline text-[10px]">{lang === "ko" ? "설정" : "Settings"}</a>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
