@@ -193,11 +193,20 @@ export default function OnboardingPage() {
 
   async function finishOnboarding() {
     trackEvent("onboarding_complete", { countries: selectedCountries.length, home: homeCountryLocal });
-    // 마케팅 수신 동의 시 PATCH /me
-    if (marketingConsent) {
-      try {
-        const token = await getIdToken();
-        if (token) {
+    try {
+      const token = await getIdToken();
+      if (token) {
+        // 기준국가 동기화
+        await fetch(`${API_BASE}/me/preferences`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ home_country: homeCountryLocal }),
+        });
+        // 마케팅 수신 동의 시 PATCH /me
+        if (marketingConsent) {
           await fetch(`${API_BASE}/me`, {
             method: "PATCH",
             headers: {
@@ -207,9 +216,9 @@ export default function OnboardingPage() {
             body: JSON.stringify({ marketing_agreed_at: new Date().toISOString() }),
           });
         }
-      } catch {
-        // 실패해도 온보딩은 계속 진행
       }
+    } catch {
+      // 실패해도 온보딩은 계속 진행
     }
     localStorage.setItem("onboarding_done", "true");
     localStorage.setItem("wwp_welcome_seen", String(Date.now()));

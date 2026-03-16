@@ -105,10 +105,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('signing-key.jks')
-            storePassword 'wewantpeace2024'
+            storeFile file('wewantpeace-release.keystore')
+            storePassword '111111'
             keyAlias 'wewantpeace'
-            keyPassword 'wewantpeace2024'
+            keyPassword '111111'
         }
     }
     buildTypes {

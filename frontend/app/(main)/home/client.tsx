@@ -13,6 +13,7 @@ import {
   usePrefetchImpactSummary,
   useTensionMine,
   useTensionAll,
+  usePatchPreferences,
   type TensionAllItem,
 } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -151,6 +152,7 @@ function ReportContent() {
   const setHomeCountry = useAppStore((s) => s.setHomeCountry);
   const myCountries = useAppStore((s) => s.myCountries);
   const completedTours = useAppStore((s) => s.completedTours);
+  const patchPrefs = usePatchPreferences();
 
   const { data: me, isLoading: meLoading } = useMe();
   const meObj = me as { plan?: string; nickname?: string; display_name?: string } | undefined;
@@ -971,6 +973,7 @@ function ReportContent() {
               <button
                 onClick={() => {
                   setHomeCountry("");
+                  patchPrefs.mutate({ home_country: "" });
                   setShowCountryPicker(false);
                 }}
                 className={cn(
@@ -1003,6 +1006,7 @@ function ReportContent() {
                         key={cc}
                         onClick={() => {
                           setHomeCountry(cc);
+                          patchPrefs.mutate({ home_country: cc });
                           setShowCountryPicker(false);
                         }}
                         className={cn(
