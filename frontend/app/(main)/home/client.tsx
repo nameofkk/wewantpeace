@@ -273,7 +273,7 @@ function ReportContent() {
   const animatedImpact = useCountUp(impactScore, 900);
   const color = impactColor(impactScore);
   const levelKey = `dash_impact_level_${summary?.level || "low"}` as Parameters<typeof t>[1];
-  const hasPro = !!(summary?.economy || summary?.trade || summary?.travel);
+  const hasProData = isPro && !!(summary?.economy || summary?.trade || summary?.travel);
 
   const topItems = useMemo(() => {
     if (!summary?.top_issues?.length) return [];
@@ -860,7 +860,7 @@ function ReportContent() {
                           <Briefcase className="h-3.5 w-3.5 shrink-0 text-blue-400" />
                           <span className="text-[10px] font-bold text-blue-400">{t(lang, "dash_pro_economy")}</span>
                         </div>
-                        {hasPro && summary?.economy ? (
+                        {hasProData && summary?.economy ? (
                           <div className="space-y-1">
                             {summary.economy.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">
@@ -883,7 +883,7 @@ function ReportContent() {
                           <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-orange-400" />
                           <span className="text-[10px] font-bold text-orange-400">{t(lang, "dash_pro_trade")}</span>
                         </div>
-                        {hasPro && summary?.trade ? (
+                        {hasProData && summary?.trade ? (
                           <div className="space-y-1">
                             {summary.trade.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">
@@ -906,7 +906,7 @@ function ReportContent() {
                           <Plane className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                           <span className="text-[10px] font-bold text-emerald-400">{t(lang, "dash_pro_travel")}</span>
                         </div>
-                        {hasPro && summary?.travel ? (
+                        {hasProData && summary?.travel ? (
                           <div className="space-y-1">
                             {summary.travel.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">

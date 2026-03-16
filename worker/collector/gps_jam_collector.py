@@ -36,7 +36,7 @@ CONFLICT_ZONES: list[dict] = [
 
 # GPS 교란 판정 기준
 LOW_ACCURACY_THRESHOLD = 6  # nac_p < 6
-JAM_RATIO_THRESHOLD = 0.3   # 30% 초과
+JAM_RATIO_THRESHOLD = 0.15  # 15% 초과 (30%에서 완화 — 실전 데이터가 0건이었음)
 
 
 @dataclass

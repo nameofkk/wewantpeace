@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.auth import plan_required
 from backend.app.core.database import AsyncSessionLocal
 from backend.app.models.issue_cluster import IssueCluster, ClusterEvent
 from backend.app.models.normalized_event import NormalizedEvent
@@ -361,9 +362,10 @@ class SignalMatchOut(BaseModel):
 @router.get("/{cluster_id}/signals", response_model=list[SignalMatchOut])
 async def get_cluster_signals(
     cluster_id: str,
+    _user=Depends(plan_required("pro")),
     db: AsyncSession = Depends(get_db),
 ):
-    """특정 클러스터에 매칭된 시그널 목록 (교차검증 증거)."""
+    """특정 클러스터에 매칭된 시그널 목록 (교차검증 증거). Pro 이상."""
     try:
         uid = uuid.UUID(cluster_id)
     except ValueError:
