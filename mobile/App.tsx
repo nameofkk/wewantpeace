@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { SafeAreaView, StyleSheet, Platform, StatusBar, Linking } from "react-native";
+import { SafeAreaView, StyleSheet, Platform, StatusBar, Linking, AppState } from "react-native";
 import * as SplashScreen from "expo-splash-screen";
 import AppWebView, {
   sendMessageToWeb,
@@ -12,7 +12,9 @@ import {
   setupTokenRefreshListener,
   setupForegroundMessageHandler,
   setupNotificationOpenedHandler,
+  setupNotifeeForegroundHandler,
   getInitialNotificationUrl,
+  checkPendingNotification,
   registerBackgroundHandler,
 } from "./src/services/push";
 import {
@@ -89,15 +91,19 @@ export default function App() {
 
   // ── 푸시 리스너 ──
   useEffect(() => {
-    // 알림 클릭 → WebView 네비게이션
+    // 알림 클릭 → WebView 네비게이션 (Firebase — 백그라운드에서 시스템 알림 탭)
     const unsubOpen = setupNotificationOpenedHandler((url) => {
       sendMessageToWeb({ type: "PUSH_NOTIFICATION_CLICK", payload: { url } });
     });
 
-    // 포그라운드 메시지 → 데이터만 로그 (notification 필드가 있으면 시스템 표시)
+    // Notifee 포그라운드 이벤트 (포그라운드에서 Notifee가 표시한 알림 탭)
+    const unsubNotifee = setupNotifeeForegroundHandler((url) => {
+      sendMessageToWeb({ type: "PUSH_NOTIFICATION_CLICK", payload: { url } });
+    });
+
+    // 포그라운드 메시지 → Notifee로 로컬 알림 표시
     const unsubFg = setupForegroundMessageHandler((_data) => {
-      // 포그라운드에서는 네이티브 notification이 자동 표시됨 (notification payload)
-      // data-only 메시지 처리가 필요하면 여기에 추가
+      // 포그라운드 FCM → Notifee displayNotification (push.ts에서 처리)
     });
 
     // 토큰 리프레시
@@ -110,9 +116,23 @@ export default function App() {
 
     return () => {
       try { unsubOpen(); } catch {}
+      try { unsubNotifee(); } catch {}
       try { unsubFg(); } catch {}
       try { unsubRefresh(); } catch {}
     };
+  }, []);
+
+  // ── 백그라운드 Notifee 알림 탭 → 앱 복귀 시 네비게이션 ──
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", async (state) => {
+      if (state === "active") {
+        const url = await checkPendingNotification();
+        if (url) {
+          sendMessageToWeb({ type: "PUSH_NOTIFICATION_CLICK", payload: { url } });
+        }
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // ── IAP 리스너 ──

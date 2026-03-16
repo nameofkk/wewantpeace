@@ -7,12 +7,13 @@
  */
 
 import messaging from "@react-native-firebase/messaging";
-import notifee, { AndroidImportance } from "@notifee/react-native";
+import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
 import { Platform, PermissionsAndroid } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CHANNEL_ALERTS, CHANNEL_CRITICAL, API_BASE } from "../utils/constants";
 
 const FCM_TOKEN_KEY = "@wwp_fcm_token";
+const PENDING_NOTIFICATION_KEY = "@wwp_pending_notification";
 
 /**
  * Android 알림 채널 생성 (Notifee 사용)
@@ -189,4 +190,40 @@ export async function getInitialNotificationUrl(): Promise<string | null> {
  */
 export async function getStoredToken(): Promise<string | null> {
   return AsyncStorage.getItem(FCM_TOKEN_KEY);
+}
+
+/**
+ * Notifee 포그라운드 이벤트 핸들러 등록
+ * (포그라운드에서 Notifee가 표시한 알림을 탭했을 때)
+ */
+export function setupNotifeeForegroundHandler(
+  onUrl: (url: string) => void,
+): () => void {
+  return notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification?.data?.cluster_id) {
+      const clusterId = detail.notification.data.cluster_id as string;
+      if (clusterId !== "test") {
+        onUrl(`/issues/${clusterId}`);
+      }
+    }
+  });
+}
+
+/**
+ * Notifee 백그라운드 이벤트에서 저장한 pending URL을 확인 후 삭제
+ */
+export async function checkPendingNotification(): Promise<string | null> {
+  const url = await AsyncStorage.getItem(PENDING_NOTIFICATION_KEY);
+  if (url) {
+    await AsyncStorage.removeItem(PENDING_NOTIFICATION_KEY);
+  }
+  return url;
+}
+
+/**
+ * Notifee 백그라운드에서 알림 탭 시 pending URL 저장
+ * (index.ts의 onBackgroundEvent에서 호출)
+ */
+export async function savePendingNotification(url: string): Promise<void> {
+  await AsyncStorage.setItem(PENDING_NOTIFICATION_KEY, url);
 }
