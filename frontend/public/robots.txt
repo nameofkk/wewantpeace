@@ -4,4 +4,5 @@ Disallow: /admin/
 Disallow: /api/
 Disallow: /login
 Disallow: /onboarding
+Disallow: /_next/static/chunks/app/
 Sitemap: https://www.wewantpeace.live/sitemap.xml
