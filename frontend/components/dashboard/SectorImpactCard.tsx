@@ -12,7 +12,11 @@ import {
   Info,
   Loader2,
   Lock,
+  AlertTriangle,
+  TrendingUp,
+  Shield,
 } from "lucide-react";
+import type { SectorExposure } from "@/lib/api";
 import dynamic from "next/dynamic";
 import { Cell } from "recharts";
 
@@ -80,14 +84,89 @@ const DEMO_SECTOR = {
   overall_risk: "high",
 };
 
-/** 섹터 분석 내부 콘텐츠 — embedded/standalone 모두에서 재사용 */
+/** USD 포맷 헬퍼 */
+function fmtUsd(val: number | null | undefined): string {
+  if (!val) return "";
+  if (val >= 1000) return `$${(val / 1000).toFixed(1)}B`;
+  return `$${Math.round(val)}M`;
+}
+
+/** 국가코드 → 이모지 플래그 */
+function ccFlag(cc: string): string {
+  if (!cc || cc.length !== 2) return "";
+  const codePoints = [...cc.toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65);
+  return String.fromCodePoint(...codePoints);
+}
+
+/** 차트 + 목록 공통 레이아웃 (embedded/standalone 모두 사용) */
+function SectorChart({
+  chartData,
+  lang,
+  isDark,
+}: {
+  chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
+  lang: Lang;
+  isDark: boolean;
+}) {
+  if (chartData.length === 0) return null;
+  return (
+    <div className="h-[160px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={chartData}
+          layout="vertical"
+          margin={{ top: 4, right: 30, bottom: 4, left: 4 }}
+        >
+          <XAxis
+            type="number"
+            domain={[0, 100]}
+            tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
+            tickFormatter={(v: number) => `${v}%`}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={lang === "en" ? 85 : 50}
+            tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
+          />
+          <Tooltip
+            contentStyle={{
+              background: isDark ? "#1e293b" : "#ffffff",
+              border: isDark ? "none" : "1px solid #e2e8f0",
+              borderRadius: "8px",
+              fontSize: 11,
+              color: isDark ? "#e2e8f0" : "#1e293b",
+              boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.08)",
+            }}
+            formatter={(value: any, _name: any, props: any) => [
+              `${value}%`,
+              lang === "ko"
+                ? `${props?.payload?.fullName || ""} 교역 의존도`
+                : `${props?.payload?.fullName || ""} Trade Dep.`,
+            ]}
+          />
+          <Bar dataKey="dependency" radius={[0, 4, 4, 0]}>
+            {chartData.map((entry, index) => (
+              <Cell
+                key={index}
+                fill={RISK_COLORS[entry.risk]?.bar || "#94a3b8"}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** 섹터 분석 내부 콘텐츠 — embedded(홈) 모드: 간결한 카드 + 교역액/국가 */
 function SectorContent({
   data,
   chartData,
   lang,
   isDark,
 }: {
-  data: { sectors: { sector: string; exposure_pct: number; trade_dependency: number; risk_level: string; description: string }[]; overall_risk: string };
+  data: { sectors: SectorExposure[]; overall_risk: string };
   chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
   lang: Lang;
   isDark: boolean;
@@ -110,93 +189,207 @@ function SectorContent({
         </span>
       </div>
 
-      {/* Bar Chart — Trade Dependency by Sector */}
-      {chartData.length > 0 && (
-        <div className="h-[160px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 4, right: 30, bottom: 4, left: 4 }}
-            >
-              <XAxis
-                type="number"
-                domain={[0, 100]}
-                tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
-                tickFormatter={(v: number) => `${v}%`}
-              />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={lang === "en" ? 85 : 50}
-                tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: isDark ? "#1e293b" : "#ffffff",
-                  border: isDark ? "none" : "1px solid #e2e8f0",
-                  borderRadius: "8px",
-                  fontSize: 11,
-                  color: isDark ? "#e2e8f0" : "#1e293b",
-                  boxShadow: isDark ? "none" : "0 2px 8px rgba(0,0,0,0.08)",
-                }}
-                formatter={(value: any, _name: any, props: any) => [
-                  `${value}%`,
-                  lang === "ko"
-                    ? `${props?.payload?.fullName || ""} 교역 의존도`
-                    : `${props?.payload?.fullName || ""} Trade Dep.`,
-                ]}
-              />
-              <Bar dataKey="dependency" radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={index}
-                    fill={RISK_COLORS[entry.risk]?.bar || "#94a3b8"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <SectorChart chartData={chartData} lang={lang} isDark={isDark} />
 
-      {/* Sector Detail Cards */}
+      {/* Sector Detail Cards — 홈용 */}
       <div className="space-y-1.5">
         {data.sectors.map((sector, idx) => {
           const colors = RISK_COLORS[sector.risk_level] || RISK_COLORS.low;
+          const tradeVol = fmtUsd(sector.trade_volume_usd);
+          const flags = (sector.affected_countries || []).slice(0, 3).map(ccFlag).filter(Boolean).join(" ");
           return (
             <div
               key={sector.sector}
-              className="flex items-center gap-2 rounded-lg bg-muted/15 px-3 py-2 fade-in-up"
+              className="rounded-lg bg-muted/15 px-3 py-2 fade-in-up"
               style={{ animationDelay: `${idx * 50}ms` }}
             >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold truncate">
-                    {sector.sector}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                      colors.bg,
-                      colors.text,
-                    )}
-                  >
-                    {RISK_LABELS[lang]?.[sector.risk_level] || sector.risk_level}
-                  </span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-semibold truncate">
+                      {sector.sector}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                        colors.bg,
+                        colors.text,
+                      )}
+                    >
+                      {RISK_LABELS[lang]?.[sector.risk_level] || sector.risk_level}
+                    </span>
+                    {flags && <span className="text-[10px] shrink-0">{flags}</span>}
+                  </div>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">
+                    {sector.description}
+                  </p>
+                  {/* risk_summary + 교역액 */}
+                  {(sector.risk_summary || tradeVol) && (
+                    <div className="flex items-center gap-2 mt-1">
+                      {sector.risk_summary && (
+                        <span className={cn("text-[8px] font-medium", colors.text)}>
+                          {sector.risk_summary}
+                        </span>
+                      )}
+                      {tradeVol && (
+                        <span className="text-[8px] text-muted-foreground tabular-nums">
+                          {lang === "ko" ? `교역 ${tradeVol}` : `Trade ${tradeVol}`}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">
-                  {sector.description}
-                </p>
+                <div className="text-right shrink-0">
+                  <span className="text-[11px] font-bold tabular-nums">
+                    {Math.round(sector.trade_dependency * 100)}%
+                  </span>
+                  <p className="text-[8px] text-muted-foreground">
+                    {lang === "ko" ? "의존도" : "dep."}
+                  </p>
+                </div>
               </div>
-              <div className="text-right shrink-0">
-                <span className="text-[11px] font-bold tabular-nums">
-                  {Math.round(sector.trade_dependency * 100)}%
-                </span>
-                <p className="text-[8px] text-muted-foreground">
-                  {lang === "ko" ? "의존도" : "dep."}
-                </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-start gap-1.5 pt-2 border-t border-border/30">
+        <Info className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-[9px] text-muted-foreground">
+          {t(lang, "dash_ai_estimate")}
+          {" · "}
+          {lang === "ko"
+            ? "출처: World Bank, UN Comtrade"
+            : "Sources: World Bank, UN Comtrade"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** 이슈 상세용 확장 콘텐츠 — 시나리오 + action point */
+function SectorDetailContent({
+  data,
+  chartData,
+  lang,
+  isDark,
+}: {
+  data: { sectors: SectorExposure[]; overall_risk: string };
+  chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
+  lang: Lang;
+  isDark: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      {/* Overall Risk Badge */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-muted-foreground">
+          {lang === "ko" ? "전체 리스크:" : "Overall:"}
+        </span>
+        <span
+          className={cn(
+            "text-[10px] font-bold px-2 py-0.5 rounded-full",
+            RISK_COLORS[data.overall_risk]?.bg,
+            RISK_COLORS[data.overall_risk]?.text,
+          )}
+        >
+          {RISK_LABELS[lang]?.[data.overall_risk] || data.overall_risk}
+        </span>
+      </div>
+
+      <SectorChart chartData={chartData} lang={lang} isDark={isDark} />
+
+      {/* Sector Detail Cards — 이슈 상세용 확장 */}
+      <div className="space-y-2">
+        {data.sectors.map((sector, idx) => {
+          const colors = RISK_COLORS[sector.risk_level] || RISK_COLORS.low;
+          const tradeVol = fmtUsd(sector.trade_volume_usd);
+          const flags = (sector.affected_countries || []).slice(0, 3).map(ccFlag).filter(Boolean).join(" ");
+          const hasScenarios = sector.scenario_worst || sector.scenario_base || sector.scenario_best;
+          return (
+            <div
+              key={sector.sector}
+              className={cn("rounded-lg px-3 py-2.5 fade-in-up border", colors.bg, "border-border/20")}
+              style={{ animationDelay: `${idx * 50}ms` }}
+            >
+              {/* 헤더 행 */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-semibold">{sector.sector}</span>
+                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0", colors.bg, colors.text)}>
+                      {RISK_LABELS[lang]?.[sector.risk_level] || sector.risk_level}
+                    </span>
+                    {flags && <span className="text-[10px] shrink-0">{flags}</span>}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[11px] font-bold tabular-nums">
+                    {Math.round(sector.trade_dependency * 100)}%
+                  </span>
+                  <p className="text-[8px] text-muted-foreground">{lang === "ko" ? "의존도" : "dep."}</p>
+                </div>
               </div>
+
+              {/* 설명 */}
+              <p className="text-[9px] text-muted-foreground mt-1">{sector.description}</p>
+
+              {/* 교역액 + 공급차질/비용증가 뱃지 */}
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {sector.risk_summary && (
+                  <span className={cn("text-[8px] font-medium px-1.5 py-0.5 rounded-full", colors.bg, colors.text)}>
+                    {sector.risk_summary}
+                  </span>
+                )}
+                {tradeVol && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-muted/30 text-muted-foreground tabular-nums">
+                    {lang === "ko" ? `교역 ${tradeVol}` : `Trade ${tradeVol}`}
+                  </span>
+                )}
+                {sector.supply_disruption_weeks && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 tabular-nums">
+                    {lang === "ko" ? `공급차질 ${sector.supply_disruption_weeks}주` : `Disruption ${sector.supply_disruption_weeks}w`}
+                  </span>
+                )}
+                {sector.cost_increase_pct && (
+                  <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 tabular-nums">
+                    {lang === "ko" ? `비용 ${sector.cost_increase_pct}` : `Cost ${sector.cost_increase_pct}`}
+                  </span>
+                )}
+              </div>
+
+              {/* 시나리오 (critical/high만) */}
+              {hasScenarios && (
+                <div className="mt-2 space-y-1 pl-2 border-l-2 border-border/30">
+                  {sector.scenario_worst && (
+                    <div className="flex items-start gap-1">
+                      <AlertTriangle className="h-2.5 w-2.5 text-red-500 shrink-0 mt-0.5" />
+                      <p className="text-[8px] text-muted-foreground">{sector.scenario_worst}</p>
+                    </div>
+                  )}
+                  {sector.scenario_base && (
+                    <div className="flex items-start gap-1">
+                      <TrendingUp className="h-2.5 w-2.5 text-orange-500 shrink-0 mt-0.5" />
+                      <p className="text-[8px] text-muted-foreground">{sector.scenario_base}</p>
+                    </div>
+                  )}
+                  {sector.scenario_best && (
+                    <div className="flex items-start gap-1">
+                      <Shield className="h-2.5 w-2.5 text-emerald-500 shrink-0 mt-0.5" />
+                      <p className="text-[8px] text-muted-foreground">{sector.scenario_best}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Point */}
+              {sector.action_point && (
+                <div className="mt-1.5 flex items-start gap-1 bg-blue-500/5 rounded px-2 py-1">
+                  <Info className="h-2.5 w-2.5 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-[8px] font-medium text-blue-700 dark:text-blue-300">{sector.action_point}</p>
+                </div>
+              )}
             </div>
           );
         })}
@@ -401,7 +594,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
           {data && (
             <div className="mt-3">
-              <SectorContent data={data} chartData={chartData} lang={lang} isDark={isDark} />
+              <SectorDetailContent data={data} chartData={chartData} lang={lang} isDark={isDark} />
             </div>
           )}
         </div>

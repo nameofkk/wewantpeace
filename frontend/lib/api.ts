@@ -726,6 +726,18 @@ export interface SectorExposure {
   trade_dependency: number;
   risk_level: string;
   description: string;
+  // v2 확장 필드
+  trade_volume_usd?: number | null;
+  export_usd?: number | null;
+  import_usd?: number | null;
+  affected_countries?: string[];
+  risk_summary?: string;
+  supply_disruption_weeks?: string | null;
+  cost_increase_pct?: string | null;
+  scenario_worst?: string | null;
+  scenario_base?: string | null;
+  scenario_best?: string | null;
+  action_point?: string | null;
 }
 
 export interface SectorAnalysis {

@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v10"
+_CACHE_VERSION = "v11"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -2701,12 +2701,12 @@ async def get_sector_overview(
     aggregated: dict[str, dict] = {}
 
     # 실제 교역 데이터 조회 (한 번만) — 모든 분쟁국 대상
-    real_trade_deps: dict[str, float | None] = {}
+    real_trade_details: dict[str, _TradeDetail | None] = {}
     for cc in country_severity:
         try:
-            real_trade_deps[cc] = await _get_real_trade_dependency(home, cc, db)
+            real_trade_details[cc] = await _get_real_trade_detail(home, cc, db)
         except Exception:
-            real_trade_deps[cc] = None
+            real_trade_details[cc] = None
 
     # 토픽 → 관련 섹터 매핑 (간접 영향 계산용)
     _topic_sector_map: dict[str, list[str]] = {
@@ -2724,11 +2724,22 @@ async def get_sector_overview(
 
     # 분쟁 클러스터의 토픽별 최고 severity 수집 (간접 영향용)
     topic_severity: dict[str, int] = {}
+    # 국가별 지배적 토픽 추적 (설명 생성용)
+    country_topic: dict[str, str] = {}
     for c in clusters:
         tp = c.topic or ""
         sev = c.severity or 0
+        cc = c.country_code or ""
         if tp and (tp not in topic_severity or sev > topic_severity[tp]):
             topic_severity[tp] = sev
+        if cc and tp:
+            if cc not in country_topic:
+                country_topic[cc] = tp
+
+    # 전체 클러스터에서 가장 지배적인 토픽 (가장 높은 severity)
+    dominant_topic = max(topic_severity, key=topic_severity.get, default="") if topic_severity else ""
+
+    l = "ko" if lang == "ko" else "en"
 
     for sector, info in sectors_data.items():
         partners = info.get("key_partners", [])
@@ -2737,23 +2748,31 @@ async def get_sector_overview(
 
         max_trade_dep = 0.0
         max_risk_score = 0.0
-        affected_countries = []
-        best_real_dep: float | None = None
+        affected_countries: list[str] = []
+        best_detail: _TradeDetail | None = None
+        best_topic_for_sector = ""
+        total_trade_usd = 0.0
+        total_export_usd = 0.0
+        total_import_usd = 0.0
 
         # 1차: 모든 분쟁국에 대해 실제 교역 데이터 + key_partners 체크
         for cc, sev in country_severity.items():
-            real_dep = real_trade_deps.get(cc)
+            detail = real_trade_details.get(cc)
+            real_dep = detail.dependency if detail else None
             is_partner = cc in partners
             partner_rank = partners.index(cc) + 1 if is_partner else 0
 
-            # 실제 교역 데이터가 있으면 key_partners 여부와 무관하게 사용
             if real_dep is not None and real_dep > 0.001:
-                trade_dep = min(0.95, real_dep * 3)  # 교역 비중을 의존도 스케일로 확대
+                trade_dep = min(0.95, real_dep * 3)
                 affected_countries.append(cc)
-                if best_real_dep is None or real_dep > best_real_dep:
-                    best_real_dep = real_dep
+                if detail:
+                    total_trade_usd += detail.total_usd or 0
+                    total_export_usd += detail.export_usd or 0
+                    total_import_usd += detail.import_usd or 0
+                if best_detail is None or (real_dep > (best_detail.dependency or 0)):
+                    best_detail = detail
+                    best_topic_for_sector = country_topic.get(cc, dominant_topic)
             elif is_partner:
-                # DB 데이터 없지만 key_partners에 있으면 순위 기반 추정
                 if partner_rank == 1:
                     trade_dep = 0.85
                 elif partner_rank == 2:
@@ -2763,8 +2782,10 @@ async def get_sector_overview(
                 else:
                     trade_dep = 0.2
                 affected_countries.append(cc)
+                if not best_topic_for_sector:
+                    best_topic_for_sector = country_topic.get(cc, dominant_topic)
             else:
-                continue  # 실제 데이터도 없고 key_partner도 아니면 스킵
+                continue
 
             risk_score = trade_dep * (sev / 100)
             if trade_dep > max_trade_dep:
@@ -2791,6 +2812,8 @@ async def get_sector_overview(
                         max_trade_dep = indirect_dep
                     if risk_score > max_risk_score:
                         max_risk_score = risk_score
+                    if not best_topic_for_sector:
+                        best_topic_for_sector = tp
 
         if max_risk_score >= 0.6:
             risk_level = "critical"
@@ -2801,35 +2824,67 @@ async def get_sector_overview(
         else:
             risk_level = "low"
 
+        # ── 설명 생성 v2: 토픽×섹터 사전 우선 ──
         n_affected = len(affected_countries)
-        if lang == "ko":
-            desc = f"GDP 대비 {gdp_pct}% 비중. "
-            if n_affected > 0 and best_real_dep is not None:
-                desc += f"{n_affected}개 분쟁국과 교역 중 (교역 비중 {best_real_dep * 100:.1f}%)."
-            elif n_affected > 0:
-                desc += f"현재 {n_affected}개 분쟁국이 핵심 교역 파트너."
-            elif max_trade_dep > 0:
-                desc += "글로벌 공급망 통한 간접 영향 가능."
-            else:
-                desc += "현재 분쟁 지역과 직접 교역 노출 없음."
-        else:
-            desc = f"{gdp_pct}% of GDP. "
-            if n_affected > 0 and best_real_dep is not None:
-                desc += f"Trading with {n_affected} conflict-affected countries (trade share {best_real_dep * 100:.1f}%)."
-            elif n_affected > 0:
-                desc += f"{n_affected} conflict-affected countries are key partners."
-            elif max_trade_dep > 0:
-                desc += "Indirect exposure through global supply chains."
-            else:
-                desc += "No direct trade exposure with conflict zones."
+        narrative = _SECTOR_NARRATIVES.get((best_topic_for_sector, sector), {}).get(l, {})
+        desc_from_narrative = narrative.get(risk_level) or narrative.get("high") or narrative.get("medium")
 
-        aggregated[sector] = {
+        if desc_from_narrative:
+            desc = desc_from_narrative
+            if total_trade_usd > 0:
+                vol = _fmt_usd(total_trade_usd)
+                if l == "ko":
+                    desc += f" ({n_affected}개국 교역 {vol})" if n_affected > 1 else f" (교역 {vol})"
+                else:
+                    desc += f" ({n_affected} countries, trade {vol})" if n_affected > 1 else f" (trade {vol})"
+            elif n_affected > 0:
+                if l == "ko":
+                    desc += f" ({n_affected}개 분쟁국 영향)"
+                else:
+                    desc += f" ({n_affected} conflict countries affected)"
+        else:
+            if l == "ko":
+                desc = f"GDP 대비 {gdp_pct}% 비중. "
+                if n_affected > 0 and total_trade_usd > 0:
+                    dep_pct = best_detail.dependency * 100 if best_detail and best_detail.dependency else 0
+                    desc += f"{n_affected}개 분쟁국과 교역 {_fmt_usd(total_trade_usd)}"
+                    if dep_pct > 0:
+                        desc += f" (비중 {dep_pct:.1f}%)"
+                elif n_affected > 0:
+                    desc += f"현재 {n_affected}개 분쟁국이 핵심 교역 파트너."
+                elif max_trade_dep > 0:
+                    desc += "글로벌 공급망 통한 간접 영향 가능."
+                else:
+                    desc += "현재 분쟁 지역과 직접 교역 노출 없음."
+            else:
+                desc = f"{gdp_pct}% of GDP. "
+                if n_affected > 0 and total_trade_usd > 0:
+                    dep_pct = best_detail.dependency * 100 if best_detail and best_detail.dependency else 0
+                    desc += f"Trade with {n_affected} conflict zones: {_fmt_usd(total_trade_usd)}"
+                    if dep_pct > 0:
+                        desc += f" (share {dep_pct:.1f}%)"
+                elif n_affected > 0:
+                    desc += f"{n_affected} conflict-affected countries are key partners."
+                elif max_trade_dep > 0:
+                    desc += "Indirect exposure through global supply chains."
+                else:
+                    desc += "No direct trade exposure with conflict zones."
+
+        entry: dict = {
             "sector": sector_label,
             "exposure_pct": gdp_pct,
             "trade_dependency": round(max_trade_dep, 2),
             "risk_level": risk_level,
             "description": desc,
+            "risk_summary": _RISK_SUMMARY.get(l, _RISK_SUMMARY["en"]).get(risk_level, ""),
+            "affected_countries": affected_countries[:5],
         }
+        if total_trade_usd > 0:
+            entry["trade_volume_usd"] = round(total_trade_usd, 1)
+            entry["export_usd"] = round(total_export_usd, 1) if total_export_usd else None
+            entry["import_usd"] = round(total_import_usd, 1) if total_import_usd else None
+
+        aggregated[sector] = entry
 
     risk_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     sectors_list = sorted(aggregated.values(), key=lambda x: risk_order.get(x["risk_level"], 4))
