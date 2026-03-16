@@ -250,7 +250,7 @@ export const translations = {
     settings_notif_push_denied: "브라우저 설정에서 알림 허용 필요",
     settings_plan_pro: "Pro 플랜",
     settings_plan_free: "Free 플랜",
-    settings_plan_pro_desc: "관심 국가 5개 · 일일 20건 · 신뢰 알림 · 토픽 필터 · KScore 3.0~ · Intel 레이어 · AI 영향 분석 · 산업별 리스크 개요",
+    settings_plan_pro_desc: "관심 국가 5개 · 일일 20건 · 신뢰 알림 · 토픽 필터 · KScore 3.0~ · Intel 레이어 · 교역 흐름 분석 · AI 영향 분석 · 산업별 리스크 개요",
     settings_plan_free_desc: "관심 국가 {n}개 · 일일 5건 · KScore 4.0 고정",
     settings_upgrade_btn: "Pro로 업그레이드",
     settings_plan_change: "플랜 변경하기",
@@ -720,7 +720,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ 플랜",
-    settings_plan_proplus_desc: "무제한 국가 · 일일 100건 · KScore 1.5~ · 이슈별 산업 리스크 · 교역 흐름 분석 · 주간 리포트 · 90일 히스토리",
+    settings_plan_proplus_desc: "무제한 국가 · 일일 100건 · KScore 1.5~ · 이슈별 산업 리스크 · 주간 리포트 · 90일 히스토리",
     settings_plan_upgrade_proplus: "Pro+로 업그레이드",
     settings_plan_active: "현재 플랜",
     settings_plan_started: "결제 시작일",
@@ -1560,7 +1560,7 @@ export const translations = {
     demo_cta_proplus: "Pro+ 구독하기",
 
     // Paywall Intel
-    paywall_pro_feature_intel: "위성·센서 인텔리전스 레이어",
+    paywall_pro_feature_intel: "위성·센서 인텔리전스 레이어 · 교역 흐름",
 
     // 투어 새 스텝
     tour_map_markers_toggle: "마커 버튼으로 이슈 마커를 표시/숨김할 수 있습니다.",
@@ -1842,7 +1842,7 @@ export const translations = {
     settings_notif_push_denied: "Allow notifications in browser settings",
     settings_plan_pro: "Pro Plan",
     settings_plan_free: "Free Plan",
-    settings_plan_pro_desc: "5 countries · 20/day · Verified alerts · Topic filter · KScore 3.0+ · Intel layers · AI impact analysis · Sector risk overview",
+    settings_plan_pro_desc: "5 countries · 20/day · Verified alerts · Topic filter · KScore 3.0+ · Intel layers · Trade flow analysis · AI impact analysis · Sector risk overview",
     settings_plan_free_desc: "{n} countries · 5/day · KScore 4.0 fixed",
     settings_upgrade_btn: "Upgrade to Pro",
     settings_plan_change: "Change Plan",
@@ -2312,7 +2312,7 @@ export const translations = {
 
     // plan section (settings)
     settings_plan_proplus: "Pro+ Plan",
-    settings_plan_proplus_desc: "Unlimited countries · 100/day · KScore 1.5+ · Per-issue sector risk · Trade flow analysis · Weekly report · 90-day history",
+    settings_plan_proplus_desc: "Unlimited countries · 100/day · KScore 1.5+ · Per-issue sector risk · Weekly report · 90-day history",
     settings_plan_upgrade_proplus: "Upgrade to Pro+",
     settings_plan_active: "Current Plan",
     settings_plan_started: "Billing started",
@@ -3152,7 +3152,7 @@ export const translations = {
     demo_cta_proplus: "Subscribe to Pro+",
 
     // Paywall Intel
-    paywall_pro_feature_intel: "Satellite & sensor intelligence layers",
+    paywall_pro_feature_intel: "Satellite & sensor intelligence layers · Trade flow",
 
     // Tour new steps
     tour_map_markers_toggle: "Toggle issue markers on/off with the marker button.",

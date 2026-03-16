@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown, Info, X } from "lucide-react";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
-import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary, useMatchedSignals } from "@/lib/api";
+import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary, useMatchedSignals, useTradeFlow } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { t, type Lang } from "@/lib/i18n";
@@ -47,6 +47,23 @@ const DEMO_SIGNALS = {
       { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [34.89, 31.95] }, properties: { strength: 0.65, intensity: 0.65, signal_type: "gps_jamming" } },
       { type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [44.37, 33.31] }, properties: { strength: 0.50, intensity: 0.50, signal_type: "gps_jamming" } },
     ],
+  },
+  trade_flow: {
+    nodes: [
+      { id: "KR_EXP" }, { id: "US" }, { id: "CN" }, { id: "RU" }, { id: "KR_IMP" },
+    ],
+    links: [
+      { source: "KR_EXP", target: "US", value: 12000 },
+      { source: "US", target: "KR_IMP", value: 8000 },
+      { source: "KR_EXP", target: "CN", value: 18000 },
+      { source: "CN", target: "KR_IMP", value: 24000 },
+      { source: "KR_EXP", target: "RU", value: 1500 },
+      { source: "RU", target: "KR_IMP", value: 3000 },
+    ],
+    home_country: "KR",
+    generated_at: new Date().toISOString(),
+    cached: false,
+    demo_tensions: { US: 10, CN: 45, RU: 72 } as Record<string, number>,
   },
 };
 
@@ -440,22 +457,26 @@ export default function MapPage() {
   const [firmsEnabled, setFirmsEnabled] = useState(false);
   const [outageEnabled, setOutageEnabled] = useState(false);
   const [gpsJamEnabled, setGpsJamEnabled] = useState(false);
+  const [tradeFlowEnabled, setTradeFlowEnabled] = useState(false);
   const firmsAnimRef = useRef<number | null>(null);
   const outageAnimRef = useRef<number | null>(null);
   const gpsJamAnimRef = useRef<number | null>(null);
+  const tradeFlowAnimRef = useRef<number | null>(null);
+  const tradeFlowPopupRef = useRef<any>(null);
   const isPro = !meLoading && !authLoading && (plan === "pro" || plan === "pro_plus");
   const [intelDemoMode, setIntelDemoMode] = useState(false);
   const { data: firmsData } = useFirmsSignals(firmsEnabled && isPro);
   const { data: outageData } = useOutageSignals(outageEnabled && isPro);
   const { data: gpsJamData } = useGpsJamSignals(gpsJamEnabled && isPro);
+  const { data: tradeFlowData } = useTradeFlow(tradeFlowEnabled && isPro);
   const { data: signalSummary } = useSignalSummary();
 
   // ── 데모 모드: 모든 Intel 레이어 OFF 시 자동 해제 ──
   useEffect(() => {
-    if (intelDemoMode && !firmsEnabled && !outageEnabled && !gpsJamEnabled) {
+    if (intelDemoMode && !firmsEnabled && !outageEnabled && !gpsJamEnabled && !tradeFlowEnabled) {
       setIntelDemoMode(false);
     }
-  }, [intelDemoMode, firmsEnabled, outageEnabled, gpsJamEnabled]);
+  }, [intelDemoMode, firmsEnabled, outageEnabled, gpsJamEnabled, tradeFlowEnabled]);
 
   // ── 매칭 연결선 (아크) ──
   const { data: matchedGeo } = useMatchedSignals(selectedCluster?.id);
@@ -935,6 +956,257 @@ export default function MapPage() {
     return cleanup;
   }, [gpsJamEnabled, gpsJamData, isMapReady, intelDemoMode]);
 
+  // ── Trade Flow Arc 레이어 ──────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady) return;
+
+    // 이벤트 핸들러 참조를 저장 (cleanup에서 해제용)
+    let _handleMouseEnter: any = null;
+    let _handleMouseLeave: any = null;
+    let _handleClick: any = null;
+
+    const cleanup = () => {
+      if (tradeFlowAnimRef.current) { cancelAnimationFrame(tradeFlowAnimRef.current); tradeFlowAnimRef.current = null; }
+      if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} tradeFlowPopupRef.current = null; }
+      try { if (_handleMouseEnter) map.off("mouseenter", "trade-flow-hit", _handleMouseEnter); } catch {}
+      try { if (_handleMouseLeave) map.off("mouseleave", "trade-flow-hit", _handleMouseLeave); } catch {}
+      try { if (_handleClick) map.off("click", "trade-flow-hit", _handleClick); } catch {}
+      try { if (map.getLayer("trade-flow-hit")) map.removeLayer("trade-flow-hit"); } catch {}
+      try { if (map.getLayer("trade-flow-arcs")) map.removeLayer("trade-flow-arcs"); } catch {}
+      try { if (map.getSource("trade-flow-source")) map.removeSource("trade-flow-source"); } catch {}
+    };
+
+    // 데모 모드 데이터 또는 실제 데이터
+    const isDemoTrade = intelDemoMode && tradeFlowEnabled;
+    const effectiveData = isDemoTrade ? DEMO_SIGNALS.trade_flow : tradeFlowData;
+
+    if (!tradeFlowEnabled || !effectiveData) {
+      cleanup();
+      return;
+    }
+
+    // ── 파트너 추출 ──
+    const home = effectiveData.home_country;
+    const exportSuffix = `${home}_EXP`;
+    const importSuffix = `${home}_IMP`;
+
+    const exportMap = new Map<string, number>();
+    const importMap = new Map<string, number>();
+    for (const link of effectiveData.links) {
+      if (link.source === exportSuffix) {
+        exportMap.set(link.target, (exportMap.get(link.target) || 0) + link.value);
+      }
+      if (link.target === importSuffix) {
+        importMap.set(link.source, (importMap.get(link.source) || 0) + link.value);
+      }
+    }
+
+    const partnerCodes = new Set([...exportMap.keys(), ...importMap.keys()]);
+    const homeCenter = COUNTRY_CENTERS[home];
+    if (!homeCenter) { cleanup(); return; }
+
+    // tension scores — 실제 데이터 or 데모 고정값
+    const tensionScores: Record<string, number> = {};
+    if (isDemoTrade && (effectiveData as any).demo_tensions) {
+      Object.assign(tensionScores, (effectiveData as any).demo_tensions);
+    } else if (tensionAll) {
+      for (const item of tensionAll as { country_code: string; raw_score: number }[]) {
+        tensionScores[item.country_code] = item.raw_score;
+      }
+    }
+
+    // ── Bezier 곡선 생성 (match-arcs 패턴 재사용) ──
+    const greatCircleArc = (from: [number, number], to: [number, number], steps = 20): [number, number][] => {
+      const pts: [number, number][] = [];
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps;
+        const lng = from[0] + (to[0] - from[0]) * f;
+        const lat = from[1] + (to[1] - from[1]) * f;
+        const bulge = Math.sin(f * Math.PI) * Math.min(5, Math.abs(to[0] - from[0]) * 0.15 + 1);
+        pts.push([lng, lat + bulge]);
+      }
+      return pts;
+    };
+
+    // ── GeoJSON 생성 ──
+    const fromCoord: [number, number] = [homeCenter.lon, homeCenter.lat];
+    const features: any[] = [];
+    for (const code of partnerCodes) {
+      const center = COUNTRY_CENTERS[code];
+      if (!center) continue;
+      const toCoord: [number, number] = [center.lon, center.lat];
+      const exportUsd = exportMap.get(code) || 0;
+      const importUsd = importMap.get(code) || 0;
+      const totalUsd = exportUsd + importUsd;
+      features.push({
+        type: "Feature",
+        properties: {
+          partner: code,
+          export_usd: exportUsd,
+          import_usd: importUsd,
+          total_usd: totalUsd,
+          tension_score: tensionScores[code] || 0,
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: greatCircleArc(fromCoord, toCoord),
+        },
+      });
+    }
+
+    if (features.length === 0) { cleanup(); return; }
+
+    const geojson = { type: "FeatureCollection", features };
+
+    try {
+      cleanup();
+      map.addSource("trade-flow-source", { type: "geojson", data: geojson });
+
+      // 아크 레이어 (choropleth 위, cluster markers 아래)
+      const beforeLayer = map.getLayer("match-arcs") ? "match-arcs" : undefined;
+      map.addLayer({
+        id: "trade-flow-arcs",
+        type: "line",
+        source: "trade-flow-source",
+        paint: {
+          "line-color": [
+            "step", ["get", "tension_score"],
+            "#10b981",
+            20, "#f59e0b",
+            40, "#f97316",
+            60, "#ef4444",
+            80, "#dc2626",
+          ],
+          "line-width": [
+            "interpolate", ["linear"], ["get", "total_usd"],
+            100, 1.5,
+            1000, 2.5,
+            10000, 4,
+            50000, 5.5,
+          ],
+          "line-dasharray": [4, 4],
+          "line-opacity": isDemoTrade ? 0.35 : 0.75,
+        },
+      }, beforeLayer);
+
+      // Hit 레이어 (투명, 넓은 width — 터치/호버 감지용)
+      map.addLayer({
+        id: "trade-flow-hit",
+        type: "line",
+        source: "trade-flow-source",
+        paint: {
+          "line-color": "rgba(0,0,0,0)",
+          "line-width": 12,
+        },
+      });
+
+      // 데모 모드일 때 blur + opacity 처리
+      if (isDemoTrade) {
+        map.setPaintProperty("trade-flow-arcs", "line-opacity", 0.35);
+      }
+
+      // ── Dash 애니메이션 (기존 requestAnimationFrame 패턴) ──
+      let dashOffset = 0;
+      let pulsePhase = 0;
+      const animate = () => {
+        dashOffset = (dashOffset + 0.3) % 8;
+        pulsePhase += 0.03;
+        try {
+          map.setPaintProperty("trade-flow-arcs", "line-dasharray", [4, 4]);
+        } catch {}
+        // severity >= 80 아크: opacity 펄스
+        if (!isDemoTrade) {
+          const basePulse = 0.55 + 0.2 * Math.sin(pulsePhase);
+          try {
+            map.setPaintProperty("trade-flow-arcs", "line-opacity", [
+              "case",
+              [">=", ["get", "tension_score"], 80], basePulse,
+              0.75,
+            ]);
+          } catch {}
+        }
+        tradeFlowAnimRef.current = requestAnimationFrame(animate);
+      };
+      tradeFlowAnimRef.current = requestAnimationFrame(animate);
+
+      // ── 호버 상호작용 ──
+      const handleMouseEnter = (e: any) => {
+        map.getCanvas().style.cursor = "pointer";
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties;
+        const partnerCode = props.partner;
+        const flag = getFlag(partnerCode);
+        const name = getCountryName(partnerCode, lang);
+        const expB = (props.export_usd / 1000).toFixed(1);
+        const impB = (props.import_usd / 1000).toFixed(1);
+        const score = props.tension_score;
+        const scoreLabel = score >= 80 ? (lang === "ko" ? "극심" : "Extreme")
+          : score >= 60 ? (lang === "ko" ? "심각" : "Severe")
+          : score >= 40 ? (lang === "ko" ? "경계" : "Alert")
+          : score >= 20 ? (lang === "ko" ? "주의" : "Caution")
+          : (lang === "ko" ? "안전" : "Stable");
+
+        const html = `<div style="font-size:12px;line-height:1.6;padding:4px 0;">
+          <strong>${flag} ${name}</strong><br/>
+          ${lang === "ko" ? "수출" : "Export"}: $${expB}B | ${lang === "ko" ? "수입" : "Import"}: $${impB}B<br/>
+          ${lang === "ko" ? "긴장도" : "Tension"}: ${score} (${scoreLabel})
+        </div>`;
+
+        if (maplibreRef.current) {
+          if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} }
+          tradeFlowPopupRef.current = new maplibreRef.current.Popup({ closeButton: false, closeOnClick: false, offset: 10 })
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        }
+
+        // 하이라이트: opacity 1.0, width +1px
+        try {
+          map.setPaintProperty("trade-flow-arcs", "line-opacity", [
+            "case",
+            ["==", ["get", "partner"], partnerCode], 1.0,
+            isDemoTrade ? 0.25 : 0.6,
+          ]);
+          map.setPaintProperty("trade-flow-arcs", "line-width", [
+            "case",
+            ["==", ["get", "partner"], partnerCode],
+            ["+", ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5], 1],
+            ["interpolate", ["linear"], ["get", "total_usd"], 100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5],
+          ]);
+        } catch {}
+      };
+
+      const handleMouseLeave = () => {
+        map.getCanvas().style.cursor = "";
+        if (tradeFlowPopupRef.current) { try { tradeFlowPopupRef.current.remove(); } catch {} tradeFlowPopupRef.current = null; }
+        // 원래 스타일 복원
+        try {
+          map.setPaintProperty("trade-flow-arcs", "line-opacity", isDemoTrade ? 0.35 : 0.75);
+          map.setPaintProperty("trade-flow-arcs", "line-width", [
+            "interpolate", ["linear"], ["get", "total_usd"],
+            100, 1.5, 1000, 2.5, 10000, 4, 50000, 5.5,
+          ]);
+        } catch {}
+      };
+
+      const handleClick = (e: any) => {
+        // 모바일 터치용: enter와 동일한 팝업 표시
+        handleMouseEnter(e);
+      };
+
+      _handleMouseEnter = handleMouseEnter;
+      _handleMouseLeave = handleMouseLeave;
+      _handleClick = handleClick;
+      map.on("mouseenter", "trade-flow-hit", handleMouseEnter);
+      map.on("mouseleave", "trade-flow-hit", handleMouseLeave);
+      map.on("click", "trade-flow-hit", handleClick);
+    } catch {}
+
+    return cleanup;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradeFlowEnabled, tradeFlowData, isMapReady, intelDemoMode, tensionAll, lang]);
+
   // ── 매칭 연결선 (Arc) — 클러스터 선택 시 시그널 포인트와의 아크 표시 ──
   useEffect(() => {
     const map = mapRef.current;
@@ -1206,7 +1478,7 @@ export default function MapPage() {
                 onClick={() => { setShowIntelPanel((v) => !v); setIntelTooltip(null); }}
                 className={cn(
                   "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors border whitespace-nowrap",
-                  (firmsEnabled || outageEnabled || gpsJamEnabled)
+                  (firmsEnabled || outageEnabled || gpsJamEnabled || tradeFlowEnabled)
                     ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
                     : "text-muted-foreground border-border hover:text-foreground",
                 )}
@@ -1254,6 +1526,17 @@ export default function MapPage() {
                     onToggle={() => {
                       if (!isPro) { setIntelDemoMode(true); }
                       setGpsJamEnabled((v) => !v);
+                    }}
+                    onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
+                    lang={lang}
+                  />
+                  <LayerToggleRow
+                    icon="🚢" label={lang === "ko" ? "교역 흐름" : "Trade Flow"}
+                    tooltip={lang === "ko" ? "주요 교역국과의 수출입 흐름을 아크로 표시합니다. 색상은 긴장도 기반." : "Shows export/import flows with major trade partners as arcs. Color is based on tension score."}
+                    enabled={tradeFlowEnabled} isPro={isPro || intelDemoMode}
+                    onToggle={() => {
+                      if (!isPro) { setIntelDemoMode(true); }
+                      setTradeFlowEnabled((v) => !v);
                     }}
                     onShowTooltip={(text) => setIntelTooltip((prev) => prev === text ? null : text)}
                     lang={lang}

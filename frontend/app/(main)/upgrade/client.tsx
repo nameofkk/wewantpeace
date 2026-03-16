@@ -100,7 +100,7 @@ const FEATURES: Feature[] = [
   },
   {
     labelKo: "교역 흐름 분석",         labelEn: "Trade flow analysis",
-    free: { ko: "데모", en: "Demo" },  pro: { ko: "데모", en: "Demo" },  proplus: true,
+    free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
     labelKo: "주간 리포트",            labelEn: "Weekly report",
@@ -669,7 +669,7 @@ function UpgradeContent() {
                 {[
                   lang === "ko" ? "관심 국가 5개 · 신뢰 알림 · 토픽 필터" : "5 countries · Verified alerts · Topic filter",
                   lang === "ko" ? "AI 영향 분석 · 산업별 리스크 개요" : "AI impact analysis · Sector risk overview",
-                  lang === "ko" ? "Intel 레이어 (위성/IODA/GPS)" : "Intel layers (FIRMS/IODA/GPS)",
+                  lang === "ko" ? "Intel 레이어 (위성/IODA/GPS/교역 흐름)" : "Intel layers (FIRMS/IODA/GPS/Trade flow)",
                   lang === "ko" ? "KScore 3.0~ · 30일 히스토리" : "KScore 3.0+ · 30-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
@@ -839,8 +839,8 @@ function UpgradeContent() {
                 {[
                   lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
                   lang === "ko" ? "무제한 국가 · 일일 100건 · KScore 1.5~" : "Unlimited countries · 100/day · KScore 1.5+",
-                  lang === "ko" ? "이슈별 산업 리스크 · 교역 흐름 분석" : "Per-issue sector risk · Trade flow analysis",
-                  lang === "ko" ? "주간 리포트 · 90일 히스토리" : "Weekly report · 90-day history",
+                  lang === "ko" ? "이슈별 산업 리스크 · 주간 리포트" : "Per-issue sector risk · Weekly report",
+                  lang === "ko" ? "90일 히스토리" : "90-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-purple-500/15 flex items-center justify-center shrink-0">

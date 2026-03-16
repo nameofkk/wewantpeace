@@ -2906,10 +2906,10 @@ class TradeFlowOut(BaseModel):
 
 @router.get("/trade-flow", response_model=TradeFlowOut)
 async def get_trade_flow(
-    user: User = Depends(plan_required("pro_plus")),
+    user: User = Depends(plan_required("pro")),
     db: AsyncSession = Depends(get_db),
 ):
-    """국가간 교역 흐름 Sankey 데이터 (Pro+ 이상)
+    """국가간 교역 흐름 Sankey 데이터 (Pro 이상)
 
     DB에 실제 교역 데이터가 있으면 사용, 없으면 SECTOR_DATA 기반 추정.
     """

@@ -30,7 +30,6 @@ import { RiskRadar } from "@/components/dashboard/RiskRadar";
 import { ImpactFlowSankey } from "@/components/dashboard/ImpactFlowSankey";
 import { ProDemoWrapper } from "@/components/dashboard/ProDemoWrapper";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
-import { TradeFlowSankey } from "@/components/dashboard/TradeFlowSankey";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import {
@@ -783,10 +782,6 @@ function ReportContent() {
                           : (lang === "ko" ? "교역 데이터가 없습니다" : "No trade data available")}
                       </p>
                     )}
-                    {/* Trade Flow Sankey (교역 흐름 시각화) */}
-                    <div className="mt-4">
-                      <TradeFlowSankey />
-                    </div>
                   </div>
                 )}
 

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useAppStore } from "@/lib/store";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -838,8 +839,9 @@ export interface TradeFlow {
 }
 
 export function useTradeFlow(enabled = true) {
+  const homeCountry = useAppStore((s) => s.homeCountry);
   return useQuery({
-    queryKey: ["impact", "trade-flow"],
+    queryKey: ["impact", "trade-flow", homeCountry],
     queryFn: () => apiFetch<TradeFlow>("/impact/trade-flow"),
     enabled,
     staleTime: 60 * 60 * 1000,
