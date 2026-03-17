@@ -56,8 +56,8 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const severity = issue.severity ?? 0;
   const eventCount = issue.event_count ?? 0;
   const desc = isEn
-    ? `${ogTitle} | Severity ${severity} | ${eventCount} reports`
-    : `${ogTitle} | 위기지수 ${severity} | ${eventCount}건 보도`;
+    ? `Severity ${severity} · ${eventCount} reports · Real-time global conflict monitoring`
+    : `위기지수 ${severity} · ${eventCount}건 보도 · 실시간 세계 분쟁 모니터링`;
 
   const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
 
