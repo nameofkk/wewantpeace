@@ -113,17 +113,17 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
   const hasPro = !!(data?.economy || data?.trade || data?.travel);
 
   return (
-    <div className="rounded-xl border border-blue-500/20 bg-card fade-in-up overflow-hidden">
-      {/* 헤더 — 이슈 상세 스타일 */}
+    <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
+      {/* 헤더 */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/5 transition-colors"
       >
-        <TrendingUp className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-        <h3 className="text-xs font-semibold text-blue-400 flex-1 text-left">
+        <div className="w-1 h-4 rounded-full bg-blue-500 shrink-0" />
+        <h3 className="text-xs font-bold text-foreground flex-1 text-left">
           {lang === "ko" ? "영향 분석" : "Impact Analysis"}
         </h3>
-        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-bold shrink-0">Pro</span>
+        <span className="text-[8px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium shrink-0">Pro</span>
         {expanded ? (
           <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         ) : (
@@ -132,7 +132,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-blue-500/10">
+        <div className="px-4 pb-4 border-t border-border">
           {isLoading && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
@@ -216,8 +216,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                     </p>
                     <a
                       href="/upgrade?source=demo_impact"
-                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
                     >
                       {t(lang, "dash_unlock_pro")}
                     </a>
@@ -343,8 +342,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                     </p>
                     <a
                       href="/upgrade"
-                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                      style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
                     >
                       {t(lang, "dash_unlock_pro")}
                     </a>

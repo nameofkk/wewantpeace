@@ -512,8 +512,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
             </p>
             <a
               href="/upgrade?source=demo_sector"
-              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-              style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
             >
               {t(lang, "dash_unlock_pro")}
             </a>
@@ -534,17 +533,17 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
   // ── Standalone mode: 이슈 상세 스타일 ──
   return (
-    <div className="rounded-xl border border-purple-500/20 bg-card fade-in-up overflow-hidden">
-      {/* 헤더 — 이슈 상세 스타일 */}
+    <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
+      {/* 헤더 */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/5 transition-colors"
       >
-        <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-        <h3 className="text-xs font-semibold text-purple-400 flex-1 text-left">
+        <div className="w-1 h-4 rounded-full bg-purple-500 shrink-0" />
+        <h3 className="text-xs font-bold text-foreground flex-1 text-left">
           {lang === "ko" ? "산업별 리스크 분석" : "Sector Risk Analysis"}
         </h3>
-        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 font-bold shrink-0">Pro+</span>
+        <span className="text-[8px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium shrink-0">Pro+</span>
         {expanded ? (
           <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         ) : (
@@ -553,7 +552,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-purple-500/10">
+        <div className="px-4 pb-4 border-t border-border">
           {(isLoading || (expanded && !effectiveClusterId && !is403 && !isError)) && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
@@ -576,8 +575,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
                   </p>
                   <a
                     href="/upgrade"
-                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white"
-                    style={{ background: "linear-gradient(to right, #7c3aed, #6366f1)" }}
+                    className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
                   >
                     {t(lang, "dash_unlock_pro_plus")}
                   </a>

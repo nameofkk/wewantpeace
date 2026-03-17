@@ -35,18 +35,18 @@ export function RiskRadar({ data, lang }: Props) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="w-[130px] h-[130px]">
+      <div className="w-[140px] h-[140px]">
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
-            <PolarGrid stroke={isDark ? "rgba(156,163,175,0.15)" : "rgba(100,116,139,0.2)"} />
+          <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="65%">
+            <PolarGrid stroke={isDark ? "rgba(156,163,175,0.18)" : "rgba(100,116,139,0.2)"} />
             <PolarAngleAxis
               dataKey="axis"
-              tick={{ fontSize: 7, fill: isDark ? "rgba(156,163,175,0.7)" : "rgba(51,65,85,0.8)" }}
+              tick={{ fontSize: 9, fill: isDark ? "rgba(209,213,219,0.85)" : "rgba(30,41,59,0.75)", fontWeight: 500 }}
             />
             <Radar
               name="prev"
               dataKey="previous"
-              stroke={isDark ? "rgba(156,163,175,0.4)" : "rgba(100,116,139,0.5)"}
+              stroke={isDark ? "rgba(156,163,175,0.35)" : "rgba(100,116,139,0.4)"}
               fill="none"
               strokeDasharray="4 3"
               strokeWidth={1}
@@ -54,18 +54,21 @@ export function RiskRadar({ data, lang }: Props) {
             <Radar
               name="current"
               dataKey="current"
-              stroke={isDark ? "rgba(239,68,68,0.6)" : "rgba(220,38,38,0.7)"}
-              fill={isDark ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.12)"}
-              strokeWidth={1.5}
+              stroke={isDark ? "rgba(239,68,68,0.7)" : "rgba(220,38,38,0.8)"}
+              fill={isDark ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.1)"}
+              strokeWidth={2}
             />
           </RadarChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center gap-1 mt-0.5">
-        <span className="text-[7px] text-muted-foreground/50">
-          {t(lang, "dash_radar_vs_prev" as TranslationKey)}
-        </span>
-        <span className={`text-[8px] font-bold ${trendColor}`}>
+      <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex items-center gap-1">
+          <span className="inline-block w-3 h-px" style={{ backgroundColor: isDark ? "rgba(156,163,175,0.4)" : "rgba(100,116,139,0.5)", borderTop: "1px dashed" }} />
+          <span className="text-[8px] text-muted-foreground/60">
+            {t(lang, "dash_radar_vs_prev" as TranslationKey)}
+          </span>
+        </div>
+        <span className={`text-[9px] font-bold ${trendColor}`}>
           {t(lang, trendKey)}
         </span>
       </div>

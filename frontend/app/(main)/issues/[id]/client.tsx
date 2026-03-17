@@ -205,7 +205,14 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
     );
   }
 
-  // Pro 유저: 실제 데이터 표시 (기존 로직)
+  const SIGNAL_LABELS: Record<string, { ko: string; en: string }> = {
+    firms_hotspot: { ko: "위성 열점", en: "Satellite Hotspot" },
+    ioda_outage: { ko: "인터넷 단절", en: "Internet Outage" },
+    cf_anomaly: { ko: "트래픽 이상", en: "Traffic Anomaly" },
+    gps_jam: { ko: "GPS 교란", en: "GPS Jamming" },
+  };
+
+  // Pro 유저: 실제 데이터 표시
   if (isPro && signals && signals.length > 0) {
     const grouped: Record<string, ClusterSignalMatch[]> = {};
     for (const s of signals) {
@@ -213,87 +220,81 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
     }
 
     return (
-      <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="h-3.5 w-3.5 text-indigo-400" />
-          <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+      <div className="rounded-xl border border-border bg-card p-4 fade-in-up">
+        <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+          <div className="w-1 h-4 rounded-full bg-blue-500 shrink-0" />
+          <h3 className="text-xs font-bold text-foreground">{t(lang, "cross_validation_title")}</h3>
+          <span className="text-[9px] text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded font-medium ml-auto">
+            {Object.keys(grouped).length} {lang === "ko" ? "종 매칭" : "matched"}
+          </span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {Object.entries(grouped).map(([type, items]) => {
             const avgDist = items.reduce((s, i) => s + (i.distance_km ?? 0), 0) / items.length;
             const avgDelta = items.reduce((s, i) => s + (i.time_delta_h ?? 0), 0) / items.length;
             const timeLabel = avgDelta < 1 ? `${Math.round(avgDelta * 60)}m` : `${avgDelta.toFixed(1)}h`;
             return (
-              <div key={type} className="flex items-start gap-2 text-[11px]">
-                {ICONS[type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
-                <div>
-                  {type === "firms_hotspot" && (
-                    <span>{t(lang, "cross_validation_firms_match", { count: items.length, distance: Math.round(avgDist), time: timeLabel })}</span>
-                  )}
-                  {type === "ioda_outage" && (
-                    <span>{t(lang, "cross_validation_outage_match", { country: items[0]?.country_code ?? "?", impact: Math.round(items[0].intensity * 100) })}</span>
-                  )}
-                  {type === "cf_anomaly" && (
-                    <span>{t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}</span>
-                  )}
-                  {type === "gps_jam" && (
-                    <span>{t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}</span>
-                  )}
-                  {items.length > 1 && type !== "firms_hotspot" && (
-                    <span className="text-muted-foreground ml-1">({items.length}건)</span>
-                  )}
+              <div key={type} className="flex items-start gap-2.5">
+                <div className="mt-0.5 w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  {ICONS[type] ?? <Activity className="h-3 w-3 text-muted-foreground" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-medium text-foreground/60 mb-0.5">
+                    {SIGNAL_LABELS[type]?.[lang] ?? type}
+                  </p>
+                  <p className="text-[11px] text-foreground/80">
+                    {type === "firms_hotspot" && t(lang, "cross_validation_firms_match", { count: items.length, distance: Math.round(avgDist), time: timeLabel })}
+                    {type === "ioda_outage" && t(lang, "cross_validation_outage_match", { country: items[0]?.country_code ?? "?", impact: Math.round(items[0].intensity * 100) })}
+                    {type === "cf_anomaly" && t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}
+                    {type === "gps_jam" && t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}
+                    {items.length > 1 && type !== "firms_hotspot" && (
+                      <span className="text-muted-foreground ml-1">({items.length}건)</span>
+                    )}
+                  </p>
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
+        <div className="mt-3 pt-2.5 border-t border-border text-[10px] text-muted-foreground">
           {t(lang, "cross_validation_boost", { boost: Math.min(15, Object.keys(grouped).length * 5) })}
         </div>
       </div>
     );
   }
 
-  // Free 유저: 데모 데이터 + blur 오버레이 (다른 화면과 동일 패턴)
+  // Free 유저: 데모 데이터 + blur 오버레이
   if (!isPro) {
     return (
-      <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up relative overflow-hidden">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="h-3.5 w-3.5 text-indigo-400" />
-          <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+      <div className="rounded-xl border border-border bg-card p-4 fade-in-up relative overflow-hidden">
+        <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+          <div className="w-1 h-4 rounded-full bg-blue-500 shrink-0" />
+          <h3 className="text-xs font-bold text-foreground">{t(lang, "cross_validation_title")}</h3>
         </div>
         <div className="relative">
           <div className="opacity-60 pointer-events-none select-none" style={{ filter: "blur(3px)" }}>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {DEMO_CROSS_MATCHES.map((demo) => (
-                <div key={demo.signal_type} className="flex items-start gap-2 text-[11px]">
-                  {ICONS[demo.signal_type] ?? <Activity className="h-3.5 w-3.5 text-muted-foreground" />}
-                  <div>
-                    {demo.signal_type === "firms_hotspot" && (
-                      <span>{t(lang, "cross_validation_firms_match", { count: demo.count, distance: demo.avg_distance_km, time: demo.avg_time_gap })}</span>
-                    )}
-                    {demo.signal_type === "ioda_outage" && (
-                      <span>{t(lang, "cross_validation_outage_match", { country: "UA", impact: 75 })}</span>
-                    )}
+                <div key={demo.signal_type} className="flex items-start gap-2.5">
+                  <div className="mt-0.5 w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                    {ICONS[demo.signal_type] ?? <Activity className="h-3 w-3 text-muted-foreground" />}
+                  </div>
+                  <div className="text-[11px] text-foreground/80">
+                    {demo.signal_type === "firms_hotspot" && t(lang, "cross_validation_firms_match", { count: demo.count, distance: demo.avg_distance_km, time: demo.avg_time_gap })}
+                    {demo.signal_type === "ioda_outage" && t(lang, "cross_validation_outage_match", { country: "UA", impact: 75 })}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-indigo-300/70">
-              {t(lang, "cross_validation_boost", { boost: 10 })}
-            </div>
           </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/30 rounded-lg">
-            <Lock className="h-5 w-5 text-muted-foreground mb-2" />
-            <p className="text-xs text-muted-foreground mb-2 font-medium">
-              {lang === "ko"
-                ? "Pro 플랜에서 이용 가능합니다"
-                : "Available for Pro plan"}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/40 rounded-lg">
+            <Lock className="h-4 w-4 text-muted-foreground mb-1.5" />
+            <p className="text-[11px] text-muted-foreground mb-2 font-medium">
+              {lang === "ko" ? "Pro 플랜에서 확인 가능" : "Available on Pro plan"}
             </p>
             <a
               href="/upgrade?source=demo_cross"
-              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-bold text-white no-underline"
-              style={{ background: "linear-gradient(to right, #2563eb, #6366f1)" }}
+              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white no-underline bg-foreground/80 hover:bg-foreground/90 transition-colors"
             >
               {t(lang, "dash_unlock_pro")}
             </a>
@@ -305,10 +306,10 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
 
   // Pro 유저이지만 시그널 데이터 없음
   return (
-    <div className="rounded-xl border border-indigo-500/20 bg-card p-4 fade-in-up">
-      <div className="flex items-center gap-2 mb-3">
-        <Shield className="h-3.5 w-3.5 text-indigo-400" />
-        <h3 className="text-xs font-semibold text-indigo-400">{t(lang, "cross_validation_title")}</h3>
+    <div className="rounded-xl border border-border bg-card p-4 fade-in-up">
+      <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+        <div className="w-1 h-4 rounded-full bg-blue-500 shrink-0" />
+        <h3 className="text-xs font-bold text-foreground">{t(lang, "cross_validation_title")}</h3>
       </div>
       <p className="text-[11px] text-muted-foreground">{t(lang, "cross_validation_none")}</p>
     </div>
@@ -326,21 +327,33 @@ function HistoricalContextSection({ clusterId, lang }: { clusterId: string; lang
   const endYear = ctx.period_end ? new Date(ctx.period_end).getFullYear() : "?";
 
   return (
-    <div className="rounded-xl border border-emerald-500/20 bg-card p-4 fade-in-up">
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="h-3.5 w-3.5 text-emerald-400" />
-        <h3 className="text-xs font-semibold text-emerald-400">{t(lang, "historical_context_title")}</h3>
+    <div className="rounded-xl border border-border bg-card p-4 fade-in-up">
+      <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+        <div className="w-1 h-4 rounded-full bg-emerald-500 shrink-0" />
+        <h3 className="text-xs font-bold text-foreground">{t(lang, "historical_context_title")}</h3>
+        <span className="text-[9px] text-muted-foreground/60 ml-auto font-medium">UCDP GED</span>
       </div>
-      <div className="space-y-1.5 text-[11px] text-muted-foreground">
-        <p>{t(lang, "historical_context_events")}</p>
-        <p className="text-foreground">
-          {t(lang, "historical_context_recorded", { start: startYear, end: endYear, count: ctx.total_events })}
-        </p>
+      <div className="space-y-2.5">
+        <div className="flex items-start gap-2">
+          <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+          <div className="text-[11px]">
+            <span className="text-muted-foreground">{t(lang, "historical_context_events")} </span>
+            <span className="font-medium text-foreground">
+              {t(lang, "historical_context_recorded", { start: startYear, end: endYear, count: ctx.total_events })}
+            </span>
+          </div>
+        </div>
         {ctx.top_actors.length > 0 && (
-          <p>{t(lang, "historical_context_actors", { actors: ctx.top_actors.join(", ") })}</p>
+          <div className="flex items-start gap-2">
+            <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+            <p className="text-[11px] text-muted-foreground">{t(lang, "historical_context_actors", { actors: ctx.top_actors.join(", ") })}</p>
+          </div>
         )}
         {ctx.recent_fatalities > 0 && (
-          <p>{t(lang, "historical_context_fatalities", { count: ctx.recent_fatalities })}</p>
+          <div className="flex items-start gap-2">
+            <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+            <p className="text-[11px] text-muted-foreground">{t(lang, "historical_context_fatalities", { count: ctx.recent_fatalities })}</p>
+          </div>
         )}
       </div>
     </div>
@@ -528,10 +541,10 @@ export default function IssueDetailClient({ initialData }: Props) {
 
         {/* T15: 정정/업데이트 이력 */}
         {issue.change_logs && issue.change_logs.length > 0 && (
-          <div className="rounded-xl border border-amber-500/20 bg-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="h-3.5 w-3.5 text-amber-400" />
-              <h3 className="text-xs font-semibold text-amber-400">{t(lang, "issue_correction_history")}</h3>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+              <div className="w-1 h-4 rounded-full bg-amber-500 shrink-0" />
+              <h3 className="text-xs font-bold text-foreground">{t(lang, "issue_correction_history")}</h3>
             </div>
             <div className="space-y-2">
               {issue.change_logs.map((log, idx) => (

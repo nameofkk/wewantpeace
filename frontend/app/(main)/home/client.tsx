@@ -860,16 +860,18 @@ function ReportContent() {
                       lang={lang}
                     >
                       {/* Economy */}
-                      <div className="rounded-lg border-l-2 border-blue-400 bg-blue-500/[0.03] p-3 mb-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Briefcase className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                          <span className="text-[10px] font-bold text-blue-400">{t(lang, "dash_pro_economy")}</span>
+                      <div className="rounded-lg border border-border bg-card p-3 mb-2.5">
+                        <div className="flex items-center gap-2 pb-2 mb-2 border-b border-border/50">
+                          <div className="w-6 h-6 rounded-md bg-blue-500/10 flex items-center justify-center shrink-0">
+                            <Briefcase className="h-3 w-3 text-blue-500" />
+                          </div>
+                          <span className="text-[11px] font-bold text-foreground">{t(lang, "dash_pro_economy")}</span>
                         </div>
                         {hasProData && summary?.economy ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {summary.economy.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">
-                                <span className="mt-[5px] h-1 w-1 rounded-full bg-blue-400 shrink-0" />
+                                <span className="mt-[5px] h-1 w-1 rounded-full bg-muted-foreground/30 shrink-0" />
                                 <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
                               </div>
                             ))}
@@ -883,16 +885,18 @@ function ReportContent() {
                       </div>
 
                       {/* Trade */}
-                      <div className="rounded-lg border-l-2 border-orange-400 bg-orange-500/[0.03] p-3 mb-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                          <span className="text-[10px] font-bold text-orange-400">{t(lang, "dash_pro_trade")}</span>
+                      <div className="rounded-lg border border-border bg-card p-3 mb-2.5">
+                        <div className="flex items-center gap-2 pb-2 mb-2 border-b border-border/50">
+                          <div className="w-6 h-6 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <ShoppingCart className="h-3 w-3 text-orange-500" />
+                          </div>
+                          <span className="text-[11px] font-bold text-foreground">{t(lang, "dash_pro_trade")}</span>
                         </div>
                         {hasProData && summary?.trade ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {summary.trade.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">
-                                <span className="mt-[5px] h-1 w-1 rounded-full bg-orange-400 shrink-0" />
+                                <span className="mt-[5px] h-1 w-1 rounded-full bg-muted-foreground/30 shrink-0" />
                                 <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
                               </div>
                             ))}
@@ -906,16 +910,18 @@ function ReportContent() {
                       </div>
 
                       {/* Travel */}
-                      <div className="rounded-lg border-l-2 border-emerald-400 bg-emerald-500/[0.03] p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Plane className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                          <span className="text-[10px] font-bold text-emerald-400">{t(lang, "dash_pro_travel")}</span>
+                      <div className="rounded-lg border border-border bg-card p-3">
+                        <div className="flex items-center gap-2 pb-2 mb-2 border-b border-border/50">
+                          <div className="w-6 h-6 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0">
+                            <Plane className="h-3 w-3 text-emerald-500" />
+                          </div>
+                          <span className="text-[11px] font-bold text-foreground">{t(lang, "dash_pro_travel")}</span>
                         </div>
                         {hasProData && summary?.travel ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {summary.travel.split(". ").filter(Boolean).map((sentence, i) => (
                               <div key={i} className="flex items-start gap-1.5">
-                                <span className="mt-[5px] h-1 w-1 rounded-full bg-emerald-400 shrink-0" />
+                                <span className="mt-[5px] h-1 w-1 rounded-full bg-muted-foreground/30 shrink-0" />
                                 <p className="text-[11px] text-foreground/70 leading-relaxed">{sentence.replace(/\.$/, "")}</p>
                               </div>
                             ))}
@@ -937,7 +943,7 @@ function ReportContent() {
 
           {/* ═══════════════ SECTION D: 산업별 리스크 분석 ═══════════════ */}
           <m.section custom={3} initial="hidden" animate="visible" variants={sectionVariants}
-            className="rounded-xl border border-purple-500/20 bg-card p-4"
+            className="rounded-xl border border-border bg-card p-4"
             data-tour="dash-sector-risk"
           >
             <SectionHeader
