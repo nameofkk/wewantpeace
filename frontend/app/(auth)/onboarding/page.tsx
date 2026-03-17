@@ -27,6 +27,7 @@ import { ALL_COUNTRIES, getCountryName, getFlag } from "@/lib/countries";
 import { useMe, API_BASE } from "@/lib/api";
 import { signInWithGoogle, signInWithApple, signInWithToss, getIdToken } from "@/lib/auth";
 import { isTossMiniApp } from "@/lib/platform";
+import { isInAppBrowser, openInExternalBrowser } from "@/lib/browser-detect";
 import { trackEvent } from "@/lib/analytics";
 
 type Step = 0 | 1 | 2;
@@ -266,8 +267,20 @@ export default function OnboardingPage() {
     }
   }
 
+  // --- 인앱브라우저 감지 ---
+  const [inAppBlocked, setInAppBlocked] = useState(false);
+
   // --- 로그인 처리 ---
   async function handleOAuthLogin(provider: "google" | "apple") {
+    if (isInAppBrowser()) {
+      setInAppBlocked(true);
+      setLoginError(
+        lang === "en"
+          ? "Google/Apple login is not supported in this browser. Please open in Chrome or Safari."
+          : "이 브라우저에서는 Google/Apple 로그인이 지원되지 않습니다.\nChrome 또는 Safari에서 열어주세요."
+      );
+      return;
+    }
     setLoginLoading(provider);
     setLoginError(null);
     try {
@@ -399,12 +412,13 @@ export default function OnboardingPage() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <div className="relative z-10 flex-1 flex flex-col items-center overflow-hidden px-4 pt-4">
+      <div className="relative z-10 flex-1 flex flex-col items-center px-4 pt-4 min-h-0">
         <div className="w-full max-w-md flex-1 flex flex-col min-h-0">
 
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center animate-fadeIn">
+            <div className="flex-1 overflow-y-auto animate-fadeIn">
+            <div className="flex flex-col items-center min-h-full justify-center py-2">
               {/* 로고 + 레이더 */}
               <div className="relative flex items-center justify-center mb-6">
                 {/* 레이더 파동 */}
@@ -425,7 +439,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <h1 className="text-lg font-bold text-foreground/80 mb-1">WeWantPeace</h1>
+              <h1 className="text-lg font-bold tracking-tight mb-1">WeWantPeace</h1>
               <h2 className="text-xl font-bold whitespace-pre-line leading-snug text-center mb-6">
                 {t(lang, "ob_hero_title")}
               </h2>
@@ -499,6 +513,7 @@ export default function OnboardingPage() {
                   ))}
                 </div>
               </div>
+            </div>
             </div>
           )}
 
@@ -684,7 +699,8 @@ export default function OnboardingPage() {
 
           {/* === Step 2: 로그인 유도 === */}
           {step === 2 && (
-            <div className="flex-1 flex flex-col items-center justify-center animate-fadeIn">
+            <div className="flex-1 overflow-y-auto animate-fadeIn">
+            <div className="flex flex-col items-center min-h-full justify-center py-2">
               <div className="mx-auto mb-6 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <Lock className="h-8 w-8 text-primary" />
               </div>
@@ -711,9 +727,20 @@ export default function OnboardingPage() {
 
               {/* 로그인 에러 메시지 */}
               {loginError && (
-                <div className="w-full rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400 text-center">
+                <div className="w-full rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400 text-center whitespace-pre-line">
                   {loginError}
                 </div>
+              )}
+
+              {/* 인앱브라우저 외부 열기 버튼 */}
+              {inAppBlocked && (
+                <button
+                  onClick={openInExternalBrowser}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-primary/50 bg-primary/10 py-3 text-sm font-bold text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <Globe className="h-4 w-4" />
+                  {lang === "en" ? "Open in browser" : "브라우저에서 열기"}
+                </button>
               )}
 
               {/* OAuth 버튼들 */}
@@ -782,6 +809,7 @@ export default function OnboardingPage() {
                   ({t(lang, "ob_login_later_sub")})
                 </p>
               </div>
+            </div>
             </div>
           )}
         </div>

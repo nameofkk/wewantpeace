@@ -23,6 +23,7 @@ import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
 import { detectPlatform } from "@/lib/platform-detect";
+import { isInAppBrowser, openInExternalBrowser } from "@/lib/browser-detect";
 import { trackEvent } from "@/lib/analytics";
 import { TERMS_KO, TERMS_EN, PRIVACY_KO, PRIVACY_EN } from "@/lib/legal-data";
 
@@ -78,6 +79,7 @@ export default function LoginPage() {
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [checkingRedirect, setCheckingRedirect] = useState(true);
   const [termsModal, setTermsModal] = useState<"terms" | "privacy" | null>(null);
+  const [inAppBlocked, setInAppBlocked] = useState(false);
 
   // iOS 플랫폼 감지 (Apple 로그인 버튼 표시용)
   const platform = detectPlatform();
@@ -269,6 +271,15 @@ export default function LoginPage() {
   }
 
   async function handleGoogleLogin() {
+    if (isInAppBrowser()) {
+      setInAppBlocked(true);
+      setError(
+        lang === "en"
+          ? "Google login is not supported in this browser. Please open in Chrome or Safari."
+          : "이 브라우저에서는 Google 로그인이 지원되지 않습니다.\nChrome 또는 Safari에서 열어주세요."
+      );
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -325,6 +336,15 @@ export default function LoginPage() {
   }
 
   async function handleAppleLogin() {
+    if (isInAppBrowser()) {
+      setInAppBlocked(true);
+      setError(
+        lang === "en"
+          ? "Apple login is not supported in this browser. Please open in Chrome or Safari."
+          : "이 브라우저에서는 Apple 로그인이 지원되지 않습니다.\nChrome 또는 Safari에서 열어주세요."
+      );
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -405,25 +425,39 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const token = await googleUser.getIdToken();
+      const registerBody = {
+        firebase_token: token,
+        nickname,
+        birth_year: year,
+        agreed_terms: agreedTerms,
+        agreed_privacy: agreedPrivacy,
+        marketing_agreed: agreedMarketing,
+        display_name: googleUser.displayName || undefined,
+        email: googleUser.email || undefined,
+      };
+      // 필수 필드 누락 사전 검증
+      const missing: string[] = [];
+      if (!registerBody.firebase_token) missing.push("firebase_token");
+      if (!registerBody.nickname) missing.push("nickname");
+      if (registerBody.birth_year == null || isNaN(registerBody.birth_year)) missing.push("birth_year");
+      if (registerBody.agreed_terms == null) missing.push("agreed_terms");
+      if (registerBody.agreed_privacy == null) missing.push("agreed_privacy");
+      if (missing.length > 0) {
+        console.error("[register] missing fields:", missing, registerBody);
+      }
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firebase_token: token,
-          nickname,
-          birth_year: year,
-          agreed_terms: agreedTerms,
-          agreed_privacy: agreedPrivacy,
-          marketing_agreed: agreedMarketing,
-          display_name: googleUser.displayName || undefined,
-          email: googleUser.email || undefined,
-        }),
+        body: JSON.stringify(registerBody),
       });
       if (!res.ok) {
         const err = await res.json();
         const detail = err.detail;
         const msg = Array.isArray(detail)
-          ? detail.map((d: { msg: string }) => d.msg).join(", ")
+          ? detail.map((d: { msg: string; loc?: (string | number)[] }) => {
+              const field = d.loc ? d.loc.filter(l => l !== "body").join(".") : "";
+              return field ? `${field}: ${d.msg}` : d.msg;
+            }).join(", ")
           : (typeof detail === "string" ? detail : (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
         throw new Error(msg);
       }
@@ -661,9 +695,19 @@ export default function LoginPage() {
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+        <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive whitespace-pre-line">
           {error}
         </div>
+      )}
+
+      {/* 인앱브라우저 외부 열기 버튼 */}
+      {inAppBlocked && (
+        <button
+          onClick={openInExternalBrowser}
+          className="w-full mb-4 flex items-center justify-center gap-2 rounded-lg border border-primary/50 bg-primary/10 py-3 text-sm font-bold text-primary hover:bg-primary/20 transition-colors"
+        >
+          {lang === "en" ? "Open in browser" : "브라우저에서 열기"}
+        </button>
       )}
 
       {tab === "login" ? (
