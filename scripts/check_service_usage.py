@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-WeWantPeace 유료 서비스 잔량/사용량 일괄 확인 스크립트.
-텔레그램 알림으로 경고 메시지 전송 가능.
+WeWantPeace 유료 서비스 잔량/사용량 일괄 확인 + 텔레그램 경고 알림.
+
+크레딧 잔액이 임계값 이하로 떨어지면 텔레그램으로 경고 전송.
 
 사용법:
-  python scripts/check_service_usage.py          # 콘솔 출력만
-  python scripts/check_service_usage.py --notify  # 텔레그램 알림도 전송
+  python scripts/check_service_usage.py              # 콘솔 출력만
+  python scripts/check_service_usage.py --notify      # 항상 텔레그램 알림
+  python scripts/check_service_usage.py --warn-only   # 경고 있을 때만 알림
 """
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -18,34 +19,37 @@ from typing import Any
 
 import httpx
 
-# ── 설정 ──────────────────────────────────────────────────
+# ── Railway 설정 ──────────────────────────────────────────
 RAILWAY_API_TOKEN = os.getenv(
     "RAILWAY_API_TOKEN", "383ab19c-f63d-4ad0-ae47-ef816b79645b"
 )
 RAILWAY_PROJECT_ID = os.getenv(
     "RAILWAY_PROJECT_ID", "8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed"
 )
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-TG_BOT_TOKEN = os.getenv(
-    "TELEGRAM_BROADCAST_BOT_TOKEN", ""
+RAILWAY_WORKSPACE_ID = os.getenv(
+    "RAILWAY_WORKSPACE_ID", "5d103fc9-0153-4221-b9f1-829a9932ff73"
 )
-TG_CHAT_ID = os.getenv("TELEGRAM_BROADCAST_CHANNEL_ID", "")
-# 관리자 텔레그램 chat ID (채널이 아닌 개인 알림용)
-ADMIN_TG_CHAT_ID = os.getenv("ADMIN_TG_CHAT_ID", TG_CHAT_ID)
 
-# 경고 임계값
-RAILWAY_COST_WARN = 40.0  # $40 이상이면 경고
-OPENAI_COST_WARN = 20.0   # $20 이상이면 경고
+# ── OpenAI (worker에서 가져옴) ────────────────────────────
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# ── 텔레그램 알림 설정 ───────────────────────────────────
+TG_BOT_TOKEN = os.getenv(
+    "SOCIAL_TG_BOT_TOKEN", "8797103470:AAGmkofyFZZyxELIS3Id28jlMJPyjJSewp8"
+)
+TG_CHAT_ID = os.getenv("ADMIN_TG_CHAT_ID", "-1003790789028")
+
+# ── 경고 임계값 ──────────────────────────────────────────
+RAILWAY_CREDIT_WARN = 3.0    # 크레딧 $3 이하 → 경고
+RAILWAY_CREDIT_DANGER = 1.0  # 크레딧 $1 이하 → 위험
+RAILWAY_USAGE_WARN = 30.0    # 월 사용량 $30 이상 → 경고
 
 
-def _gql(query: str, variables: dict | None = None) -> dict:
+def _gql(query: str) -> dict:
     """Railway GraphQL API 호출."""
-    payload: dict[str, Any] = {"query": query}
-    if variables:
-        payload["variables"] = variables
     resp = httpx.post(
         "https://backboard.railway.app/graphql/v2",
-        json=payload,
+        json={"query": query},
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {RAILWAY_API_TOKEN}",
@@ -53,121 +57,183 @@ def _gql(query: str, variables: dict | None = None) -> dict:
         timeout=15,
     )
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    if "errors" in data:
+        raise RuntimeError(data["errors"][0]["message"])
+    return data
 
 
 def check_railway() -> dict:
-    """Railway 사용량 및 예상 비용 조회."""
+    """Railway 크레딧 잔액 + 사용량 + 예상 비용."""
     result: dict[str, Any] = {"name": "Railway", "status": "ok", "details": {}}
     try:
-        # 프로젝트 정보
-        proj = _gql(
-            '{ project(id: "%s") { name subscriptionType services { edges { node { name id } } } } }'
-            % RAILWAY_PROJECT_ID
+        # 1) 크레딧 잔액 & 현재 사용량
+        billing = _gql(
+            '{ workspace(workspaceId: "%s") { customer { '
+            "creditBalance remainingUsageCreditBalance currentUsage "
+            "isPrepaying state billingPeriod { start end } "
+            "usageLimit { hardLimit softLimit } "
+            "} } }" % RAILWAY_WORKSPACE_ID
         )
-        p = proj["data"]["project"]
-        result["details"]["plan"] = p["subscriptionType"]
-        result["details"]["services"] = [
-            e["node"]["name"] for e in p["services"]["edges"]
-        ]
+        c = billing["data"]["workspace"]["customer"]
+        credit = c["creditBalance"]
+        usage_credit = c["remainingUsageCreditBalance"]
+        current_usage = c["currentUsage"]
+        state = c["state"]
+        period_start = c["billingPeriod"]["start"][:10]
+        period_end = c["billingPeriod"]["end"][:10]
+        limit = c.get("usageLimit")
+        hard_limit = limit["hardLimit"] if limit else None
+        soft_limit = limit["softLimit"] if limit else None
 
-        # 예상 사용량
-        usage = _gql(
-            '{ estimatedUsage(projectId: "%s", measurements: [CPU_USAGE, MEMORY_USAGE_GB, NETWORK_TX_GB]) { estimatedValue measurement } }'
-            % RAILWAY_PROJECT_ID
+        result["details"]["credit_balance"] = f"${credit:.2f}"
+        result["details"]["usage_credit"] = f"${usage_credit:.2f}"
+        result["details"]["current_usage"] = f"${current_usage:.2f}"
+        result["details"]["billing_period"] = f"{period_start} ~ {period_end}"
+        result["details"]["state"] = state
+        if hard_limit:
+            result["details"]["hard_limit"] = f"${hard_limit:.2f}"
+        if soft_limit:
+            result["details"]["soft_limit"] = f"${soft_limit:.2f}"
+
+        # 2) 예상 월간 비용
+        est = _gql(
+            '{ estimatedUsage(projectId: "%s", measurements: '
+            "[CPU_USAGE, MEMORY_USAGE_GB, NETWORK_TX_GB]) "
+            "{ estimatedValue measurement } }" % RAILWAY_PROJECT_ID
         )
-        costs = {}
-        # Railway 단가: CPU $0.000463/vCPU-min, Memory $0.000231/GB-min, Network $0.10/GB
         price_map = {
             "CPU_USAGE": 0.000463,
             "MEMORY_USAGE_GB": 0.000231,
             "NETWORK_TX_GB": 0.10,
         }
-        for item in usage["data"]["estimatedUsage"]:
+        total_est = 5.0  # Hobby 기본료
+        for item in est["data"]["estimatedUsage"]:
             m = item["measurement"]
             v = item["estimatedValue"]
-            cost = v * price_map.get(m, 0)
-            costs[m] = {"value": round(v, 2), "cost": round(cost, 2)}
+            total_est += v * price_map.get(m, 0)
+        result["details"]["estimated_monthly"] = f"${total_est:.2f}"
 
-        total = sum(c["cost"] for c in costs.values()) + 5.0  # Hobby 기본료
-        result["details"]["estimated_costs"] = costs
-        result["details"]["total_estimated"] = round(total, 2)
+        # 3) 서비스 목록
+        proj = _gql(
+            '{ project(id: "%s") { services { edges { node { name } } } } }'
+            % RAILWAY_PROJECT_ID
+        )
+        svcs = [e["node"]["name"] for e in proj["data"]["project"]["services"]["edges"]]
+        result["details"]["services"] = ", ".join(svcs)
 
-        if total > RAILWAY_COST_WARN:
+        # 4) 경고 판단
+        warnings = []
+        if credit <= RAILWAY_CREDIT_DANGER:
+            warnings.append(f"🔴 크레딧 잔액 ${credit:.2f} — 위험!")
+            result["status"] = "error"
+        elif credit <= RAILWAY_CREDIT_WARN:
+            warnings.append(f"🟡 크레딧 잔액 ${credit:.2f} — 충전 권장")
             result["status"] = "warn"
-            result["message"] = f"Railway 예상 비용 ${total:.2f} (임계값 ${RAILWAY_COST_WARN})"
+
+        if total_est > RAILWAY_USAGE_WARN:
+            warnings.append(f"🟡 예상 월 비용 ${total_est:.2f}")
+            if result["status"] == "ok":
+                result["status"] = "warn"
+
+        if warnings:
+            result["message"] = " | ".join(warnings)
         else:
-            result["message"] = f"Railway 예상 비용 ${total:.2f} (정상)"
+            result["message"] = (
+                f"크레딧 ${credit:.2f}, "
+                f"이번 달 ${current_usage:.2f} 사용, "
+                f"예상 ${total_est:.2f}/월"
+            )
 
     except Exception as e:
         result["status"] = "error"
-        result["message"] = f"Railway 조회 실패: {e}"
+        result["message"] = f"조회 실패: {e}"
     return result
 
 
 def check_openai() -> dict:
-    """OpenAI 잔액/사용량 확인 (dashboard 링크 제공)."""
-    result: dict[str, Any] = {"name": "OpenAI", "status": "ok", "details": {}}
-    if not OPENAI_API_KEY:
+    """OpenAI API 키 유효성 + 상태 확인."""
+    result: dict[str, Any] = {"name": "OpenAI (GPT-4o-mini)", "status": "ok", "details": {}}
+
+    # worker의 env에서 가져올 수 있으면 가져옴
+    api_key = OPENAI_API_KEY
+    if not api_key:
+        try:
+            data = _gql(
+                '{ variables(projectId: "%s", environmentId: "92d7e229-1071-4b32-a12c-8336ef7be7d5",'
+                ' serviceId: "2ee51089-125e-4e77-95e8-0fc3b8935ec5") }' % RAILWAY_PROJECT_ID
+            )
+            api_key = data["data"]["variables"].get("OPENAI_API_KEY", "")
+        except Exception:
+            pass
+
+    if not api_key:
         result["status"] = "skip"
-        result["message"] = "OPENAI_API_KEY 미설정"
+        result["message"] = "API 키 미확인"
         return result
 
     try:
-        # Organization billing 조회 시도
         resp = httpx.get(
             "https://api.openai.com/v1/models",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+            headers={"Authorization": f"Bearer {api_key}"},
             timeout=10,
         )
         if resp.status_code == 200:
-            result["message"] = "OpenAI API 키 유효 — 사용량은 https://platform.openai.com/usage 에서 확인"
+            result["message"] = "API 키 정상 — 잔액은 platform.openai.com/usage 확인"
         elif resp.status_code == 401:
             result["status"] = "error"
-            result["message"] = "OpenAI API 키 만료 또는 무효!"
+            result["message"] = "API 키 만료/무효! 즉시 확인 필요"
         elif resp.status_code == 429:
             result["status"] = "warn"
-            result["message"] = "OpenAI 요청 한도 초과 (Rate limit)!"
+            result["message"] = "Rate limit 초과 또는 잔액 소진!"
         else:
             result["status"] = "warn"
-            result["message"] = f"OpenAI 응답: HTTP {resp.status_code}"
+            result["message"] = f"HTTP {resp.status_code} — 확인 필요"
     except Exception as e:
         result["status"] = "error"
-        result["message"] = f"OpenAI 조회 실패: {e}"
+        result["message"] = f"연결 실패: {e}"
     return result
 
 
 def check_supabase() -> dict:
-    """Supabase DB 연결 확인."""
-    result: dict[str, Any] = {"name": "Supabase (PostgreSQL)", "status": "ok", "details": {}}
-    result["message"] = "사용량은 https://supabase.com/dashboard 에서 확인"
-    result["details"]["note"] = "Pro 플랜 $25/월 — DB 크기, API 호출 횟수 확인 필요"
-    return result
-
-
-def check_mapbox() -> dict:
-    """Mapbox 토큰 유효성 확인."""
-    result: dict[str, Any] = {"name": "Mapbox", "status": "ok", "details": {}}
-    result["message"] = "Free tier 50k loads/월 — https://account.mapbox.com/ 에서 확인"
-    return result
-
-
-def check_x_api() -> dict:
-    """X (Twitter) API 상태 확인."""
-    result: dict[str, Any] = {"name": "X (Twitter) API", "status": "ok", "details": {}}
-    result["message"] = "API 플랜/사용량은 https://developer.x.com/en/portal/dashboard 에서 확인"
-    result["details"]["note"] = "Free/Basic/Pro 플랜에 따라 $0~$100+/월"
+    """Supabase DB 연결 상태 확인."""
+    result: dict[str, Any] = {"name": "Supabase (DB)", "status": "ok", "details": {}}
+    try:
+        # Supabase REST API health check
+        resp = httpx.get(
+            "https://smxitufpgfuzepldglfo.supabase.co/rest/v1/",
+            headers={"apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"},
+            timeout=10,
+        )
+        # 401도 서버 응답이면 살아있는 것
+        if resp.status_code in (200, 401, 403):
+            result["message"] = "서버 응답 정상 — 잔액은 supabase.com/dashboard 확인"
+        else:
+            result["status"] = "warn"
+            result["message"] = f"HTTP {resp.status_code} — 확인 필요"
+    except Exception:
+        result["status"] = "error"
+        result["message"] = "Supabase 연결 실패!"
     return result
 
 
 def check_cloudflare_radar() -> dict:
-    """Cloudflare Radar 토큰 유효성 확인."""
+    """Cloudflare Radar 토큰 상태."""
     result: dict[str, Any] = {"name": "Cloudflare Radar", "status": "ok", "details": {}}
-    cf_token = os.getenv("CF_RADAR_TOKEN", "")
+    try:
+        data = _gql(
+            '{ variables(projectId: "%s", environmentId: "92d7e229-1071-4b32-a12c-8336ef7be7d5",'
+            ' serviceId: "2ee51089-125e-4e77-95e8-0fc3b8935ec5") }' % RAILWAY_PROJECT_ID
+        )
+        cf_token = data["data"]["variables"].get("CF_RADAR_TOKEN", "")
+    except Exception:
+        cf_token = os.getenv("CF_RADAR_TOKEN", "")
+
     if not cf_token:
         result["status"] = "warn"
-        result["message"] = "CF_RADAR_TOKEN 미설정 — 토큰 만료 상태일 수 있음"
+        result["message"] = "토큰 미설정"
         return result
+
     try:
         resp = httpx.get(
             "https://api.cloudflare.com/client/v4/user/tokens/verify",
@@ -176,72 +242,105 @@ def check_cloudflare_radar() -> dict:
         )
         data = resp.json()
         if data.get("success"):
-            result["message"] = "Cloudflare 토큰 유효"
+            result["message"] = "토큰 유효"
         else:
             result["status"] = "warn"
-            result["message"] = "Cloudflare 토큰 만료! 갱신 필요"
+            result["message"] = "토큰 만료! 갱신 필요"
     except Exception as e:
         result["status"] = "error"
-        result["message"] = f"Cloudflare 조회 실패: {e}"
+        result["message"] = f"확인 실패: {e}"
     return result
 
 
-def check_dodo() -> dict:
-    """DodoPayments 상태."""
-    result: dict[str, Any] = {"name": "DodoPayments", "status": "ok", "details": {}}
-    result["message"] = "거래 수수료 기반 — https://dashboard.dodopayments.com 에서 확인"
+def check_backend_health() -> dict:
+    """백엔드 API 헬스체크."""
+    result: dict[str, Any] = {"name": "Backend API", "status": "ok", "details": {}}
+    try:
+        resp = httpx.get(
+            "https://backend-production-3af7.up.railway.app/health",
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            result["message"] = "정상 응답"
+        else:
+            result["status"] = "warn"
+            result["message"] = f"HTTP {resp.status_code}"
+    except Exception as e:
+        result["status"] = "error"
+        result["message"] = f"백엔드 다운! {e}"
     return result
 
+
+def check_frontend_health() -> dict:
+    """프론트엔드 상태 확인."""
+    result: dict[str, Any] = {"name": "Frontend", "status": "ok", "details": {}}
+    try:
+        resp = httpx.get("https://www.wewantpeace.live/", timeout=10, follow_redirects=True)
+        if resp.status_code == 200:
+            result["message"] = "정상 응답"
+        else:
+            result["status"] = "warn"
+            result["message"] = f"HTTP {resp.status_code}"
+    except Exception as e:
+        result["status"] = "error"
+        result["message"] = f"프론트엔드 다운! {e}"
+    return result
+
+
+# ── 리포트 포맷 & 텔레그램 전송 ─────────────────────────
 
 def format_report(results: list[dict]) -> str:
-    """결과를 보기 좋게 포맷."""
+    """콘솔 + 텔레그램용 텍스트 포맷."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    lines = [f"📊 WeWantPeace 서비스 상태 ({now})", "=" * 45]
+    lines = [f"📊 WeWantPeace 서비스 상태 리포트", f"🕐 {now}", ""]
 
     warnings = []
     for r in results:
         icon = {"ok": "✅", "warn": "⚠️", "error": "❌", "skip": "⏭️"}.get(
             r["status"], "❓"
         )
-        lines.append(f"\n{icon} {r['name']}")
+        lines.append(f"{icon} {r['name']}")
         lines.append(f"   {r.get('message', '')}")
-        if r.get("details"):
-            for k, v in r["details"].items():
-                if k == "estimated_costs":
-                    for mk, mv in v.items():
-                        lines.append(f"   - {mk}: {mv['value']} → ${mv['cost']}")
-                elif k == "services":
-                    lines.append(f"   - 서비스: {', '.join(v)}")
-                elif k == "total_estimated":
-                    continue
-                else:
-                    lines.append(f"   - {k}: {v}")
+
+        # 세부 정보 (Railway 크레딧 등 핵심만)
+        details = r.get("details", {})
+        for k in ("credit_balance", "current_usage", "estimated_monthly",
+                   "billing_period", "services"):
+            if k in details:
+                label = {
+                    "credit_balance": "크레딧 잔액",
+                    "current_usage": "이번 달 사용량",
+                    "estimated_monthly": "예상 월 비용",
+                    "billing_period": "빌링 기간",
+                    "services": "서비스",
+                }.get(k, k)
+                lines.append(f"   └ {label}: {details[k]}")
+
+        lines.append("")
 
         if r["status"] in ("warn", "error"):
             warnings.append(r)
 
     if warnings:
-        lines.append("\n" + "=" * 45)
-        lines.append("🚨 주의 필요:")
+        lines.append("━" * 35)
+        lines.append("🚨 주의 필요 항목:")
         for w in warnings:
-            lines.append(f"  - {w['name']}: {w.get('message', '')}")
+            lines.append(f"  ▸ {w['name']}: {w.get('message', '')}")
+    else:
+        lines.append("✅ 모든 서비스 정상!")
 
     return "\n".join(lines)
 
 
 def send_telegram(text: str) -> bool:
     """텔레그램으로 알림 전송."""
-    if not TG_BOT_TOKEN or not ADMIN_TG_CHAT_ID:
-        print("⚠️ 텔레그램 봇 토큰 또는 채팅 ID 미설정 — 알림 건너뜀")
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        print("⚠️ 텔레그램 설정 없음 — 알림 건너뜀")
         return False
     try:
         resp = httpx.post(
             f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
-            json={
-                "chat_id": ADMIN_TG_CHAT_ID,
-                "text": text,
-                "parse_mode": "HTML",
-            },
+            json={"chat_id": TG_CHAT_ID, "text": text},
             timeout=10,
         )
         return resp.status_code == 200
@@ -251,23 +350,21 @@ def send_telegram(text: str) -> bool:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="WeWantPeace 유료 서비스 잔량 확인")
-    parser.add_argument("--notify", action="store_true", help="텔레그램 알림 전송")
-    parser.add_argument(
-        "--warn-only",
-        action="store_true",
-        help="경고/에러가 있을 때만 텔레그램 알림",
+    parser = argparse.ArgumentParser(
+        description="WeWantPeace 유료 서비스 잔량 확인 & 텔레그램 경고"
     )
+    parser.add_argument("--notify", action="store_true", help="텔레그램 알림 전송")
+    parser.add_argument("--warn-only", action="store_true",
+                        help="경고/에러가 있을 때만 텔레그램 알림 (--notify 암시)")
     args = parser.parse_args()
 
     results = [
         check_railway(),
         check_openai(),
         check_supabase(),
-        check_mapbox(),
-        check_x_api(),
         check_cloudflare_radar(),
-        check_dodo(),
+        check_backend_health(),
+        check_frontend_health(),
     ]
 
     report = format_report(results)
@@ -275,7 +372,8 @@ def main():
 
     has_warnings = any(r["status"] in ("warn", "error") for r in results)
 
-    if args.notify:
+    should_notify = args.notify or args.warn_only
+    if should_notify:
         if args.warn_only and not has_warnings:
             print("\n✅ 경고 없음 — 텔레그램 알림 건너뜀")
         else:
