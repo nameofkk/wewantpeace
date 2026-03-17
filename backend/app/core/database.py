@@ -61,10 +61,15 @@ class UUIDArray(TypeDecorator):
         return [_uuid.UUID(v) for v in json.loads(value)]
 
 _is_sqlite = settings.database_url.startswith("sqlite")
+# Supabase Session mode pooler 연결 수 제한 대응:
+# Worker(4 프로세스 × pool_size) + Backend 합계가 Supabase 한도 이내여야 함
+import os as _os
+_pool_size = 3 if _os.environ.get("CELERY_WORKER") else 5
+_max_overflow = 2 if _os.environ.get("CELERY_WORKER") else 5
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    **({} if _is_sqlite else {"pool_size": 10, "max_overflow": 10, "pool_pre_ping": True, "pool_recycle": 3600}),
+    **({} if _is_sqlite else {"pool_size": _pool_size, "max_overflow": _max_overflow, "pool_pre_ping": True, "pool_recycle": 1800}),
 )
 
 AsyncSessionLocal = async_sessionmaker(
