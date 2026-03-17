@@ -49,6 +49,7 @@ export async function trackEvent(
         session_id: sessionId,
         platform: "web",
       }),
+      keepalive: true,
     }).catch(() => {}); // fire-and-forget
   } catch {
     // silent fail
@@ -76,6 +77,7 @@ export async function trackPaywallEvent(
         plan: extra?.plan,
         session_id: extra?.session_id,
       }),
+      keepalive: true,
     }).catch(() => {});
   } catch {
     // silent fail
