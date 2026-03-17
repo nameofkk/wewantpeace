@@ -192,7 +192,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => setMobileOpen(false), [pathname]);
 
-  // 인증 + 어드민 권한 확인 (10초 타임아웃)
+  // 인증 + 어드민 권한 확인 (재시도 1회 포함)
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -202,25 +202,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     let cancelled = false;
     const timeout = setTimeout(() => {
       if (!cancelled) setAuthStatus("denied");
-    }, 10_000);
+    }, 15_000);
 
-    user
-      .getIdToken()
-      .then(async (token) => {
-        try {
-          const res = await fetch(`${API_BASE}/admin/stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(8_000),
-          });
-          if (!cancelled) setAuthStatus(res.ok ? "ok" : "denied");
-        } catch {
-          if (!cancelled) setAuthStatus("denied");
+    async function checkAdmin(retry: boolean) {
+      try {
+        // Firebase auth 복원 대기
+        const { waitForAuth } = await import("@/lib/auth");
+        await waitForAuth();
+        const token = await user!.getIdToken(retry); // retry=true면 강제 갱신
+        const res = await fetch(`${API_BASE}/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          setAuthStatus("ok");
+        } else if ((res.status === 401 || res.status === 403) && !retry) {
+          // 토큰이 아직 준비 안 됐을 수 있음 — 1초 후 강제 갱신으로 재시도
+          await new Promise((r) => setTimeout(r, 1000));
+          if (!cancelled) await checkAdmin(true);
+        } else {
+          setAuthStatus("denied");
         }
-      })
-      .catch(() => {
-        if (!cancelled) setAuthStatus("denied");
-      })
-      .finally(() => clearTimeout(timeout));
+      } catch {
+        if (!cancelled) {
+          if (!retry) {
+            await new Promise((r) => setTimeout(r, 1000));
+            if (!cancelled) await checkAdmin(true);
+          } else {
+            setAuthStatus("denied");
+          }
+        }
+      }
+    }
+
+    checkAdmin(false).finally(() => clearTimeout(timeout));
 
     return () => { cancelled = true; clearTimeout(timeout); };
   }, [user, loading]);

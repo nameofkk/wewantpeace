@@ -12,7 +12,8 @@ export async function adminFetch<T>(
   if (devUid) {
     headers["X-Dev-UID"] = devUid;
   } else {
-    const { getIdToken } = await import("./auth");
+    const { waitForAuth, getIdToken } = await import("./auth");
+    await waitForAuth();
     const token = await getIdToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }

@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_, cast, Date, text, delete
+from sqlalchemy import select, func, and_, or_, cast, Date, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, require_admin
@@ -248,7 +248,7 @@ async def list_users(
     # visit_count subquery
     visit_sub = (
         select(AppEvent.user_id, func.count().label("visit_count"))
-        .where(AppEvent.session_id != "backfill")
+        .where(or_(AppEvent.session_id.is_(None), AppEvent.session_id != "backfill"))
         .group_by(AppEvent.user_id)
         .subquery()
     )
