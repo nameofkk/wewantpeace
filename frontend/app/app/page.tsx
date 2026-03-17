@@ -7,20 +7,20 @@ const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewant
 const APP_STORE_URL = ""; // iOS 앱 출시 시 추가
 
 export const metadata: Metadata = {
-  title: "WeWantPeace — 앱 다운로드",
+  title: "위원트피스 설치하기",
   description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
   openGraph: {
     type: "website",
     locale: "ko_KR",
     url: `${SITE_URL}/app`,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터",
+    title: "위원트피스 설치하기",
     description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터",
+    title: "위원트피스 설치하기",
     description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
