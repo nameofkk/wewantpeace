@@ -383,100 +383,123 @@ function ReportContent() {
             initial="hidden"
             animate="visible"
             variants={sectionVariants}
-            className="rounded-xl border border-border bg-card p-4"
+            className="rounded-xl border border-border bg-card"
             data-tour="dash-risk"
           >
-            <SectionHeader
-              icon={BarChart3}
-              title={t(lang, "dash_section_hero_title" as any)}
-              desc={t(lang, "dash_section_hero_desc" as any)}
-              tooltip={t(lang, "dash_section_hero_tooltip" as any)}
-            />
-            {/* Impact Score + Risk Radar */}
-            <div className="flex items-start gap-3">
-              {/* Left: Impact Score */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl font-bold tabular-nums leading-none score-reveal" style={{ color }}>
-                    {Math.round(animatedImpact)}
-                  </span>
-                  <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                    style={{ color, backgroundColor: `${color}15` }}
-                  >
-                    {t(lang, levelKey)}
-                  </span>
-                </div>
-
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full transition-all duration-1000 ease-out"
-                    style={{ width: `${Math.min(impactScore, 100)}%`, backgroundColor: color }}
-                  />
-                </div>
-
-                <p className="text-[10px] text-foreground/60 leading-snug line-clamp-1 mb-2">
-                  {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
-                </p>
+            {/* ── 영향도 점수 + 레이더 ── */}
+            <div className="p-4 pb-3">
+              <div className="flex items-center gap-1.5 mb-3">
+                <h2 className="text-xs font-bold text-foreground">{t(lang, "dash_section_hero_title" as any)}</h2>
+                <InfoTooltip text={t(lang, "dash_section_hero_tooltip" as any)} direction="down" />
+                {updatedTime && <span className="text-[9px] text-muted-foreground/50 ml-auto">{updatedTime}</span>}
               </div>
 
-              {/* Right: Risk Radar (compact) */}
-              {summary?.risk_radar && (
-                <div className="shrink-0">
-                  <RiskRadar data={summary.risk_radar} lang={lang} />
+              <div className="flex items-start gap-4">
+                {/* Left: Impact Score */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 mb-1.5">
+                    <span className="text-3xl font-extrabold tabular-nums leading-none score-reveal" style={{ color }}>
+                      {Math.round(animatedImpact)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">/100</span>
+                    <span
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                      style={{ color, backgroundColor: `${color}12` }}
+                    >
+                      {t(lang, levelKey)}
+                    </span>
+                  </div>
+
+                  <div className="h-1 rounded-full bg-muted overflow-hidden mb-3">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${Math.min(impactScore, 100)}%`, backgroundColor: color }}
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-foreground/70 leading-relaxed line-clamp-3">
+                    {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
+                  </p>
                 </div>
-              )}
-            </div>
 
-            {/* Home tension + global counts */}
-            <div className="flex items-center gap-1.5 text-[10px] mb-1.5 flex-wrap">
-              <span className="text-sm">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
-              <span className={cn("font-bold tabular-nums", tensionColor(homeScore).text)}>
-                {Math.round(animatedHomeScore)}
-              </span>
-              <div className="h-1.5 w-12 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={cn("h-full rounded-full transition-all duration-1000 ease-out", tensionColor(homeScore).bar)}
-                  style={{ width: `${Math.min(homeScore, 100)}%` }}
-                />
+                {/* Right: Risk Radar */}
+                {summary?.risk_radar && (
+                  <div className="shrink-0">
+                    <RiskRadar data={summary.risk_radar} lang={lang} />
+                  </div>
+                )}
               </div>
-              <span className={cn("text-[9px]", tensionColor(homeScore).text)}>
-                {tensionLabelShort(homeScore, lang)}
-              </span>
-              <span className="text-muted-foreground/30">|</span>
-              {extremeCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-600 dark:bg-red-900 animate-pulse" />
-                  <span className="text-[9px] text-red-700 dark:text-red-300 font-medium">{extremeCount}</span>
-                </span>
-              )}
-              {severeCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  <span className="text-[9px] text-red-600 dark:text-red-400 font-medium">{severeCount}</span>
-                </span>
-              )}
-              {alertCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                  <span className="text-[9px] text-orange-600 dark:text-orange-300 font-medium">{alertCount}</span>
-                </span>
-              )}
-              {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
-                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
-                  {t(lang, "dash_global_stable")}
-                </span>
-              )}
             </div>
 
-            {/* Issue stats + time */}
-            <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-3">
-              <span>{lang === "ko" ? "이슈" : "Issues"} <strong>{summary?.total_active_issues ?? 0}</strong></span>
-              <span className="text-red-600 dark:text-red-400">{t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong></span>
-              {updatedTime && <span className="ml-auto">{updatedTime}</span>}
+            {/* ── 기준국가 긴장도 ── */}
+            <div className="px-4 py-3 border-t border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      {homeCountry
+                        ? (lang === "ko" ? "기준국가 긴장도" : "Home Country Tension")
+                        : (lang === "ko" ? "글로벌 평균 긴장도" : "Global Avg. Tension")}
+                    </span>
+                    <span className={cn("text-xs font-bold tabular-nums", tensionColor(homeScore).text)}>
+                      {Math.round(animatedHomeScore)}
+                    </span>
+                    <span className={cn("text-[9px] font-medium px-1.5 py-0.5 rounded", tensionColor(homeScore).text)}>
+                      {tensionLabelShort(homeScore, lang)}
+                    </span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-1000 ease-out", tensionColor(homeScore).bar)}
+                      style={{ width: `${Math.min(homeScore, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 전 세계 현황 요약 ── */}
+            <div className="px-4 py-3 border-t border-border">
+              <div className="flex items-center gap-3 text-[10px] flex-wrap">
+                <span className="text-muted-foreground font-medium shrink-0">
+                  {lang === "ko" ? "전 세계" : "Global"}
+                </span>
+                {extremeCount > 0 && (
+                  <span className="flex items-center gap-1 text-red-700 dark:text-red-300">
+                    <span className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500 animate-pulse shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "극심" : "Extreme"} {extremeCount}</span>
+                  </span>
+                )}
+                {severeCount > 0 && (
+                  <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                    <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "심각" : "Severe"} {severeCount}</span>
+                  </span>
+                )}
+                {alertCount > 0 && (
+                  <span className="flex items-center gap-1 text-orange-600 dark:text-orange-300">
+                    <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "경계" : "Alert"} {alertCount}</span>
+                  </span>
+                )}
+                {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    {t(lang, "dash_global_stable")}
+                  </span>
+                )}
+                <span className="text-muted-foreground/40">|</span>
+                <span className="text-muted-foreground">
+                  {lang === "ko" ? "활성 이슈" : "Active"} <strong>{summary?.total_active_issues ?? 0}</strong>
+                </span>
+                <span className="text-red-600 dark:text-red-400">
+                  {t(lang, "dash_high_impact")} <strong>{summary?.critical_issues_count ?? 0}</strong>
+                </span>
+              </div>
             </div>
 
             {/* Watchlist chips */}
+            <div className="px-4 pt-3 pb-4 border-t border-border">
             <div data-tour="dash-watchlist">
             {myCountries.length > 0 ? (
               <div className="space-y-1">
@@ -525,6 +548,7 @@ function ReportContent() {
                 </Link>
               </div>
             )}
+            </div>
             </div>
           </m.section>
 
