@@ -18,6 +18,11 @@ from typing import Any, Optional
 
 import feedparser
 from sqlalchemy import select
+
+# 일부 사이트가 feedparser 기본 UA를 차단하므로 브라우저 UA 사용
+feedparser.USER_AGENT = (
+    "Mozilla/5.0 (compatible; WeWantPeace/1.0; +https://www.wewantpeace.live)"
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.source_channel import SourceChannel

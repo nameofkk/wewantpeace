@@ -145,12 +145,18 @@ async def check_source_channels(db: AsyncSession) -> HealthCheckResult:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             for ch in inactive_rss:
                 try:
-                    resp = await client.head(ch.feed_url)
+                    # HEAD 대신 GET으로 Content-Type 확인 — HTML 반환 사이트 오탐 방지
+                    resp = await client.get(ch.feed_url, headers={
+                        "User-Agent": "Mozilla/5.0 (compatible; WeWantPeace/1.0)"
+                    })
                     if resp.status_code == 200:
-                        recoverable_channels.append({
-                            "id": ch.id,
-                            "name": ch.display_name,
-                        })
+                        ct = resp.headers.get("content-type", "")
+                        # XML/RSS/Atom 형식이어야 실제 복구 가능
+                        if "xml" in ct or "rss" in ct or "atom" in ct:
+                            recoverable_channels.append({
+                                "id": ch.id,
+                                "name": ch.display_name,
+                            })
                 except Exception:
                     pass  # 네트워크 오류는 무시 — 여전히 비활성 유지
 
