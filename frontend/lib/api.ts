@@ -632,6 +632,8 @@ export interface ImpactFlowNode {
   label: string;
   color: string;
   category: string;
+  cluster_id?: string;
+  country_codes?: string[];
 }
 
 export interface ImpactFlowLink {

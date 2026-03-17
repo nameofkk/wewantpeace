@@ -203,6 +203,8 @@ class ImpactFlowNode(BaseModel):
     label: str
     color: str
     category: str
+    cluster_id: str | None = None
+    country_codes: list[str] = []
 
 class ImpactFlowLink(BaseModel):
     source: str
@@ -1773,7 +1775,10 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
         title = c.title_ko if lang == "ko" and c.title_ko else c.title or f"Issue {idx+1}"
         title = title[:20]
         node_id = f"c{idx}"
-        nodes.append(ImpactFlowNode(id=node_id, label=title, color="#dc2626", category="conflict"))
+        nodes.append(ImpactFlowNode(
+            id=node_id, label=title, color="#dc2626", category="conflict",
+            cluster_id=str(c.id), country_codes=[cc] if cc else [],
+        ))
 
         linked = False
         # 1차: key_partners 매칭 (이슈 국가가 기준 국가의 교역 파트너일 때)

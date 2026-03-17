@@ -274,7 +274,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
     return (
       <div ref={containerRef} className="relative" style={{ minHeight: 200 }}>
         <div className="flex items-center justify-center py-8">
-          <div className="h-4 w-4 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
         </div>
       </div>
     );
@@ -292,10 +292,15 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
     : { connectedLinks: new Set<number>(), connectedNodes: new Set<string>() };
   const isHovering = hoveredNodeId !== null;
 
-  const popupIssue = popupIdx !== null ? (conflictIssues?.[popupIdx] ?? {
-    title: conflictNodes[popupIdx]?.label ?? "",
-    countryCodes: [],
-    clusterId: undefined,
+  // 노드 자체의 cluster_id로 매칭 (인덱스 기반 X — scored vs pkscore_sorted 정렬 순서 다름)
+  const popupNode = popupIdx !== null ? conflictNodes[popupIdx] : null;
+  const popupIssueFromProps = popupNode
+    ? conflictIssues?.find((ci) => ci.clusterId === popupNode.cluster_id)
+    : undefined;
+  const popupIssue = popupIdx !== null ? (popupIssueFromProps ?? {
+    title: popupNode?.label ?? "",
+    countryCodes: popupNode?.country_codes ?? [],
+    clusterId: popupNode?.cluster_id,
   }) : null;
 
   return (
@@ -498,8 +503,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
       {/* 분쟁 이슈 버튼 목록 */}
       <div className="px-3 pb-2 flex flex-wrap gap-1.5" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.25s ease-in-out" }}>
         {conflictNodes.map((node, idx) => {
-          const issue = conflictIssues?.[idx];
-          const flags = issue?.countryCodes?.slice(0, 2).map(getFlag).join("") ?? "";
+          const flags = (node.country_codes ?? []).slice(0, 2).map(getFlag).join("");
           const shortTitle = node.label.length > 12 ? node.label.slice(0, 12) + "…" : node.label;
           const isActive = hoveredNodeId === node.id;
           return (

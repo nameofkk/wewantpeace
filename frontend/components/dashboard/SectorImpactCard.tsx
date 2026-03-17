@@ -492,7 +492,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
     if (!inView || isLoading || (!effectiveClusterId && !is403 && !isError)) {
       return (
         <div ref={containerRef} className="flex items-center justify-center py-6">
-          <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       );
     }
@@ -555,7 +555,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
         <div className="px-4 pb-4 border-t border-border">
           {(isLoading || (expanded && !effectiveClusterId && !is403 && !isError)) && (
             <div className="flex items-center justify-center py-6">
-              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           )}
 

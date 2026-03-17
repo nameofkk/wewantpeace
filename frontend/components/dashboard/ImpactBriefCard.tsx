@@ -135,7 +135,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
         <div className="px-4 pb-4 border-t border-border">
           {isLoading && (
             <div className="flex items-center justify-center py-6">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           )}
 
