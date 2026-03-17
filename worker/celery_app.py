@@ -303,6 +303,7 @@ app.conf.beat_schedule = {
     "beat-heartbeat": {
         "task": "beat_heartbeat",
         "schedule": 300.0,  # 5분마다
+        "options": {"queue": "process"},
     },
 }
 
