@@ -20,23 +20,28 @@ export function isGoogleOAuthBlocked(): boolean {
   return /FB_IAB|FBAV|Instagram|FBAN|Barcelona|Threads/i.test(ua);
 }
 
-/** 인앱브라우저에서 외부 브라우저로 현재 URL 열기 시도 */
-export function openInExternalBrowser(): void {
-  if (typeof window === "undefined") return;
+/**
+ * 인앱브라우저에서 외부 브라우저로 현재 URL 열기 시도.
+ * 클립보드에 URL 복사 후 성공 여부를 반환.
+ * intent:// 등은 인앱브라우저마다 동작이 달라 신뢰할 수 없으므로 클립보드 복사 방식 사용.
+ */
+export async function openInExternalBrowser(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   const url = window.location.href;
-  const ua = navigator.userAgent || "";
-
-  // Android: intent URL로 Chrome/기본 브라우저에서 열기
-  if (/Android/i.test(ua)) {
-    window.location.href = `intent://${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}#Intent;scheme=https;action=android.intent.action.VIEW;end`;
-    return;
+  try {
+    await navigator.clipboard.writeText(url);
+    return true;
+  } catch {
+    // clipboard API 미지원 시 fallback
+    const ta = document.createElement("textarea");
+    ta.value = url;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    return true;
   }
-
-  // iOS / fallback: clipboard 복사 + 새 창 시도
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).catch(() => {});
-  }
-  window.open(url, '_blank');
 }
 
 /** PWA standalone 모드(홈 화면에서 실행) 감지 */

@@ -269,6 +269,7 @@ export default function OnboardingPage() {
 
   // --- 인앱브라우저 감지 ---
   const [inAppBlocked, setInAppBlocked] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   // --- 로그인 처리 ---
   async function handleOAuthLogin(provider: "google" | "apple") {
@@ -732,14 +733,23 @@ export default function OnboardingPage() {
                 </div>
               )}
 
-              {/* 인앱브라우저 외부 열기 버튼 */}
+              {/* 인앱브라우저 URL 복사 버튼 */}
               {inAppBlocked && (
                 <button
-                  onClick={openInExternalBrowser}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-primary/50 bg-primary/10 py-3 text-sm font-bold text-primary hover:bg-primary/20 transition-colors"
+                  onClick={async () => {
+                    await openInExternalBrowser();
+                    setUrlCopied(true);
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition-colors ${
+                    urlCopied
+                      ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                      : "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+                  }`}
                 >
                   <Globe className="h-4 w-4" />
-                  {lang === "en" ? "Open in browser" : "브라우저에서 열기"}
+                  {urlCopied
+                    ? (lang === "en" ? "URL copied! Paste in your browser" : "URL 복사 완료! 브라우저에 붙여넣기 해주세요")
+                    : (lang === "en" ? "Copy URL to open in browser" : "URL 복사하기 (브라우저에서 열기)")}
                 </button>
               )}
 

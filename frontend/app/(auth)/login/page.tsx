@@ -80,6 +80,7 @@ export default function LoginPage() {
   const [checkingRedirect, setCheckingRedirect] = useState(true);
   const [termsModal, setTermsModal] = useState<"terms" | "privacy" | null>(null);
   const [inAppBlocked, setInAppBlocked] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   // iOS 플랫폼 감지 (Apple 로그인 버튼 표시용)
   const platform = detectPlatform();
@@ -700,13 +701,22 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* 인앱브라우저 외부 열기 버튼 */}
+      {/* 인앱브라우저 URL 복사 버튼 */}
       {inAppBlocked && (
         <button
-          onClick={openInExternalBrowser}
-          className="w-full mb-4 flex items-center justify-center gap-2 rounded-lg border border-primary/50 bg-primary/10 py-3 text-sm font-bold text-primary hover:bg-primary/20 transition-colors"
+          onClick={async () => {
+            await openInExternalBrowser();
+            setUrlCopied(true);
+          }}
+          className={`w-full mb-4 flex items-center justify-center gap-2 rounded-lg border py-3 text-sm font-bold transition-colors ${
+            urlCopied
+              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+              : "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+          }`}
         >
-          {lang === "en" ? "Open in browser" : "브라우저에서 열기"}
+          {urlCopied
+            ? (lang === "en" ? "URL copied! Paste in your browser" : "URL 복사 완료! 브라우저에 붙여넣기 해주세요")
+            : (lang === "en" ? "Copy URL to open in browser" : "URL 복사하기 (브라우저에서 열기)")}
         </button>
       )}
 
