@@ -1118,30 +1118,36 @@ def reprocess_orphans(self):
         zombie_count = 0
 
         BATCH_SIZE = 500
-        while True:
-            batch_count = 0
+        MAX_BATCHES = 5  # 무한 루프 방지: 최대 2500개까지만 처리
+        seen_ids: set = set()  # 이미 시도한 이벤트 ID 추적
+
+        for batch_num in range(MAX_BATCHES):
             async with AsyncSessionLocal() as db:
                 async with db.begin():
                     # cluster_events에 없는 normalized_events (severity>=20, 7일 이내)
                     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-                    orphan_result = await db.execute(
-                        select(NormalizedEvent).where(
-                            NormalizedEvent.severity >= 20,
-                            NormalizedEvent.event_time >= cutoff,
-                            not_(
-                                exists().where(
-                                    ClusterEvent.event_id == NormalizedEvent.id
-                                )
-                            ),
-                        ).order_by(NormalizedEvent.event_time.asc()).limit(BATCH_SIZE)
+                    query = select(NormalizedEvent).where(
+                        NormalizedEvent.severity >= 20,
+                        NormalizedEvent.event_time >= cutoff,
+                        not_(
+                            exists().where(
+                                ClusterEvent.event_id == NormalizedEvent.id
+                            )
+                        ),
                     )
+                    # 이미 시도한 이벤트 제외 (무한 루프 방지)
+                    if seen_ids:
+                        query = query.where(NormalizedEvent.id.notin_(seen_ids))
+                    query = query.order_by(NormalizedEvent.event_time.asc()).limit(BATCH_SIZE)
+
+                    orphan_result = await db.execute(query)
                     orphans = orphan_result.scalars().all()
-                    batch_count = len(orphans)
-                    if batch_count == 0:
+                    if not orphans:
                         break
-                    logger.info("오펀 이벤트 %d개 배치 처리 시작", batch_count)
+                    logger.info("오펀 이벤트 %d개 배치 처리 시작 (batch %d/%d)", len(orphans), batch_num + 1, MAX_BATCHES)
 
                     for ev in orphans:
+                        seen_ids.add(ev.id)
                         try:
                             cluster, _ = await assign_cluster(ev, db)
                             if cluster:
@@ -1152,8 +1158,8 @@ def reprocess_orphans(self):
                             logger.warning("오펀 재처리 실패 [%s]: %s", ev.id, e)
                             skipped += 1
 
-            if batch_count < BATCH_SIZE:
-                break
+                    if len(orphans) < BATCH_SIZE:
+                        break
 
         logger.info("오펀 재처리 완료: reassigned=%d, skipped=%d", reassigned, skipped)
 
