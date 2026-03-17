@@ -18,7 +18,6 @@ import {
 } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import {
-  personalizedKScore,
   type TrendingItem,
 } from "@/lib/kscore-utils";
 import { SUPPORTED_HOME_COUNTRIES } from "@/lib/impact-factors";
@@ -573,21 +572,19 @@ function ReportContent() {
               </div>
             )}
 
-            {/* #1 Issue: SmartSummaryCard Full */}
-            <div data-tour="dash-smart-summary">
+            {/* 주요 이슈 통합 섹션: #1 Full + #2-#5 Compact */}
             {topIssue && (
-              <div className="rounded-xl border border-border bg-card mt-5">
+              <div className="rounded-xl border border-border bg-card mt-5" data-tour="dash-smart-summary">
                 <div className="px-4 pt-3 pb-1">
                   <SectionHeader
                     icon={AlertTriangle}
-                    title={lang === "ko" ? "가장 영향이 큰 이슈" : "Top Impact Issue"}
-                    desc={lang === "ko" ? "종합 영향도 1위" : "#1 by impact score"}
-                    tooltip={lang === "ko"
-                      ? "현재 활성 이슈 중 설정한 기준국가에 가장 영향이 큰 이슈의 요약입니다. 무슨 일인지, 나에게 어떤 영향이 있는지, 언제 영향이 올지를 3줄로 보여줍니다."
-                      : "Summary of the issue with highest impact on your home country. Shows what happened, how it affects you, and when to expect effects."}
+                    title={t(lang, "dash_section_stories_title" as any)}
+                    desc={t(lang, "dash_section_stories_desc" as any)}
+                    tooltip={t(lang, "dash_section_stories_tooltip" as any)}
                   />
                 </div>
-                <div className="px-4 pb-4">
+                {/* #1 Issue */}
+                <div className="px-4 pb-3">
                   <SmartSummaryCardFull
                     item={topIssue}
                     homeCountry={homeCountry ?? ""}
@@ -597,34 +594,22 @@ function ReportContent() {
                     isPro={isPro}
                   />
                 </div>
-              </div>
-            )}
-            </div>
-
-            {/* #2-#5 Issues: Compact */}
-            {restIssues.length > 0 && (
-              <div className="rounded-xl border border-border bg-card mt-5" data-tour="dash-top-issues">
-                <div className="px-4 pt-3 pb-1">
-                  <SectionHeader
-                    icon={AlertTriangle}
-                    title={t(lang, "dash_section_stories_title" as any)}
-                    desc={t(lang, "dash_section_stories_desc" as any)}
-                    tooltip={t(lang, "dash_section_stories_tooltip" as any)}
-                  />
-                </div>
-                <div className="px-4 pb-3">
-                  {restIssues.map((item, idx) => (
-                    <SmartSummaryCompact
-                      key={item.id}
-                      item={item}
-                      index={idx}
-                      homeCountry={homeCountry ?? ""}
-                      lang={lang}
-                      topIssueRaw={summary?.top_issues?.[idx + 1]}
-                      isLast={idx === restIssues.length - 1}
-                    />
-                  ))}
-                </div>
+                {/* #2-#5 Issues */}
+                {restIssues.length > 0 && (
+                  <div className="px-4 pb-3" data-tour="dash-top-issues">
+                    {restIssues.map((item, idx) => (
+                      <SmartSummaryCompact
+                        key={item.id}
+                        item={item}
+                        index={idx}
+                        homeCountry={homeCountry ?? ""}
+                        lang={lang}
+                        topIssueRaw={summary?.top_issues?.[idx + 1]}
+                        isLast={idx === restIssues.length - 1}
+                      />
+                    ))}
+                  </div>
+                )}
                 <Link
                   href="/feed"
                   className="flex items-center justify-center gap-1.5 border-t border-border/30 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors rounded-b-xl"

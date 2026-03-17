@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v11"
+_CACHE_VERSION = "v12"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -320,17 +320,8 @@ async def _build_impact_summary(
             if cc in info.get("key_partners", []):
                 affected_sectors.add(sector)
 
-    # Top 5 이슈: personalizedKScore (kscore × impact_factor) 기준 정렬
-    # (종합 점수는 impact score 기반, 이슈 목록은 KScore 기반 — 클라이언트와 동일)
-    pkscore_sorted = sorted(
-        scored,
-        key=lambda x: -(
-            (x[0].kscore or 0) * calc_impact_factor(
-                x[0].country_code or "", x[0].topic or "unknown", home
-            )
-        ),
-    )
-    top5_for_issues = pkscore_sorted[:5]
+    # Top 5 이슈: impact_score 기준 (Sankey와 동일한 정렬)
+    top5_for_issues = scored[:5]
 
     from backend.app.models.economic_data import TradeBilateral, CommodityPrice
     from backend.app.models.issue_cluster import ClusterEvent

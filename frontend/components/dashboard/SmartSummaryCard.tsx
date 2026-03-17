@@ -7,15 +7,19 @@ import { getFlag, getCountryName } from "@/lib/countries";
 import { t, type TranslationKey } from "@/lib/i18n";
 import {
   TOPIC_COLORS,
-  personalizedKScore,
-  roundKScore,
-  kscoreAccent,
-  getKScoreBadge,
   type TrendingItem,
 } from "@/lib/kscore-utils";
 import { stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MarketSnapshot } from "@/lib/api";
+
+/* ── Impact score color helpers ── */
+
+function impactScoreColor(score: number) {
+  if (score >= 70) return { text: "text-red-500", bar: "bg-red-500", border: "border-l-red-500" };
+  if (score >= 40) return { text: "text-orange-500", bar: "bg-orange-500", border: "border-l-orange-500" };
+  return { text: "text-emerald-500", bar: "bg-emerald-500", border: "border-l-emerald-500" };
+}
 
 /* ── Full card for #1 issue ── */
 
@@ -43,7 +47,6 @@ function getRelevantMarketChips(cc: string, market: MarketSnapshot | null | unde
     return market.indices.filter((i) => ["KOSPI"].includes(i.symbol)).map(toChip);
   if (["UA", "RU", "DE", "FR", "GB"].includes(cc))
     return market.indices.filter((i) => ["DAX", "FTSE"].includes(i.symbol)).map(toChip);
-  // 매칭 안 되면 유가라도 표시
   return market.commodities.slice(0, 1);
 }
 
@@ -52,9 +55,6 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
   const [expanded, setExpanded] = useState(false);
 
   const topic = item.topic ?? "unknown";
-  const pKScore = personalizedKScore(item, homeCountry);
-  const k = roundKScore(pKScore);
-  const badge = getKScoreBadge(pKScore, lang);
   const clusterId = item.cluster_ids?.[0];
   const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
   const topicKey = `topic_${topic}` as TranslationKey;
@@ -63,124 +63,150 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
     ? buildSmartTitle(item.keyword, topic, lang, getCountryName, item.country_codes[0])
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
+  const impactScore = topIssueRaw?.impact_score ?? 0;
   const cc = item.country_codes?.[0] ?? "";
   const marketChips = getRelevantMarketChips(cc, market);
+  const colors = impactScoreColor(impactScore);
 
   const whatLine = topIssueRaw?.what_line;
   const soWhatLine = topIssueRaw?.so_what_line;
   const whenLine = topIssueRaw?.when_line;
-  const entityAnchor = topIssueRaw?.entity_anchor;
   const bodySnippet = topIssueRaw?.body_snippet;
 
   return (
     <section
-      className="rounded-xl border border-border bg-card overflow-hidden cursor-pointer"
+      className={cn("rounded-xl border border-border bg-card overflow-hidden cursor-pointer border-l-[3px]", colors.border)}
       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
     >
-      {/* Header: topic + flags + KScore */}
-      <div className={cn("px-3 pt-2.5 pb-2 border-b border-border/30", kscoreAccent(pKScore))}>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={cn(
-            "inline-flex items-center h-4 rounded-full px-1.5 text-[8px] font-medium leading-none shrink-0",
-            TOPIC_COLORS[topic]
-          )}>
-            {topicLabel}
-          </span>
-          {item.country_codes.length > 0 && (
-            <span className="text-xs shrink-0">
-              {item.country_codes.slice(0, 3).map((code: string) => getFlag(code)).join("")}
-            </span>
-          )}
-          {item.is_spike && (
-            <span className="text-[7px] px-1 py-0.5 rounded bg-red-500/10 text-red-400 font-medium shrink-0">
-              {t(lang, "dash_badge_spike" as TranslationKey)}
-            </span>
-          )}
-          {(item.confidence ?? 0) >= 0.7 && (
-            <span className="text-[7px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium shrink-0">
-              {t(lang, "dash_badge_verified" as TranslationKey)}
-            </span>
-          )}
-          <div className="ml-auto shrink-0 flex items-baseline gap-0.5">
-            <span className={cn("text-[8px]", badge.text)}>K</span>
-            <span className={cn("text-base font-bold tabular-nums leading-none", badge.text)}>
-              {k.toFixed(1)}
-            </span>
+      {/* ── Header: Title + Impact Score ── */}
+      <div className="px-3.5 pt-3 pb-2.5">
+        <div className="flex items-start gap-2.5">
+          <div className="flex-1 min-w-0">
+            {/* Flags + Title */}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              {item.country_codes.length > 0 && (
+                <span className="text-sm shrink-0">
+                  {item.country_codes.slice(0, 3).map((code: string) => getFlag(code)).join("")}
+                </span>
+              )}
+              <h3 className="text-[13px] font-bold text-foreground leading-snug line-clamp-2">{displayTitle}</h3>
+            </div>
+            {/* Topic + badges row */}
+            <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
+              <span className={cn(
+                "inline-flex items-center h-[18px] rounded-full px-2 text-[9px] font-medium leading-none shrink-0",
+                TOPIC_COLORS[topic]
+              )}>
+                {topicLabel}
+              </span>
+              {item.is_spike && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-semibold shrink-0">
+                  SPIKE
+                </span>
+              )}
+              {(item.confidence ?? 0) >= 0.7 && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">
+                  {t(lang, "dash_badge_verified" as TranslationKey)}
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Impact Score */}
+          <div className="shrink-0 text-right">
+            <div className={cn("text-2xl font-bold tabular-nums leading-none", colors.text)}>{impactScore}</div>
+            <div className="text-[8px] text-muted-foreground mt-0.5">{lang === "ko" ? "영향도" : "Impact"}</div>
           </div>
         </div>
       </div>
 
-      {/* Smart Summary 3 lines */}
-      <div className="px-3 py-2.5 space-y-1.5">
+      {/* ── 3-line Smart Summary ── */}
+      <div className="px-3.5 py-3 space-y-2.5 border-t border-border/20">
         {whatLine && (
-          <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-red-400 shrink-0 mt-0.5 min-w-[28px]">
-              {t(lang, "dash_smart_what" as TranslationKey)}
-            </span>
-            <span className="text-[10px] text-foreground/80 leading-snug line-clamp-2">{whatLine}</span>
+          <div className="flex gap-2.5">
+            <div className="shrink-0 w-[3px] rounded-full bg-red-400 self-stretch" />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-red-400 block mb-0.5">
+                {t(lang, "dash_smart_what" as TranslationKey)}
+              </span>
+              <span className="text-[11px] text-foreground/80 leading-snug line-clamp-2 block">{whatLine}</span>
+            </div>
           </div>
         )}
         {soWhatLine && (
-          <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-orange-400 shrink-0 mt-0.5 min-w-[28px]">
-              {t(lang, "dash_smart_so_what" as TranslationKey)}
-            </span>
-            <span className="text-[10px] text-foreground/80 leading-snug font-medium line-clamp-2">{soWhatLine}</span>
+          <div className="flex gap-2.5">
+            <div className="shrink-0 w-[3px] rounded-full bg-orange-400 self-stretch" />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-orange-400 block mb-0.5">
+                {t(lang, "dash_smart_so_what" as TranslationKey)}
+              </span>
+              <span className="text-[11px] text-foreground/80 leading-snug font-medium line-clamp-2 block">{soWhatLine}</span>
+            </div>
           </div>
         )}
         {whenLine && (
-          <div className="flex items-start gap-1.5">
-            <span className="text-[8px] font-bold text-blue-400 shrink-0 mt-0.5 min-w-[28px]">
-              {t(lang, "dash_smart_when" as TranslationKey)}
-            </span>
-            <span className="text-[10px] text-foreground/60 leading-snug">{whenLine}</span>
+          <div className="flex gap-2.5">
+            <div className="shrink-0 w-[3px] rounded-full bg-blue-400 self-stretch" />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-blue-400 block mb-0.5">
+                {t(lang, "dash_smart_when" as TranslationKey)}
+              </span>
+              <span className="text-[11px] text-foreground/70 leading-snug block">{whenLine}</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Market chips + entity_anchor */}
-      <div className="px-3 pb-2 space-y-1">
-        {marketChips.length > 0 && (
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+      {/* ── Impact score bar ── */}
+      <div className="px-3.5 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-muted/30 rounded-full overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", colors.bar)}
+              style={{ width: `${Math.min(impactScore, 100)}%` }}
+            />
+          </div>
+          <span className={cn("text-[9px] font-bold tabular-nums", colors.text)}>{impactScore}/100</span>
+        </div>
+      </div>
+
+      {/* ── Market chips ── */}
+      {marketChips.length > 0 && (
+        <div className="px-3.5 pb-2.5">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             {marketChips.map((m) => (
-              <span key={m.symbol} className="shrink-0 inline-flex items-center gap-0.5 rounded bg-muted/20 px-1.5 py-0.5 text-[8px]">
+              <span key={m.symbol} className="shrink-0 inline-flex items-center gap-1 rounded-md bg-muted/20 px-2 py-1 text-[9px]">
                 <span className="font-medium">{m.name}</span>
                 <span className="tabular-nums">${m.price_usd.toLocaleString()}</span>
-                <span className={cn("font-medium tabular-nums", m.change_pct > 0 ? "text-red-500" : m.change_pct < 0 ? "text-blue-500" : "text-muted-foreground")}>
+                <span className={cn("font-semibold tabular-nums", m.change_pct > 0 ? "text-red-500" : m.change_pct < 0 ? "text-blue-500" : "text-muted-foreground")}>
                   {m.change_pct > 0 ? "+" : ""}{m.change_pct.toFixed(1)}%
                 </span>
               </span>
             ))}
           </div>
-        )}
-        {isPro && entityAnchor && (
-          <p className="text-[8px] text-muted-foreground/60 truncate">
-            {/^[A-Z]{2}$/.test(entityAnchor) ? getCountryName(entityAnchor, lang) : entityAnchor}
-          </p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Body snippet (Pro, collapsible) */}
+      {/* ── Body snippet (Pro, collapsible) ── */}
       {isPro && bodySnippet && (
-        <div className="px-3 pb-2.5 border-t border-border/20 pt-2">
+        <div className="px-3.5 pb-2.5 border-t border-border/20 pt-2.5">
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            className="flex items-center gap-1 text-[8px] text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            {expanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+            {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             {t(lang, "dash_smart_detail" as TranslationKey)}
           </button>
           {expanded && (
-            <p className="text-[9px] text-foreground/60 leading-relaxed mt-1.5">{bodySnippet}</p>
+            <p className="text-[10px] text-foreground/60 leading-relaxed mt-1.5">{bodySnippet}</p>
           )}
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-3 pb-2.5 flex justify-end">
-        <span className="text-[9px] text-primary font-medium flex items-center gap-0.5">
+      {/* ── Footer ── */}
+      <div className="px-3.5 py-2.5 border-t border-border/20 flex justify-end">
+        <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
           {t(lang, "dash_chain_detail" as TranslationKey)}
-          <ChevronRight className="h-2.5 w-2.5" />
+          <ChevronRight className="h-3 w-3" />
         </span>
       </div>
     </section>
@@ -201,9 +227,6 @@ interface SmartSummaryCompactProps {
 export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRaw, isLast }: SmartSummaryCompactProps) {
   const router = useRouter();
   const topic = item.topic ?? "unknown";
-  const pKScore = personalizedKScore(item, homeCountry);
-  const k = roundKScore(pKScore);
-  const badge = getKScoreBadge(pKScore, lang);
   const clusterId = item.cluster_ids?.[0];
   const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
   const topicKey = `topic_${topic}` as TranslationKey;
@@ -212,35 +235,43 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
     ? buildSmartTitle(item.keyword, topic, lang, getCountryName, item.country_codes[0])
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
+  const impactScore = topIssueRaw?.impact_score ?? 0;
   const soWhatLine = topIssueRaw?.so_what_line;
+  const colors = impactScoreColor(impactScore);
 
   return (
     <div
       onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
       className={cn(
-        "flex items-center gap-1.5 py-2 cursor-pointer hover:bg-muted/10 transition-all duration-200 rounded-lg px-1 -mx-1",
+        "flex items-center gap-2 py-2.5 cursor-pointer hover:bg-muted/10 transition-all duration-200 rounded-lg px-1.5 -mx-1.5",
         !isLast && "border-b border-border/30",
       )}
     >
-      <span className="text-[9px] font-bold text-muted-foreground w-4 text-center shrink-0">#{index + 2}</span>
+      {/* Ranking */}
+      <span className="text-[10px] font-bold text-muted-foreground w-5 text-center shrink-0">#{index + 2}</span>
+
+      {/* Flag */}
       {item.country_codes.length > 0 && (
-        <span className="text-[10px] shrink-0">
-          {getFlag(item.country_codes[0])}
-        </span>
+        <span className="text-sm shrink-0">{getFlag(item.country_codes[0])}</span>
       )}
+
+      {/* Title + description */}
       <div className="flex-1 min-w-0">
-        <span className="text-[10px] font-medium truncate block leading-tight">{displayTitle}</span>
+        <span className="text-[11px] font-semibold truncate block leading-tight">{displayTitle}</span>
         {soWhatLine && (
-          <span className="text-[8px] text-foreground/50 truncate block mt-0.5 leading-tight">{soWhatLine}</span>
+          <span className="text-[9px] text-foreground/50 truncate block mt-0.5 leading-tight">{soWhatLine}</span>
         )}
       </div>
-      <div className="shrink-0 flex items-baseline gap-0.5">
-        <span className="text-[7px] text-muted-foreground">K</span>
-        <span className={cn("text-xs font-bold tabular-nums", badge.text)}>
-          {k.toFixed(1)}
-        </span>
+
+      {/* Impact score mini bar */}
+      <div className="shrink-0 flex items-center gap-1.5 w-[60px]">
+        <div className="flex-1 h-1 bg-muted/30 rounded-full overflow-hidden">
+          <div className={cn("h-full rounded-full", colors.bar)} style={{ width: `${Math.min(impactScore, 100)}%` }} />
+        </div>
+        <span className={cn("text-[10px] font-bold tabular-nums w-5 text-right", colors.text)}>{impactScore}</span>
       </div>
-      <ChevronRight className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+
+      <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
     </div>
   );
 }
