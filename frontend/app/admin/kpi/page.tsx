@@ -95,6 +95,31 @@ function WowBadge({ delta }: { delta: number }) {
   );
 }
 
+const RAW_METRIC_LABELS_KO: Record<string, string> = {
+  auth_success: "로그인 성공",
+  onboarding_complete: "온보딩 완료",
+  dashboard_view: "대시보드 조회",
+  issue_view: "이슈 상세 조회",
+  map_view: "지도 조회",
+  alert_click: "알림 클릭",
+  share_click: "공유 클릭",
+  paywall_shown: "페이월 노출",
+  paywall_purchase: "페이월 결제",
+  trial_started: "체험판 시작",
+  trial_converted: "체험판 → 유료 전환",
+  promo_started: "프로모션 시작",
+  promo_converted: "프로모션 → 유료 전환",
+  discount_eligible: "할인 대상",
+  discount_converted: "할인 전환",
+  active_referral_users: "추천 활성 유저",
+  d7_cohort: "D7 코호트 (7~14일 전 가입)",
+  d7_retained: "D7 재방문 유저",
+  push_sent: "푸시 발송",
+  push_clicked: "푸시 클릭",
+  subscription_created: "구독 생성",
+  subscription_cancelled: "구독 취소",
+};
+
 export default function KpiPage() {
   const lang = useAppStore((s) => s.lang);
   const [kpi, setKpi] = useState<KpiData | null>(null);
@@ -232,17 +257,20 @@ export default function KpiPage() {
         <div className="divide-y divide-border">
           {Object.entries(kpi.raw)
             .sort(([, a], [, b]) => b - a)
-            .map(([key, val]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between px-5 py-2.5 text-sm"
-              >
-                <span className="text-muted-foreground font-mono text-xs">
-                  {key}
-                </span>
-                <span className="font-medium tabular-nums">{val.toLocaleString()}</span>
-              </div>
-            ))}
+            .map(([key, val]) => {
+              const label = lang === "ko" ? (RAW_METRIC_LABELS_KO[key] ?? key) : key;
+              return (
+                <div
+                  key={key}
+                  className="flex items-center justify-between px-5 py-2.5 text-sm"
+                >
+                  <span className="text-muted-foreground text-xs">
+                    {label}
+                  </span>
+                  <span className="font-medium tabular-nums">{val.toLocaleString()}</span>
+                </div>
+              );
+            })}
         </div>
       </div>
 
