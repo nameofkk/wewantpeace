@@ -78,12 +78,12 @@ async def _check_telegram_collection(db: AsyncSession) -> CheckResult:
     if not last:
         return CheckResult("telegram_collection", False, "Telegram 수집 기록 없음")
     age = datetime.now(timezone.utc) - last.replace(tzinfo=timezone.utc) if last.tzinfo is None else datetime.now(timezone.utc) - last
-    ok = age < timedelta(minutes=10)
+    ok = age < timedelta(minutes=30)
     mins = int(age.total_seconds() / 60)
     return CheckResult(
         "telegram_collection",
         ok,
-        f"최근 수집: {mins}분 전" if ok else f"Telegram 수집 중단: {mins}분 경과 (>10분)",
+        f"최근 수집: {mins}분 전" if ok else f"Telegram 수집 중단: {mins}분 경과 (>30분)",
     )
 
 
