@@ -221,9 +221,13 @@ async def list_users(
     status: Optional[str] = Query(None),
     exclude_status: Optional[str] = Query(None),
     plan: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query("desc"),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    from backend.app.models.app_event import AppEvent
+
     filters = []
     if search:
         safe_search = search.replace("%", r"\%").replace("_", r"\_")
@@ -241,13 +245,36 @@ async def list_users(
         count_q = count_q.where(and_(*filters))
     total = (await db.execute(count_q)).scalar() or 0
 
-    # paginated rows
-    q = select(User)
+    # visit_count subquery
+    visit_sub = (
+        select(AppEvent.user_id, func.count().label("visit_count"))
+        .where(AppEvent.session_id != "backfill")
+        .group_by(AppEvent.user_id)
+        .subquery()
+    )
+
+    # paginated rows with visit_count
+    q = (
+        select(User, func.coalesce(visit_sub.c.visit_count, 0).label("visit_count"))
+        .outerjoin(visit_sub, User.id == visit_sub.c.user_id)
+    )
     if filters:
         q = q.where(and_(*filters))
-    q = q.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
+
+    # sorting
+    sort_col_map = {
+        "nickname": User.nickname,
+        "created_at": User.created_at,
+        "last_active": User.last_active,
+        "visit_count": func.coalesce(visit_sub.c.visit_count, 0),
+        "plan": User.plan,
+    }
+    sort_col = sort_col_map.get(sort_by, User.created_at)
+    q = q.order_by(sort_col.asc() if sort_order == "asc" else sort_col.desc())
+    q = q.offset((page - 1) * limit).limit(limit)
+
     result = await db.execute(q)
-    users = result.scalars().all()
+    rows = result.all()
 
     return {
         "total": total,
@@ -262,8 +289,9 @@ async def list_users(
                 "role": u.role,
                 "created_at": u.created_at.isoformat(),
                 "last_active": u.last_active.isoformat() if u.last_active else None,
+                "visit_count": vc,
             }
-            for u in users
+            for u, vc in rows
         ],
     }
 

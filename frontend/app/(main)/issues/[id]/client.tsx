@@ -288,13 +288,13 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
             </div>
           </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/40 rounded-lg">
-            <Lock className="h-4 w-4 text-muted-foreground mb-1.5" />
-            <p className="text-[11px] text-muted-foreground mb-2 font-medium">
+            <Lock className="h-5 w-5 text-muted-foreground mb-2" />
+            <p className="text-xs text-muted-foreground mb-2 font-medium">
               {lang === "ko" ? "Pro 플랜에서 확인 가능" : "Available on Pro plan"}
             </p>
             <a
               href="/upgrade?source=demo_cross"
-              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white no-underline bg-foreground/80 hover:bg-foreground/90 transition-colors"
+              className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold no-underline bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {t(lang, "dash_unlock_pro")}
             </a>
@@ -536,8 +536,8 @@ export default function IssueDetailClient({ initialData }: Props) {
         {/* 영향 분석 */}
         <ImpactBriefCard clusterId={id} />
 
-        {/* 산업별 리스크 분석 — Pro 이상만 표시 */}
-        {isPro && <SectorImpactCard clusterId={id} />}
+        {/* 산업별 리스크 분석 — 컴포넌트 내부에서 Free 플랜 blur 처리 */}
+        <SectorImpactCard clusterId={id} />
 
         {/* T15: 정정/업데이트 이력 */}
         {issue.change_logs && issue.change_logs.length > 0 && (

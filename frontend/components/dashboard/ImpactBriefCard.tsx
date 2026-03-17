@@ -216,7 +216,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                     </p>
                     <a
                       href="/upgrade?source=demo_impact"
-                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                     >
                       {t(lang, "dash_unlock_pro")}
                     </a>
@@ -342,7 +342,7 @@ export function ImpactBriefCard({ clusterId }: { clusterId?: string } = {}) {
                     </p>
                     <a
                       href="/upgrade"
-                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold text-white bg-foreground/80 hover:bg-foreground/90 transition-colors"
+                      className="inline-flex rounded-full px-3 py-1.5 text-[10px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                     >
                       {t(lang, "dash_unlock_pro")}
                     </a>
