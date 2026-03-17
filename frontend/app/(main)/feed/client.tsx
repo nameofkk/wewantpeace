@@ -596,12 +596,17 @@ function FeedPageContent() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작
+  // searchParams를 deps에서 제거: replaceState로 URL 변경 시 레이스 컨디션 방지
+  const tourTriggered = useRef(false);
   useEffect(() => {
+    if (tourTriggered.current) return;
     if (searchParams.get("tour") === "1" && !completedTours.includes("feed")) {
-      setTourRun(true);
+      tourTriggered.current = true;
       window.history.replaceState({}, "", "/feed");
+      setTourRun(true);
     }
-  }, [searchParams, completedTours]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedTours]);
 
   const feedTourSteps: Step[] = useMemo(() => [
     {

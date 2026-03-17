@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useMemo, useEffect, useState } from "react";
+import React, { Suspense, useMemo, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -170,13 +170,18 @@ function ReportContent() {
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작 (데이터 로딩 완료 후)
+  // searchParams를 deps에서 제거: replaceState로 URL 변경 시 re-render가 timer를 취소하는 레이스 컨디션 방지
+  const tourTriggered = useRef(false);
   useEffect(() => {
+    if (tourTriggered.current) return;
     if (searchParams.get("tour") === "1" && !completedTours.includes("dashboard") && !summaryLoading && summary) {
-      const timer = setTimeout(() => setTourRun(true), 500);
+      tourTriggered.current = true;
       window.history.replaceState({}, "", "/home");
+      const timer = setTimeout(() => setTourRun(true), 500);
       return () => clearTimeout(timer);
     }
-  }, [searchParams, completedTours, summaryLoading, summary]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedTours, summaryLoading, summary]);
 
   const dashTourSteps: Step[] = useMemo(() => [
     {
