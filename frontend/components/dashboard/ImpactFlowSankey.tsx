@@ -35,7 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   impact: "#3b82f6",
 };
 
-const NUM_LABELS = ["①", "②", "③", "④", "⑤"];
+const NUM_LABELS = ["1", "2", "3", "4", "5"];
 
 function truncLabel(s: string, max: number) {
   if (max >= 999) return s; // no truncation
@@ -46,9 +46,9 @@ function truncLabel(s: string, max: number) {
 function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeClass: "sm" | "md" | "lg", lang: "ko" | "en" = "ko") {
   const isEn = lang === "en";
   const sizeCfg = {
-    sm:  { top: 10, right: isEn ? 130 : 100, bottom: 18, left: isEn ? 50 : 55, nodeW: 10, colGap: 40, nodePad: 6, minNodeH: 12, maxLinkH: 20, minLink: 2 },
-    md:  { top: 10, right: isEn ? 160 : 140, bottom: 20, left: isEn ? 58 : 65, nodeW: 14, colGap: 60, nodePad: 10, minNodeH: 18, maxLinkH: 28, minLink: 3 },
-    lg:  { top: 12, right: 160, bottom: 22, left: 75, nodeW: 16, colGap: 80, nodePad: 14, minNodeH: 22, maxLinkH: 34, minLink: 4 },
+    sm:  { top: 10, right: isEn ? 130 : 100, bottom: 18, left: isEn ? 16 : 22, nodeW: 10, colGap: 40, nodePad: 6, minNodeH: 12, maxLinkH: 20, minLink: 2 },
+    md:  { top: 10, right: isEn ? 160 : 140, bottom: 20, left: isEn ? 22 : 28, nodeW: 14, colGap: 60, nodePad: 10, minNodeH: 18, maxLinkH: 28, minLink: 3 },
+    lg:  { top: 12, right: 160, bottom: 22, left: 36, nodeW: 16, colGap: 80, nodePad: 14, minNodeH: 22, maxLinkH: 34, minLink: 4 },
   };
   const cfg = sizeCfg[sizeClass];
   const margin = { top: cfg.top, right: cfg.right, bottom: cfg.bottom, left: cfg.left };
@@ -470,19 +470,14 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
             const idx = conflictIdxMap.get(id) ?? -1;
             const isNodeConnected = !isHovering || connectedNodes.has(id);
 
-            const maxLabelLen = sizeClass === "lg" ? 8 : sizeClass === "md" ? 6 : 5;
-            const conflictShortLabel = isConflict
-              ? `${NUM_LABELS[idx] ?? ""} ${truncLabel(pos.label, maxLabelLen)}`
-              : "";
-            const labelText = isConflict ? conflictShortLabel : pos.label;
+            const labelText = isConflict
+              ? NUM_LABELS[idx] ?? ""
+              : pos.label;
 
             const textX = isConflict
-              ? pos.x - 6
+              ? pos.x - 4
               : pos.x + nodeW + 4;
             const textAnchor = isConflict ? "end" : "start";
-            const fontSize = isConflict
-              ? (sizeClass === "lg" ? 11 : sizeClass === "md" ? 10 : effectiveWidth < 380 ? 8 : 9)
-              : (sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11);
 
             return (
               <text
@@ -492,7 +487,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                 dy="0.35em"
                 textAnchor={textAnchor}
                 fill={isConflict ? pos.color : isDark ? "rgba(156,163,175,0.9)" : "rgba(55,65,81,0.9)"}
-                fontSize={fontSize}
+                fontSize={sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11}
                 fontWeight={isHovering && isNodeConnected ? 700 : 600}
                 opacity={isHovering && !isNodeConnected ? 0.25 : 1}
                 style={{ transition: "opacity 0.25s ease, font-weight 0.25s ease" }}
