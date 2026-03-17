@@ -62,10 +62,10 @@ class UUIDArray(TypeDecorator):
 
 _is_sqlite = settings.database_url.startswith("sqlite")
 # Supabase Session mode pooler 연결 수 제한 대응:
-# Worker(4 프로세스 × pool_size) + Backend 합계가 Supabase 한도 이내여야 함
+# Worker(6 프로세스 × pool_size) + Backend 합계가 Supabase 한도(~20) 이내여야 함
 import os as _os
-_pool_size = 3 if _os.environ.get("CELERY_WORKER") else 5
-_max_overflow = 2 if _os.environ.get("CELERY_WORKER") else 5
+_pool_size = 2 if _os.environ.get("CELERY_WORKER") else 5
+_max_overflow = 1 if _os.environ.get("CELERY_WORKER") else 5
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
