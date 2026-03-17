@@ -27,7 +27,7 @@ import { ALL_COUNTRIES, getCountryName, getFlag } from "@/lib/countries";
 import { useMe, API_BASE } from "@/lib/api";
 import { signInWithGoogle, signInWithApple, signInWithToss, getIdToken } from "@/lib/auth";
 import { isTossMiniApp } from "@/lib/platform";
-import { isInAppBrowser, openInExternalBrowser } from "@/lib/browser-detect";
+import { isGoogleOAuthBlocked, openInExternalBrowser } from "@/lib/browser-detect";
 import { trackEvent } from "@/lib/analytics";
 
 type Step = 0 | 1 | 2;
@@ -272,7 +272,7 @@ export default function OnboardingPage() {
 
   // --- 로그인 처리 ---
   async function handleOAuthLogin(provider: "google" | "apple") {
-    if (isInAppBrowser()) {
+    if (isGoogleOAuthBlocked()) {
       setInAppBlocked(true);
       setLoginError(
         lang === "en"

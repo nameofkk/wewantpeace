@@ -9,6 +9,17 @@ export function isInAppBrowser(): boolean {
   return /KAKAOTALK|NAVER|LINE|FB_IAB|FBAV|Instagram|FBAN|Barcelona|Threads/i.test(ua);
 }
 
+/**
+ * Google OAuth가 차단되는 인앱브라우저만 감지.
+ * Meta 계열(Threads/Instagram/Facebook)은 자체 WebView를 사용하여 Google이 403 disallowed_useragent로 차단.
+ * 카카오톡/네이버/LINE은 Chrome Custom Tabs를 사용하므로 Google OAuth 허용됨.
+ */
+export function isGoogleOAuthBlocked(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /FB_IAB|FBAV|Instagram|FBAN|Barcelona|Threads/i.test(ua);
+}
+
 /** 인앱브라우저에서 외부 브라우저로 현재 URL 열기 시도 */
 export function openInExternalBrowser(): void {
   if (typeof window === "undefined") return;

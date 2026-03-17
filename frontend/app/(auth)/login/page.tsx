@@ -23,7 +23,7 @@ import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
 import { isTossMiniApp } from "@/lib/platform";
 import { detectPlatform } from "@/lib/platform-detect";
-import { isInAppBrowser, openInExternalBrowser } from "@/lib/browser-detect";
+import { isGoogleOAuthBlocked, openInExternalBrowser } from "@/lib/browser-detect";
 import { trackEvent } from "@/lib/analytics";
 import { TERMS_KO, TERMS_EN, PRIVACY_KO, PRIVACY_EN } from "@/lib/legal-data";
 
@@ -271,7 +271,7 @@ export default function LoginPage() {
   }
 
   async function handleGoogleLogin() {
-    if (isInAppBrowser()) {
+    if (isGoogleOAuthBlocked()) {
       setInAppBlocked(true);
       setError(
         lang === "en"
@@ -336,7 +336,7 @@ export default function LoginPage() {
   }
 
   async function handleAppleLogin() {
-    if (isInAppBrowser()) {
+    if (isGoogleOAuthBlocked()) {
       setInAppBlocked(true);
       setError(
         lang === "en"
