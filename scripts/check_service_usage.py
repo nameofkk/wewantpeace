@@ -340,7 +340,11 @@ def send_telegram(text: str) -> bool:
     try:
         resp = httpx.post(
             f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage",
-            json={"chat_id": TG_CHAT_ID, "text": text},
+            json={
+                "chat_id": TG_CHAT_ID,
+                "text": text,
+                "disable_web_page_preview": True,
+            },
             timeout=10,
         )
         return resp.status_code == 200

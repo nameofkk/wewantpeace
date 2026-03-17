@@ -68,6 +68,7 @@ async def send_health_report(results: list) -> bool:
                     json={
                         "chat_id": SOCIAL_TG_CHAT_ID,
                         "text": message,
+                        "disable_web_page_preview": True,
                     },
                 )
                 if resp.status_code == 200:
@@ -142,6 +143,7 @@ async def send_health_report(results: list) -> bool:
                         "chat_id": SOCIAL_TG_CHAT_ID,
                         "text": issue_msg,
                         "reply_markup": keyboard,
+                        "disable_web_page_preview": True,
                     },
                 )
 
@@ -300,6 +302,7 @@ async def process_approvals() -> dict:
                         json={
                             "chat_id": SOCIAL_TG_CHAT_ID,
                             "text": f"\u274c {username}님이 {action_info['action']} 무시함",
+                            "disable_web_page_preview": True,
                         },
                     )
 
@@ -342,7 +345,7 @@ async def _send_fix_result(
         )
         await client.post(
             f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-            json={"chat_id": SOCIAL_TG_CHAT_ID, "text": text},
+            json={"chat_id": SOCIAL_TG_CHAT_ID, "text": text, "disable_web_page_preview": True},
         )
     except Exception:
         logger.exception("수정 결과 알림 전송 오류")

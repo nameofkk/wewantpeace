@@ -269,6 +269,7 @@ async def send_monitoring_alert(results: list[CheckResult]) -> bool:
                     "chat_id": SOCIAL_TG_CHAT_ID,
                     "text": message,
                     "parse_mode": "Markdown",
+                    "disable_web_page_preview": True,
                 },
             )
             if resp.status_code == 200:

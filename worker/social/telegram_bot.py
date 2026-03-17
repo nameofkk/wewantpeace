@@ -385,7 +385,7 @@ async def _poll_updates():
                             if chat_id:
                                 await client.post(
                                     f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-                                    json={"chat_id": chat_id, "text": reply},
+                                    json={"chat_id": chat_id, "text": reply, "disable_web_page_preview": True},
                                 )
                             continue
 
@@ -465,7 +465,7 @@ async def _handle_agent_message(client, chat_id: int, text: str):
             chunk = reply[i:i + 4096]
             await client.post(
                 f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": chunk},
+                json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},
             )
     except Exception:
         logger.exception("AI 에이전트 메시지 처리 오류")
