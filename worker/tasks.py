@@ -3024,8 +3024,8 @@ def generate_kscore_social(self):
             async with db.begin():
                 cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
 
-                # 최근 24시간 내 포스팅된 클러스터 제외 (날짜 전환 폭발 방지)
-                dedup_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+                # 최근 72시간 내 생성되었거나 발행된 클러스터 제외 (중복 방지)
+                dedup_cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
                 existing_ids_result = await db.execute(
                     select(SocialPost.source_cluster_id)
                     .where(
@@ -3034,6 +3034,16 @@ def generate_kscore_social(self):
                     )
                 )
                 already_posted = {r[0] for r in existing_ids_result.fetchall() if r[0] is not None}
+                # published 상태 포스트는 72시간 내 published_at 기준으로도 체크
+                published_ids_result = await db.execute(
+                    select(SocialPost.source_cluster_id)
+                    .where(
+                        SocialPost.content_type == "kscore_alert",
+                        SocialPost.status == "published",
+                        SocialPost.published_at >= dedup_cutoff,
+                    )
+                )
+                already_posted |= {r[0] for r in published_ids_result.fetchall() if r[0] is not None}
 
                 query = (
                     select(IssueCluster)

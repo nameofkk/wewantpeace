@@ -272,6 +272,20 @@ async def generate_kscore_alert(
         logger.info("KScore Alert 이미 존재: %s", dedup_key)
         return None
 
+    # 같은 클러스터의 최근 72시간 내 published 포스트가 있으면 중복 방지
+    published_cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+    published_check = await db.execute(
+        select(SocialPost.id).where(
+            SocialPost.source_cluster_id == cluster.id,
+            SocialPost.content_type == "kscore_alert",
+            SocialPost.status == "published",
+            SocialPost.published_at >= published_cutoff,
+        ).limit(1)
+    )
+    if published_check.scalar_one_or_none():
+        logger.info("KScore Alert 72시간 내 이미 발행됨: cluster=%s", cluster.id)
+        return None
+
     country_codes = [cluster.country_code] if cluster.country_code else []
     hashtags = _build_hashtags(country_codes, topic=cluster.topic or "")
     risk = "high" if cluster.severity >= 70 else "medium"
