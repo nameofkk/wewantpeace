@@ -59,13 +59,18 @@ class Settings(BaseSettings):
 
     # 토스 앱인토스 + 프로덕션 도메인은 항상 허용 (환경변수 ALLOWED_ORIGINS와 병합됨)
     extra_cors_origins: List[str] = [
+        # 토스 WebView 실제 origin (tossmini.com 도메인)
+        "https://wewantpeace.apps.tossmini.com",
+        "https://wewantpeace.private-apps.tossmini.com",
+        # 토스 콘솔/API 도메인
         "https://apps-in-toss.toss.im",
         "https://apps-in-toss-api.toss.im",
+        # 프로덕션 웹
         "https://www.wewantpeace.live",
         "https://wewantpeace.live",
     ]
-    # 토스 WebView의 실제 origin이 서브도메인일 수 있으므로 regex 패턴 추가
-    cors_origin_regex: str = r"https://.*\.toss\.im"
+    # 토스 WebView origin: *.tossmini.com + *.toss.im 모두 허용
+    cors_origin_regex: str = r"https://.*\.(tossmini\.com|toss\.im)"
     allowed_origins: List[str] = ["http://localhost:3000"]
 
     @model_validator(mode="after")
