@@ -16,6 +16,8 @@ export function isIOS(): boolean {
 export function isPushSupported(): boolean {
   if (typeof window === "undefined") return false;
   if (isIOS()) return false;
+  // 토스 WebView는 Service Worker 미지원
+  if (process.env.NEXT_PUBLIC_IS_TOSS_MINIAPP === "true") return false;
   if (!("Notification" in window)) return false;
   if (!("serviceWorker" in navigator)) return false;
   return true;
