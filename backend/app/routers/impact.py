@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v12"
+_CACHE_VERSION = "v13"
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -2436,6 +2436,9 @@ async def _calc_sector_exposure(
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     l = "ko" if lang == "ko" else "en"
 
+    # 섹터 GDP 비중 합계 (교역금액 비례배분용)
+    total_gdp_pct = sum(info["gdp_pct"] for info in sectors_data.values()) or 1.0
+
     # DB 교역 상세 조회
     trade_detail: _TradeDetail | None = None
     if db:
@@ -2451,6 +2454,7 @@ async def _calc_sector_exposure(
     for sector, info in sectors_data.items():
         partners = info.get("key_partners", [])
         gdp_pct = info["gdp_pct"]
+        sector_share = gdp_pct / total_gdp_pct  # 섹터 GDP 비중 (교역금액 비례배분용)
 
         is_partner = affected_country in partners
         partner_rank = partners.index(affected_country) + 1 if is_partner else 0
@@ -2482,6 +2486,11 @@ async def _calc_sector_exposure(
 
         sector_label = labels.get(sector, sector)
 
+        # 섹터별 교역금액 추정 (국가 전체 교역액 × 섹터 GDP 비중)
+        sector_trade_usd = (trade_detail.total_usd or 0) * sector_share if trade_detail and trade_detail.total_usd else 0
+        sector_export_usd = (trade_detail.export_usd or 0) * sector_share if trade_detail and trade_detail.export_usd else 0
+        sector_import_usd = (trade_detail.import_usd or 0) * sector_share if trade_detail and trade_detail.import_usd else 0
+
         # ── 설명 생성 (v2: 토픽×섹터 사전 우선) ──
         narrative = _SECTOR_NARRATIVES.get((topic, sector), {}).get(l, {})
         desc_from_narrative = narrative.get(risk_level) or narrative.get("high") or narrative.get("medium")
@@ -2489,8 +2498,8 @@ async def _calc_sector_exposure(
         if desc_from_narrative:
             # 토픽별 구체 설명 + 교역 수치 보강
             desc = desc_from_narrative
-            if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
-                vol = _fmt_usd(trade_detail.total_usd)
+            if sector_trade_usd > 0:
+                vol = _fmt_usd(sector_trade_usd)
                 pct = f"{real_trade_dep * 100:.1f}%" if real_trade_dep else ""
                 if l == "ko":
                     desc += f" (교역 {vol}, 비중 {pct})" if pct else f" (교역 {vol})"
@@ -2505,16 +2514,16 @@ async def _calc_sector_exposure(
             # 폴백: 기존 템플릿 + 교역액 추가
             if l == "ko":
                 desc = f"GDP 대비 {gdp_pct}% 비중. "
-                if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
-                    desc += f"해당 지역과 교역 {_fmt_usd(trade_detail.total_usd)} (비중 {real_trade_dep * 100:.1f}%)."
+                if sector_trade_usd > 0:
+                    desc += f"해당 지역과 교역 {_fmt_usd(sector_trade_usd)} (비중 {real_trade_dep * 100:.1f}%)."
                 elif is_partner:
                     desc += f"해당 지역은 {sector_label} 분야 {partner_rank}위 교역 파트너."
                 else:
                     desc += "직접 교역 관계는 낮으나 글로벌 공급망 간접 영향 가능."
             else:
                 desc = f"{gdp_pct}% of GDP. "
-                if trade_detail and trade_detail.total_usd and trade_detail.total_usd > 0:
-                    desc += f"Trade with affected region: {_fmt_usd(trade_detail.total_usd)} (share {real_trade_dep * 100:.1f}%)."
+                if sector_trade_usd > 0:
+                    desc += f"Trade with affected region: {_fmt_usd(sector_trade_usd)} (share {real_trade_dep * 100:.1f}%)."
                 elif is_partner:
                     desc += f"Affected region is #{partner_rank} trade partner for {sector_label}."
                 else:
@@ -2549,10 +2558,10 @@ async def _calc_sector_exposure(
             "action_point": action_point,
         }
 
-        if trade_detail and trade_detail.total_usd:
-            entry["trade_volume_usd"] = round(trade_detail.total_usd, 1)
-            entry["export_usd"] = round(trade_detail.export_usd, 1) if trade_detail.export_usd else None
-            entry["import_usd"] = round(trade_detail.import_usd, 1) if trade_detail.import_usd else None
+        if sector_trade_usd > 0:
+            entry["trade_volume_usd"] = round(sector_trade_usd, 1)
+            entry["export_usd"] = round(sector_export_usd, 1) if sector_export_usd else None
+            entry["import_usd"] = round(sector_import_usd, 1) if sector_import_usd else None
 
         result.append(entry)
 
@@ -2696,6 +2705,9 @@ async def get_sector_overview(
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     aggregated: dict[str, dict] = {}
 
+    # 섹터 GDP 비중 합계 (교역금액 비례배분용)
+    total_gdp_pct = sum(info["gdp_pct"] for info in sectors_data.values()) or 1.0
+
     # 실제 교역 데이터 조회 (한 번만) — 모든 분쟁국 대상
     real_trade_details: dict[str, _TradeDetail | None] = {}
     for cc in country_severity:
@@ -2762,9 +2774,11 @@ async def get_sector_overview(
                 trade_dep = min(0.95, real_dep * 3)
                 affected_countries.append(cc)
                 if detail:
-                    total_trade_usd += detail.total_usd or 0
-                    total_export_usd += detail.export_usd or 0
-                    total_import_usd += detail.import_usd or 0
+                    # 섹터 GDP 비중으로 비례배분 (국가 전체 교역액 × 섹터 비중)
+                    sector_share = gdp_pct / total_gdp_pct
+                    total_trade_usd += (detail.total_usd or 0) * sector_share
+                    total_export_usd += (detail.export_usd or 0) * sector_share
+                    total_import_usd += (detail.import_usd or 0) * sector_share
                 if best_detail is None or (real_dep > (best_detail.dependency or 0)):
                     best_detail = detail
                     best_topic_for_sector = country_topic.get(cc, dominant_topic)
