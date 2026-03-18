@@ -133,7 +133,7 @@ export default function AdminDashboard() {
       icon: Layers,
       color: "text-emerald-400",
       bg: "bg-emerald-500/10",
-      href: "/admin/clusters",
+      href: "/admin/issues",
     },
     {
       label: t(lang, "admin_events_today"),
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
       icon: FileText,
       color: "text-cyan-400",
       bg: "bg-cyan-500/10",
-      href: "/admin/events",
+      href: "/admin/issues?tab=events",
     },
     {
       label: t(lang, "admin_crisis_countries"),
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
       icon: AlertTriangle,
       color: stats?.crisis_countries ? "text-red-400" : "text-muted-foreground",
       bg: stats?.crisis_countries ? "bg-red-500/10" : "bg-secondary",
-      href: "/admin/tension",
+      href: "/admin/monitoring?tab=tension",
     },
     {
       label: t(lang, "admin_pending_reports"),
@@ -331,7 +331,7 @@ export default function AdminDashboard() {
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {t(lang, "admin_event_chart_title")}
             </h3>
-            <Link href="/admin/events" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+            <Link href="/admin/issues?tab=events" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
               {t(lang, "pipeline_view_all")} <ArrowUpRight className="h-2.5 w-2.5" />
             </Link>
           </div>
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {t(lang, "admin_tension_heatmap")}
             </h3>
-            <Link href="/admin/tension" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+            <Link href="/admin/monitoring?tab=tension" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
               {t(lang, "pipeline_view_all")} <ArrowUpRight className="h-2.5 w-2.5" />
             </Link>
           </div>

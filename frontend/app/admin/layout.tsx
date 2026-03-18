@@ -55,8 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "admin_group_data",
     items: [
       { href: "/admin/pipeline", icon: Workflow, labelKey: "admin_pipeline" },
-      { href: "/admin/clusters", icon: Layers, labelKey: "admin_clusters" },
-      { href: "/admin/events", icon: FileText, labelKey: "admin_events" },
+      { href: "/admin/issues", icon: Layers, labelKey: "admin_issues" },
       { href: "/admin/sources", icon: Radio, labelKey: "admin_sources" },
     ],
   },
@@ -64,8 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: "admin_group_analytics",
     items: [
       { href: "/admin/kpi", icon: BarChart3, labelKey: "admin_kpi" },
-      { href: "/admin/kscore", icon: TrendingUp, labelKey: "admin_trending" },
-      { href: "/admin/tension", icon: Activity, labelKey: "admin_tension" },
+      { href: "/admin/monitoring", icon: Activity, labelKey: "admin_monitoring" },
     ],
   },
   {

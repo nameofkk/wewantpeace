@@ -43,6 +43,24 @@
             </td>
           </tr>
 
+          <!-- Editor Note (if present) -->
+          {% if editor_note %}
+          <tr>
+            <td style="padding:32px 40px 16px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#1a2332;border-radius:8px;border:1px solid #388bfd40;overflow:hidden;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#58a6ff;text-transform:uppercase;letter-spacing:0.5px;">
+                      {% if lang == 'ko' %}에디터 노트{% else %}Editor's Note{% endif %}
+                    </p>
+                    <p style="margin:0;font-size:14px;color:#e6edf3;line-height:1.6;white-space:pre-wrap;">{{ editor_note }}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {% endif %}
+
           <!-- Section 1: Top 10 Issues -->
           <tr>
             <td style="padding:32px 40px 24px;">

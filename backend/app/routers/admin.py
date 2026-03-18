@@ -3391,3 +3391,420 @@ async def update_social_post(
     await db.flush()
     await _log_action(db, admin, "update_social", "social_post", post_id, changes)
     return {"status": "ok"}
+
+
+# ── 주간 리포트 관리 ──────────────────────────────────────────────────────────
+
+class WeeklyReportDraftBody(BaseModel):
+    editor_note_ko: Optional[str] = None
+    editor_note_en: Optional[str] = None
+    issue_ids: Optional[list[str]] = None  # 순서가 있는 이슈 ID 목록
+
+
+@router.get("/weekly-report/draft")
+async def get_weekly_report_draft(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """현재 주간 리포트 초안 데이터 반환."""
+    import json as _json
+
+    redis = await get_redis()
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%Y-W%W")
+    draft_key = f"admin:weekly-report:draft:{week_key}"
+
+    # 저장된 초안 로드
+    raw = await redis.get(draft_key)
+    draft = _json.loads(raw) if raw else {}
+
+    # 기본 데이터: 공개 weekly-summary와 동일한 로직
+    cutoff = now - timedelta(days=7)
+
+    top_clusters_q = await db.execute(
+        select(
+            IssueCluster.id,
+            IssueCluster.title,
+            IssueCluster.title_ko,
+            IssueCluster.severity,
+            IssueCluster.kscore,
+            IssueCluster.event_count,
+            IssueCluster.country_code,
+            IssueCluster.topic,
+        )
+        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
+        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
+        .limit(20)  # 편집 가능하도록 넉넉히 가져옴
+    )
+    all_issues = [
+        {
+            "id": str(row.id),
+            "title": row.title,
+            "title_ko": row.title_ko,
+            "severity": row.severity,
+            "kscore": round(row.kscore, 2),
+            "event_count": row.event_count,
+            "country_code": row.country_code,
+            "topic": row.topic,
+        }
+        for row in top_clusters_q.all()
+    ]
+
+    # 초안에서 순서/제외 적용
+    ordered_ids = draft.get("issue_ids")
+    if ordered_ids:
+        id_map = {iss["id"]: iss for iss in all_issues}
+        top_issues = [id_map[iid] for iid in ordered_ids if iid in id_map]
+    else:
+        top_issues = all_issues[:10]
+
+    # 긴장도 TOP 10
+    from sqlalchemy import func as sa_func
+    latest_tension_subq = (
+        select(
+            TensionIndex.country_code,
+            TensionIndex.raw_score,
+            TensionIndex.tension_level,
+            sa_func.row_number()
+            .over(partition_by=TensionIndex.country_code, order_by=TensionIndex.time.desc())
+            .label("rn"),
+        ).subquery()
+    )
+    tension_q = await db.execute(
+        select(
+            latest_tension_subq.c.country_code,
+            latest_tension_subq.c.raw_score,
+            latest_tension_subq.c.tension_level,
+        )
+        .where(latest_tension_subq.c.rn == 1)
+        .order_by(latest_tension_subq.c.raw_score.desc())
+        .limit(10)
+    )
+    top_tension = [
+        {"country_code": row.country_code, "raw_score": round(row.raw_score, 1), "tension_level": row.tension_level}
+        for row in tension_q.all()
+    ]
+
+    # 통계
+    total_events = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
+    )).scalar() or 0
+    new_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff, IssueCluster.severity > 0)
+    )).scalar() or 0
+    crisis_q = await db.execute(
+        select(latest_tension_subq.c.country_code)
+        .where(latest_tension_subq.c.rn == 1, latest_tension_subq.c.tension_level >= 3)
+    )
+    crisis_countries = len(crisis_q.all())
+
+    # 발송 대상 수
+    target_count = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(User.marketing_agreed_at != None, User.status != "deleted", User.email != None)
+    )).scalar() or 0
+
+    return {
+        "week": week_key,
+        "editor_note_ko": draft.get("editor_note_ko", ""),
+        "editor_note_en": draft.get("editor_note_en", ""),
+        "top_issues": top_issues,
+        "all_issues": all_issues,
+        "top_tension": top_tension,
+        "stats": {
+            "total_events": total_events,
+            "new_clusters": new_clusters,
+            "crisis_countries": crisis_countries,
+        },
+        "target_count": target_count,
+    }
+
+
+@router.put("/weekly-report/draft")
+async def save_weekly_report_draft(
+    body: WeeklyReportDraftBody,
+    admin: User = Depends(require_admin),
+):
+    """초안 저장 (에디터 노트, 이슈 순서)."""
+    import json as _json
+
+    redis = await get_redis()
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%Y-W%W")
+    draft_key = f"admin:weekly-report:draft:{week_key}"
+
+    raw = await redis.get(draft_key)
+    draft = _json.loads(raw) if raw else {}
+
+    if body.editor_note_ko is not None:
+        draft["editor_note_ko"] = body.editor_note_ko
+    if body.editor_note_en is not None:
+        draft["editor_note_en"] = body.editor_note_en
+    if body.issue_ids is not None:
+        draft["issue_ids"] = body.issue_ids
+
+    await redis.set(draft_key, _json.dumps(draft), ex=30 * 24 * 3600)  # 30일 TTL
+
+    return {"status": "ok"}
+
+
+@router.post("/weekly-report/send-test")
+async def send_weekly_report_test(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """어드민 본인에게 테스트 발송."""
+    from backend.app.core.config import settings
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from mako.template import Template
+    import json as _json
+
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(503, detail="SMTP not configured")
+
+    if not admin.email:
+        raise HTTPException(400, detail="Admin email not found")
+
+    # 초안 로드
+    redis = await get_redis()
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%Y-W%W")
+    raw = await redis.get(f"admin:weekly-report:draft:{week_key}")
+    draft = _json.loads(raw) if raw else {}
+
+    # 데이터 가져오기 (간소 버전 — draft API와 동일 로직)
+    cutoff = now - timedelta(days=7)
+    top_clusters_q = await db.execute(
+        select(IssueCluster)
+        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
+        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
+        .limit(10)
+    )
+    issues = top_clusters_q.scalars().all()
+
+    from sqlalchemy import func as sa_func
+    latest_tension_subq = (
+        select(
+            TensionIndex.country_code,
+            TensionIndex.raw_score,
+            TensionIndex.tension_level,
+            sa_func.row_number()
+            .over(partition_by=TensionIndex.country_code, order_by=TensionIndex.time.desc())
+            .label("rn"),
+        ).subquery()
+    )
+    tension_q = await db.execute(
+        select(
+            latest_tension_subq.c.country_code,
+            latest_tension_subq.c.raw_score,
+            latest_tension_subq.c.tension_level,
+        )
+        .where(latest_tension_subq.c.rn == 1)
+        .order_by(latest_tension_subq.c.raw_score.desc())
+        .limit(10)
+    )
+    tensions = [type("T", (), {"country_code": r.country_code, "raw_score": r.raw_score, "tension_level": r.tension_level}) for r in tension_q.all()]
+
+    total_events = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
+    )).scalar() or 0
+    new_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff, IssueCluster.severity > 0)
+    )).scalar() or 0
+
+    # 렌더링
+    import os
+    tpl_path = os.path.join(os.path.dirname(__file__), "..", "templates", "weekly_report.html")
+    tpl = Template(filename=tpl_path)
+    html = tpl.render(
+        lang="ko",
+        user=admin,
+        issues=issues,
+        tensions=tensions,
+        stats={"total_events": total_events, "new_clusters": new_clusters, "crisis_countries": 0},
+        is_pro=True,
+        editor_note=draft.get("editor_note_ko", ""),
+    )
+
+    # 발송
+    try:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+        msg = MIMEMultipart("alternative")
+        msg["From"] = settings.smtp_user
+        msg["To"] = admin.email
+        msg["Subject"] = "[TEST] WeWantPeace Weekly Report"
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        smtp.sendmail(settings.smtp_user, admin.email, msg.as_string())
+        smtp.quit()
+    except Exception as e:
+        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+
+    await _log_action(db, admin, "weekly_report_test_send")
+    return {"status": "ok", "sent_to": admin.email}
+
+
+@router.post("/weekly-report/send")
+async def send_weekly_report_all(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 대상 주간 리포트 발송."""
+    from backend.app.core.config import settings
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from mako.template import Template
+    import json as _json
+
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(503, detail="SMTP not configured")
+
+    # 초안 로드
+    redis = await get_redis()
+    now = datetime.now(timezone.utc)
+    week_key = now.strftime("%Y-W%W")
+    raw = await redis.get(f"admin:weekly-report:draft:{week_key}")
+    draft = _json.loads(raw) if raw else {}
+
+    # 대상 유저
+    result = await db.execute(
+        select(User).where(
+            User.marketing_agreed_at != None, User.status != "deleted", User.email != None
+        )
+    )
+    users = result.scalars().all()
+    if not users:
+        raise HTTPException(400, detail="No recipients")
+
+    # 데이터
+    cutoff = now - timedelta(days=7)
+    top_clusters_q = await db.execute(
+        select(IssueCluster)
+        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
+        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
+        .limit(10)
+    )
+    issues = top_clusters_q.scalars().all()
+
+    from sqlalchemy import func as sa_func
+    latest_tension_subq = (
+        select(
+            TensionIndex.country_code,
+            TensionIndex.raw_score,
+            TensionIndex.tension_level,
+            sa_func.row_number()
+            .over(partition_by=TensionIndex.country_code, order_by=TensionIndex.time.desc())
+            .label("rn"),
+        ).subquery()
+    )
+    tension_q = await db.execute(
+        select(
+            latest_tension_subq.c.country_code,
+            latest_tension_subq.c.raw_score,
+            latest_tension_subq.c.tension_level,
+        )
+        .where(latest_tension_subq.c.rn == 1)
+        .order_by(latest_tension_subq.c.raw_score.desc())
+        .limit(10)
+    )
+    tensions = [type("T", (), {"country_code": r.country_code, "raw_score": r.raw_score, "tension_level": r.tension_level}) for r in tension_q.all()]
+
+    total_events = (await db.execute(
+        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
+    )).scalar() or 0
+    new_clusters = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff, IssueCluster.severity > 0)
+    )).scalar() or 0
+
+    import os
+    tpl_path = os.path.join(os.path.dirname(__file__), "..", "templates", "weekly_report.html")
+    tpl = Template(filename=tpl_path)
+    stats_data = {"total_events": total_events, "new_clusters": new_clusters, "crisis_countries": 0}
+
+    # 로그 생성
+    log = MarketingEmailLog(
+        admin_id=admin.id,
+        subject="WeWantPeace Weekly Report",
+        body="[weekly-report]",
+        sent_count=0,
+        failed_count=0,
+        status="sending",
+    )
+    db.add(log)
+    await db.flush()
+
+    sent = 0
+    failed = 0
+    try:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+
+        for u in users:
+            try:
+                lang = getattr(u, "lang", None) or "ko"
+                is_pro = getattr(u, "plan", "free") != "free"
+                note = draft.get(f"editor_note_{lang}", "") or draft.get("editor_note_ko", "")
+                html = tpl.render(
+                    lang=lang,
+                    user=u,
+                    issues=issues,
+                    tensions=tensions if is_pro else [],
+                    stats=stats_data,
+                    is_pro=is_pro,
+                    editor_note=note,
+                )
+                subj = "WeWantPeace 주간 리포트" if lang == "ko" else "WeWantPeace Weekly Report"
+                msg = MIMEMultipart("alternative")
+                msg["From"] = settings.smtp_user
+                msg["To"] = u.email
+                msg["Subject"] = subj
+                msg.attach(MIMEText(html, "html", "utf-8"))
+                smtp.sendmail(settings.smtp_user, u.email, msg.as_string())
+                sent += 1
+            except Exception:
+                failed += 1
+
+        smtp.quit()
+    except Exception as e:
+        log.status = "failed"
+        log.failed_count = len(users)
+        await db.flush()
+        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+
+    log.sent_count = sent
+    log.failed_count = failed
+    log.status = "completed"
+    await db.flush()
+    await _log_action(db, admin, "weekly_report_send", detail={"sent": sent, "failed": failed})
+
+    return {"status": "ok", "sent": sent, "failed": failed}
+
+
+@router.get("/weekly-report/history")
+async def weekly_report_history(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """주간 리포트 발송 기록."""
+    result = await db.execute(
+        select(MarketingEmailLog)
+        .where(MarketingEmailLog.subject.contains("Weekly Report"))
+        .order_by(MarketingEmailLog.created_at.desc())
+        .limit(20)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": l.id,
+            "date": l.created_at.isoformat() if l.created_at else None,
+            "sent": l.sent_count,
+            "failed": l.failed_count,
+            "status": l.status,
+        }
+        for l in logs
+    ]
