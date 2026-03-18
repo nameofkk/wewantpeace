@@ -161,11 +161,16 @@ def _get_toss_cert() -> tuple[str, str]:
         cert_path = os.path.join(cert_dir, "client.crt")
         key_path = os.path.join(cert_dir, "client.key")
         if not os.path.exists(cert_path):
-            with open(cert_path, "wb") as f:
-                f.write(base64.b64decode(settings.toss_client_cert_b64))
-            with open(key_path, "wb") as f:
-                f.write(base64.b64decode(settings.toss_client_key_b64))
-            os.chmod(key_path, 0o600)
+            try:
+                with open(cert_path, "wb") as f:
+                    f.write(base64.b64decode(settings.toss_client_cert_b64))
+                with open(key_path, "wb") as f:
+                    f.write(base64.b64decode(settings.toss_client_key_b64))
+                os.chmod(key_path, 0o600)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("토스 mTLS 인증서 디코딩 실패: %s", e)
+                raise HTTPException(503, detail="토스 mTLS 인증서 설정 오류")
         return cert_path, key_path
 
     # 파일 경로 (로컬 개발용)
@@ -230,7 +235,11 @@ async def _get_toss_user_key(access_token: str) -> str:
 
     # 응답이 암호화된 경우 복호화 시도
     if "encryptedData" in data and settings.toss_decryption_key:
-        data = _decrypt_toss_user_data(data["encryptedData"])
+        try:
+            data = _decrypt_toss_user_data(data["encryptedData"])
+        except Exception as e:
+            logger.error("토스 유저 데이터 복호화 실패: %s", e)
+            raise HTTPException(502, detail="토스 유저 정보 복호화에 실패했습니다.")
 
     user_key = data.get("userKey") or data.get("user_key")
     if not user_key:

@@ -265,7 +265,19 @@ export default function LoginPage() {
       }
     } catch (e: unknown) {
       const err = e as { message?: string };
-      setError(err.message || (lang === "ko" ? "토스 로그인에 실패했습니다." : "Toss login failed."));
+      const msg = err.message || "";
+      // iOS WKWebView "Load failed" / 네트워크 에러 분류
+      if (msg.includes("Load failed") || msg.includes("네트워크") || msg.includes("network")) {
+        setError(lang === "ko"
+          ? "네트워크 연결 오류입니다. 인터넷 연결을 확인하고 다시 시도해주세요."
+          : "Network error. Please check your connection and try again.");
+      } else if (msg.includes("시간 초과") || msg.includes("timeout") || msg.includes("AbortError")) {
+        setError(lang === "ko"
+          ? "서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."
+          : "Server timeout. Please try again later.");
+      } else {
+        setError(msg || (lang === "ko" ? "토스 로그인에 실패했습니다." : "Toss login failed."));
+      }
     } finally {
       setLoading(false);
     }

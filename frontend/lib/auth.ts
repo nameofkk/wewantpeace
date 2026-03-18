@@ -162,11 +162,30 @@ export async function signInWithToss(): Promise<{
   // 2. 백엔드에서 코드 교환 → Firebase Custom Token
   const API_BASE =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-  const res = await fetch(`${API_BASE}/auth/toss-login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ authorization_code: authorizationCode }),
-  });
+
+  // 토스 WebView에서 fetch hang 방지: 15초 타임아웃
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/auth/toss-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authorization_code: authorizationCode }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timeout);
+    // iOS WKWebView "TypeError: Load failed" 또는 AbortError 대응
+    const err = e as Error;
+    if (err.name === "AbortError") {
+      throw new Error("서버 응답 시간 초과. 잠시 후 다시 시도해주세요.");
+    }
+    throw new Error("네트워크 연결 오류. 인터넷 연결을 확인해주세요.");
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { setupForegroundListener } from "@/lib/fcm";
+import { isTossMiniApp } from "@/lib/platform";
 
 function ThemeSync() {
   const theme = useAppStore((s) => s.theme);
@@ -19,6 +20,8 @@ function ThemeSync() {
 
 function FCMForegroundInit() {
   useEffect(() => {
+    // 토스 WebView에서는 Service Worker 미지원 → FCM 초기화 스킵
+    if (isTossMiniApp()) return;
     setupForegroundListener();
   }, []);
   return null;

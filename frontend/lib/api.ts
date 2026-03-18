@@ -8,7 +8,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   if (devUid) return { "X-Dev-UID": devUid };
   try {
     const { waitForAuth, getIdToken } = await import("./auth");
-    await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 5초)
+    await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 8초)
     const token = await getIdToken();
     if (token) return { Authorization: `Bearer ${token}` };
   } catch {
@@ -29,14 +29,36 @@ async function apiFetch<T>(
   }
   const authHeaders = await getAuthHeaders();
   const hasAuth = !!authHeaders.Authorization || !!authHeaders["X-Dev-UID"];
-  const res = await fetch(url.toString(), {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...options?.headers,
-    },
-  });
+
+  // 토스 WebView 등에서 fetch hang 방지: 20초 타임아웃
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  // 기존 signal이 있으면 연결
+  if (options?.signal) {
+    options.signal.addEventListener("abort", () => controller.abort());
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+        ...options?.headers,
+      },
+    });
+  } catch (e) {
+    clearTimeout(timeout);
+    const err = e as Error;
+    if (err.name === "AbortError") {
+      throw Object.assign(new Error("서버 응답 시간 초과"), { status: 0 });
+    }
+    throw Object.assign(new Error("네트워크 연결 오류"), { status: 0 });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     // 401이면 토큰 강제 갱신 후 1회 재시도 (토큰이 있었을 때만)
     if (res.status === 401 && !_retried && hasAuth) {
