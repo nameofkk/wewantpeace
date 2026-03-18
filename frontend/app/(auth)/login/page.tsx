@@ -727,13 +727,15 @@ export default function LoginPage() {
               <button
                 onClick={handleTossLogin}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-3 rounded-lg py-3 text-sm font-bold text-white transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2.5 rounded-lg py-3 font-bold text-white transition-colors disabled:opacity-50"
                 style={{ backgroundColor: "#0064FF" }}
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.5 14.5v-9l7 4.5-7 4.5z" fill="white"/>
-                </svg>
-                {t(lang, "login_toss")}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span className="text-[15px] font-black tracking-tight" style={{ fontFamily: "'SF Pro', system-ui, sans-serif" }}>toss</span>
+                )}
+                <span className="text-sm">{t(lang, "login_toss")}</span>
               </button>
 
               <div className="relative">

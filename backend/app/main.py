@@ -214,6 +214,7 @@ logger.info("CORS allowed_origins: %s", settings.allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Dev-UID", "X-Requested-With"],
@@ -223,6 +224,9 @@ app.add_middleware(
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+    # CORS preflight(OPTIONS)에는 보안 헤더 추가하지 않음 (WebView 호환성)
+    if request.method == "OPTIONS":
+        return response
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

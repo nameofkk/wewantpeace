@@ -64,6 +64,8 @@ class Settings(BaseSettings):
         "https://www.wewantpeace.live",
         "https://wewantpeace.live",
     ]
+    # 토스 WebView의 실제 origin이 서브도메인일 수 있으므로 regex 패턴 추가
+    cors_origin_regex: str = r"https://.*\.toss\.im"
     allowed_origins: List[str] = ["http://localhost:3000"]
 
     @model_validator(mode="after")
