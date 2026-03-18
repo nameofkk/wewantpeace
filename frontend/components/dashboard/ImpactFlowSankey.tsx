@@ -7,6 +7,7 @@ import { t, type TranslationKey } from "@/lib/i18n";
 import { getFlag } from "@/lib/countries";
 import { useAppStore } from "@/lib/store";
 import { ChevronRight, X } from "lucide-react";
+import { issueDetailPath } from "@/lib/toss-nav";
 import type { ImpactFlowOut } from "@/lib/api";
 
 /**
@@ -562,7 +563,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
                   <button
                     onClick={() => {
                       setPopupIdx(null);
-                      router.push(`/issues/${(popupIssue as ConflictIssue).clusterId}`);
+                      router.push(issueDetailPath((popupIssue as ConflictIssue).clusterId!));
                     }}
                     className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
                   >

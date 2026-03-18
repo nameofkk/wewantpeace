@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { useSearchIssues, type SearchResult } from "@/lib/api";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { issueDetailPath } from "@/lib/toss-nav";
 
 function getSeverityColor(severity: number): string {
   if (severity >= 80) return "#991b1b";
@@ -140,7 +141,7 @@ function SearchResultCard({ item, lang }: { item: SearchResult; lang: "ko" | "en
 
   return (
     <Link
-      href={`/issues/${item.id}`}
+      href={issueDetailPath(item.id)}
       className={cn(
         "block rounded-xl border border-border/50 p-3",
         "bg-card hover:bg-muted/50 transition-colors",

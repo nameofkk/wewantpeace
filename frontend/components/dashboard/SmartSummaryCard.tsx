@@ -11,6 +11,7 @@ import {
 } from "@/lib/kscore-utils";
 import { stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { issueDetailPath } from "@/lib/toss-nav";
 import type { MarketSnapshot } from "@/lib/api";
 
 /* ── Impact score color helpers ── */
@@ -76,7 +77,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
   return (
     <section
       className={cn("rounded-xl border border-border bg-card overflow-hidden cursor-pointer border-l-[3px]", colors.border)}
-      onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+      onClick={clusterId ? () => router.push(issueDetailPath(clusterId)) : undefined}
     >
       {/* ── Header: Title + Impact Score ── */}
       <div className="px-3.5 pt-3 pb-2.5">
@@ -241,7 +242,7 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
 
   return (
     <div
-      onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+      onClick={clusterId ? () => router.push(issueDetailPath(clusterId)) : undefined}
       className={cn(
         "flex items-center gap-2 py-2.5 cursor-pointer hover:bg-muted/10 transition-all duration-200 rounded-lg px-1.5 -mx-1.5",
         !isLast && "border-b border-border/30",

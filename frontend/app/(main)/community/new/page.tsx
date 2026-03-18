@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE, useMe } from "@/lib/api";
+import { communityPostPath } from "@/lib/toss-nav";
 
 type PostType = "discussion" | "analysis" | "question" | "notice";
 
@@ -204,7 +205,7 @@ export default function NewPostPage() {
 
       const post = await res.json();
       await queryClient.invalidateQueries({ queryKey: ["community-posts"] });
-      router.push(`/community/${post.id}`);
+      router.push(communityPostPath(post.id));
     } catch (e: unknown) {
       const err = e as { message?: string };
       setError(err.message || t(lang, "new_post_error_generic"));

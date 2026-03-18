@@ -8,6 +8,7 @@ import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
 import { API_BASE, useMyPreferences } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
+import { issueDetailPath } from "@/lib/toss-nav";
 const POLL_INTERVAL = 60_000;
 const AUTO_DISMISS_MS = 9_000;
 
@@ -318,7 +319,7 @@ export function NewEventBanner() {
           <div className="flex items-center gap-1 shrink-0">
             {clusterId && (
               <Link
-                href={`/issues/${clusterId}`}
+                href={issueDetailPath(clusterId)}
                 onClick={dismiss}
                 className="flex items-center gap-1 rounded-lg bg-secondary hover:bg-secondary/80 px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors"
               >

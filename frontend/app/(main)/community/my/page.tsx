@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
+import { communityPostPath, communityEditPath } from "@/lib/toss-nav";
 
 function relativeTime(iso: string, lang: "ko" | "en"): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -119,7 +120,7 @@ export default function MyPostsPage() {
         {posts?.map((post) => (
           <div key={post.id} className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-start gap-2">
-              <Link href={`/community/${post.id}`} className="flex-1 min-w-0">
+              <Link href={communityPostPath(post.id)} className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium">
                     {t(lang, `community_type_${post.post_type}` as Parameters<typeof t>[1]) || post.post_type}
@@ -135,7 +136,7 @@ export default function MyPostsPage() {
               </Link>
               <div className="flex items-center gap-2 shrink-0 mt-1">
                 <Link
-                  href={`/community/${post.id}/edit`}
+                  href={communityEditPath(post.id)}
                   className="rounded-lg border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                 >
                   <Pencil className="h-3.5 w-3.5" />

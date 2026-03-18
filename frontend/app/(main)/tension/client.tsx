@@ -15,6 +15,7 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { ALL_MONITORED_COUNTRIES, COUNTRY_MAP, getCountryName, getFlag } from "@/lib/countries";
 import { ShareButton } from "@/components/issue/ShareButton";
+import { issueDetailPath, countryIssuesPath } from "@/lib/toss-nav";
 
 interface ClusterSummary {
   id: string;
@@ -474,7 +475,7 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
               {t(lang, "tension_cause_issues", { n: data.top5_clusters.length })}
             </p>
             <Link
-              href={`/issues/country/${data.country_code.toLowerCase()}`}
+              href={countryIssuesPath(data.country_code.toLowerCase())}
               className="flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
@@ -492,7 +493,7 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
               return (
                 <Link
                   key={c.id}
-                  href={`/issues/${c.id}`}
+                  href={issueDetailPath(c.id)}
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity fade-in-up"
                   style={{ animationDelay: `${500 + i * 70}ms` }}
                 >
