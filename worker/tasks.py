@@ -2043,7 +2043,7 @@ def send_daily_engagement(self):
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
-                # 대상: last_active < 24h, notify_engagement=True, active 토큰 보유
+                # 대상: last_active < 24h, active 토큰 보유 (전체 유저 무조건 발송)
                 rows = await db.execute(
                     select(
                         User.id,
@@ -2058,7 +2058,6 @@ def send_daily_engagement(self):
                     .where(
                         User.status == "active",
                         User.last_active < cutoff,
-                        UserPreference.notify_engagement == True,
                         UserPushToken.status == "active",
                     )
                     .group_by(
