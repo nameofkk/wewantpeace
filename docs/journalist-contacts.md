@@ -2,27 +2,212 @@
 
 > WeWantPeace 서비스 홍보 목적으로 수집한 기자 이메일 리스트
 > 수집일: 2026-03-18
-> 총 고유 이메일: 240개 (10개 매체)
+> 총 고유 이메일: 369개 (10개 매체)
 
 ## 수집 매체 현황
 
-| 매체 | 수집 수 | 비고 |
-|------|---------|------|
-| 연합뉴스 | 59 | 국제/정치/경제/안보/북한 |
-| 한겨레 | 47 | 국제/정치/경제/사회 |
-| 중앙일보 | 25 | 국제/정치/경제/사회 |
-| 조선일보 | 25 | 국제/정치/경제/사회 |
-| 전자신문 | 23 | IT/산업/경제 |
-| 헤럴드경제 | 17 | 경제/사회 |
-| 한국경제 | 16 | 국제/정치/경제 |
-| 아시아경제 | 12 | 경제/사회 |
-| 매일경제 | 8 | 국제/경제 |
-| 동아일보 | 8 | 국제/정치/사회 |
+| 매체 | 수집 수 |
+|------|---------|
+| 중앙일보 | 89 |
+| 한겨레 | 85 |
+| 연합뉴스 | 59 |
+| 조선일보 | 31 |
+| 전자신문 | 23 |
+| 매일경제 | 23 |
+| 헤럴드경제 | 17 |
+| 한국경제 | 16 |
+| 동아일보 | 14 |
+| 아시아경제 | 12 |
 
 ### 이메일 미노출 매체 (수집 불가)
 KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, 서울경제, 이데일리, 파이낸셜뉴스, 머니투데이, 디지털타임스, 경향신문, 오마이뉴스, 뉴스1, 한국일보, 서울신문
 
 ---
+
+
+## 중앙일보
+
+| 이름 | 이메일 | 대표 기사 |
+|------|--------|----------|
+| 미확인 | an.daehun@joongang.co.kr | 박완수 vs 김경수 붙는다…31년 만에 첫 전현� |
+| 미확인 | chae.hyeseon@joongang.co.kr | &apos;K-의료&apos; 찾는 외국인 160만…세계가 주 |
+| 미확인 | choi.seoin@joongang.co.kr | 특검, 김건희 도이치 재판 2심에 &apos;방조 혐� |
+| 미확인 | chomg@joongang.co.kr | &#91;속보&#93;&apos;국내주식 복귀계좌 양도세 � |
+| 미확인 | dino87@joongang.co.kr | 경찰·소방관은 되고 교도관은 안된다?…법무 |
+| 미확인 | han.areum2@joongang.co.kr | 부커스, 전남교육청 통합도서관 26개 기관에 � |
+| 미확인 | han.younghye@joongang.co.kr | &#91;속보&#93; 李대통령 &quot;&apos;韓 지정학적 � |
+| 미확인 | hongdoya@joongang.co.kr | 이정현, 대구 공천 놓고 중진 겨냥 &quot;꿩 먹� |
+| 미확인 | hyeon.yeseul@joongang.co.kr | &#91;속보&#93; 정부, BTS 공연 대비 종로· 중구 � |
+| 미확인 | im.soungbin@joongang.co.kr | &#91;단독&#93; &apos;모텔 연쇄살인&apos; 김소영,  |
+| 미확인 | kaypubb@joongang.co.kr | 베네수엘라 &apos;마두로 매치&apos;서 웃었다… |
+| 미확인 | kim.banghyun@joongang.co.kr | “헌법 명문화 약속하더니 돌변”… &quot;선� |
+| 미확인 | kim.eunbin@joongang.co.kr | &apos;항공사 기장 살해&apos; 50대 &quot;공군사관 |
+| 미확인 | kim.nahye1@joongang.co.kr | 대구한의대 한방의료체험타운, 대구시장 표� |
+| 미확인 | kim.seongjin1@joongang.co.kr | 명태균-오세훈 법정 대면 불발…吳 “민중기  |
+| 미확인 | lee.boram2@joongang.co.kr | 서울 시내 폐교, AI교육센터·특수학교로 탈바 |
+| 미확인 | mole@joongang.co.kr | 얼굴에 숨은 &apos;뇌 하수구&apos; 찾았다…치� |
+| 미확인 | oh.hyunseok1@joongang.co.kr | 복심 김남준도 &quot;좋은 상사 아냐&quot;…이� |
+| 미확인 | oh.samgwon@joongang.co.kr | &quot;교습비 34만원, 자습실비 72만원&quot;…통� |
+| 미확인 | park.jongsuh@joongang.co.kr | ATM에 100만원 두고 달아난 30대들…가방서 현� |
+| 미확인 | park.junkyu1@joongang.co.kr | &quot;李 고향예? 챙기긴 뭘 챙기요&quot; &quot;국 |
+| 미확인 | park.seonghun@joongang.co.kr | &#91;단독&#93; 김소영 &apos;모텔 살인&apos; 부검� |
+| 미확인 | park.taein@joongang.co.kr | 검찰총장 이름만 빼고…與강경파 입맛대로 � |
+| 미확인 | shin.hyeyeon@joongang.co.kr | &apos;이영애 딸&apos; 그 미성년 배우 깜짝…한� |
+| 미확인 | youknow@joongang.co.kr | &quot;조선땅 독도 왜 갔나&quot; 추궁에 사무라� |
+| 미확인 | julee@joongang.co.kr | &#91;이은주의 아트&디자인&#93; 김선두의 폭죽, |
+| 미확인 | theother@joongang.co.kr | &#91;강혜란의 쇼미더컬처&#93; K 보이즈로 불러 |
+| 미확인 | wisehj@joongang.co.kr | &#91;김호정의 음악의 세계&#93; 임윤찬의 ‘모� |
+| 미확인 | moon.soyoung@joongang.co.kr | ‘거대 사기극’? NFT 아트 시장 몰락의 교훈 & |
+| 미확인 | jeong.hyejeong@joongang.co.kr | &#91;속보&#93; &apos;케데헌&apos; 美아카데미도 � |
+| 미확인 | jeong.eunhye1@joongang.co.kr | &apos;케데헌&apos; 오스카상 수상…매기 강 &quot |
+| 미확인 | choi.minji3@joongang.co.kr | “국악 관심 실감…지치지 않고 곡 쓸 것”… |
+| 미확인 | gojhm@joongang.co.kr | 폴 토마스 앤더슨 감독, 드디어 오스카 트로� |
+| 미확인 | akapj@joongang.co.kr | 이란전쟁 여파로 메시-야말 &apos;세기의 대결& |
+| 미확인 | bae.youngeun@joongang.co.kr | 봄에 강한 롯데, 시범경기 무패 행진…최형우 |
+| 미확인 | rpark7@joongang.co.kr | 돌아온 양현준...대표팀에 철밥통 없다 |
+| 미확인 | ko.bongjun@joongang.co.kr | &#91;골프소식&#93;노희영 디렉터, 더 시에나 오 |
+| 미확인 | chang.yoonseo1@joongang.co.kr | 우주에서 본 잠실 올림픽 경기장…K-위성, 지� |
+| 미확인 | kim.jeeyoon@joongang.co.kr | &#91;서소문 포럼&#93; 김구의 소원 |
+| 미확인 | choi.hyeonchul@joongang.co.kr | &#91;서소문 포럼&#93; 정순신의 ‘현재형’ 한� |
+| 미확인 | hspark97@joongang.co.kr | &#91;분수대&#93; 다크 브랜든 |
+| 미확인 | sam@joongang.co.kr | &#91;분수대&#93; 행복이란 파랑새 |
+| 미확인 | think@joongang.co.kr | 순기능보다 역기능 커진 전세, 질서 있는 퇴� |
+| 미확인 | ijjeon@joongang.co.kr | &#91;로컬 프리즘&#93; 팔당 규제 위헌소원 각하 |
+| 미확인 | shotgun@joongang.co.kr | &#91;권혁재의 사람사진&#93; 제주올레의 현재� |
+| 미확인 | onuki.tomoko@joongang.co.kr | &#91;글로벌 아이&#93; 옥스퍼드 사전에 수록된  |
+| 미확인 | jung.sinae@joongang.co.kr | 北 미스터리한 여성 로봇…이번엔 한복 입고  |
+| 미확인 | ha.junho1@joongang.co.kr | 김민수 &quot;李한테 개딸과 절연하라 했나…� |
+| 미확인 | yu.sungkuk@joongang.co.kr | 李 “단계적·점진적 개헌” 공감에 개헌 논� |
+| 미확인 | yoon.sungmin@joongang.co.kr | 李 “전쟁 추경, 차량 5부제” 지시…“부동� |
+| 미확인 | jang.guseul@joongang.co.kr | 李대통령, ‘케데헌’ 아카데미 2관왕에 “김 |
+| 미확인 | kim.jihye6@joongang.co.kr | 美루비오, 조현에 &quot;호르무즈 안전확보에 � |
+| 미확인 | yoon.jiwon1@joongang.co.kr | 美 루비오, 조현 장관에 &quot;호르무즈 협력 � |
+| 미확인 | muzes@joongang.co.kr | 김종인 &quot;오세훈, 서울시장 출마 안 할 것� |
+| 미확인 | hanyi@joongang.co.kr | &quot;그 털보, 영 맘에 안들어부러&quot; &quot;여 |
+| 미확인 | kkskk@joongang.co.kr | 李 지적 뒤 확 뜬 &apos;공항 통합설&apos;…따질 |
+| 미확인 | etoile@joongang.co.kr | “생존권 보장해달라&quot;신장학회·환우단체 |
+| 미확인 | heo.jeongwon@joongang.co.kr | 李 대통령 5·10부제 언급에…기후부, ‘공공� |
+| 미확인 | chung.yeonggyo@joongang.co.kr | 北 최고인민회의 선거 종료...김정은 탄광 선� |
+| 미확인 | kim.gyutae@joongang.co.kr | ‘피바람 예고’ 이정현, 충북지사 날렸다…� |
+| 미확인 | yang.sumin@joongang.co.kr | 일본 건너가 기시다와 손 잡은 나경원…“한� |
+| 미확인 | uuu@joongang.co.kr | &quot;출국 직전 드론 공격&quot;…한국인 204명 � |
+| 미확인 | oh.soyeong@joongang.co.kr | &quot;수긍해라&quot; 김어준에 따졌다…與양부� |
+| 미확인 | kim.minju6@joongang.co.kr | 현직도 후보도… 부산교육감 선거 또 ‘사법  |
+| 미확인 | kim.jongho1@joongang.co.kr | &#91;포토타임&#93; 650마력 V8 괴력…벤틀리 최� |
+| 미확인 | kim.yejung@joongang.co.kr | &#91;단독&#93; 43㎝ 정육칼 들고 &quot;쑤셔버린� |
+| 미확인 | kim.jungseok@joongang.co.kr | &#91;르포&#93; 1년 지났지만…&apos;7평 컨테이너 |
+| 미확인 | song.weonseop@joongang.co.kr | &#91;송원섭의 와칭&#93; 천만 관객 &apos;왕사남& |
+| 미확인 | 9key@joongang.co.kr | 공소취소 거래설 때리는 국힘 “사실이면 李, |
+| 미확인 | kim.nahan@joongang.co.kr | 전재수 부산시장 도전하자 박민식·한동훈·� |
+| 미확인 | hongj@joongang.co.kr | 李지지율 66% 취임 후 최고…민주 47% 국힘 20% � |
+| 미확인 | shim.seokyong@joongang.co.kr | &#91;단독&#93; 사드 일부, 중동 뺀다… 李 &quot;� |
+| 미확인 | kang.bohyun@joongang.co.kr | &apos;정치중립&apos; 교육감 선거인데… 예비후 |
+| 미확인 | feeling@joongang.co.kr | 중국 산불 영향에 짙어진 미세먼지…내일 수� |
+| 미확인 | kimkr8486@joongang.co.kr | &#91;포토타임&#93; 광화문 1㎞가 공연장…BTS 컴 |
+| 미확인 | kim.hd@joongang.co.kr | &#91;포토타임&#93; 밀라노·코르티나 동계 패럴 |
+| 미확인 | kim.changyong@joongang.co.kr | &#91;단독&#93; 시장정비 사업 담당하며 뇌물 받 |
+| 미확인 | son.sungbae@joongang.co.kr | &#91;단독&#93; &quot;왜 하필 지금&quot;…경찰, 경 |
+| 미확인 | sakehoon@joongang.co.kr | &quot;스트레스 많이 느낀다&quot; 40대 가장 높� |
+| 미확인 | lee.hooyeon@joongang.co.kr | 강남·서초 절반 이상 영유 다녔다…부모들 � |
+| 미확인 | kwak.jooyoung@joongang.co.kr | BTS 공연 때 광화문 ‘스타디움’ 된다…경찰  |
+| 미확인 | suk.gyeongmin@joongang.co.kr | 정부, 쉰들러 ISDS 3200억원 소송 &quot;100% 승소&q |
+| 미확인 | lee.gyurim@joongang.co.kr | &apos;비흡연 택시&apos; 찾는 사람들…차에 밴 � |
+| 미확인 | ha.namhyun@joongang.co.kr | 강수진, 4월에 국립발레단장 12년 임기 마무리 |
+| 미확인 | j.sijo@joongang.co.kr | &#91;중앙 시조 백일장 - 2월 수상작&#93; 뱅쇼 ·  |
+| 미확인 | vangogh@joongang.co.kr | 인간 내면의 거대한 힘, 스님 감독이 영화로 � |
+| 미확인 | choi.hyeri@joongang.co.kr | 객관적 뜻풀이 대신 감성 공략...요즘 사전은  |
+| 미확인 | song.jihoon@joongang.co.kr | ‘배추보이’는 흔들리지 않았다…스노보드  |
+| 미확인 | han.chanwoo@joongang.co.kr | “지금은 응원과 지지로 뜻 모을 때”…월드� |
+
+## 한겨레
+
+| 이름 | 이메일 | 대표 기사 |
+|------|--------|----------|
+| 김미나 | mina@hani.co.kr | “적에겐 자비도, 포로 대우도 없다”…미 국 |
+| 김원철 | wonchul@hani.co.kr | “한국 보호해줬더니…” 트럼프, 미군 규모  |
+| 천호성 | rieux@hani.co.kr | ‘트럼프 핵심 참모’ 와일스 백악관 비서실� |
+| 윤연정 | yj2gaze@hani.co.kr | 트럼프 “쿠바 접수하는 영광 누릴 것”…현  |
+| 정의길 | Egil@hani.co.kr | 트럼프 참모 ‘이스라엘, 핵무기 쓸 수도’ � |
+| 정유경 | edge@hani.co.kr | ‘중동 간 한국 사드 언제 돌아오나’…미 국 |
+| 김지훈 | watchdog@hani.co.kr | 트럼프 딜레마…‘핵무기 10기 분량’ 이란 � |
+| 김지은 | mirae@hani.co.kr | 이스라엘 “지난밤 제거”…‘이란 지정 생� |
+| 곽진산 | kjs@hani.co.kr | 호주 시드니 도심서 20대 한국인 집단 폭행 당 |
+| 조기원 | garden@hani.co.kr | 네팔 산악 도로에서 버스 300ｍ 아래로 추락… |
+| 이정연 | xingxing@hani.co.kr | 평양-베이징 국제열차, 6년 만에 다시 달린다� |
+| 이정연 | forchis@hani.co.kr | 미 무역법 301조 ‘과잉생산’ 조사, 중 정조� |
+| 장현은 | mix@hani.co.kr | “감사합” 뚝…‘골든’ 수상소감 끊은 아� |
+| 김양희 | whizzer4@hani.co.kr | 스포츠는 드라마다…베네수엘라, 미국과 WBC � |
+| 심우삼 | wu32@hani.co.kr | 트럼프 “전직 대통령, ‘이란 공습 내가 할 � |
+| 박현 | hyun21@hani.co.kr | 전쟁 지휘하는 인공지능…‘완전자율무기’  |
+| 이우연 | azar@hani.co.kr | 일본인 57% “한국과 방위 협력, 미국 다음으� |
+| 이본영 | ebon@hani.co.kr | 다카이치 “스모 모래판 금녀제는 전통…앞� |
+| 미확인 | newiron@hani.co.kr | 이 대통령 “BTS 공연 안전하게 만반의 준비… |
+| 미확인 | yj@hani.co.kr | 강훈식 “UAE 원유 1800만 배럴 추가…총 2400만  |
+| 미확인 | yws@hani.co.kr | 이 대통령 “논의과정 관리 좀 그랬다”…검� |
+| 미확인 | khsong@hani.co.kr | 오세훈 “서울시장 후보 등록한다”…태산명 |
+| 미확인 | penj@hani.co.kr | 이 대통령 “사업자금으로 대출받아 부동산 � |
+| 미확인 | key@hani.co.kr | ‘BTS 공연’ 앞두고 19일부터 종로구·중구 일 |
+| 미확인 | forever@hani.co.kr | 이정현, 대구시장 경선 나선 중진 향해 “꽃� |
+| 미확인 | freehwa@hani.co.kr | “왜 전라도 출신이 충북 선거 좌지우지?”… |
+| 미확인 | hyopd@hani.co.kr | 송언석, 우원식에 “조작기소 의혹 국조특위� |
+| 미확인 | sol@hani.co.kr | ‘의원직 상실’ 양문석 “재판소원 안 한다� |
+| 미확인 | ham@hani.co.kr | ‘브레이크 없는 픽시 자전거’ 탄 10명 중 4� |
+| 미확인 | kyj@hani.co.kr | 이 대통령 지적한 ‘비싼 교복값’…광주 27� |
+| 미확인 | yhy@hani.co.kr | 산업부, 미국에 ‘조선 기자재’ 관세 예외 � |
+| 미확인 | jeje@hani.co.kr | 코스피 5% 급등에 5900선 회복…매수 사이드카  |
+| 미확인 | chaibs@hani.co.kr | 배경훈 “AI, 독자성 논란 떠나 세계적 수준 � |
+| 미확인 | harry@hani.co.kr | 1년 전 싸늘했던 삼성전자 주총, 올해는 축제� |
+| 미확인 | emd@hani.co.kr | 삼성전자 노조, ‘성과급 정상화’ 요구 5월 � |
+| 미확인 | cjhoon@hani.co.kr | ‘청년월세 지원’ 올해부터 확대…2년 동안  |
+| 미확인 | che@hani.co.kr | 지난해 방문객들 ‘국립공원’서 1인당 8만원 |
+| 미확인 | 3strings@hani.co.kr | 기후변화로 “활동 부족→건강악화→연 50만� |
+| 미확인 | southjh@hani.co.kr | 삼성전자 노조, 총파업 예고…쟁의 찬성률 93. |
+| 미확인 | loveletter@hani.co.kr | ‘반복 출금’으로 ATM 수수료 수백만원 챙긴  |
+| 미확인 | abbado@hani.co.kr | ‘○○약물 ○○㎍/L 복용 시’…‘약물운전� |
+| 미확인 | quicksilver@hani.co.kr | 특검, ‘주가조작 무죄’ 김건희 방조 혐의 � |
+| 미확인 | k21@hani.co.kr | 인권위 “교통약자 심사 때 ‘한의사 진단서� |
+| 미확인 | j9@hani.co.kr | 검찰, “이게 사법부냐” 법정 모욕 ‘김용현 |
+| 미확인 | euni@hani.co.kr | 6년간 경찰 퇴직 뒤 ‘로펌행’ 최소 144명…� |
+| 미확인 | hycho@hani.co.kr | “13시간 노동 그대로”…봉제노동자들, 전태 |
+| 미확인 | gayoon@hani.co.kr | [단독] 특사경 실수로 놓칠뻔한 147억 환치기� |
+| 미확인 | nopil@hani.co.kr | 반세기 만에 인간 달 여행 힘드네…아르테미� |
+| 미확인 | xeno@hani.co.kr | “러, 이란에 미국 군함·항공기 위치정보 제� |
+| 미확인 | ari@hani.co.kr | “이야기 있는 ‘동네 목욕탕’ 사라지기 전� |
+| 미확인 | anmadang@hani.co.kr | 고문서로 보는 단종과 엄흥도…국립중앙도서 |
+| 미확인 | dmsgud@hani.co.kr | 케이팝 ‘골든’ 타임…아카데미서 디캐프리 |
+| 미확인 | nuge@hani.co.kr | 서울시 SH, 종묘 앞 ‘유물의 땅’ 재개발 터 1 |
+| 미확인 | jglee@hani.co.kr | BTS “여전히 한국서 온 촌놈이란 사실”…다� |
+| 미확인 | kimck@hani.co.kr | 신진서의 보기 드문 착각…승리한 박정환 맥� |
+| 미확인 | boysoo@hani.co.kr | 2026 KBO리그 평균 연봉 역대 최고…1위는 양의� |
+| 미확인 | myviollet@hani.co.kr | 마지막 모의고사 치르는 홍명보 “5월까지 대 |
+| 미확인 | haojune@hani.co.kr | 설마가 사라진 트럼프의 ‘광기 외교’ [뉴스 |
+| 미확인 | ggum@hani.co.kr | 앤트로픽과 효율적 이타주의 [유레카] |
+| 미확인 | monad@hani.co.kr | ‘뉴 이재명’이라는 유령 [아침햇발] |
+| 미확인 | moon0@hani.co.kr | 뚜안아, 집에 가자, 나랑 가자 [이문영의 당신 |
+| 미확인 | gyuhyun@hani.co.kr | 여러 색깔 투표를 할 상상 [전국 프리즘] |
+| 미확인 | ph@hani.co.kr | 현대차 노조, 스티븐 호킹, 이 대통령의 같은  |
+| 미확인 | shan@hani.co.kr | 트럼프가 가도 ‘아름다운 시절’은 다시 오� |
+| 미확인 | spring@hani.co.kr | ‘벚꽃엔딩’에도 엔딩이 있을까 [유레카] |
+| 미확인 | unique@hani.co.kr | 친한계 ‘장동혁 지도부 총사퇴’ 요구…소� |
+| 미확인 | givenhappy@hani.co.kr | 내부 결속도 안되는데…이정현 국힘 공관위� |
+| 미확인 | nomad@hani.co.kr | 김여정 노동당 부장 승진…‘총비서 재추대� |
+| 미확인 | sea@hani.co.kr | 대미투자특별법 발목 잡은 ‘사법 3법’…특� |
+| 미확인 | eco@hani.co.kr | 보이스피싱에 당한 ‘코인’도 환급해준다… |
+| 미확인 | kyewan@hani.co.kr | 은행 주담대 6.5%…2년5개월 만에 최고 |
+| 미확인 | sun@hani.co.kr | 국내 스타트업 이사회, 여성 비중 6.9% 그쳐…� |
+| 미확인 | edigna@hani.co.kr | “AI 군비경쟁 계속돼도 전쟁 멈추는 건 여전� |
+| 미확인 | beep@hani.co.kr | [단독] 현직 검사, 특사경 지휘 필요성 항변 � |
+| 미확인 | wjryu@hani.co.kr | ‘남양주 교제살인 부실 대응’ 논란에 경찰  |
+| 미확인 | doall@hani.co.kr | “퇴근시간 허위기록 지시”…복지시설 송죽 |
+| 미확인 | ehot@hani.co.kr | 하청노조, 원청에 ‘산업안전’ 요구…노동� |
+| 미확인 | tree21@hani.co.kr | ‘환자기본법’ 제정과 함께 준비해야 할 것  |
+| 미확인 | umkija@hani.co.kr | 세계에서 가장 아름다운 책, ‘산 239’…“산 |
+| 미확인 | ejkim@hani.co.kr | ‘채식주의자’ 부커상 수상 이후 10년…세계 |
+| 미확인 | sungman@hani.co.kr | “숱한 역사 고난 이겨낸 한국인 얼굴, ‘모� |
+| 미확인 | summer@hani.co.kr | 쩌우스칭X션 베이커의 ‘왼손잡이 소녀’…� |
+| 미확인 | frog@hani.co.kr | 이명박 4대강 사업 파헤친 영화 ‘추적’, 추� |
+| 미확인 | shin@hani.co.kr | 윤석열 정부가 반토막 낸 영화제 예산, 지원 � |
+| 미확인 | anaki@hani.co.kr | 이해찬, 미래를 말하지 않고 미래를 생각한 � |
 
 ## 연합뉴스
 
@@ -88,88 +273,6 @@ KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, �
 | 민선희 | ssun@yna.co.kr | 외교부, &apos;지상전 본격화&apos; 레바논서 조� |
 | 김화영 | quintet@yna.co.kr | [영상] 불난 트럭 소방서까지 2㎞ 내달렸다…� |
 
-## 한겨레
-
-| 이름 | 이메일 | 대표 기사 |
-|------|--------|----------|
-| 김미나 | mina@hani.co.kr | “적에겐 자비도, 포로 대우도 없다”…미 국 |
-| 김원철 | wonchul@hani.co.kr | “한국 보호해줬더니…” 트럼프, 미군 규모  |
-| 천호성 | rieux@hani.co.kr | ‘트럼프 핵심 참모’ 와일스 백악관 비서실� |
-| 윤연정 | yj2gaze@hani.co.kr | 트럼프 “쿠바 접수하는 영광 누릴 것”…현  |
-| 정의길 | Egil@hani.co.kr | 트럼프 참모 ‘이스라엘, 핵무기 쓸 수도’ � |
-| 정유경 | edge@hani.co.kr | ‘중동 간 한국 사드 언제 돌아오나’…미 국 |
-| 김지훈 | watchdog@hani.co.kr | 트럼프 딜레마…‘핵무기 10기 분량’ 이란 � |
-| 김지은 | mirae@hani.co.kr | 이스라엘 “지난밤 제거”…‘이란 지정 생� |
-| 곽진산 | kjs@hani.co.kr | 호주 시드니 도심서 20대 한국인 집단 폭행 당 |
-| 조기원 | garden@hani.co.kr | 네팔 산악 도로에서 버스 300ｍ 아래로 추락… |
-| 이정연 | xingxing@hani.co.kr | 평양-베이징 국제열차, 6년 만에 다시 달린다� |
-| 이정연 | forchis@hani.co.kr | 미 무역법 301조 ‘과잉생산’ 조사, 중 정조� |
-| 장현은 | mix@hani.co.kr | “감사합” 뚝…‘골든’ 수상소감 끊은 아� |
-| 김양희 | whizzer4@hani.co.kr | 스포츠는 드라마다…베네수엘라, 미국과 WBC � |
-| 심우삼 | wu32@hani.co.kr | 트럼프 “전직 대통령, ‘이란 공습 내가 할 � |
-| 박현 | hyun21@hani.co.kr | 전쟁 지휘하는 인공지능…‘완전자율무기’  |
-| 이우연 | azar@hani.co.kr | 일본인 57% “한국과 방위 협력, 미국 다음으� |
-| 이본영 | ebon@hani.co.kr | 다카이치 “스모 모래판 금녀제는 전통…앞� |
-| 미확인 | newiron@hani.co.kr | 이 대통령 “BTS 공연 안전하게 만반의 준비… |
-| 미확인 | yj@hani.co.kr | 강훈식 “UAE 원유 1800만 배럴 추가…총 2400만  |
-| 미확인 | yws@hani.co.kr | 이 대통령 “논의과정 관리 좀 그랬다”…검� |
-| 미확인 | khsong@hani.co.kr | 오세훈 “서울시장 후보 등록한다”…태산명 |
-| 미확인 | penj@hani.co.kr | 이 대통령 “사업자금으로 대출받아 부동산 � |
-| 미확인 | key@hani.co.kr | ‘BTS 공연’ 앞두고 19일부터 종로구·중구 일 |
-| 미확인 | forever@hani.co.kr | 이정현, 대구시장 경선 나선 중진 향해 “꽃� |
-| 미확인 | freehwa@hani.co.kr | “왜 전라도 출신이 충북 선거 좌지우지?”… |
-| 미확인 | hyopd@hani.co.kr | 송언석, 우원식에 “조작기소 의혹 국조특위� |
-| 미확인 | sol@hani.co.kr | ‘의원직 상실’ 양문석 “재판소원 안 한다� |
-| 미확인 | ham@hani.co.kr | ‘브레이크 없는 픽시 자전거’ 탄 10명 중 4� |
-| 미확인 | kyj@hani.co.kr | 이 대통령 지적한 ‘비싼 교복값’…광주 27� |
-| 미확인 | yhy@hani.co.kr | 산업부, 미국에 ‘조선 기자재’ 관세 예외 � |
-| 미확인 | jeje@hani.co.kr | 코스피 5% 급등에 5900선 회복…매수 사이드카  |
-| 미확인 | chaibs@hani.co.kr | 배경훈 “AI, 독자성 논란 떠나 세계적 수준 � |
-| 미확인 | harry@hani.co.kr | 1년 전 싸늘했던 삼성전자 주총, 올해는 축제� |
-| 미확인 | emd@hani.co.kr | 삼성전자 노조, ‘성과급 정상화’ 요구 5월 � |
-| 미확인 | cjhoon@hani.co.kr | ‘청년월세 지원’ 올해부터 확대…2년 동안  |
-| 미확인 | che@hani.co.kr | 지난해 방문객들 ‘국립공원’서 1인당 8만원 |
-| 미확인 | 3strings@hani.co.kr | 기후변화로 “활동 부족→건강악화→연 50만� |
-| 미확인 | southjh@hani.co.kr | 삼성전자 노조, 총파업 예고…쟁의 찬성률 93. |
-| 미확인 | loveletter@hani.co.kr | ‘반복 출금’으로 ATM 수수료 수백만원 챙긴  |
-| 미확인 | abbado@hani.co.kr | ‘○○약물 ○○㎍/L 복용 시’…‘약물운전� |
-| 미확인 | quicksilver@hani.co.kr | 특검, ‘주가조작 무죄’ 김건희 방조 혐의 � |
-| 미확인 | k21@hani.co.kr | 인권위 “교통약자 심사 때 ‘한의사 진단서� |
-| 미확인 | j9@hani.co.kr | 검찰, “이게 사법부냐” 법정 모욕 ‘김용현 |
-| 미확인 | euni@hani.co.kr | 6년간 경찰 퇴직 뒤 ‘로펌행’ 최소 144명…� |
-| 미확인 | hycho@hani.co.kr | “13시간 노동 그대로”…봉제노동자들, 전태 |
-| 미확인 | gayoon@hani.co.kr | [단독] 특사경 실수로 놓칠뻔한 147억 환치기� |
-
-## 중앙일보
-
-| 이름 | 이메일 | 대표 기사 |
-|------|--------|----------|
-| 미확인 | an.daehun@joongang.co.kr | 박완수 vs 김경수 붙는다…31년 만에 첫 전현� |
-| 미확인 | chae.hyeseon@joongang.co.kr | &apos;K-의료&apos; 찾는 외국인 160만…세계가 주 |
-| 미확인 | choi.seoin@joongang.co.kr | 특검, 김건희 도이치 재판 2심에 &apos;방조 혐� |
-| 미확인 | chomg@joongang.co.kr | &#91;속보&#93;&apos;국내주식 복귀계좌 양도세 � |
-| 미확인 | dino87@joongang.co.kr | 경찰·소방관은 되고 교도관은 안된다?…법무 |
-| 미확인 | han.areum2@joongang.co.kr | 부커스, 전남교육청 통합도서관 26개 기관에 � |
-| 미확인 | han.younghye@joongang.co.kr | &#91;속보&#93; 李대통령 &quot;&apos;韓 지정학적 � |
-| 미확인 | hongdoya@joongang.co.kr | 이정현, 대구 공천 놓고 중진 겨냥 &quot;꿩 먹� |
-| 미확인 | hyeon.yeseul@joongang.co.kr | &#91;속보&#93; 정부, BTS 공연 대비 종로· 중구 � |
-| 미확인 | im.soungbin@joongang.co.kr | &#91;단독&#93; &apos;모텔 연쇄살인&apos; 김소영,  |
-| 미확인 | kaypubb@joongang.co.kr | 베네수엘라 &apos;마두로 매치&apos;서 웃었다… |
-| 미확인 | kim.banghyun@joongang.co.kr | “헌법 명문화 약속하더니 돌변”… &quot;선� |
-| 미확인 | kim.eunbin@joongang.co.kr | &apos;항공사 기장 살해&apos; 50대 &quot;공군사관 |
-| 미확인 | kim.nahye1@joongang.co.kr | 대구한의대 한방의료체험타운, 대구시장 표� |
-| 미확인 | kim.seongjin1@joongang.co.kr | 명태균-오세훈 법정 대면 불발…吳 “민중기  |
-| 미확인 | lee.boram2@joongang.co.kr | 서울 시내 폐교, AI교육센터·특수학교로 탈바 |
-| 미확인 | mole@joongang.co.kr | 얼굴에 숨은 &apos;뇌 하수구&apos; 찾았다…치� |
-| 미확인 | oh.hyunseok1@joongang.co.kr | 복심 김남준도 &quot;좋은 상사 아냐&quot;…이� |
-| 미확인 | oh.samgwon@joongang.co.kr | &quot;교습비 34만원, 자습실비 72만원&quot;…통� |
-| 미확인 | park.jongsuh@joongang.co.kr | ATM에 100만원 두고 달아난 30대들…가방서 현� |
-| 미확인 | park.junkyu1@joongang.co.kr | &quot;李 고향예? 챙기긴 뭘 챙기요&quot; &quot;국 |
-| 미확인 | park.seonghun@joongang.co.kr | &#91;단독&#93; 김소영 &apos;모텔 살인&apos; 부검� |
-| 미확인 | park.taein@joongang.co.kr | 검찰총장 이름만 빼고…與강경파 입맛대로 � |
-| 미확인 | shin.hyeyeon@joongang.co.kr | &apos;이영애 딸&apos; 그 미성년 배우 깜짝…한� |
-| 미확인 | youknow@joongang.co.kr | &quot;조선땅 독도 왜 갔나&quot; 추궁에 사무라� |
-
 ## 조선일보
 
 | 이름 | 이메일 | 대표 기사 |
@@ -199,6 +302,12 @@ KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, �
 | 유소연 | why@chosun.com | 30분 걸리던 심사 10초 만에…하나은행, AI로 � |
 | 양지호 | yang.jiho@chosun.com | 美 최신 방공무기 IFPC, 한미 연합훈련에 첫 투 |
 | 김윤주 | yunj@chosun.com | 공시가격 최상위 주택 10곳 중 9곳이 강남·용� |
+| 정우상 논설위원 | imagine@chosun.com | [정우상 칼럼] 다시 김어준 유튜브에 농락당� |
+| 양승수 기자 | win@chosun.com | ‘마두로 더비’ 승자는 베네수엘라... 미국 � |
+| 성진혁 기자 | jhsung@chosun.com | 커리와 비교된 강이슬, FIBA 월드컵 최종 예선  |
+| 주희연 기자 | joo@chosun.com | 李 “주식 오늘 팔았는데 왜 돈은 모레 주나� |
+| 실리콘밸리=강다은 특파원 | kkang@chosun.com | 메타, 메타버스 사업 접는다 |
+| 김은경 기자 | kimngi@chosun.com | ‘통일교 청탁’ 윤영호, 내달 27일 항소심 선 |
 
 ## 전자신문
 
@@ -227,6 +336,34 @@ KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, �
 | 미확인 | mobydic@etnews.com | 李대통령, 與에 “檢개혁, 과정관리 아쉬워” |
 | 미확인 | editorial@etnews.com | [사설] 송전망 투자 좋지만, 활용전략이 더 중 |
 | 미확인 | sgbyun@etnews.com | [단독]카카오 '카인톡', 안드로이드로 확장…� |
+
+## 매일경제
+
+| 이름 | 이메일 | 대표 기사 |
+|------|--------|----------|
+| 김유신 | trust@mk.co.kr | 여행 블로거인 줄만 알았더니 ‘찐금수저’� |
+| 허서윤 | syhuh74@mk.co.kr | 이란전 최대 승자 된 한국 해운사…빈 유조선 |
+| 이상규 | boyondal@mk.co.kr | ‘이란전쟁’ 혼자 결정하고 이제 와 군함 보 |
+| 류영상 | ifyouare@mk.co.kr | 트럼프 “나토 도움 필요 없다…일본·한국도 |
+| 전종헌 | cap@mk.co.kr | [속보] 美 SEC “비트코인은 ‘디지털 상품’� |
+| 김혜진 | heyjiny@mk.co.kr | “양심상 이란전쟁 지지못해” 美 대테러 수� |
+| 한상헌 | aries@mk.co.kr | 이란 전쟁에도 부자들은 여행 간다…美 항공� |
+| 김명수 | mskim@mk.co.kr | 가디언AI, 엔비디아 주최 세계 최대 AI 컨퍼런� |
+| 안갑성 | ksahn@mk.co.kr | 전쟁나면 하수는 금, 고수는 코인 산다는데… |
+| 맹성규 | sgmaeng@mk.co.kr | 5월까지 돌아오면 양도세 0원…RIA 법안, 서학� |
+| 최아영 | cay@mk.co.kr | “떨어질 때 쓸어담자”…급락장서 삼전닉스 |
+| 최종일 | choi.jongil@mk.co.kr | 이란 사태 여전한데, 6천피 곧 회복?…코스피  |
+| 김민주 | kim.minjoo@mk.co.kr | 삼성전자·SK하이닉스, 코스피 시총 비중 40% � |
+| 조성신 | robgud@mk.co.kr | “당분간은 집 살 계획 없어요”…전국 주택� |
+| 홍혜진 | hong.hyejin@mk.co.kr | '한강벨트' 성동구 공시가 29% 쑥 … 도봉구는  |
+| 임영신 | yeungim@mk.co.kr | 서울시 “국가유산청 SH 고발 유감…3자 논의  |
+| 백지연 | gobaek@mk.co.kr | ‘보유세 폭탄’ 집주인들도 절세 매도 나서� |
+| 박소은 | park.soeun@mk.co.kr | 20만원씩 24개월 ‘청년월세 지원’ 받아볼까� |
+| 방영덕 | byd@mk.co.kr | “빵값·라면값 잡았지만, 버거값은 왜 못잡� |
+| 강인선 | rkddls44@mk.co.kr | 공공기관부터 차량 요일제 … 걸프전때는 민� |
+| 이미연 | enero20@mk.co.kr | “수수료 규제, 약인가 독인가”…플랫폼 생� |
+| 김진룡 | kim.jinryong@mk.co.kr | 항공사 기장 살해범 이유가…“나보다 먼저 � |
+| 이용익 | yongik@mk.co.kr | “유튜브도 길다고 안보는데 책이라뇨”…10� |
 
 ## 헤럴드경제
 
@@ -271,6 +408,25 @@ KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, �
 | 기자 | yjlee@hankyung.com | 한강벨트 공시가 23% 뛰어…원베일리 보유세 1 |
 | 한경닷컴 | waterbean@hankyung.com | politics_page_1 |
 
+## 동아일보
+
+| 이름 | 이메일 | 대표 기사 |
+|------|--------|----------|
+| 미확인 | 71wook@donga.com | “이란, 위안화 거래 조건 걸고 8개국과 호르� |
+| 미확인 | bong087@donga.com | ‘의원직 상실’ 與양문석 “재판소원 진행� |
+| 미확인 | cjh1225@donga.com | “트럼프 그렇게 화내는 건 처음 봐”…파병  |
+| 미확인 | gamja822@donga.com | ‘곰 습격 사건’ 생중계 기자 뒤에 진짜 곰� |
+| 미확인 | hs87cho@donga.com | 김어준 방송 나간 정청래 “검찰총장? 그냥 � |
+| 미확인 | hyewon@donga.com | 여직원 책상에 체모 놓은 50대 상사…성범죄 � |
+| 미확인 | xunnio410@donga.com | 8개 카드사 연봉 뜯어보니 대부분 ‘억대’… |
+| 미확인 | yes@donga.com | 보험·예금담보 대출까지 끌어다 증시로…전� |
+| 미확인 | pistols@donga.com | 부모·자식은 노화 부르는 관계…배우자는 예 |
+| 미확인 | phoebe@donga.com | “장시간 업무엔 커피 대신 이것?”…집중력  |
+| 미확인 | yohan@donga.com | 세월의 공격도 블로킹… 불혹에도 ‘천수배� |
+| 미확인 | hjh@donga.com | LA FC, 북중미 챔피언스컵 8강행…손흥민은 7경 |
+| 미확인 | imsun@donga.com | 친트럼프 정보통이 이란 공격에 반기…‘마� |
+| 미확인 | rladudgh2349@donga.com | 젠슨 황 “엔비디아, 중국 수출용 ‘H200’ 생� |
+
 ## 아시아경제
 
 | 이름 | 이메일 | 대표 기사 |
@@ -287,30 +443,3 @@ KBS, MBC, JTBC, SBS, YTN, 뉴시스, 국민일보, 세계일보, 문화일보, �
 | 미확인 | tmdtjq8506@asiae.co.kr | 李대통령 &quot;주식 오늘 팔았는데 왜 돈은 모 |
 | 미확인 | 5625@asiae.co.kr | ‘520조 대미 투자’ 컨트롤타워 시동…한미� |
 | 미확인 | jbg@asiae.co.kr | 삼성전자 노조, 5월 총파업 가결…쟁의  찬성� |
-
-## 매일경제
-
-| 이름 | 이메일 | 대표 기사 |
-|------|--------|----------|
-| 김유신 | trust@mk.co.kr | 여행 블로거인 줄만 알았더니 ‘찐금수저’� |
-| 허서윤 | syhuh74@mk.co.kr | 이란전 최대 승자 된 한국 해운사…빈 유조선 |
-| 이상규 | boyondal@mk.co.kr | ‘이란전쟁’ 혼자 결정하고 이제 와 군함 보 |
-| 류영상 | ifyouare@mk.co.kr | 트럼프 “나토 도움 필요 없다…일본·한국도 |
-| 전종헌 | cap@mk.co.kr | [속보] 美 SEC “비트코인은 ‘디지털 상품’� |
-| 김혜진 | heyjiny@mk.co.kr | “양심상 이란전쟁 지지못해” 美 대테러 수� |
-| 한상헌 | aries@mk.co.kr | 이란 전쟁에도 부자들은 여행 간다…美 항공� |
-| 김명수 | mskim@mk.co.kr | 가디언AI, 엔비디아 주최 세계 최대 AI 컨퍼런� |
-
-## 동아일보
-
-| 이름 | 이메일 | 대표 기사 |
-|------|--------|----------|
-| 미확인 | 71wook@donga.com | “이란, 위안화 거래 조건 걸고 8개국과 호르� |
-| 미확인 | bong087@donga.com | ‘의원직 상실’ 與양문석 “재판소원 진행� |
-| 미확인 | cjh1225@donga.com | “트럼프 그렇게 화내는 건 처음 봐”…파병  |
-| 미확인 | gamja822@donga.com | ‘곰 습격 사건’ 생중계 기자 뒤에 진짜 곰� |
-| 미확인 | hs87cho@donga.com | 김어준 방송 나간 정청래 “검찰총장? 그냥 � |
-| 미확인 | hyewon@donga.com | 여직원 책상에 체모 놓은 50대 상사…성범죄 � |
-| 미확인 | xunnio410@donga.com | 8개 카드사 연봉 뜯어보니 대부분 ‘억대’… |
-| 미확인 | yes@donga.com | 보험·예금담보 대출까지 끌어다 증시로…전� |
-
