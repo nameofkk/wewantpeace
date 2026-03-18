@@ -8,6 +8,7 @@ import { useNotifications, useMarkRead, useMarkAllRead, useSubmitFeedback, Notif
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { t, Lang } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
+import { issueDetailPath } from "@/lib/toss-nav";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
@@ -74,7 +75,7 @@ export default function NotificationsPage() {
       }
     }
     if (notif.cluster_id) {
-      router.push(`/issues/${notif.cluster_id}`);
+      router.push(issueDetailPath(notif.cluster_id));
     }
   };
 

@@ -6,6 +6,7 @@ import { useAppStore } from "@/lib/store";
 import { API_BASE } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Megaphone } from "lucide-react";
+import { communityPostPath } from "@/lib/toss-nav";
 
 interface Notice {
   id: string;
@@ -34,7 +35,7 @@ export function NoticeTicker() {
 
   return (
     <button
-      onClick={() => router.push(`/community/${latest.id}`)}
+      onClick={() => router.push(communityPostPath(latest.id))}
       className="w-full flex items-center gap-2 px-4 py-2 bg-blue-500/5 border-b border-blue-500/10 hover:bg-blue-500/10 transition-colors"
     >
       <span className="flex items-center gap-1.5 shrink-0">

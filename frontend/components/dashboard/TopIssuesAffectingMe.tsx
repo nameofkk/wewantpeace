@@ -17,6 +17,7 @@ import {
   type TrendingItem,
 } from "@/lib/kscore-utils";
 import { ChevronRight, Newspaper, AlertTriangle } from "lucide-react";
+import { issueDetailPath } from "@/lib/toss-nav";
 import { SectionHeader } from "./SectionHeader";
 
 export function TopIssuesAffectingMe() {
@@ -111,7 +112,7 @@ export function TopIssuesAffectingMe() {
           return (
             <div
               key={item.id}
-              onClick={clusterId ? () => router.push(`/issues/${clusterId}`) : undefined}
+              onClick={clusterId ? () => router.push(issueDetailPath(clusterId)) : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-xl border border-border bg-card p-3 cursor-pointer",
                 "hover:bg-card/80 transition-all border-l-4 fade-in-up",

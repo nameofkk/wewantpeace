@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { API_BASE } from "@/lib/api";
+import { communityPostPath } from "@/lib/toss-nav";
 
 type PostType = "all" | "discussion" | "analysis" | "question" | "notice";
 type SortBy = "latest" | "popular";
@@ -66,7 +67,7 @@ function PostCard({ post, index = 0, lang }: { post: Post; index?: number; lang:
   const typeKey = `community_type_${post.post_type}` as Parameters<typeof t>[1];
   const isNotice = post.post_type === "notice";
   return (
-    <Link href={`/community/${post.id}`}>
+    <Link href={communityPostPath(post.id)}>
       <div
         className={cn(
           "card-enter rounded-xl border p-4 hover:bg-card/80 transition-colors cursor-pointer",
@@ -232,7 +233,7 @@ export default function CommunityPage() {
         {activeType !== "notice" && pinnedNotices && pinnedNotices.length > 0 && (
           <div className="space-y-2 pb-3 border-b border-yellow-500/20">
             {pinnedNotices.map((notice) => (
-              <Link key={notice.id} href={`/community/${notice.id}`}>
+              <Link key={notice.id} href={communityPostPath(notice.id)}>
                 <div className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5 hover:bg-yellow-500/10 transition-colors cursor-pointer">
                   <Megaphone className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
                   <span className="text-sm font-medium truncate flex-1">{lang === "en" && notice.title_en ? notice.title_en : notice.title}</span>
@@ -260,7 +261,7 @@ export default function CommunityPage() {
               <div className="overflow-x-auto">
                 <div className="flex gap-3 px-4 pb-4" style={{ minWidth: "max-content" }}>
                   {hotTopics.map((post, i) => (
-                    <Link key={post.id} href={`/community/${post.id}`}>
+                    <Link key={post.id} href={communityPostPath(post.id)}>
                       <div
                         className="fade-in-up w-48 rounded-lg border border-border bg-background p-3 hover:bg-secondary/30 transition-colors cursor-pointer flex-shrink-0"
                         style={{ animationDelay: `${i * 80}ms` }}

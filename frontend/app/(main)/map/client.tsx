@@ -11,6 +11,7 @@ import { t, type Lang } from "@/lib/i18n";
 import { getFlag, getCountryName, COUNTRY_CENTERS } from "@/lib/countries";
 import { PaywallModal, usePaywall } from "@/components/ui/PaywallModal";
 import { ShareButton } from "@/components/issue/ShareButton";
+import { issueDetailPath, countryIssuesPath } from "@/lib/toss-nav";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
@@ -312,14 +313,14 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
             <button
               className="w-full rounded-lg py-2.5 text-xs font-bold transition-all"
               style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}
-              onClick={() => { window.location.href = `/issues/${cluster.id}`; }}
+              onClick={() => { window.location.href = issueDetailPath(cluster.id); }}
             >
               {t(lang, "map_popup_detail")}
             </button>
             {(cluster.grouped_count ?? 1) > 1 && cluster.country_code && (
               <button
                 className="w-full rounded-lg py-2 text-xs text-muted-foreground border border-border transition-all hover:text-foreground"
-                onClick={() => { window.location.href = `/issues/country/${cluster.country_code}`; }}
+                onClick={() => { window.location.href = countryIssuesPath(cluster.country_code); }}
               >
                 {t(lang, "map_popup_all_in_region", { n: cluster.grouped_count ?? 1 })}
               </button>
@@ -350,7 +351,7 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
     <span
       key={c.id}
       className={`inline-flex items-center gap-2 px-6 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer hover:text-white"}`}
-      onClick={isPreview ? undefined : () => { window.location.href = `/issues/${c.id}`; }}
+      onClick={isPreview ? undefined : () => { window.location.href = issueDetailPath(c.id); }}
     >
       <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: getKScoreColor(c.kscore) }} />
       <span className="text-[11px] text-slate-300/80">

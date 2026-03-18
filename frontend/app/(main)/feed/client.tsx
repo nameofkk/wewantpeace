@@ -15,6 +15,7 @@ import { LogoIcon } from "@/components/ui/logo-icon";
 import { t } from "@/lib/i18n";
 import { KScoreHistoryChart } from "@/components/trending/KScoreHistoryChart";
 import { ShareButton } from "@/components/issue/ShareButton";
+import { issueDetailPath } from "@/lib/toss-nav";
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
@@ -274,7 +275,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
         isAlert && !isSevere && "card-pulse-alert",
       )}
       style={{ animationDelay: `${delay}ms` }}
-      onClick={clusterId && !editing ? () => router.push(`/issues/${clusterId}`) : undefined}
+      onClick={clusterId && !editing ? () => router.push(issueDetailPath(clusterId)) : undefined}
     >
       {/* 배경 글로우 (경계 이상) */}
       {isAlert && (
@@ -1057,7 +1058,7 @@ function FeedPageContent() {
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {/* 최근 급부상 카드 */}
             {!isLoading && !isError && trendingTab === "global" && risingData.length > 0 && (
-              <RisingCard risingItems={risingData} allItems={globalData ?? []} lang={lang} onNavigate={(id) => router.push(`/issues/${id}`)} />
+              <RisingCard risingItems={risingData} allItems={globalData ?? []} lang={lang} onNavigate={(id) => router.push(issueDetailPath(id))} />
             )}
 
             {isLoading && <LoadingSkeleton />}
