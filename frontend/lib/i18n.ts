@@ -142,6 +142,8 @@ export const translations = {
     tension_updated: "갱신",
     tension_refresh_interval: "15분마다 갱신",
     tension_no_data: "긴장도 데이터가 없습니다.",
+    tension_no_events: "관련 이벤트가 없습니다",
+    issue_events: "건",
 
     // 긴장도 레벨 (TENSION_LEVELS 대체)
     tension_level_0: "안정",
@@ -1774,6 +1776,8 @@ export const translations = {
     tension_updated: "updated",
     tension_refresh_interval: "Refreshes every 15 min",
     tension_no_data: "No tension data available.",
+    tension_no_events: "No related events",
+    issue_events: "events",
 
     // tension level labels
     tension_level_0: "Stable",
