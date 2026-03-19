@@ -1,6 +1,6 @@
 {
   "name": "wewantpeace-frontend",
-  "version": "0.2.7",
+  "version": "0.3.6",
   "private": true,
   "scripts": {
     "dev": "next dev",

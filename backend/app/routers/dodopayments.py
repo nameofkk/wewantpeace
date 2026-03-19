@@ -8,12 +8,13 @@ import uuid as _uuid
 from datetime import datetime, timedelta, timezone
 
 from dodopayments import DodoPayments
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, get_db
+from backend.app.core.auth import get_current_user, get_db, _verify_firebase_token, _get_or_create_user
 from backend.app.core.config import settings
 from backend.app.models.user import User
 from backend.app.models.subscription import Subscription, PaymentHistory
@@ -67,6 +68,11 @@ class CheckoutBody(BaseModel):
     plan: str  # "pro" | "pro_plus"
 
 
+class TossCheckoutBody(BaseModel):
+    plan: str  # "pro" | "pro_plus"
+    token: str  # Firebase ID Token (Toss WebView에서는 Authorization 헤더 대신 body로 전달)
+
+
 # ── Checkout 생성 ─────────────────────────────────────────────────────────────
 
 @router.post("/create-checkout")
@@ -110,11 +116,16 @@ async def create_checkout(
                 current_user.id, existing_sub.plan, body.plan,
             )
 
+    # 이메일이 없는 유저(토스 등) → 플레이스홀더 사용
+    customer_email = current_user.email
+    if not customer_email:
+        customer_email = f"user_{current_user.id}@wewantpeace.live"
+
     # DodoPayments Checkout Session 생성
     client = _get_dodo_client()
     session = client.checkout_sessions.create(
         product_cart=[{"product_id": product_id, "quantity": 1}],
-        customer={"email": current_user.email or "", "name": current_user.display_name or ""},
+        customer={"email": customer_email, "name": current_user.display_name or "사용자"},
         return_url="https://www.wewantpeace.live/upgrade/success",
         metadata={"user_id": str(current_user.id), "plan": body.plan},
     )
@@ -128,6 +139,75 @@ async def create_checkout(
         "checkout_url": session.checkout_url,
         "plan": body.plan,
     }
+
+
+# ── Toss WebView 전용: Form-urlencoded fetch (CORS preflight 우회) ────────────
+
+@router.post("/create-checkout-simple")
+async def create_checkout_simple(
+    plan: str = Form(...),
+    token: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Toss WebView 전용: application/x-www-form-urlencoded로 전송하면
+    CORS 'Simple Request'가 되어 preflight(OPTIONS) 없이 바로 전송됨.
+    JSON 응답으로 checkout_url 반환.
+    """
+    token_info = _verify_firebase_token(token)
+    if not token_info or not token_info.get("uid"):
+        raise HTTPException(401, detail="유효하지 않은 토큰입니다.")
+
+    current_user = await _get_or_create_user(token_info["uid"], db, email=token_info.get("email"))
+
+    if plan not in ("pro", "pro_plus"):
+        raise HTTPException(422, detail="유효하지 않은 플랜입니다.")
+
+    product_id = _plan_to_dodo_product(plan)
+    if not product_id:
+        raise HTTPException(500, detail="DodoPayments 상품 ID가 설정되지 않았습니다.")
+
+    if not settings.dodo_api_key:
+        raise HTTPException(500, detail="DodoPayments API 키가 설정되지 않았습니다.")
+
+    # 기존 구독 처리
+    existing_result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == current_user.id,
+            Subscription.status.in_(["active", "trial", "grace_period"]),
+        )
+    )
+    now = datetime.now(timezone.utc)
+    for existing_sub in existing_result.scalars().all():
+        if existing_sub.status == "trial":
+            existing_sub.status = "expired"
+            existing_sub.updated_at = now
+        elif existing_sub.plan == plan:
+            raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 같은 플랜의 활성 구독이 있습니다."})
+        else:
+            existing_sub.status = "cancelled"
+            existing_sub.cancelled_at = now
+            existing_sub.updated_at = now
+
+    # 토스 유저는 이메일이 없을 수 있음 → 플레이스홀더 사용
+    customer_email = current_user.email
+    if not customer_email:
+        customer_email = f"toss_{current_user.id}@wewantpeace.live"
+
+    try:
+        client = _get_dodo_client()
+        session = client.checkout_sessions.create(
+            product_cart=[{"product_id": product_id, "quantity": 1}],
+            customer={"email": customer_email, "name": current_user.display_name or "토스 사용자"},
+            return_url="https://www.wewantpeace.live/upgrade/success",
+            metadata={"user_id": str(current_user.id), "plan": plan},
+        )
+    except Exception as e:
+        logger.error("DodoPayments create-checkout-simple 실패: user=%s error=%s", current_user.id, e)
+        raise HTTPException(502, detail=f"결제 생성 실패: {str(e)[:200]}")
+
+    logger.info("DodoPayments simple checkout: user=%s plan=%s", current_user.id, plan)
+    return {"checkout_url": session.checkout_url, "plan": plan}
 
 
 # ── 웹훅 ─────────────────────────────────────────────────────────────────────
