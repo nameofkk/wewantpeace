@@ -323,16 +323,16 @@ export default function CommunityPage() {
           </div>
         </div>
 
-        {/* Filter chips */}
-        <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
+        {/* Filter tabs */}
+        <div className="flex overflow-x-auto scrollbar-hide">
           {TYPES.map((type) => (
             <button
               key={type.value}
               onClick={() => setActiveType(type.value)}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`shrink-0 px-4 py-2.5 text-xs font-medium transition-colors border-b-2 ${
                 activeType === type.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {type.icon ? `${type.icon} ` : ""}
