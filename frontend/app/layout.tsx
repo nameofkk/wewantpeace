@@ -277,12 +277,12 @@ export default function RootLayout({
           </div>
 
           {/* 타이틀 */}
-          <p style={{ marginTop: 16, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", color: "#f1f5f9" }}>
+          <p style={{ marginTop: 16, fontSize: 22, fontWeight: 900, letterSpacing: "-0.02em", color: "#ffffff" }}>
             WeWantPeace
           </p>
 
           {/* 서브타이틀 — 서비스 설명 */}
-          <p style={{ marginTop: 6, fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", color: "rgba(148,163,184,0.8)", textTransform: "uppercase" }}>
+          <p style={{ marginTop: 6, fontSize: 12, fontWeight: 500, letterSpacing: "0.05em", color: "rgba(255,255,255,0.8)", textTransform: "uppercase" }}>
             Real-time Global Conflict Monitor
           </p>
 

@@ -418,7 +418,7 @@ export default function OnboardingPage() {
 
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
-            <div className="flex-1 overflow-y-auto animate-fadeIn">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
             <div className="flex flex-col items-center min-h-full justify-center py-2">
               {/* 로고 + 레이더 */}
               <div className="relative flex items-center justify-center mb-6">
@@ -440,8 +440,8 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <h1 className="text-lg font-bold tracking-tight mb-1">WeWantPeace</h1>
-              <h2 className="text-xl font-bold whitespace-pre-line leading-snug text-center mb-6">
+              <h1 className="text-lg font-bold tracking-tight mb-1 text-white">WeWantPeace</h1>
+              <h2 className="text-xl font-bold whitespace-pre-line leading-snug text-center mb-6 text-white">
                 {t(lang, "ob_hero_title")}
               </h2>
 
@@ -520,8 +520,9 @@ export default function OnboardingPage() {
                 <iframe
                   title="disquiet-badge"
                   frameBorder={0}
+                  scrolling="no"
                   src="https://badge.disquiet.io/rank-badge?productUrlSlug=we-want-peace&mode=dark&rank=bronze"
-                  style={{ width: 210, height: 54, border: "none" }}
+                  style={{ width: 224, height: 71, border: "none", overflow: "hidden", display: "block" }}
                 />
               </div>
             </div>
@@ -710,7 +711,7 @@ export default function OnboardingPage() {
 
           {/* === Step 2: 로그인 유도 === */}
           {step === 2 && (
-            <div className="flex-1 overflow-y-auto animate-fadeIn">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
             <div className="flex flex-col items-center min-h-full justify-center py-2">
               <div className="mx-auto mb-6 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <Lock className="h-8 w-8 text-primary" />

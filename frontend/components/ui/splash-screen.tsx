@@ -101,12 +101,12 @@ export function SplashScreen({ visible }: SplashScreenProps) {
       </div>
 
       {/* 타이틀 */}
-      <p className="mt-4 text-[22px] font-black tracking-tight text-slate-100">
+      <p className="relative z-[1] mt-4 text-[22px] font-black tracking-tight text-white">
         WeWantPeace
       </p>
 
       {/* 서브타이틀 */}
-      <p className="mt-1.5 text-xs font-medium tracking-widest uppercase text-slate-400/80">
+      <p className="relative z-[1] mt-1.5 text-xs font-medium tracking-widest uppercase text-white/80">
         Real-time Global Conflict Monitor
       </p>
 
@@ -115,13 +115,14 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         <iframe
           title="disquiet-badge"
           frameBorder={0}
+          scrolling="no"
           src="https://badge.disquiet.io/rank-badge?productUrlSlug=we-want-peace&mode=dark&rank=bronze"
-          style={{ width: 210, height: 54, border: "none" }}
+          style={{ width: 224, height: 71, border: "none", overflow: "hidden", display: "block" }}
         />
       </div>
 
       {/* 로딩 인디케이터 */}
-      <div className="mt-4 flex items-center gap-2">
+      <div className="relative z-[1] mt-4 flex items-center gap-2">
         <div className="flex gap-[3px]">
           <span className={"splash-dot h-1 w-1 rounded-full bg-blue-500/70"} />
           <span
