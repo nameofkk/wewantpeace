@@ -11,8 +11,9 @@ import { detectPlatform, type AppPlatform } from "@/lib/platform-detect";
 import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { API_BASE, useMe, createDodoCheckout } from "@/lib/api";
-import { DodoPayments } from "dodopayments-checkout";
+import { API_BASE, useMe } from "@/lib/api";
+// DodoPayments SDK: Toss WebView에서 window.fetch 간섭 방지를 위해 dynamic import 사용
+// import { DodoPayments } from "dodopayments-checkout";  // ← 삭제됨
 import AppTour from "@/components/ui/AppTour";
 import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
@@ -79,7 +80,7 @@ const FEATURES: Feature[] = [
     free: false,                       pro: true,                        proplus: true,
   },
   {
-    labelKo: "Intel (FIRMS/IODA/GPS/교역흐름)", labelEn: "Intel (FIRMS/IODA/GPS/Trade)",
+    labelKo: "Intel 레이어",                   labelEn: "Intel layers",
     free: { ko: "데모", en: "Demo" },  pro: true,                        proplus: true,
   },
   {
@@ -211,16 +212,20 @@ function UpgradeContent() {
 
   useEffect(() => {
     setPlatform(detectPlatform());
-    // DodoPayments Overlay SDK 초기화
-    DodoPayments.Initialize({
-      mode: "live",
-      displayType: "overlay",
-      onEvent: (event: { event_type: string }) => {
-        if (event.event_type === "checkout.closed") {
-          setLoading(null);
-        }
-      },
-    });
+    // 토스 WebView: DodoPayments SDK 로드 자체를 하지 않음 (fetch 간섭 방지)
+    if (!isTossMiniApp()) {
+      import("dodopayments-checkout").then(({ DodoPayments }) => {
+        DodoPayments.Initialize({
+          mode: "live",
+          displayType: "overlay",
+          onEvent: (event: { event_type: string }) => {
+            if (event.event_type === "checkout.closed") {
+              setLoading(null);
+            }
+          },
+        });
+      });
+    }
   }, []);
 
   // 현재 플랜에 따라 기본 선택 변경
@@ -423,9 +428,53 @@ function UpgradeContent() {
   }
 
   async function handleDodoCheckout(planId: string) {
-    const { checkout_url } = await createDodoCheckout(planId);
-    if (checkout_url) {
-      await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
+    let step = "init";
+    try {
+      step = "getIdToken";
+      const token = await user!.getIdToken();
+
+      const isToss = isTossMiniApp();
+      const endpoint = isToss
+        ? `${API_BASE}/payments/dodo/create-checkout-toss`
+        : `${API_BASE}/payments/dodo/create-checkout`;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const bodyData = isToss
+        ? JSON.stringify({ plan: planId, token })
+        : JSON.stringify({ plan: planId });
+
+      if (!isToss) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      step = `fetch(${isToss ? "toss" : "normal"})`;
+      const res = await fetch(endpoint, { method: "POST", headers, body: bodyData });
+
+      step = "checkStatus";
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw Object.assign(
+          new Error(data.detail || (lang === "ko" ? "결제 생성 실패" : "Checkout creation failed")),
+          { status: res.status, body: data },
+        );
+      }
+
+      step = "parseJSON";
+      const { checkout_url } = await res.json();
+      if (!checkout_url) return;
+
+      step = "openCheckout";
+      if (isToss) {
+        window.location.href = checkout_url;
+      } else {
+        const { DodoPayments } = await import("dodopayments-checkout");
+        await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
+      }
+    } catch (e) {
+      const err = e as Error & { status?: number; body?: unknown };
+      throw Object.assign(
+        new Error(`[${step}] ${err.name}: ${err.message} (origin=${typeof window !== "undefined" ? window.location.origin : "?"})`),
+        { status: err.status, body: err.body },
+      );
     }
   }
 
@@ -662,7 +711,7 @@ function UpgradeContent() {
                 {[
                   lang === "ko" ? "관심 국가 5개 · 신뢰 알림 · 토픽 필터" : "5 countries · Verified alerts · Topic filter",
                   lang === "ko" ? "AI 영향 분석 · 산업별 리스크 개요" : "AI impact analysis · Sector risk overview",
-                  lang === "ko" ? "Intel 레이어 (위성/IODA/GPS/교역 흐름)" : "Intel layers (FIRMS/IODA/GPS/Trade flow)",
+                  lang === "ko" ? "Intel 레이어 (위성·GPS·교역)" : "Intel layers (FIRMS·GPS·Trade)",
                   lang === "ko" ? "KScore 3.0~ · 30일 히스토리" : "KScore 3.0+ · 30-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
