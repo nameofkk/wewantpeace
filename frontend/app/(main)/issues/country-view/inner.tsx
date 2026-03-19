@@ -87,7 +87,7 @@ export default function CountryIssuesInner() {
 
         {clusters?.map((c) => {
           const raw = lang === "en" ? c.title : (c.title_ko ?? c.title);
-          const title = isJunkTitle(raw) ? buildSmartTitle(c.topic, c.country_code, lang) : stripTitlePrefix(raw);
+          const title = isJunkTitle(raw) ? buildSmartTitle(raw, c.topic, lang, getCountryName, c.country_code) : stripTitlePrefix(raw);
           const color = getSeverityColor(c.severity);
 
           return (
