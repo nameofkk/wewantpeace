@@ -137,6 +137,7 @@ def _user_to_out(u: User) -> UserOut:
 
 class TossLoginBody(BaseModel):
     authorization_code: str
+    referrer: str = "DEFAULT"
 
 
 class TossLoginOut(BaseModel):
@@ -181,7 +182,7 @@ def _get_toss_cert() -> tuple[str, str]:
     return cert_path, key_path
 
 
-async def _exchange_toss_code(authorization_code: str) -> dict:
+async def _exchange_toss_code(authorization_code: str, referrer: str = "DEFAULT") -> dict:
     """Toss authorizationCode → accessToken 교환 (mTLS 인증)."""
     import json as _json
     import httpx
@@ -192,7 +193,7 @@ async def _exchange_toss_code(authorization_code: str) -> dict:
         async with httpx.AsyncClient(cert=cert, timeout=10) as client:
             resp = await client.post(
                 f"{TOSS_API_BASE}/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
-                json={"authorizationCode": authorization_code},
+                json={"authorizationCode": authorization_code, "referrer": referrer},
                 headers={"Content-Type": "application/json"},
             )
             resp.raise_for_status()
@@ -279,9 +280,13 @@ async def toss_login(
     4. Firebase Custom Token 발급 → 프론트에서 signInWithCustomToken()
     """
     # 1. 코드 → 토큰 교환
-    token_data = await _exchange_toss_code(body.authorization_code)
+    token_data = await _exchange_toss_code(body.authorization_code, body.referrer)
+    # 응답이 {"resultType":"SUCCESS","success":{...}} 구조일 수 있음
+    if "success" in token_data and isinstance(token_data["success"], dict):
+        token_data = token_data["success"]
     access_token = token_data.get("accessToken") or token_data.get("access_token")
     if not access_token:
+        logger.error("토스 토큰 응답에 accessToken 없음: %s", list(token_data.keys()))
         raise HTTPException(502, detail="토스 토큰 응답에 accessToken 없음")
 
     # 2. userKey 조회
