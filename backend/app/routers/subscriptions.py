@@ -21,6 +21,7 @@ router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 PROMO_CODES = {
     "PRODUCTHUNT": {"plan": "pro", "days": 7, "description": "Product Hunt launch offer"},
+    "THREADS": {"plan": "pro_plus", "days": 14, "description": "Threads 친구들 전용 Pro+ 2주 체험"},
 }
 
 PLANS = {
