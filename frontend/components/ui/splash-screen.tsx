@@ -110,8 +110,18 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         Real-time Global Conflict Monitor
       </p>
 
+      {/* Disquiet 배지 */}
+      <div className="mt-6 relative z-[1]">
+        <iframe
+          title="disquiet-badge"
+          frameBorder={0}
+          src="https://badge.disquiet.io/vote-badge?productUrlSlug=we-want-peace&mode=dark"
+          style={{ width: 210, height: 54, border: "none" }}
+        />
+      </div>
+
       {/* 로딩 인디케이터 */}
-      <div className="mt-8 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2">
         <div className="flex gap-[3px]">
           <span className={"splash-dot h-1 w-1 rounded-full bg-blue-500/70"} />
           <span

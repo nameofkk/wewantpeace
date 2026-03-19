@@ -483,16 +483,6 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              {/* Disquiet 배지 */}
-              <div className="flex justify-center mb-4">
-                <iframe
-                  title="disquiet-badge"
-                  frameBorder={0}
-                  src="https://badge.disquiet.io/vote-badge?productUrlSlug=we-want-peace&mode=dark"
-                  style={{ width: 210, height: 54, border: "none" }}
-                />
-              </div>
-
               {/* 하단 신뢰 지표 */}
               <div className="w-full flex items-center justify-between px-2 mb-2">
                 <div className="flex items-center gap-3">
