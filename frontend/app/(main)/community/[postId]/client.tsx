@@ -379,6 +379,20 @@ export default function PostDetailPage() {
     } catch {}
   }
 
+  async function handleTogglePin() {
+    if (!user) return;
+    const token = await user.getIdToken();
+    const res = await fetch(`${API_BASE}/community/posts/${postId}/pin`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ["post", postId] });
+      queryClient.invalidateQueries({ queryKey: ["pinned-notices"] });
+      queryClient.invalidateQueries({ queryKey: ["community-posts"] });
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(t(lang, "post_delete_confirm"))) return;
     deleteMutation.mutate();
@@ -523,6 +537,19 @@ export default function PostDetailPage() {
           </button>
           {(isMyPost || isAdmin) && (
             <div className="ml-auto flex items-center gap-2">
+              {isAdmin && (
+                <button
+                  onClick={handleTogglePin}
+                  className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                    post.is_pinned
+                      ? "border-yellow-500/40 text-yellow-500 bg-yellow-500/10"
+                      : "border-border text-muted-foreground hover:text-yellow-500 hover:border-yellow-500/40"
+                  }`}
+                >
+                  <Pin className="h-3 w-3" />
+                  {post.is_pinned ? t(lang, "post_unpin") : t(lang, "post_pin")}
+                </button>
+              )}
               <Link
                 href={`/community/${postId}/edit`}
                 className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
