@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X, Megaphone, Pin, Bookmark } from "lucide-react";
+import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X, Pin, Bookmark } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { API_BASE, useMe, toggleBookmark } from "@/lib/api";
-import Avatar from "@/components/community/Avatar";
 import MarkdownContent from "@/components/community/MarkdownContent";
 
 function relativeTime(iso: string, lang: Lang): string {
@@ -106,7 +105,6 @@ function CommentItem({
     <div className={cn("", depth > 0 && "ml-6 border-l-2 border-border pl-4")}>
       <div className="py-3">
         <div className="flex gap-2.5">
-          <Avatar nickname={comment.author_nickname} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
@@ -425,8 +423,6 @@ export default function PostDetailPage() {
   }));
 
   const typeKey = `community_type_${post.post_type}` as Parameters<typeof t>[1];
-  const TYPE_ICONS: Record<string, string> = { discussion: "\uD83D\uDCAC", analysis: "\uD83D\uDCCA", question: "\u2753", notice: "\uD83D\uDCE2" };
-  const typeIcon = TYPE_ICONS[post.post_type] || "";
   const typeLabel = t(lang, typeKey) || post.post_type;
   const relativeTimeDisplay = relativeTime(post.created_at, lang);
   const displayContent = lang === "en" && post.content_en ? post.content_en : post.content;
@@ -462,24 +458,14 @@ export default function PostDetailPage() {
           )}
         </div>
 
-        {/* Author section with Avatar */}
-        <div className="flex items-center gap-3 mb-4">
-          <Avatar nickname={post.author_nickname} plan={post.author_plan} size="md" />
-          <div className="flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="font-medium text-sm">{post.author_nickname || t(lang, "community_anonymous")}</span>
-              <PlanBadge plan={post.author_plan} />
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-              <span>{relativeTimeDisplay}</span>
-              <span>&middot;</span>
-              <span>{t(lang, "post_views", { n: post.view_count })}</span>
-            </div>
+        {/* Author */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{post.author_nickname || t(lang, "community_anonymous")}</span>
+            <PlanBadge plan={post.author_plan} />
+            <span className="text-xs text-muted-foreground">{relativeTimeDisplay}</span>
           </div>
-          {/* Type badge */}
-          <span className="text-[10px] px-2 py-1 rounded-full bg-muted/60 text-muted-foreground">
-            {typeIcon} {typeLabel}
-          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground">{typeLabel}</span>
         </div>
 
         <h1 className="text-lg font-bold leading-snug mb-4">{lang === "en" && post.title_en ? post.title_en : post.title}</h1>
