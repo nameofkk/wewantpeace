@@ -17,6 +17,7 @@ from backend.app.models.partner import Partner
 from backend.app.models.short_link import ShortLink, LinkClick
 from backend.app.models.social_post import SocialPost, SocialPostPlatform
 from backend.app.models.economic_data import TradeBilateral, EconomicIndicator, ExchangeRate, CommodityPrice, MarketIndex, TravelAdvisory
+from backend.app.models.community import Post, Comment, CommentReaction, PostReaction, Report, Feedback, AdminLog, MarketingEmailLog, Bookmark
 
 __all__ = [
     "SourceChannel",
@@ -50,4 +51,13 @@ __all__ = [
     "CommodityPrice",
     "MarketIndex",
     "TravelAdvisory",
+    "Post",
+    "Comment",
+    "CommentReaction",
+    "PostReaction",
+    "Report",
+    "Feedback",
+    "AdminLog",
+    "MarketingEmailLog",
+    "Bookmark",
 ]
