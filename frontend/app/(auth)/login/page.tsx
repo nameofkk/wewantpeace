@@ -473,8 +473,10 @@ export default function LoginPage() {
           : (typeof detail === "string" ? detail : (lang === "en" ? "Registration failed." : "가입에 실패했습니다."));
         throw new Error(msg);
       }
+      const registeredUser = await res.json();
       trackEvent("auth_success", { provider: "google", source: "register" });
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      // 등록 응답을 즉시 캐시에 반영 — RegistrationGuard가 stale 데이터로 리다이렉트하는 것 방지
+      queryClient.setQueryData(["me"], registeredUser);
       localStorage.setItem("onboarding_done", "true");
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));
       router.push(getReturnUrl());
@@ -622,8 +624,9 @@ export default function LoginPage() {
         throw new Error(msg);
       }
 
+      const registeredEmailUser = await res.json();
       trackEvent("auth_success", { provider: "email", source: "register" });
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      queryClient.setQueryData(["me"], registeredEmailUser);
       localStorage.setItem("onboarding_done", "true");
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));
       router.push(getReturnUrl());
