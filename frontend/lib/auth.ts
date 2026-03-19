@@ -157,7 +157,20 @@ export async function signInWithToss(): Promise<{
   >("appLogin");
 
   // 1. 토스 네이티브 로그인 → authorizationCode 획득
-  const { authorizationCode } = await appLogin();
+  let authorizationCode: string;
+  try {
+    const result = await appLogin();
+    authorizationCode = result.authorizationCode;
+  } catch (e) {
+    const bridgeErr = e as Error;
+    console.error("[Toss] appLogin bridge error:", bridgeErr);
+    throw new Error(
+      bridgeErr.message || "토스 앱 로그인에 실패했습니다. 토스 앱을 최신 버전으로 업데이트해주세요."
+    );
+  }
+  if (!authorizationCode) {
+    throw new Error("토스 인증 코드를 받지 못했습니다.");
+  }
 
   // 2. 백엔드에서 코드 교환 → Firebase Custom Token
   const API_BASE =

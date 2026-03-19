@@ -16,8 +16,8 @@ function IssueViewInner() {
     );
   }
 
-  // initialData 없이 전달 → client.tsx가 useClusterDetail(id)로 API에서 fetch
-  return <IssueDetailClient initialData={{ id } as any} />;
+  // id prop만 전달 → client.tsx가 useClusterDetail(id)로 API에서 fetch
+  return <IssueDetailClient id={id} />;
 }
 
 export default function IssueViewPage() {
