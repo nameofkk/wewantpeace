@@ -11,6 +11,8 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE, useMe } from "@/lib/api";
 import { communityPostPath } from "@/lib/toss-nav";
+import MarkdownToolbar from "@/components/community/MarkdownToolbar";
+import MarkdownContent from "@/components/community/MarkdownContent";
 
 type PostType = "discussion" | "analysis" | "question" | "notice";
 
@@ -48,6 +50,8 @@ export default function NewPostPage() {
   const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [clusterId, setClusterId] = useState("");
   const [clusterTitle, setClusterTitle] = useState("");
   const [loading, setLoading] = useState(false);
@@ -251,20 +255,17 @@ export default function NewPostPage() {
         )}
 
         {/* 게시글 유형 */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {(isAdmin ? [...POST_TYPE_IDS, "notice" as PostType] : POST_TYPE_IDS).map((id) => (
             <button
               key={id}
               type="button"
               onClick={() => setPostType(id)}
-              className={cn(
-                "flex-1 rounded-xl border py-2 text-xs font-medium transition-colors",
+              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 postType === id
-                  ? id === "notice"
-                    ? "border-yellow-500 bg-yellow-500/10 text-yellow-500"
-                    : "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground"
-              )}
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 text-muted-foreground"
+              }`}
             >
               {t(lang, `community_type_${id}` as Parameters<typeof t>[1])}
             </button>
@@ -286,13 +287,33 @@ export default function NewPostPage() {
 
         {/* 내용 */}
         <div>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={t(lang, "new_post_content_placeholder")}
-            rows={10}
-            className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
-          />
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium">{t(lang, "new_post_content")}</label>
+            <button
+              type="button"
+              onClick={() => setShowPreview(!showPreview)}
+              className="text-xs text-primary"
+            >
+              {showPreview ? t(lang, "community_edit_mode") : t(lang, "community_preview")}
+            </button>
+          </div>
+          {showPreview ? (
+            <div className="rounded-xl border border-border p-3 min-h-[200px]">
+              <MarkdownContent content={content} />
+            </div>
+          ) : (
+            <>
+              <MarkdownToolbar textareaRef={contentRef as React.RefObject<HTMLTextAreaElement>} />
+              <textarea
+                ref={contentRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={t(lang, "new_post_content_placeholder")}
+                rows={10}
+                className="w-full rounded-xl rounded-t-none border border-t-0 border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
+              />
+            </>
+          )}
         </div>
 
         {/* 이미지 업로드 */}

@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X, Megaphone, Pin } from "lucide-react";
+import { ChevronLeft, ThumbsUp, ThumbsDown, MessageSquare, Flag, Trash2, Loader2, Send, Pencil, Check, X, Megaphone, Pin, Bookmark } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
-import { API_BASE, useMe } from "@/lib/api";
+import { API_BASE, useMe, toggleBookmark } from "@/lib/api";
+import Avatar from "@/components/community/Avatar";
+import MarkdownContent from "@/components/community/MarkdownContent";
 
 function relativeTime(iso: string, lang: Lang): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -103,82 +105,87 @@ function CommentItem({
   return (
     <div className={cn("", depth > 0 && "ml-6 border-l-2 border-border pl-4")}>
       <div className="py-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <span className="text-xs font-semibold">{comment.author_nickname || t(lang, "community_anonymous")}</span>
-            <span className="ml-2 text-[10px] text-muted-foreground">{relativeTime(comment.created_at, lang)}</span>
-          </div>
-          {/* 내 댓글 수정/삭제 버튼 */}
-          {isMine && !isDeleted && !isEditing && (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => onEditStart(comment.id, comment.content)}
-                className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5"
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-              <button
-                onClick={() => onDelete(comment.id)}
-                className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-0.5"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+        <div className="flex gap-2.5">
+          <Avatar nickname={comment.author_nickname} size="sm" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <span className="text-xs font-semibold">{comment.author_nickname || t(lang, "community_anonymous")}</span>
+                <span className="ml-2 text-[10px] text-muted-foreground">{relativeTime(comment.created_at, lang)}</span>
+              </div>
+              {/* 내 댓글 수정/삭제 버튼 */}
+              {isMine && !isDeleted && !isEditing && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => onEditStart(comment.id, comment.content)}
+                    className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => onDelete(comment.id)}
+                    className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-0.5"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* 수정 중 인라인 폼 */}
-        {isEditing ? (
-          <div className="mt-2">
-            <textarea
-              value={editCommentText}
-              onChange={(e) => onEditTextChange(e.target.value)}
-              rows={2}
-              className="w-full rounded-xl border border-primary bg-card px-3 py-2 text-sm outline-none resize-none"
-              autoFocus
-            />
-            <div className="flex gap-2 mt-1.5 justify-end">
-              <button
-                onClick={() => onEditSave(comment.id)}
-                className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground"
-              >
-                <Check className="h-3 w-3" />
-                {lang === "ko" ? "저장" : "Save"}
-              </button>
-              <button
-                onClick={onEditCancel}
-                className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-                {lang === "ko" ? "취소" : "Cancel"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className={cn("mt-1 text-sm leading-relaxed", isDeleted && "text-muted-foreground italic")}>
-            {lang === "en" && comment.content_en ? comment.content_en : comment.content}
-          </p>
-        )}
+            {/* 수정 중 인라인 폼 */}
+            {isEditing ? (
+              <div className="mt-2">
+                <textarea
+                  value={editCommentText}
+                  onChange={(e) => onEditTextChange(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-primary bg-card px-3 py-2 text-sm outline-none resize-none"
+                  autoFocus
+                />
+                <div className="flex gap-2 mt-1.5 justify-end">
+                  <button
+                    onClick={() => onEditSave(comment.id)}
+                    className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground"
+                  >
+                    <Check className="h-3 w-3" />
+                    {lang === "ko" ? "저장" : "Save"}
+                  </button>
+                  <button
+                    onClick={onEditCancel}
+                    className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                    {lang === "ko" ? "취소" : "Cancel"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className={cn("mt-1 text-sm leading-relaxed", isDeleted && "text-muted-foreground italic")}>
+                {lang === "en" && comment.content_en ? comment.content_en : comment.content}
+              </p>
+            )}
 
-        {!isEditing && (
-          <div className="flex items-center gap-3 mt-2">
-            <button
-              onClick={() => onLike(comment.id)}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
-            >
-              <ThumbsUp className="h-3 w-3" />
-              {comment.like_count}
-            </button>
-            {depth === 0 && !isDeleted && (
-              <button
-                onClick={() => onReply(comment.id, comment.author_nickname || t(lang, "community_anonymous"))}
-                className="text-[11px] text-muted-foreground hover:text-primary"
-              >
-                {t(lang, "post_reply")}
-              </button>
+            {!isEditing && (
+              <div className="flex items-center gap-3 mt-2">
+                <button
+                  onClick={() => onLike(comment.id)}
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary"
+                >
+                  <ThumbsUp className="h-3 w-3" />
+                  {comment.like_count}
+                </button>
+                {depth === 0 && !isDeleted && (
+                  <button
+                    onClick={() => onReply(comment.id, comment.author_nickname || t(lang, "community_anonymous"))}
+                    className="text-[11px] text-muted-foreground hover:text-primary"
+                  >
+                    {t(lang, "post_reply")}
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
       {comment.replies?.map((reply) => (
         <CommentItem
@@ -233,6 +240,7 @@ export default function PostDetailPage() {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState("");
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   const { data: post, isLoading: postLoading, isError: postError } = useQuery<Post>({
     queryKey: ["post", postId],
@@ -363,6 +371,14 @@ export default function PostDetailPage() {
     alert(t(lang, "post_report_done"));
   }
 
+  async function handleBookmarkToggle() {
+    if (!user) return;
+    try {
+      const result = await toggleBookmark(post!.id);
+      setIsBookmarked(result.bookmarked);
+    } catch {}
+  }
+
   async function handleDelete() {
     if (!window.confirm(t(lang, "post_delete_confirm"))) return;
     deleteMutation.mutate();
@@ -395,6 +411,11 @@ export default function PostDetailPage() {
   }));
 
   const typeKey = `community_type_${post.post_type}` as Parameters<typeof t>[1];
+  const TYPE_ICONS: Record<string, string> = { discussion: "\uD83D\uDCAC", analysis: "\uD83D\uDCCA", question: "\u2753", notice: "\uD83D\uDCE2" };
+  const typeIcon = TYPE_ICONS[post.post_type] || "";
+  const typeLabel = t(lang, typeKey) || post.post_type;
+  const relativeTimeDisplay = relativeTime(post.created_at, lang);
+  const displayContent = lang === "en" && post.content_en ? post.content_en : post.content;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -411,14 +432,8 @@ export default function PostDetailPage() {
 
       {/* 게시글 */}
       <div className="px-4 pt-4 pb-2">
+        {/* Cluster link + pinned badge */}
         <div className="flex items-center gap-2 mb-3">
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-            post.post_type === "notice" ? "bg-yellow-500/20 text-yellow-500" : "bg-secondary"
-          )}>
-            {post.post_type === "notice" && <Megaphone className="inline h-2.5 w-2.5 mr-0.5" />}
-            {t(lang, typeKey) || post.post_type}
-          </span>
           {post.is_pinned && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-yellow-500">
               <Pin className="h-2.5 w-2.5" />
@@ -432,19 +447,30 @@ export default function PostDetailPage() {
             </Link>
           )}
         </div>
-        <h1 className="text-lg font-bold leading-snug">{lang === "en" && post.title_en ? post.title_en : post.title}</h1>
-        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1">
-            {post.author_nickname || t(lang, "community_anonymous")}
-            <PlanBadge plan={post.author_plan} />
+
+        {/* Author section with Avatar */}
+        <div className="flex items-center gap-3 mb-4">
+          <Avatar nickname={post.author_nickname} plan={post.author_plan} size="md" />
+          <div className="flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-sm">{post.author_nickname || t(lang, "community_anonymous")}</span>
+              <PlanBadge plan={post.author_plan} />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+              <span>{relativeTimeDisplay}</span>
+              <span>&middot;</span>
+              <span>{t(lang, "post_views", { n: post.view_count })}</span>
+            </div>
+          </div>
+          {/* Type badge */}
+          <span className="text-[10px] px-2 py-1 rounded-full bg-muted/60 text-muted-foreground">
+            {typeIcon} {typeLabel}
           </span>
-          <span>·</span>
-          <span>{relativeTime(post.created_at, lang)}</span>
-          <span>·</span>
-          <span>{t(lang, "post_views", { n: post.view_count })}</span>
         </div>
 
-        <div className="mt-4 text-sm leading-relaxed whitespace-pre-wrap">{lang === "en" && post.content_en ? post.content_en : post.content}</div>
+        <h1 className="text-lg font-bold leading-snug mb-4">{lang === "en" && post.title_en ? post.title_en : post.title}</h1>
+
+        <MarkdownContent content={displayContent} className="mb-4" />
 
         {/* 이미지 그리드 */}
         {post.images && post.images.length > 0 && (
@@ -489,6 +515,12 @@ export default function PostDetailPage() {
             <MessageSquare className="h-4 w-4" />
             <span>{post.comment_count}</span>
           </span>
+          <button
+            onClick={handleBookmarkToggle}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-primary text-primary" : ""}`} />
+          </button>
           {(isMyPost || isAdmin) && (
             <div className="ml-auto flex items-center gap-2">
               <Link
@@ -512,42 +544,44 @@ export default function PostDetailPage() {
       </div>
 
       {/* 댓글 목록 */}
-      <div className="flex-1 px-4 py-2 border-t border-border">
-        <h2 className="text-sm font-bold mb-2">{t(lang, "post_comment_count", { n: comments.length })}</h2>
+      <div className="bg-muted/20 rounded-t-2xl mt-4">
+        <div className="flex-1 px-4 py-2 border-t border-border">
+          <h2 className="text-sm font-bold mb-2">{t(lang, "post_comment_count", { n: comments.length })}</h2>
 
-        {commentsLoading && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          {commentsLoading && (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {!commentsLoading && commentTree.length === 0 && (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              {t(lang, "post_no_comments")}
+            </p>
+          )}
+
+          <div className="divide-y divide-border">
+            {commentTree.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                lang={lang}
+                onReply={(id, nick) => {
+                  setReplyTo({ id, nick });
+                  document.getElementById("comment-input")?.focus();
+                }}
+                onLike={handleCommentLike}
+                onDelete={handleCommentDelete}
+                myUserId={myUserId}
+                editingCommentId={editingCommentId}
+                editCommentText={editCommentText}
+                onEditStart={(id, content) => { setEditingCommentId(id); setEditCommentText(content); }}
+                onEditSave={handleCommentEditSave}
+                onEditCancel={() => { setEditingCommentId(null); setEditCommentText(""); }}
+                onEditTextChange={setEditCommentText}
+              />
+            ))}
           </div>
-        )}
-
-        {!commentsLoading && commentTree.length === 0 && (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            {t(lang, "post_no_comments")}
-          </p>
-        )}
-
-        <div className="divide-y divide-border">
-          {commentTree.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              lang={lang}
-              onReply={(id, nick) => {
-                setReplyTo({ id, nick });
-                document.getElementById("comment-input")?.focus();
-              }}
-              onLike={handleCommentLike}
-              onDelete={handleCommentDelete}
-              myUserId={myUserId}
-              editingCommentId={editingCommentId}
-              editCommentText={editCommentText}
-              onEditStart={(id, content) => { setEditingCommentId(id); setEditCommentText(content); }}
-              onEditSave={handleCommentEditSave}
-              onEditCancel={() => { setEditingCommentId(null); setEditCommentText(""); }}
-              onEditTextChange={setEditCommentText}
-            />
-          ))}
         </div>
       </div>
 
