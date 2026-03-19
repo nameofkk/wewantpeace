@@ -11,7 +11,7 @@ import { detectPlatform, type AppPlatform } from "@/lib/platform-detect";
 import { isTossMiniApp } from "@/lib/platform";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { API_BASE, useMe } from "@/lib/api";
+import { API_BASE, useMe, createDodoCheckout } from "@/lib/api";
 // DodoPayments SDK: Toss WebView에서 window.fetch 간섭 방지를 위해 dynamic import 사용
 // import { DodoPayments } from "dodopayments-checkout";  // ← 삭제됨
 import AppTour from "@/components/ui/AppTour";
@@ -147,12 +147,13 @@ function UpgradeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const source = searchParams.get("source");
+  const redirectError = searchParams.get("error");
   const { user, loading: authLoading } = useAuth();
   const { lang } = useAppStore();
   const { data: me } = useMe();
   const currentPlan = (me as { plan?: string })?.plan ?? "free";
   const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(redirectError);
   const [trialUsed, setTrialUsed] = useState(false);
   const [isCurrentlyTrial, setIsCurrentlyTrial] = useState(false);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
@@ -428,53 +429,39 @@ function UpgradeContent() {
   }
 
   async function handleDodoCheckout(planId: string) {
-    let step = "init";
-    try {
-      step = "getIdToken";
+    if (isTossMiniApp()) {
+      // Toss WebView: application/json fetch는 CORS preflight가 필요 → 차단됨
+      // application/x-www-form-urlencoded은 "Simple Request"라 preflight 없음!
       const token = await user!.getIdToken();
+      const params = new URLSearchParams();
+      params.set("plan", planId);
+      params.set("token", token);
 
-      const isToss = isTossMiniApp();
-      const endpoint = isToss
-        ? `${API_BASE}/payments/dodo/create-checkout-toss`
-        : `${API_BASE}/payments/dodo/create-checkout`;
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      const bodyData = isToss
-        ? JSON.stringify({ plan: planId, token })
-        : JSON.stringify({ plan: planId });
+      const res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
+        method: "POST",
+        body: params, // Content-Type: application/x-www-form-urlencoded 자동 설정
+      });
 
-      if (!isToss) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      step = `fetch(${isToss ? "toss" : "normal"})`;
-      const res = await fetch(endpoint, { method: "POST", headers, body: bodyData });
-
-      step = "checkStatus";
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw Object.assign(
-          new Error(data.detail || (lang === "ko" ? "결제 생성 실패" : "Checkout creation failed")),
+          new Error(typeof data.detail === "string" ? data.detail : data.detail?.message || "결제 생성 실패"),
           { status: res.status, body: data },
         );
       }
 
-      step = "parseJSON";
       const { checkout_url } = await res.json();
-      if (!checkout_url) return;
-
-      step = "openCheckout";
-      if (isToss) {
+      if (checkout_url) {
         window.location.href = checkout_url;
-      } else {
-        const { DodoPayments } = await import("dodopayments-checkout");
-        await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
       }
-    } catch (e) {
-      const err = e as Error & { status?: number; body?: unknown };
-      throw Object.assign(
-        new Error(`[${step}] ${err.name}: ${err.message} (origin=${typeof window !== "undefined" ? window.location.origin : "?"})`),
-        { status: err.status, body: err.body },
-      );
+      return;
+    }
+
+    // 일반 웹: fetch + DodoPayments overlay
+    const { checkout_url } = await createDodoCheckout(planId);
+    if (checkout_url) {
+      const { DodoPayments } = await import("dodopayments-checkout");
+      await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
     }
   }
 
