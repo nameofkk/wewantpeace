@@ -194,6 +194,7 @@ export async function signInWithToss(): Promise<{
     clearTimeout(timeout);
     // iOS WKWebView "TypeError: Load failed" 또는 AbortError 대응
     const err = e as Error;
+    console.error("[Toss] fetch error:", err.name, err.message, err);
     if (err.name === "AbortError") {
       throw new Error("서버 응답 시간 초과. 잠시 후 다시 시도해주세요.");
     }

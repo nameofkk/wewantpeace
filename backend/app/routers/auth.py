@@ -234,6 +234,12 @@ async def _get_toss_user_key(access_token: str) -> str:
         logger.error("토스 유저 정보 응답 파싱 오류: %s", e)
         raise HTTPException(502, detail="토스 응답을 처리할 수 없습니다.")
 
+    logger.info("토스 login-me 응답 키: %s", list(data.keys()))
+
+    # 응답이 {"resultType":"SUCCESS","success":{...}} 구조일 수 있음
+    if "success" in data and isinstance(data["success"], dict):
+        data = data["success"]
+
     # 응답이 암호화된 경우 복호화 시도
     if "encryptedData" in data and settings.toss_decryption_key:
         try:
@@ -244,8 +250,8 @@ async def _get_toss_user_key(access_token: str) -> str:
 
     user_key = data.get("userKey") or data.get("user_key")
     if not user_key:
-        logger.error("토스 응답에 userKey 없음: %s", list(data.keys()))
-        raise HTTPException(502, detail="토스 유저 식별 실패")
+        logger.error("토스 응답에 userKey 없음: %s (data=%s)", list(data.keys()), data)
+        raise HTTPException(502, detail=f"토스 유저 식별 실패 (keys: {list(data.keys())})")
     return user_key
 
 
