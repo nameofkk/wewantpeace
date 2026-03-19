@@ -11,8 +11,8 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 8초)
     const token = await getIdToken();
     if (token) return { Authorization: `Bearer ${token}` };
-  } catch {
-    // fallback
+  } catch (e) {
+    console.error("[apiFetch] getAuthHeaders error:", e);
   }
   return {};
 }
@@ -55,7 +55,7 @@ async function apiFetch<T>(
     if (err.name === "AbortError") {
       throw Object.assign(new Error("서버 응답 시간 초과"), { status: 0 });
     }
-    throw Object.assign(new Error("네트워크 연결 오류"), { status: 0 });
+    throw Object.assign(new Error(`네트워크 연결 오류 (${err.name}: ${err.message}) url=${url.pathname}`), { status: 0 });
   } finally {
     clearTimeout(timeout);
   }
@@ -1026,4 +1026,55 @@ export function useClusterContext(clusterId: string | null | undefined) {
     enabled: !!clusterId,
     staleTime: 10 * 60 * 1000,
   });
+}
+
+// --- 커뮤니티 API ---
+
+export interface Post {
+  id: string;
+  post_type: string;
+  cluster_id?: string | null;
+  cluster_title?: string | null;
+  cluster_title_ko?: string | null;
+  title: string;
+  title_en?: string | null;
+  content?: string | null;
+  content_en?: string | null;
+  author_nickname?: string;
+  author_plan?: string | null;
+  created_at: string;
+  view_count: number;
+  comment_count: number;
+  like_count: number;
+  dislike_count: number;
+  is_pinned?: boolean;
+  is_bookmarked?: boolean;
+  images?: string[];
+}
+
+// Cursor-based posts fetch (for infinite scroll)
+export async function fetchPostsCursor(params: {
+  cursor?: string;
+  limit?: number;
+  post_type?: string;
+  sort_by?: string;
+  q?: string;
+}): Promise<{ posts: Post[]; next_cursor: string | null }> {
+  const searchParams = new URLSearchParams();
+  if (params.cursor) searchParams.set("cursor", params.cursor);
+  if (params.limit) searchParams.set("limit", String(params.limit));
+  if (params.post_type && params.post_type !== "all") searchParams.set("post_type", params.post_type);
+  if (params.sort_by) searchParams.set("sort_by", params.sort_by);
+  if (params.q) searchParams.set("q", params.q);
+  return apiFetch(`/community/posts?${searchParams.toString()}`);
+}
+
+// Bookmark toggle
+export async function toggleBookmark(postId: string): Promise<{ bookmarked: boolean }> {
+  return apiFetch(`/community/posts/${postId}/bookmark`, undefined, { method: "POST" });
+}
+
+// Fetch bookmarks
+export async function fetchBookmarks(page?: number): Promise<Post[]> {
+  return apiFetch(`/community/bookmarks`, { page: String(page || 1) });
 }

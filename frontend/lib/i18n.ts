@@ -190,6 +190,9 @@ export const translations = {
     community_views: "조회",
     community_likes: "좋아요",
     community_comments: "댓글",
+    community_search_placeholder: "게시글 검색...",
+    community_no_more: "더 이상 게시글이 없습니다",
+    community_loading_more: "불러오는 중...",
 
     // 커뮤니티 글 상세
     post_header: "커뮤니티",
@@ -1824,6 +1827,9 @@ export const translations = {
     community_views: "Views",
     community_likes: "Likes",
     community_comments: "Comments",
+    community_search_placeholder: "Search posts...",
+    community_no_more: "No more posts",
+    community_loading_more: "Loading...",
 
     // community post detail
     post_header: "Community",
