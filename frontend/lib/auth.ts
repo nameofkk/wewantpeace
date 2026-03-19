@@ -158,9 +158,11 @@ export async function signInWithToss(): Promise<{
 
   // 1. 토스 네이티브 로그인 → authorizationCode 획득
   let authorizationCode: string;
+  let referrer: string = "DEFAULT";
   try {
     const result = await appLogin();
     authorizationCode = result.authorizationCode;
+    referrer = result.referrer || "DEFAULT";
   } catch (e) {
     const bridgeErr = e as Error;
     console.error("[Toss] appLogin bridge error:", bridgeErr);
@@ -185,7 +187,7 @@ export async function signInWithToss(): Promise<{
     res = await fetch(`${API_BASE}/auth/toss-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorization_code: authorizationCode }),
+      body: JSON.stringify({ authorization_code: authorizationCode, referrer }),
       signal: controller.signal,
     });
   } catch (e) {
