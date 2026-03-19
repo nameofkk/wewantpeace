@@ -320,7 +320,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
             {(cluster.grouped_count ?? 1) > 1 && cluster.country_code && (
               <button
                 className="w-full rounded-lg py-2 text-xs text-muted-foreground border border-border transition-all hover:text-foreground"
-                onClick={() => { window.location.href = countryIssuesPath(cluster.country_code); }}
+                onClick={() => { window.location.href = countryIssuesPath(cluster.country_code!); }}
               >
                 {t(lang, "map_popup_all_in_region", { n: cluster.grouped_count ?? 1 })}
               </button>
