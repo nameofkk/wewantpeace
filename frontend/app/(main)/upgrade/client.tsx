@@ -428,7 +428,7 @@ function UpgradeContent() {
     }
   }
 
-  const isWeb = platform === "web" && !isTossMiniApp();
+  const isWeb = platform === "web";  // 토스 WebView도 웹 결제(DodoPayments) 사용
 
   return (
     <div className="min-h-screen bg-background" data-tour="upgrade-page">

@@ -87,6 +87,7 @@ interface ClusterDetail {
 
 interface Props {
   initialData?: ClusterDetail;
+  id?: string;
 }
 
 function KScoreHistorySection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
@@ -360,8 +361,8 @@ function HistoricalContextSection({ clusterId, lang }: { clusterId: string; lang
   );
 }
 
-export default function IssueDetailClient({ initialData }: Props) {
-  const id = initialData?.id ?? "";
+export default function IssueDetailClient({ initialData, id: propId }: Props) {
+  const id = propId || initialData?.id || "";
   const router = useRouter();
   const { data, isPending, isError } = useClusterDetail(id);
   const issue = (data as ClusterDetail | undefined) ?? initialData;
