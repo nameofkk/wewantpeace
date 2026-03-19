@@ -750,10 +750,6 @@ export default function LoginPage() {
                 <span className="text-sm">{t(lang, "login_toss")}</span>
               </button>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-                <div className="relative flex justify-center text-xs text-muted-foreground"><span className="bg-card px-2">{t(lang, "login_or_email")}</span></div>
-              </div>
             </>
           ) : (
             <>
