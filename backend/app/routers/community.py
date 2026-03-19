@@ -10,14 +10,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import get_current_user, get_db
+from backend.app.core.auth import get_current_user, get_optional_user, get_db
 from backend.app.core.config import settings
 from backend.app.core.limiter import limiter
 from backend.app.models.user import User
-from backend.app.models.community import Post, Comment, CommentReaction, PostReaction, Report
+from backend.app.models.community import Post, Comment, CommentReaction, PostReaction, Report, Bookmark
 from backend.app.models.issue_cluster import IssueCluster
 
 router = APIRouter(prefix="/community", tags=["community"])
@@ -93,6 +93,7 @@ class PostOut(BaseModel):
     like_count: int
     dislike_count: int
     is_pinned: bool = False
+    is_bookmarked: bool = False
     images: list[str]
     created_at: str
     updated_at: str
@@ -135,6 +136,7 @@ def _post_to_out(
     cluster_title: Optional[str] = None,
     author_plan: Optional[str] = None,
     cluster_title_ko: Optional[str] = None,
+    is_bookmarked: bool = False,
 ) -> PostOut:
     imgs: list[str] = []
     if p.images:
@@ -159,6 +161,7 @@ def _post_to_out(
         like_count=p.like_count,
         dislike_count=p.dislike_count,
         is_pinned=p.is_pinned,
+        is_bookmarked=is_bookmarked,
         images=imgs,
         created_at=p.created_at.isoformat(),
         updated_at=p.updated_at.isoformat(),
@@ -248,7 +251,7 @@ async def pinned_notices(
     ]
 
 
-@router.get("/posts", response_model=list[PostOut])
+@router.get("/posts")
 async def list_posts(
     cluster_id: Optional[str] = Query(None),
     topic: Optional[str] = Query(None),
@@ -256,24 +259,56 @@ async def list_posts(
     sort_by: str = Query("latest"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    q: Optional[str] = Query(None, min_length=2, max_length=100),
+    cursor: Optional[str] = Query(None, description="Last post ID for infinite scroll"),
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
-    q = select(Post).where(Post.status == "active")
+    query = select(Post).where(Post.status == "active")
     if cluster_id:
         try:
-            q = q.where(Post.cluster_id == uuid.UUID(cluster_id))
+            query = query.where(Post.cluster_id == uuid.UUID(cluster_id))
         except ValueError:
             pass
     if post_type:
-        q = q.where(Post.post_type == post_type)
+        query = query.where(Post.post_type == post_type)
+
+    # 검색 필터
+    if q:
+        search_filter = f"%{q}%"
+        query = query.where(or_(Post.title.ilike(search_filter), Post.content.ilike(search_filter)))
+
+    # 커서 기반 페이지네이션
+    if cursor:
+        try:
+            cursor_uuid = uuid.UUID(cursor)
+            cursor_result = await db.execute(select(Post.created_at, Post.like_count, Post.view_count).where(Post.id == cursor_uuid))
+            cursor_row = cursor_result.one_or_none()
+            if cursor_row:
+                if sort_by == "popular":
+                    cursor_score = cursor_row[1] + cursor_row[2]  # like_count + view_count
+                    query = query.where(
+                        or_(
+                            (Post.like_count + Post.view_count) < cursor_score,
+                            ((Post.like_count + Post.view_count) == cursor_score) & (Post.created_at < cursor_row[0]),
+                        )
+                    )
+                else:
+                    query = query.where(Post.created_at < cursor_row[0])
+        except ValueError:
+            pass
 
     if sort_by == "popular":
-        q = q.order_by((Post.like_count + Post.view_count).desc(), Post.created_at.desc())
+        query = query.order_by((Post.like_count + Post.view_count).desc(), Post.created_at.desc())
     else:
-        q = q.order_by(Post.created_at.desc())
+        query = query.order_by(Post.created_at.desc())
 
-    q = q.offset((page - 1) * limit).limit(limit)
-    result = await db.execute(q)
+    # 커서가 없으면 기존 offset 페이지네이션 사용
+    if not cursor:
+        query = query.offset((page - 1) * limit)
+    query = query.limit(limit)
+
+    result = await db.execute(query)
     posts = result.scalars().all()
 
     # 작성자 닉네임 + 플랜 배치 조회
@@ -299,16 +334,32 @@ async def list_posts(
             cluster_titles_en[str(row[0])] = row[2] or row[1] or ""  # English first
             cluster_titles_ko[str(row[0])] = row[1] or row[2] or ""  # Korean first
 
-    return [
+    # 북마크 상태 배치 조회 (로그인 시)
+    bookmarked_ids: set[str] = set()
+    if current_user and posts:
+        post_ids = [p.id for p in posts]
+        br = await db.execute(
+            select(Bookmark.post_id).where(
+                Bookmark.user_id == current_user.id,
+                Bookmark.post_id.in_(post_ids),
+            )
+        )
+        bookmarked_ids = {str(row[0]) for row in br.fetchall()}
+
+    post_list = [
         _post_to_out(
             p,
             nicknames.get(str(p.user_id)),
             cluster_titles_en.get(str(p.cluster_id)) if p.cluster_id else None,
             plans.get(str(p.user_id)),
             cluster_titles_ko.get(str(p.cluster_id)) if p.cluster_id else None,
+            is_bookmarked=str(p.id) in bookmarked_ids,
         )
         for p in posts
     ]
+
+    next_cursor = str(posts[-1].id) if len(posts) == limit else None
+    return {"posts": post_list, "next_cursor": next_cursor}
 
 
 @router.get("/hot-topics", response_model=list[PostOut])
@@ -431,6 +482,7 @@ async def get_post(
     request: Request,
     post_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     try:
         pid = uuid.UUID(post_id)
@@ -467,7 +519,18 @@ async def get_post(
             cluster_title = crow[1] or crow[0]      # English first
             cluster_title_ko = crow[0] or crow[1]   # Korean first
 
-    return _post_to_out(post, nickname, cluster_title, plan, cluster_title_ko)
+    # 북마크 상태 확인
+    is_bookmarked = False
+    if current_user:
+        bm = await db.execute(
+            select(Bookmark.id).where(
+                Bookmark.user_id == current_user.id,
+                Bookmark.post_id == pid,
+            )
+        )
+        is_bookmarked = bm.scalar_one_or_none() is not None
+
+    return _post_to_out(post, nickname, cluster_title, plan, cluster_title_ko, is_bookmarked=is_bookmarked)
 
 
 @router.patch("/posts/{post_id}", response_model=PostOut)
@@ -598,6 +661,108 @@ async def react_post(
 
     await db.flush()
     return {"action": "added", "reaction_type": body.reaction_type}
+
+
+# ── 북마크 ────────────────────────────────────────────────────────────────────
+
+@router.post("/posts/{post_id}/bookmark", status_code=200)
+async def toggle_bookmark(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """북마크 토글 (추가/제거)"""
+    try:
+        pid = uuid.UUID(post_id)
+    except ValueError:
+        raise HTTPException(422, detail="유효하지 않은 post_id입니다.")
+
+    # 게시글 존재 확인
+    result = await db.execute(select(Post).where(Post.id == pid, Post.status != "deleted"))
+    if not result.scalar_one_or_none():
+        raise HTTPException(404, detail="게시글을 찾을 수 없습니다.")
+
+    # 기존 북마크 확인
+    existing = await db.execute(
+        select(Bookmark).where(Bookmark.user_id == current_user.id, Bookmark.post_id == pid)
+    )
+    bookmark = existing.scalar_one_or_none()
+
+    if bookmark:
+        await db.delete(bookmark)
+        await db.flush()
+        return {"bookmarked": False}
+    else:
+        db.add(Bookmark(user_id=current_user.id, post_id=pid))
+        await db.flush()
+        return {"bookmarked": True}
+
+
+@router.get("/bookmarks", response_model=list[PostOut])
+async def list_bookmarks(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """내 북마크 목록"""
+    # 북마크된 post_id를 created_at desc로 조회
+    bm_q = (
+        select(Bookmark.post_id)
+        .where(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    )
+    bm_result = await db.execute(bm_q)
+    post_ids = [row[0] for row in bm_result.fetchall()]
+
+    if not post_ids:
+        return []
+
+    # 게시글 조회
+    result = await db.execute(
+        select(Post).where(Post.id.in_(post_ids), Post.status != "deleted")
+    )
+    posts_map = {p.id: p for p in result.scalars().all()}
+
+    # 북마크 순서 유지
+    posts = [posts_map[pid] for pid in post_ids if pid in posts_map]
+
+    # 작성자 닉네임 + 플랜 배치 조회
+    user_ids = [p.user_id for p in posts if p.user_id]
+    nicknames: dict[str, str] = {}
+    plans: dict[str, str] = {}
+    if user_ids:
+        ur = await db.execute(select(User.id, User.nickname, User.plan).where(User.id.in_(user_ids)))
+        for row in ur.fetchall():
+            nicknames[str(row[0])] = row[1] or "익명"
+            plans[str(row[0])] = row[2]
+
+    # 연관 이슈 제목 배치 조회
+    cluster_ids = [p.cluster_id for p in posts if p.cluster_id]
+    cluster_titles_en: dict[str, str] = {}
+    cluster_titles_ko: dict[str, str] = {}
+    if cluster_ids:
+        cr = await db.execute(
+            select(IssueCluster.id, IssueCluster.title_ko, IssueCluster.title)
+            .where(IssueCluster.id.in_(cluster_ids))
+        )
+        for row in cr.fetchall():
+            cluster_titles_en[str(row[0])] = row[2] or row[1] or ""
+            cluster_titles_ko[str(row[0])] = row[1] or row[2] or ""
+
+    return [
+        _post_to_out(
+            p,
+            nicknames.get(str(p.user_id)),
+            cluster_titles_en.get(str(p.cluster_id)) if p.cluster_id else None,
+            plans.get(str(p.user_id)),
+            cluster_titles_ko.get(str(p.cluster_id)) if p.cluster_id else None,
+            is_bookmarked=True,  # 북마크 목록이므로 항상 True
+        )
+        for p in posts
+    ]
 
 
 # ── 댓글 ─────────────────────────────────────────────────────────────────────
