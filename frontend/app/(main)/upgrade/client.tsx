@@ -245,12 +245,13 @@ function UpgradeContent() {
         await handleIOSPurchase(planId);
       }
     } catch (e: unknown) {
-      const err = e as { message?: string; body?: { detail?: { code?: string; message?: string } | string } };
+      const err = e as { message?: string; status?: number; body?: { detail?: { code?: string; message?: string } | string } };
+      console.error("[Upgrade] error:", err);
       const code = typeof err.body?.detail === "object" ? err.body?.detail?.code : "";
       if (code === "ALREADY_SUBSCRIBED") {
         setError(lang === "ko" ? "이미 활성 구독이 있습니다. 설정에서 현재 구독을 확인해주세요." : "You already have an active subscription. Please check your current plan in Settings.");
       } else {
-        setError(err.message || t(lang, "upgrade_payment_error"));
+        setError(`[DEBUG] ${err.message} (status=${err.status}, platform=${platform}, isWeb=${isWeb})`);
       }
     } finally {
       setLoading(null);
