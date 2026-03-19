@@ -185,6 +185,9 @@ export const translations = {
     community_edit_uploading: "업로드 중...",
     community_edit_upload_fail: "업로드 실패",
     community_edit_upload_error: "이미지 업로드 중 오류가 발생했습니다.",
+    community_views: "조회",
+    community_likes: "좋아요",
+    community_comments: "댓글",
 
     // 커뮤니티 글 상세
     post_header: "커뮤니티",
@@ -1814,6 +1817,9 @@ export const translations = {
     community_edit_uploading: "Uploading...",
     community_edit_upload_fail: "Upload failed",
     community_edit_upload_error: "An error occurred while uploading image.",
+    community_views: "Views",
+    community_likes: "Likes",
+    community_comments: "Comments",
 
     // community post detail
     post_header: "Community",
