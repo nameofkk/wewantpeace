@@ -170,6 +170,8 @@ export const translations = {
     community_pinned_notice: "공지사항",
     community_anonymous: "익명",
     community_linked_issue: "이슈 연계",
+    community_preview: "미리보기",
+    community_edit_mode: "편집",
     community_days_ago: "{n}일 전",
 
     // 커뮤니티 글 수정
@@ -614,6 +616,7 @@ export const translations = {
     new_post_submit: "게시",
     new_post_logged_in: "{email} 로 로그인됨",
     new_post_title_placeholder: "제목을 입력하세요 (5자 이상)",
+    new_post_content: "내용",
     new_post_content_placeholder: "내용을 입력하세요 (10자 이상)",
     new_post_images_label: "사진",
     new_post_images_desc: "(선택, 최대 {n}장)",
@@ -1807,6 +1810,8 @@ export const translations = {
     community_pinned_notice: "Notices",
     community_anonymous: "Anonymous",
     community_linked_issue: "Linked Issue",
+    community_preview: "Preview",
+    community_edit_mode: "Edit",
     community_days_ago: "{n}d ago",
 
     // community edit post
@@ -2251,6 +2256,7 @@ export const translations = {
     new_post_submit: "Post",
     new_post_logged_in: "Logged in as {email}",
     new_post_title_placeholder: "Enter title (5+ chars)",
+    new_post_content: "Content",
     new_post_content_placeholder: "Enter content (10+ chars)",
     new_post_images_label: "Photos",
     new_post_images_desc: "(optional, max {n})",
