@@ -96,22 +96,22 @@ export function WeeklyReportCard() {
               </div>
 
               {/* Stats row */}
-              <div className="flex gap-2">
-                <div className="flex-1 rounded-lg bg-muted/15 px-3 py-2 text-center">
+              <div className="flex" style={{ gap: "var(--gap-card)" }}>
+                <div className="flex-1 rounded-lg bg-muted/15 px-2 sm:px-3 py-2 text-center">
                   <Activity className="h-3 w-3 mx-auto mb-1 text-muted-foreground" />
                   <p className="text-sm font-bold tabular-nums">{DEMO_WEEKLY.total_events}</p>
                   <p className="text-[8px] text-muted-foreground">
                     {lang === "ko" ? "총 이벤트" : "Total Events"}
                   </p>
                 </div>
-                <div className="flex-1 rounded-lg bg-muted/15 px-3 py-2 text-center">
+                <div className="flex-1 rounded-lg bg-muted/15 px-2 sm:px-3 py-2 text-center">
                   <BarChart3 className="h-3 w-3 mx-auto mb-1 text-muted-foreground" />
                   <p className="text-sm font-bold tabular-nums">{DEMO_WEEKLY.new_clusters}</p>
                   <p className="text-[8px] text-muted-foreground">
                     {lang === "ko" ? "신규 클러스터" : "New Clusters"}
                   </p>
                 </div>
-                <div className="flex-1 rounded-lg bg-muted/15 px-3 py-2 text-center">
+                <div className="flex-1 rounded-lg bg-muted/15 px-2 sm:px-3 py-2 text-center">
                   <div className={cn("h-3 w-3 mx-auto mb-1 rounded-full", severityBarColor(DEMO_WEEKLY.avg_severity))} />
                   <p className="text-sm font-bold tabular-nums">{DEMO_WEEKLY.avg_severity}</p>
                   <p className="text-[8px] text-muted-foreground">

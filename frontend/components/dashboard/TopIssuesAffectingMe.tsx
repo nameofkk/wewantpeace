@@ -130,7 +130,7 @@ export function TopIssuesAffectingMe() {
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide mb-0.5">
                   {item.country_codes.length > 0 && (
                     <span className="text-[11px]">
                       {item.country_codes.map((code: string) => getFlag(code)).join(" ")}

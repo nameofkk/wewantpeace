@@ -6,6 +6,7 @@ import { Download, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { isTossMiniApp } from "@/lib/platform";
+import { cn } from "@/lib/utils";
 
 const DISMISS_KEY = "pwa_install_dismissed";
 const DISMISS_HOURS = 24;
@@ -64,7 +65,10 @@ export function PWAInstallPrompt() {
   if (!visible || pathname === "/upgrade") return null;
 
   return (
-    <div className="fixed bottom-[72px] left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
+    <div className={cn(
+      "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300",
+      isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
+    )}>
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20">
         <Download className="h-5 w-5 text-primary" />
       </div>

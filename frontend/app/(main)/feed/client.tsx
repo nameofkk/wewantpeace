@@ -187,7 +187,7 @@ function KScoreHistorySection({
         >
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0" />
-            <span className="whitespace-nowrap">
+            <span className="whitespace-nowrap text-ellipsis overflow-hidden">
               {userLevel < (PLAN_ORDER["pro"] ?? 1)
                 ? (lang === "ko" ? "Pro 30일 · Pro+ 90일 히스토리" : "Pro: 30d · Pro+: 90d history")
                 : (lang === "ko" ? "90일 히스토리는 Pro+ 전용" : "90d history — Pro+ only")}
@@ -1041,7 +1041,7 @@ function FeedPageContent() {
           </Link>
           {userPlan === "free" && (
             <div className="mt-4 flex items-center justify-between gap-2 w-full max-w-xs rounded-lg px-3 py-2" style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
-              <p className="text-[11px] text-muted-foreground text-left whitespace-nowrap">
+              <p className="text-[11px] text-muted-foreground text-left whitespace-nowrap overflow-hidden text-ellipsis">
                 {t(lang, "plan_country_limit_hint")}
               </p>
               <a

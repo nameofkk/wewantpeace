@@ -661,7 +661,7 @@ export default function LoginPage() {
 
   if (checkingRedirect) {
     return (
-      <div className="rounded-2xl border border-border bg-card shadow-xl p-8 flex flex-col items-center justify-center min-h-[300px]">
+      <div className="rounded-2xl border border-border bg-card shadow-xl p-5 sm:p-8 flex flex-col items-center justify-center min-h-[250px]">
         <div className="relative h-7 w-16 mb-4">
           <Image src="/logo-eye.png" alt="WeWantPeace" fill className="object-contain" priority />
         </div>
@@ -674,9 +674,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-xl p-8">
+    <div className="rounded-2xl border border-border bg-card shadow-xl p-5 sm:p-8">
       {/* 로고 */}
-      <div className="flex items-center gap-2 justify-center mb-6">
+      <div className="flex items-center gap-2 justify-center" style={{ marginBottom: "var(--space-lg)" }}>
         <div className="relative h-7 w-16">
           <Image src="/logo-eye.png" alt="WeWantPeace" fill className="object-contain" priority />
         </div>
@@ -685,7 +685,7 @@ export default function LoginPage() {
 
       {/* 구글 신규 가입 헤더 */}
       {tab === "google-register" && (
-        <div className="mb-6 text-center">
+        <div className="text-center" style={{ marginBottom: "var(--space-lg)" }}>
           <h2 className="text-base font-bold">{t(lang, "login_google_register_title")}</h2>
           <p className="text-xs text-muted-foreground mt-1">{t(lang, "login_google_register_desc")}</p>
         </div>
@@ -693,7 +693,7 @@ export default function LoginPage() {
 
       {/* 탭 (Toss 미니앱에서는 숨김 — Toss 로그인만 제공) */}
       {tab !== "google-register" && !isTossMiniApp() && (
-        <div className="flex rounded-lg bg-secondary p-1 mb-6">
+        <div className="flex rounded-lg bg-secondary p-1" style={{ marginBottom: "var(--space-lg)" }}>
           {(["login", "register"] as const).map((tabKey) => (
             <button
               key={tabKey}
@@ -710,7 +710,7 @@ export default function LoginPage() {
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive whitespace-pre-line">
+        <div className="mb-3 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 sm:mb-4 sm:px-4 sm:py-3 text-sm text-destructive whitespace-pre-line">
           {error}
         </div>
       )}
