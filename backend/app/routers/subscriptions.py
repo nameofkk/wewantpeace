@@ -26,7 +26,7 @@ PROMO_CODES = {
 }
 
 PLANS = {
-    "pro": {"name": "Pro", "amount": 4900, "features": [
+    "pro": {"name": "Pro", "amount": 390, "features": [
         {"ko": "관심 국가 5개", "en": "5 monitored countries"},
         {"ko": "내 국가 변경", "en": "Change home country"},
         {"ko": "실시간 이슈 지도", "en": "Real-time issue map"},
@@ -37,7 +37,7 @@ PLANS = {
         {"ko": "방해금지 시간", "en": "Quiet hours"},
         {"ko": "30일 히스토리", "en": "30-day history"},
     ]},
-    "pro_plus": {"name": "Pro+", "amount": 9900, "features": [
+    "pro_plus": {"name": "Pro+", "amount": 690, "features": [
         {"ko": "Pro 기능 전체", "en": "All Pro features"},
         {"ko": "관심 국가 무제한", "en": "Unlimited monitored countries"},
         {"ko": "일일 알림 50건", "en": "50 daily alerts"},
@@ -66,7 +66,7 @@ async def get_plans():
             "id": plan_id,
             "name": info["name"],
             "amount": info["amount"],
-            "currency": "KRW",
+            "currency": "USD",
             "features": info["features"],
         }
         for plan_id, info in PLANS.items()
@@ -123,7 +123,7 @@ async def cancel_subscription(
     )
     sub = result.scalar_one_or_none()
     if not sub:
-        raise HTTPException(404, detail={"code": "NO_ACTIVE_SUBSCRIPTION"})
+        raise HTTPException(404, detail="활성 구독이 없습니다.")
 
     # 스토어 구독은 스토어에서 직접 취소해야 함
     if sub.platform in ("android", "ios"):
@@ -165,7 +165,7 @@ async def start_trial(
 ):
     """Pro 7일 무료 체험. Pro만 가능, Pro+ 제외. 무료 혜택 계정당 1회."""
     if current_user.plan != "free":
-        raise HTTPException(409, detail={"code": "ALREADY_PAID_PLAN"})
+        raise HTTPException(409, detail="이미 유료 플랜을 사용 중입니다.")
 
     # 이전 trial 이력 확인 (trial_end IS NOT NULL)
     existing = await db.execute(
@@ -175,7 +175,7 @@ async def start_trial(
         ).limit(1)
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(409, detail={"code": "TRIAL_ALREADY_USED"})
+        raise HTTPException(409, detail="이미 무료 체험을 사용하셨습니다.")
 
     # 프로모 이력 확인 — 무료 혜택은 계정당 총 1회
     promo_existing = await db.execute(
@@ -185,7 +185,7 @@ async def start_trial(
         ).limit(1)
     )
     if promo_existing.scalar_one_or_none():
-        raise HTTPException(409, detail={"code": "FREE_BENEFIT_ALREADY_USED"})
+        raise HTTPException(409, detail="이미 무료 혜택을 사용하셨습니다.")
 
     now = datetime.now(timezone.utc)
     trial_end = now + timedelta(days=7)
@@ -225,11 +225,11 @@ async def redeem_promo(
     code = body.code.strip().upper()
     promo = PROMO_CODES.get(code)
     if not promo:
-        raise HTTPException(400, detail={"code": "INVALID_PROMO_CODE"})
+        raise HTTPException(400, detail="유효하지 않은 프로모 코드입니다.")
 
     # 이미 유료 플랜이면 거부
     if current_user.plan != "free":
-        raise HTTPException(409, detail={"code": "ALREADY_PAID_PLAN"})
+        raise HTTPException(409, detail="이미 유료 플랜을 사용 중입니다.")
 
     # 이미 같은 프로모 코드를 사용했으면 거부
     platform_tag = f"promo:{code}"
@@ -240,7 +240,7 @@ async def redeem_promo(
         ).limit(1)
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(409, detail={"code": "PROMO_ALREADY_USED"})
+        raise HTTPException(409, detail="이미 사용한 프로모 코드입니다.")
 
     # trial 이력 확인 — 무료 혜택은 계정당 총 1회
     trial_existing = await db.execute(
@@ -250,7 +250,7 @@ async def redeem_promo(
         ).limit(1)
     )
     if trial_existing.scalar_one_or_none():
-        raise HTTPException(409, detail={"code": "FREE_BENEFIT_ALREADY_USED"})
+        raise HTTPException(409, detail="이미 무료 혜택을 사용하셨습니다.")
 
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(days=promo["days"])

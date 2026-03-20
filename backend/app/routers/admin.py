@@ -593,7 +593,7 @@ async def list_subscriptions(
                 "plan": u.plan,
                 "status": s.status if s else "admin_granted",
                 "amount": s.amount if s else 0,
-                "currency": s.currency if s else "KRW",
+                "currency": s.currency if s else "USD",
                 "platform": s.platform if s else "admin",
                 "started_at": (s.started_at.isoformat() if s else u.created_at.isoformat()),
                 "expires_at": (s.expires_at.isoformat() if s and s.expires_at else None),
@@ -610,8 +610,8 @@ async def list_subscriptions(
 class AppSettings(BaseModel):
     maintenance_mode: bool = False
     allow_signup: bool = True
-    pro_price: int = 4900
-    pro_plus_price: int = 9900
+    pro_price: int = 390
+    pro_plus_price: int = 690
     notice_banner: str = ""
 
 
