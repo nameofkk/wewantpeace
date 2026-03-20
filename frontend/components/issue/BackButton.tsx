@@ -8,7 +8,7 @@ export function BackButton() {
   return (
     <button
       onClick={() => router.back()}
-      className="rounded-lg p-1.5 hover:bg-secondary transition-colors"
+      className="rounded-lg p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-secondary transition-colors"
     >
       <ArrowLeft className="h-5 w-5" />
     </button>
