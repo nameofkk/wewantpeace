@@ -103,6 +103,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=3),  # 매일 새벽 3시 UTC
         "options": {"queue": "process"},
     },
+    "cleanup-old-data": {
+        "task": "worker.tasks.cleanup_old_data",
+        "schedule": crontab(minute=30, hour=3),  # 매일 새벽 3시 30분 UTC
+        "options": {"queue": "process"},
+    },
     # ── Sprint 2: Delivery Integrity 배치 ──
     "timeout-pending-deliveries": {
         "task": "worker.tasks.timeout_pending_deliveries",
