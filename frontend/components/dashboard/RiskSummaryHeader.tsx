@@ -62,7 +62,7 @@ export function RiskSummaryHeader() {
       <div className="rounded-xl border border-border bg-card p-4 fade-in-up">
         {/* Home Country */}
         <div className="flex items-center gap-3 mb-3">
-          <div className={cn("flex items-center justify-center h-12 w-12 rounded-xl ring-2", color.bg, color.ring)}>
+          <div className={cn("flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-xl ring-2", color.bg, color.ring)}>
             <span className="text-xl">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
           </div>
           <div className="flex-1 min-w-0">
@@ -76,7 +76,7 @@ export function RiskSummaryHeader() {
             </div>
           </div>
           <div className="text-right">
-            <span className={cn("text-2xl font-bold tabular-nums leading-none", color.text)}>
+            <span className={cn("font-bold tabular-nums leading-none", color.text)} style={{ fontSize: "var(--text-score-lg)" }}>
               {Math.round(animatedScore)}
             </span>
             <span className="text-[10px] text-muted-foreground block">/100</span>

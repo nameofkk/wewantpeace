@@ -7,6 +7,7 @@ import { isNativeApp, isMobileBrowser, isAndroidBrowser, isIOSBrowser } from "@/
 import { isTossMiniApp } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 const DISMISS_KEY = "smart_app_banner_dismissed";
 const DISMISS_HOURS = 72; // 3일
@@ -102,7 +103,10 @@ export function SmartAppBanner() {
   // 인앱브라우저: "외부 브라우저에서 열기" 안내
   if (inApp) {
     return (
-      <div className="fixed bottom-[72px] left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300">
+      <div className={cn(
+        "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300",
+        isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
+      )}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20">
           <ExternalLink className="h-5 w-5 text-primary" />
         </div>
@@ -144,7 +148,10 @@ export function SmartAppBanner() {
         : "앱 다운로드";
 
   return (
-    <div className="fixed bottom-[72px] left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 animate-in slide-in-from-bottom-4 duration-300">
+    <div className={cn(
+      "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 animate-in slide-in-from-bottom-4 duration-300",
+      isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
+    )}>
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20">
           <Smartphone className="h-5 w-5 text-primary" />

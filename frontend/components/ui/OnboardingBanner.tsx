@@ -6,6 +6,8 @@ import { ArrowRight, X } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { LogoIcon } from "@/components/ui/logo-icon";
+import { isTossMiniApp } from "@/lib/platform";
+import { cn } from "@/lib/utils";
 
 /**
  * 공유 링크로 진입한 온보딩 미완료 유저에게 표시하는 하단 CTA 배너.
@@ -48,7 +50,10 @@ export function OnboardingBanner() {
 
   return (
     <div
-      className="fixed bottom-[72px] left-4 right-4 z-50 rounded-xl border border-blue-500/30 shadow-xl p-3.5 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300"
+      className={cn(
+        "fixed left-4 right-4 z-50 rounded-xl border border-blue-500/30 shadow-xl p-3.5 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300",
+        isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
+      )}
       style={{
         background:
           "linear-gradient(135deg, rgba(15,23,42,0.97) 0%, rgba(30,41,59,0.97) 100%)",

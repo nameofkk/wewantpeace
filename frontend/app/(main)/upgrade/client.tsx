@@ -937,7 +937,8 @@ function UpgradeContent() {
           <h3 className="text-xs font-bold mb-4 text-center text-muted-foreground uppercase tracking-widest">
             {lang === "ko" ? "플랜 상세 비교" : "Detailed Comparison"}
           </h3>
-          <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="rounded-2xl border border-border overflow-hidden overflow-x-auto">
+            <div className="min-w-[420px]">
             {/* 헤더 */}
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr] bg-muted/30 text-[11px] font-bold">
               <div className="p-3 text-muted-foreground">{lang === "ko" ? "기능" : "Feature"}</div>
@@ -974,6 +975,7 @@ function UpgradeContent() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
 

@@ -456,17 +456,17 @@ export default function IssueDetailClient({ initialData, id: propId }: Props) {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-center mb-4">
-            <div className="rounded-lg bg-secondary p-2">
-              <p className="text-lg font-bold">{issue.severity}</p>
+          <div className="grid grid-cols-3 text-center mb-4" style={{ gap: "var(--gap-card)" }}>
+            <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
+              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{issue.severity}</p>
               <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_severity")}</p>
             </div>
-            <div className="rounded-lg bg-secondary p-2">
-              <p className="text-lg font-bold">{Math.round(issue.confidence * 100)}%</p>
+            <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
+              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{Math.round(issue.confidence * 100)}%</p>
               <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_confidence")}</p>
             </div>
-            <div className="rounded-lg bg-secondary p-2">
-              <p className="text-lg font-bold">{issue.event_count}</p>
+            <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
+              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{issue.event_count}</p>
               <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_events")}</p>
             </div>
           </div>

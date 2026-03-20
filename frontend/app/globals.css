@@ -42,6 +42,13 @@
     --icon-sm: clamp(1.75rem, 5vw, 2.5rem);
     --icon-md: clamp(2.5rem, 8vw, 4rem);
 
+    /* ── Responsive Score Text (큰 숫자용, vw 기반) ── */
+    --text-score-lg: clamp(1.5rem, 4vw, 1.875rem);   /* 24~30px */
+    --text-score-md: clamp(1.125rem, 3vw, 1.25rem);   /* 18~20px */
+
+    /* ── Responsive Gap (그리드/카드 간격, vw 기반) ── */
+    --gap-card: clamp(0.25rem, 1.2vw, 0.5rem);        /* 4~8px */
+
     /* ── Safe Area ── */
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-top: env(safe-area-inset-top, 0px);

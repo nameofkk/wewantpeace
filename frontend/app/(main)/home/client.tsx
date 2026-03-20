@@ -333,7 +333,7 @@ function ReportContent() {
       <TourHelpButton tourId="dashboard" onStartTour={() => setTourRun(true)} />
       {/* ═══════════════ Header ═══════════════ */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-sm px-4 pt-4 pb-3">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
           {/* 왼쪽 — 타이틀 + LIVE */}
           <div className="flex items-center gap-1.5 min-w-0">
             <h1 className="text-sm font-bold whitespace-nowrap">{t(lang, "dash_title")}</h1>
@@ -358,7 +358,7 @@ function ReportContent() {
               <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
             </button>
             {updatedTime && (
-              <span className="text-[9px] text-muted-foreground whitespace-nowrap">{updatedTime}</span>
+              <span className="text-[9px] text-muted-foreground whitespace-nowrap hidden min-[375px]:inline">{updatedTime}</span>
             )}
           </div>
         </div>
