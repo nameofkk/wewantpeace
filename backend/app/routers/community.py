@@ -188,7 +188,9 @@ def _comment_to_out(c: Comment, nickname: Optional[str] = None) -> CommentOut:
 # ── 이미지 업로드 ──────────────────────────────────────────────────────────────
 
 @router.post("/upload")
+@limiter.limit("10/minute")
 async def upload_image(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
@@ -423,6 +425,7 @@ async def my_posts(
 
 
 @router.post("/posts", response_model=PostOut, status_code=201)
+@limiter.limit("10/minute")
 async def create_post(
     body: PostCreate,
     request: Request,

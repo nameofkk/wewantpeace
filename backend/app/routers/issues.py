@@ -178,7 +178,7 @@ async def list_clusters(
     topic: Optional[str] = Query(None),
     country_code: Optional[str] = Query(None, description="국가 코드 필터 (예: US, KR)"),
     severity_min: int = Query(1, ge=0, le=100),
-    limit: int = Query(2000, ge=1, le=5000),
+    limit: int = Query(200, ge=1, le=2000),
     sort_by: Optional[str] = Query(None, description="정렬 기준: kscore, severity, latest"),
     db: AsyncSession = Depends(get_db),
 ):

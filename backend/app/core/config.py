@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         "https://wewantpeace.live",
     ]
     # 토스 WebView origin: *.tossmini.com + *.toss.im 모두 허용
-    cors_origin_regex: str = r"https://.*\.(tossmini\.com|toss\.im)"
+    cors_origin_regex: str = r"^https://[a-z0-9-]+\.(tossmini\.com|toss\.im)$"
     allowed_origins: List[str] = ["http://localhost:3000"]
 
     @model_validator(mode="after")
