@@ -7,25 +7,41 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.li
 
 export const metadata: Metadata = {
   title: {
-    default: "WeWantPeace",
-    template: "WeWantPeace",
+    default: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    template: "%s | WeWantPeace",
   },
-  description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
+  description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석. KScore로 나에게 미치는 위험도를 확인하세요.",
+  keywords: [
+    "분쟁 모니터링", "국제 안보", "긴장도 지수", "실시간 뉴스", "위기 분석",
+    "전쟁 뉴스", "글로벌 리스크", "지정학", "안보 위협", "KScore",
+    "conflict monitoring", "global security", "tension index", "real-time news",
+    "geopolitical risk", "crisis analysis", "war news", "security alert",
+    "WeWantPeace", "위원트피스",
+  ],
   manifest: "/manifest.json",
   metadataBase: new URL(SITE_URL),
+  alternates: {
+    canonical: SITE_URL,
+    languages: {
+      "ko": SITE_URL,
+      "en": `${SITE_URL}/en`,
+      "x-default": SITE_URL,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "ko_KR",
+    alternateLocale: "en_US",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace",
-    description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
+    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    description: "195개국 분쟁·안보 이슈를 실시간 모니터링. AI 기반 KScore로 나에게 미치는 영향을 분석합니다.",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace",
-    description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
+    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    description: "195개국 분쟁·안보 이슈를 실시간 모니터링. AI 기반 KScore로 나에게 미치는 영향을 분석합니다.",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
   appleWebApp: {
@@ -42,6 +58,13 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   verification: {
     google: "LJQ8sx_1VitFQTLo9e3oNys3rRVZdpIWAHuSYZtzrOo",
