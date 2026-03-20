@@ -91,7 +91,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <SessionTracker />
       <NewEventBanner />
       <WelcomeModal />
-      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[60px]"}>{children}</main>
+      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[72px]"}>{children}</main>
       <BottomNav />
       <OnboardingBanner />
       <PWAInstallPrompt />
