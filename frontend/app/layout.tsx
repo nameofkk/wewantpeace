@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { OnboardingGuard } from "@/components/ui/onboarding-guard";
@@ -255,6 +256,18 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
         <meta name="msapplication-TileImage" content="/mstile-150x150.png" />
         <meta name="msapplication-TileColor" content="#0f1729" />
+        {/* GA4 Analytics — NEXT_PUBLIC_GA4_ID 환경변수 설정 시에만 로드 */}
+        {process.env.NEXT_PUBLIC_GA4_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA4_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA4_ID}');`}
+            </Script>
+          </>
+        )}
       </head>
       <body className="min-h-screen bg-background antialiased">
         {/* 인라인 스플래시: JS 번들 로드 전 빈 화면 방지 (React 하이드레이션 후 제거됨) */}
@@ -290,13 +303,16 @@ export default function RootLayout({
               <div style={{ position: "absolute", top: "50%", left: "50%", width: 50, height: 50, borderRadius: "50%", border: "1px solid rgba(59,130,246,0.15)", transform: "translate(-50%,-50%)", animation: "splash-radar 3s ease-out 2s infinite" }} />
             </>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-eye.png"
-              alt=""
-              width={184}
-              height={80}
-              style={{ position: "relative", zIndex: 1, height: 80, width: "auto", objectFit: "contain", filter: "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
-            />
+            <picture>
+              <source srcSet="/logo-eye.webp" type="image/webp" />
+              <img
+                src="/logo-eye.png"
+                alt=""
+                width={184}
+                height={80}
+                style={{ position: "relative", zIndex: 1, height: 80, width: "auto", objectFit: "contain", filter: "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
+              />
+            </picture>
           </div>
 
           {/* 타이틀 */}
