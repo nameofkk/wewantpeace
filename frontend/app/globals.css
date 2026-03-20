@@ -107,8 +107,7 @@
 
 /* 하단 탭바 */
 .tab-bar {
-  height: 60px;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 /* ── 마커 애니메이션 ───────────────────────────────── */
