@@ -235,7 +235,7 @@ conflict, terror, coup, sanctions, cyber, protest, diplomacy, maritime, disaster
 
 ### 15. 수익 모델 — 실제 구현
 
-| | Free | Pro (₩4,900/월) | Pro+ (₩9,900/월) |
+| | Free | Pro ($3.90/월) | Pro+ ($6.90/월) |
 |--|------|-----------------|-------------------|
 | 관심 국가 | 2개 | 5개 | 무제한 |
 | 실시간 지도 | 잠김 | 열림 | 열림 |
@@ -290,7 +290,7 @@ Google Play Billing + iOS StoreKit 통합 완료.
 | 핵심 경험 | 기준 국가 설정 → 맞춤 알림 → 확인 → 행동 | 지도 탐색하며 발견 |
 | 사용 빈도 | 하루 1~3회 (알림 기반) | 접속 시 30분~1시간 몰입 |
 | 타깃 | 여행자, 해외 거주자, 투자자, 글로벌 워커 (일반인) | OSINT 매니아, 분석가, 밀덕, 트레이더 |
-| 수익 모델 | Free → Pro (₩4,900) → Pro+ (₩9,900) 구독 | 완전 무료 (비수익화 선언) |
+| 수익 모델 | Free → Pro ($3.90) → Pro+ ($6.90) 구독 | 완전 무료 (비수익화 선언) |
 | 스택 | Next.js 14 + FastAPI + Celery + Supabase PostgreSQL | Vanilla TS + Vercel Edge Functions 60+ + Redis (서버 DB 없음) |
 | 갱신 주기 | **5분** (Tension/Trending/RSS/Telegram) | 실시간 스트리밍 (Edge Functions) |
 | 모니터링 국가 | 69개국 (확대 예정) | 23개 tier-1 + universal |

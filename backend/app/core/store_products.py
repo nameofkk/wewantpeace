@@ -16,10 +16,10 @@ APPLE_PRODUCTS = {
 PLAN_TO_GOOGLE = {v: k for k, v in GOOGLE_PRODUCTS.items()}
 PLAN_TO_APPLE = {v: k for k, v in APPLE_PRODUCTS.items()}
 
-# plan별 금액
+# plan별 금액 (USD 센트)
 PLAN_AMOUNTS = {
-    "pro": 4900,
-    "pro_plus": 9900,
+    "pro": 390,
+    "pro_plus": 690,
 }
 
 
