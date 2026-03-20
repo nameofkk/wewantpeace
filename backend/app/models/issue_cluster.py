@@ -21,6 +21,7 @@ class IssueCluster(Base):
     cluster_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     geohash5: Mapped[str] = mapped_column(String(8), nullable=False)
     topic: Mapped[str] = mapped_column(String(32), nullable=False)
+    sub_topic: Mapped[str] = mapped_column(String(32), nullable=False, server_default="general")
     entity_anchor: Mapped[str | None] = mapped_column(String(256), nullable=True)
     country_code: Mapped[str | None] = mapped_column(String(4), nullable=True)
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)

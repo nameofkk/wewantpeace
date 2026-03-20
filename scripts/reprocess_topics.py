@@ -24,7 +24,7 @@ sys.path.insert(0, "/home/krshin7/Projects/wewantpeace")
 from sqlalchemy import text
 from backend.app.core.database import AsyncSessionLocal
 from worker.processor.normalizer import (
-    _classify_topic, _extract_geo, _make_geohash,
+    _classify_topic, _classify_sub_topic, _extract_geo, _make_geohash,
     _calculate_severity, is_relevant, NormalizeResult,
 )
 
@@ -32,18 +32,20 @@ FORCE_ALL = "--all" in sys.argv
 
 
 async def step1_reprocess_events(db):
-    """normalized_events 재분류."""
+    """normalized_events 재분류 (sub_topic 포함)."""
     if FORCE_ALL:
         r = await db.execute(text("""
-            SELECT id, topic, country_code, body, title, source_tier, severity
+            SELECT id, topic, country_code, body, title, source_tier, severity,
+                   COALESCE(sub_topic, 'general') as sub_topic
             FROM normalized_events
             ORDER BY id
         """))
     else:
         r = await db.execute(text("""
-            SELECT id, topic, country_code, body, title, source_tier, severity
+            SELECT id, topic, country_code, body, title, source_tier, severity,
+                   COALESCE(sub_topic, 'general') as sub_topic
             FROM normalized_events
-            WHERE topic = 'unknown' OR country_code IS NULL
+            WHERE topic = 'unknown' OR country_code IS NULL OR sub_topic = 'general'
             ORDER BY id
         """))
     rows = r.fetchall()
@@ -61,19 +63,22 @@ async def step1_reprocess_events(db):
         new_country, new_lat, new_lon = _extract_geo(combined)
         new_geohash = _make_geohash(new_lat, new_lon)
         new_severity = _calculate_severity(combined, new_topic)
+        new_sub_topic = _classify_sub_topic(combined, new_topic)
 
         if (not FORCE_ALL
                 and new_topic == row.topic
                 and new_country == row.country_code
-                and new_severity == row.severity):
+                and new_severity == row.severity
+                and new_sub_topic == row.sub_topic):
             skipped += 1
             continue
 
-        print(f"  [{row.topic}→{new_topic}] [{row.country_code}→{new_country}] sev={new_severity} | {(row.title or '')[:50]}")
+        print(f"  [{row.topic}→{new_topic}] [{row.sub_topic}→{new_sub_topic}] [{row.country_code}→{new_country}] sev={new_severity} | {(row.title or '')[:50]}")
 
         await db.execute(text("""
             UPDATE normalized_events
             SET topic = :topic,
+                sub_topic = :sub_topic,
                 country_code = :cc,
                 lat = :lat,
                 lon = :lon,
@@ -82,6 +87,7 @@ async def step1_reprocess_events(db):
             WHERE id = :id
         """), {
             "topic": new_topic,
+            "sub_topic": new_sub_topic,
             "cc": new_country,
             "lat": new_lat,
             "lon": new_lon,
@@ -405,6 +411,16 @@ async def step7_unlink_mismatched_cluster_events(db):
     print(f"  제거된 불일치 링크: {removed}개\n")
 
 
+async def step8_split_oversized(db):
+    """대형 클러스터를 sub_topic 기반으로 분할."""
+    from worker.processor.clusterer import split_oversized_clusters
+
+    print("[Step 8] 대형 클러스터 sub_topic 기반 분할")
+    splits = await split_oversized_clusters(db)
+    await db.commit()
+    print(f"  분할: {len(splits)}개 새 클러스터 생성\n")
+
+
 async def main():
     async with AsyncSessionLocal() as db:
         changed = await step1_reprocess_events(db)
@@ -432,6 +448,10 @@ async def main():
 
     async with AsyncSessionLocal() as db:
         await step7_unlink_mismatched_cluster_events(db)
+
+    # Step 8: 대형 클러스터 sub_topic 기반 분할
+    async with AsyncSessionLocal() as db:
+        await step8_split_oversized(db)
 
     print("=== 전체 재처리 완료 ===")
     print("  홈 / 지도 / 긴장도 탭에 자동 반영됩니다 (staleTime 만료 또는 새로고침 시).")

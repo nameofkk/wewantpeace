@@ -695,12 +695,17 @@ def process_raw_event(self, raw_event_id: str):
                     s_title_ko = _translate_to_korean(s_title)
 
                     s_body_ko = _translate_to_korean(raw_event.raw_text[:500])
+                    from worker.processor.normalizer import _classify_sub_topic
+                    s_sub_topic = _classify_sub_topic(
+                        (s_title + " " + raw_event.raw_text[:500]), s_topic,
+                    )
                     norm = NormalizeResult(
                         title=s_title[:120],
                         title_ko=s_title_ko,
                         body=raw_event.raw_text[:2000],
                         body_ko=s_body_ko,
                         topic=s_topic,
+                        sub_topic=s_sub_topic,
                         entity_anchor=s_cc or s_title[:64],
                         lat=s_lat,
                         lon=s_lon,
@@ -748,6 +753,7 @@ def process_raw_event(self, raw_event_id: str):
                     body=norm.body,
                     body_ko=norm.body_ko,
                     topic=norm.topic,
+                    sub_topic=getattr(norm, "sub_topic", "general") or "general",
                     entity_anchor=norm.entity_anchor,
                     lat=norm.lat,
                     lon=norm.lon,
@@ -3713,6 +3719,32 @@ def deactivate_stale_clusters(self):
         return run_async(_run())
     except Exception as exc:
         logger.error("deactivate_stale_clusters 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+# ── 대형 클러스터 분할 ─────────────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.split_oversized_clusters",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def split_oversized_clusters_task(self):
+    """대형 클러스터 sub_topic 기반 자동 분할 (6시간마다)."""
+
+    async def _run():
+        from worker.processor.clusterer import split_oversized_clusters
+        async with AsyncSessionLocal() as db:
+            splits = await split_oversized_clusters(db)
+            await db.commit()
+            return {"status": "ok", "splits": len(splits)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("split_oversized_clusters 오류: %s", exc)
         raise self.retry(exc=exc)
 
 

@@ -207,6 +207,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC = KST 15:00
         "options": {"queue": "process"},
     },
+    "split-oversized-clusters": {
+        "task": "worker.tasks.split_oversized_clusters",
+        "schedule": crontab(minute=30, hour="*/6"),  # 6시간마다
+        "options": {"queue": "process"},
+    },
     # ── SNS 토큰 자동 갱신 ──
     "refresh-social-tokens": {
         "task": "worker.tasks.refresh_social_tokens",
