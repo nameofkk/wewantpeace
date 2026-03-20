@@ -1,14 +1,16 @@
 {
-  "name": "WeWantPeace",
-  "short_name": "WWPeace",
-  "description": "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁 모니터링 & 개인화 영향 분석",
+  "name": "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+  "short_name": "WeWantPeace",
+  "description": "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석",
+  "description_en": "Real-time global conflict monitoring across 195 countries with AI-powered KScore impact analysis",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1729",
   "theme_color": "#0f1729",
   "orientation": "portrait",
-  "categories": ["news", "utilities"],
+  "categories": ["news", "utilities", "security"],
   "lang": "ko",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -25,10 +27,24 @@
   ],
   "shortcuts": [
     {
-      "name": "지도",
+      "name": "실시간 이슈 지도",
       "short_name": "지도",
-      "description": "세계 이슈 지도",
+      "description": "195개국 실시간 분쟁·안보 이슈 지도",
       "url": "/map",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "긴장도 지수",
+      "short_name": "긴장도",
+      "description": "국가별 실시간 긴장도 지수",
+      "url": "/tension",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "실시간 피드",
+      "short_name": "피드",
+      "description": "글로벌 분쟁·안보 실시간 피드",
+      "url": "/feed",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
