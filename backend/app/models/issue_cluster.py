@@ -11,6 +11,7 @@ class IssueCluster(Base):
         Index("ix_clusters_country_severity", "country_code", "severity"),
         Index("ix_clusters_topic_last_event", "topic", "last_event_at"),
         Index("ix_clusters_country_last_event", "country_code", "last_event_at"),
+        Index("ix_cluster_active_kscore", "is_active", "kscore"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -18,7 +19,7 @@ class IssueCluster(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    cluster_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+    cluster_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True, index=True)
     geohash5: Mapped[str] = mapped_column(String(8), nullable=False)
     topic: Mapped[str] = mapped_column(String(32), nullable=False)
     sub_topic: Mapped[str] = mapped_column(String(32), nullable=False, server_default="general")
@@ -29,9 +30,9 @@ class IssueCluster(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     title_ko: Mapped[str | None] = mapped_column(String, nullable=True)
     event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    severity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    severity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, index=True)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    kscore: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    kscore: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, index=True)
     is_spike: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     spike_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     source_tiers: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
@@ -42,7 +43,7 @@ class IssueCluster(Base):
     window_end: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     is_flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     signal_corroboration_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     signal_types: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
