@@ -251,11 +251,11 @@ function UpgradeContent() {
         await handleIOSPurchase(planId);
       }
     } catch (e: unknown) {
-      const err = e as { message?: string; status?: number; body?: { detail?: { code?: string; message?: string } | string } };
+      const err = e as { message?: string; status?: number; body?: { detail?: string } };
       console.error("[Upgrade] error:", err);
-      const code = typeof err.body?.detail === "object" ? err.body?.detail?.code : "";
-      if (code === "ALREADY_SUBSCRIBED") {
-        setError(lang === "ko" ? "이미 활성 구독이 있습니다. 설정에서 현재 구독을 확인해주세요." : "You already have an active subscription. Please check your current plan in Settings.");
+      const detail = typeof err.body?.detail === "string" ? err.body.detail : "";
+      if (err.status === 409 && detail) {
+        setError(detail);
       } else {
         setError(`[DEBUG] ${err.message} (status=${err.status}, platform=${platform}, isWeb=${isWeb})`);
       }
@@ -332,15 +332,14 @@ function UpgradeContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        const code = data?.detail?.code || data?.detail || "";
-        if (code === "INVALID_PROMO_CODE") {
-          setError(t(lang, "promo_invalid"));
-        } else if (code === "PROMO_ALREADY_USED") {
-          setError(t(lang, "promo_already_used"));
-        } else if (code === "ALREADY_PAID_PLAN") {
-          setError(t(lang, "promo_already_paid"));
+        // detail은 string으로 통일 (서버에서 한국어 메시지 전달)
+        const detail = typeof data?.detail === "string" ? data.detail : "";
+        if (res.status === 400) {
+          setError(detail || t(lang, "promo_invalid"));
+        } else if (res.status === 409) {
+          setError(detail || t(lang, "promo_already_used"));
         } else {
-          setError(t(lang, "promo_invalid"));
+          setError(detail || t(lang, "promo_invalid"));
         }
         return;
       }
