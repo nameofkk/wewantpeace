@@ -13,6 +13,7 @@ import { useMe, useMyAreas } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { updateLastActive, checkAndResetSession } from "@/lib/session";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 /** DB에 저장된 관심국가를 localStorage(Zustand)에 동기화 — DB가 항상 진실의 원천 */
 function CountrySync() {
@@ -91,7 +92,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <SessionTracker />
       <NewEventBanner />
       <WelcomeModal />
-      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[72px]"}>{children}</main>
+      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[72px]"}>
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
       <BottomNav />
       <OnboardingBanner />
       <PWAInstallPrompt />

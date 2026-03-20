@@ -66,6 +66,16 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
     setPlatform(detectPlatform());
   }, []);
 
+  // 모달 열릴 때 body scroll lock
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   // 페이월 표시 시 이벤트 트래킹
   useEffect(() => {
     if (isOpen) {

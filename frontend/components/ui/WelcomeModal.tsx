@@ -25,6 +25,16 @@ export default function WelcomeModal() {
     }
   }, []);
 
+  // 모달 열릴 때 body scroll lock
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const handleClose = () => {

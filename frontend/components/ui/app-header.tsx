@@ -57,7 +57,7 @@ function AppHeaderInner() {
         )}
       >
         <div className="flex items-center justify-between h-[52px] px-4">
-          <div className="w-9" />
+          <div className="w-11" />
           <Link
             href="/home"
             onClick={handleTap}
@@ -91,7 +91,7 @@ function AppHeaderInner() {
             </span>
           </Link>
           {isLoggedIn ? (
-            <Link href="/notifications" className="relative w-9 h-9 flex items-center justify-center" aria-label={lang === "ko" ? (unread > 0 ? `알림 ${unread}개 읽지 않음` : "알림") : (unread > 0 ? `${unread} unread notifications` : "Notifications")}>
+            <Link href="/notifications" className="relative w-11 h-11 flex items-center justify-center" aria-label={lang === "ko" ? (unread > 0 ? `알림 ${unread}개 읽지 않음` : "알림") : (unread > 0 ? `${unread} unread notifications` : "Notifications")}>
               <Bell className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
               {unread > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
@@ -100,7 +100,7 @@ function AppHeaderInner() {
               )}
             </Link>
           ) : (
-            <div className="w-9" />
+            <div className="w-11" />
           )}
         </div>
       </header>
