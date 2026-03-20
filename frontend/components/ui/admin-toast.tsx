@@ -64,7 +64,7 @@ export function AdminToastProvider({ children }: { children: React.ReactNode }) 
               open
               onOpenChange={(open) => { if (!open) removeToast(item.id); }}
               className={cn(
-                "rounded-xl border px-4 py-3 shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px]",
+                "rounded-xl border px-4 py-3 shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px] max-sm:min-w-0 max-sm:w-full",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out",
                 "data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right",
                 COLOR_MAP[item.type]

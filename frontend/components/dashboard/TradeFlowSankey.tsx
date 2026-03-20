@@ -167,7 +167,7 @@ export function TradeFlowSankey() {
     return (
       <>
         {/* Stacked Bar Chart */}
-        <div className="h-[240px] w-full mt-3">
+        <div className="h-[180px] sm:h-[240px] w-full mt-3">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={flows}
