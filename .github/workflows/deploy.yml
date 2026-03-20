@@ -44,3 +44,15 @@ jobs:
           deploy_service "$FRONTEND" "frontend"
 
           echo "All services redeployed successfully"
+
+  rollback:
+    name: Rollback Notification
+    needs: deploy
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify deployment failure
+        run: |
+          echo "::error::Deployment failed. Manual rollback required via Railway dashboard."
+          echo "Railway Dashboard: https://railway.app/project/${{ env.RAILWAY_PROJECT_ID }}"
+          echo "To rollback, go to the Railway dashboard and redeploy the previous successful deployment."

@@ -107,6 +107,10 @@ TENSION_WARMUP_FACTOR: float = 0.6
 # 활발한 분쟁지역의 최소 긴장도 점수.
 # 보도 공백 시간에도 0점으로 떨어지는 것을 방지.
 # v1: 수작업 정의. 향후 ACLED 90일 이벤트 밀도 기반 자동 산출 전환 예정.
+# TODO: Automate floor calculation from ACLED 90-day event density
+# - ACLED API에서 국가별 90일 이벤트 수 조회
+# - 이벤트 밀도 상위 N개국에 대해 floor 자동 산출
+# - 주기적 업데이트 (월 1회 또는 주 1회)
 CONFLICT_FLOOR: dict[str, float] = {
     "UA": 55.0,   # 우크라이나: 러시아 전면전
     "PS": 50.0,   # 팔레스타인: 이스라엘-하마스 전쟁
