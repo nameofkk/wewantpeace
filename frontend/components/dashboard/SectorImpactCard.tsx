@@ -110,7 +110,7 @@ function SectorChart({
 }) {
   if (chartData.length === 0) return null;
   return (
-    <div className="h-[160px] w-full">
+    <div className="h-[120px] sm:h-[160px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={chartData}
