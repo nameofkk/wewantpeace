@@ -4156,3 +4156,56 @@ def beat_heartbeat():
     """Beat 프로세스가 살아있음을 표시."""
     r = _get_sync_redis()
     r.set("beat:heartbeat", datetime.now(UTC).isoformat(), ex=600)
+
+
+# ── 오래된 데이터 하드 삭제 ───────────────────────────────────────────────────
+
+@app.task(
+    name="worker.tasks.cleanup_old_data",
+    queue="process",
+    bind=True,
+    max_retries=1,
+    default_retry_delay=120,
+)
+def cleanup_old_data(self):
+    """
+    30일+ raw_events 삭제, severity=0 normalized_events 삭제 (노이즈).
+    매일 새벽 3시 30분 UTC 실행.
+    """
+    _record_heartbeat("cleanup_old_data")
+
+    async def _run():
+        from sqlalchemy import text as sa_text
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 1. 30일+ raw_events 하드 삭제
+                raw_result = await db.execute(
+                    sa_text("DELETE FROM raw_events WHERE collected_at < :cutoff"),
+                    {"cutoff": cutoff},
+                )
+                deleted_raw = raw_result.rowcount
+
+                # 2. severity=0 normalized_events 하드 삭제 (노이즈)
+                norm_result = await db.execute(
+                    sa_text("DELETE FROM normalized_events WHERE severity = 0"),
+                )
+                deleted_norm = norm_result.rowcount
+
+                logger.info(
+                    "cleanup_old_data: raw_events %d개 삭제 (cutoff=%s), 노이즈 normalized_events %d개 삭제",
+                    deleted_raw, cutoff.isoformat(), deleted_norm,
+                )
+                return {
+                    "status": "ok",
+                    "deleted_raw_events": deleted_raw,
+                    "deleted_noise_normalized": deleted_norm,
+                    "cutoff": cutoff.isoformat(),
+                }
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("cleanup_old_data 오류: %s", exc)
+        raise self.retry(exc=exc)

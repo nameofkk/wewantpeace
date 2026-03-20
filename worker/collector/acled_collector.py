@@ -192,28 +192,42 @@ class ACLEDCollector:
             "event_date_where": ">=",
         }
 
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
-                async with session.get(
-                    self.API_BASE,
-                    params=params,
-                    headers={"Authorization": f"Bearer {access_token}"},
-                ) as resp:
-                    if resp.status == 401:
-                        # 토큰 만료 → 캐시 삭제 후 재인증
-                        if redis:
-                            await redis.delete(_REDIS_TOKEN_KEY)
-                        result.errors.append("ACLED 토큰 만료 (다음 사이클에서 재인증)")
-                        return result
-                    if resp.status != 200:
-                        result.errors.append(f"HTTP {resp.status}")
-                        return result
-                    data = await resp.json(content_type=None)
-        except asyncio.TimeoutError:
-            result.errors.append("API 타임아웃")
-            return result
-        except Exception as e:
-            result.errors.append(f"API 오류: {e}")
+        # Exponential backoff 재시도 (5s, 10s, 20s) — 401(토큰 만료)은 즉시 반환
+        MAX_RETRIES = 3
+        data = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
+                    async with session.get(
+                        self.API_BASE,
+                        params=params,
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    ) as resp:
+                        if resp.status == 401:
+                            # 토큰 만료 → 캐시 삭제 후 재인증 (재시도 무의미)
+                            if redis:
+                                await redis.delete(_REDIS_TOKEN_KEY)
+                            result.errors.append("ACLED 토큰 만료 (다음 사이클에서 재인증)")
+                            return result
+                        if resp.status != 200:
+                            raise aiohttp.ClientResponseError(
+                                resp.request_info, resp.history,
+                                status=resp.status, message=f"HTTP {resp.status}",
+                            )
+                        data = await resp.json(content_type=None)
+                break  # 성공 시 루프 탈출
+            except Exception as e:
+                if attempt < MAX_RETRIES - 1:
+                    wait = 2 ** attempt * 5  # 5s, 10s, 20s
+                    logger.warning("ACLED fetch 재시도 %d/%d (%ds 후): %s", attempt + 1, MAX_RETRIES, wait, e)
+                    await asyncio.sleep(wait)
+                else:
+                    logger.error("ACLED fetch 실패 (%d회 재시도 후): %s", MAX_RETRIES, e)
+                    result.errors.append(f"API 오류 ({MAX_RETRIES}회 재시도 실패): {e}")
+                    return result
+
+        if data is None:
+            result.errors.append("API 응답 없음")
             return result
 
         events = data.get("data", [])
