@@ -522,6 +522,9 @@ async def kscore_history(
     else:
         # 8일 이상: 시간별(~30일) 또는 일별(31일+) 집계
         trunc = "hour" if days <= 30 else "day"
+        ALLOWED_TRUNC = {"hour", "day", "week", "month"}
+        if trunc not in ALLOWED_TRUNC:
+            raise HTTPException(400, "Invalid time truncation")
         result = await db.execute(
             sa_text(f"""
                 SELECT DISTINCT ON (DATE_TRUNC('{trunc}', calculated_at))

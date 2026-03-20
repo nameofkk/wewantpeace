@@ -329,6 +329,7 @@ async def toss_login(
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserOut, status_code=201)
+@limiter.limit("5/minute")
 async def register(
     body: RegisterBody,
     request: Request,
