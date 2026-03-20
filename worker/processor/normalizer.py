@@ -78,15 +78,26 @@ Given a news article title and body, classify it into exactly ONE topic and assi
 - Read the FULL body context before deciding. Title alone can be misleading.
 - When casualties are explicitly mentioned, severity MUST reflect the scale above.
 
-Respond ONLY with JSON: {"topic": "...", "severity": N}"""
+## Sub-topic (optional refinement within topic):
+For "conflict": nk_provocation | military_exercise | geopolitical_response | active_combat | arms_transfer | general
+For "sanctions": oil_energy | trade_tariff | general
+For all other topics: general
+
+Respond ONLY with JSON: {"topic": "...", "sub_topic": "...", "severity": N}"""
 
 
-def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, int]]:
+_VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
+    "conflict": frozenset(["nk_provocation", "military_exercise", "geopolitical_response", "active_combat", "arms_transfer", "general"]),
+    "sanctions": frozenset(["oil_energy", "trade_tariff", "general"]),
+}
+
+
+def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int]]:
     """
-    GPT-4o-mini로 토픽 + severity 분류.
+    GPT-4o-mini로 토픽 + sub_topic + severity 분류.
 
     Returns:
-        (topic, severity) 또는 실패 시 None
+        (topic, sub_topic, severity) 또는 실패 시 None
     """
     if not _OPENAI_KEY:
         return None
@@ -108,7 +119,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, int]]:
                 {"role": "user", "content": user_text},
             ],
             temperature=0,
-            max_tokens=60,
+            max_tokens=80,
             response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content
@@ -129,11 +140,75 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, int]]:
             return None
 
         severity = max(0, min(100, int(severity)))
-        return topic, severity
+
+        # sub_topic 추출 (유효하지 않으면 general)
+        raw_sub = data.get("sub_topic", "general").strip().lower()
+        valid_subs = _VALID_SUB_TOPICS.get(topic)
+        sub_topic = raw_sub if (valid_subs and raw_sub in valid_subs) else "general"
+
+        return topic, sub_topic, severity
 
     except Exception:
         logger.exception("AI 분류 실패 (제목: %s)", title[:80])
         return None
+
+# ── Sub-topic 키워드 기반 분류 ──────────────────────────────────────────────
+
+_SUB_TOPIC_KEYWORDS: dict[str, dict[str, list[str]]] = {
+    "conflict": {
+        "nk_provocation": [
+            "north korea", "pyongyang", "kim jong", "icbm", "hwasong",
+            "ballistic missile test", "nuclear test", "slbm",
+            "북한", "김정은", "탄도미사일", "핵실험",
+        ],
+        "military_exercise": [
+            "military exercise", "joint exercise", "drill", "war games",
+            "freedom shield", "ulchi", "combined exercise", "live fire",
+            "합동훈련", "연합훈련", "훈련",
+        ],
+        "geopolitical_response": [
+            "government response", "defense posture", "대응", "조치",
+            "성명", "규탄", "diplomatic response",
+        ],
+        "active_combat": [
+            "casualties", "killed", "airstrike", "bombardment",
+            "offensive", "ground operation", "shelling", "frontline", "combat",
+        ],
+        "arms_transfer": [
+            "arms transfer", "weapons transfer", "military aid",
+            "arms deal", "defense contract",
+        ],
+    },
+    "sanctions": {
+        "oil_energy": [
+            "oil price", "crude oil", "brent", "opec",
+            "energy crisis", "petroleum", "barrel",
+        ],
+        "trade_tariff": [
+            "tariff", "trade war", "trade ban", "export control",
+        ],
+    },
+}
+
+
+def _classify_sub_topic(text: str, topic: str) -> str:
+    """키워드 기반 sub_topic 분류 (AI 실패 시 폴백)."""
+    sub_map = _SUB_TOPIC_KEYWORDS.get(topic)
+    if not sub_map:
+        return "general"
+
+    lower = text.lower()
+    best_sub = "general"
+    best_count = 0
+
+    for sub, keywords in sub_map.items():
+        count = sum(1 for kw in keywords if kw in lower)
+        if count > best_count:
+            best_count = count
+            best_sub = sub
+
+    return best_sub
+
 
 # ── Topic 분류 키워드 ────────────────────────────────────────────────────────
 
@@ -1576,6 +1651,7 @@ class NormalizeResult:
     body: str
     body_ko: Optional[str]
     topic: str
+    sub_topic: str
     entity_anchor: Optional[str]
     lat: Optional[float]
     lon: Optional[float]
@@ -2062,8 +2138,8 @@ def normalize(
     ai_result = _classify_with_ai(_title_for_ai, text_for_analysis)
 
     if ai_result is not None:
-        topic, severity = ai_result
-        logger.debug("AI 분류: topic=%s, severity=%d (제목: %s)", topic, severity, _title_for_ai[:60])
+        topic, sub_topic, severity = ai_result
+        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, _title_for_ai[:60])
     else:
         # 폴백: 기존 키워드 기반 분류
         topic = _classify_topic(text_for_analysis)
@@ -2072,7 +2148,8 @@ def normalize(
             if multilang_topic:
                 topic = multilang_topic
         severity = _calculate_severity(text_for_analysis, topic, title=source_title)
-        logger.debug("규칙 폴백: topic=%s, severity=%d (제목: %s)", topic, severity, _title_for_ai[:60])
+        sub_topic = _classify_sub_topic(text_for_analysis, topic)
+        logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, _title_for_ai[:60])
     # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
     country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
@@ -2123,6 +2200,7 @@ def normalize(
         body=text_for_analysis[:2000],  # 번역된 본문 저장
         body_ko=body_ko,
         topic=topic,
+        sub_topic=sub_topic,
         entity_anchor=entity_anchor,
         lat=lat,
         lon=lon,

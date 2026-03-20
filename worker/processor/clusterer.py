@@ -39,6 +39,10 @@ MIN_TITLE_OVERLAP_HIGH_SEV = 0.08  # 0.13→0.08, 고심각도 이벤트는 더 
 AI_MATCH_LOW = 0.06   # 0.10→0.06, 더 많은 경계 케이스를 AI에게 위임
 AI_MATCH_HIGH = 0.25  # 0.20→0.25, AI 판정 상한 확장
 
+# Sub-topic soft signal 보정값
+SUBTOPIC_BONUS = 0.06    # 같은 sub_topic (둘 다 non-general) → sim +0.06
+SUBTOPIC_PENALTY = 0.08  # 다른 sub_topic (둘 다 non-general) → sim -0.08
+
 # 활성 클러스터 후보 최대 조회 수
 MAX_CANDIDATE_CLUSTERS = 10
 
@@ -516,6 +520,15 @@ async def assign_cluster(
             ko_b=cand.title_ko,
         )
 
+        # (2b) Sub-topic soft signal 보정
+        ev_sub = getattr(event, "sub_topic", "general") or "general"
+        cand_sub = getattr(cand, "sub_topic", "general") or "general"
+        if ev_sub != "general" and cand_sub != "general":
+            if ev_sub == cand_sub:
+                sim += SUBTOPIC_BONUS
+            else:
+                sim -= SUBTOPIC_PENALTY
+
         # 고심각도(양쪽 모두 >=50)는 낮은 임계값, 일반은 높은 임계값
         threshold = MIN_TITLE_OVERLAP_HIGH_SEV \
             if event.severity >= 50 and cand.severity >= 50 \
@@ -601,6 +614,10 @@ async def assign_cluster(
         if _is_junk_title(event.title) and not _is_junk_title(cluster.title):
             event.title = cluster.title
             logger.debug("junk 이벤트 제목 교체: %s → %s", event.id, cluster.title[:40])
+        # sub_topic: 클러스터가 general이고 이벤트가 구체적이면 갱신
+        ev_sub = getattr(event, "sub_topic", "general") or "general"
+        if (getattr(cluster, "sub_topic", "general") or "general") == "general" and ev_sub != "general":
+            cluster.sub_topic = ev_sub
         # image_url: 아직 없으면 이벤트 것으로 채우기
         if not cluster.image_url and event.image_url:
             cluster.image_url = event.image_url
@@ -647,6 +664,7 @@ async def assign_cluster(
             cluster_key=key,
             geohash5=geohash5,
             topic=event.topic,
+            sub_topic=getattr(event, "sub_topic", "general") or "general",
             entity_anchor=event.entity_anchor,
             country_code=event.country_code,
             lat=event.lat,
@@ -841,3 +859,179 @@ async def merge_fragmented_clusters(
         logger.info("총 %d개 클러스터 병합 완료", len(merged))
 
     return merged
+
+
+# ── 대형 클러스터 자동 분할 ──────────────────────────────────────────────────
+
+SPLIT_MIN_EVENTS = 15  # 분할 대상 최소 이벤트 수
+
+
+async def split_oversized_clusters(
+    db: AsyncSession,
+    *,
+    min_events: int = SPLIT_MIN_EVENTS,
+) -> list[tuple[str, str]]:
+    """
+    대형 클러스터를 sub_topic 기반으로 분할.
+
+    - event_count >= min_events인 활성 클러스터 조회
+    - 클러스터 내 이벤트들의 sub_topic 분포 확인
+    - distinct non-general sub_topic 2개 이상이면 분리
+    - 가장 큰 그룹은 원본 유지, 나머지 새 클러스터 생성
+
+    Returns: [(original_cluster_id, new_cluster_id), ...]
+    """
+    from collections import Counter
+
+    now = datetime.now(timezone.utc)
+
+    # 1) 대형 활성 클러스터 조회
+    big_q = (
+        select(IssueCluster)
+        .where(
+            IssueCluster.is_active == True,  # noqa: E712
+            IssueCluster.event_count >= min_events,
+        )
+        .order_by(IssueCluster.event_count.desc())
+        .limit(100)
+    )
+    big_result = await db.execute(big_q)
+    big_clusters = list(big_result.scalars().all())
+
+    if not big_clusters:
+        return []
+
+    splits: list[tuple[str, str]] = []
+
+    for cluster in big_clusters:
+        # 2) 클러스터 내 이벤트 + sub_topic 조회
+        ev_q = (
+            select(NormalizedEvent)
+            .join(ClusterEvent, ClusterEvent.event_id == NormalizedEvent.id)
+            .where(ClusterEvent.cluster_id == cluster.id)
+        )
+        ev_result = await db.execute(ev_q)
+        events = list(ev_result.scalars().all())
+
+        # sub_topic 분포 계산 (general 제외)
+        sub_counter: Counter[str] = Counter()
+        events_by_sub: dict[str, list[NormalizedEvent]] = {}
+        for ev in events:
+            sub = getattr(ev, "sub_topic", "general") or "general"
+            sub_counter[sub] += 1
+            events_by_sub.setdefault(sub, []).append(ev)
+
+        # non-general sub_topic이 2개 이상이어야 분할
+        non_general = {k: v for k, v in sub_counter.items() if k != "general"}
+        if len(non_general) < 2:
+            continue
+
+        # 3) 가장 큰 그룹 결정 (general + 최다 non-general → 원본 유지)
+        largest_sub = max(non_general, key=lambda k: non_general[k])
+        keep_subs = {"general", largest_sub}
+
+        # 분리할 이벤트 그룹
+        split_groups: dict[str, list[NormalizedEvent]] = {
+            k: v for k, v in events_by_sub.items() if k not in keep_subs
+        }
+
+        if not split_groups:
+            continue
+
+        # 4) 각 분리 그룹에 대해 새 클러스터 생성
+        for sub, sub_events in split_groups.items():
+            if not sub_events:
+                continue
+
+            # 대표 이벤트 (severity 최고)
+            rep = max(sub_events, key=lambda e: e.severity)
+
+            # 제목 생성
+            ai = generate_ai_title(
+                [{"title": rep.title, "body": rep.body or ""}],
+                rep.topic, rep.country_code,
+            )
+            if ai:
+                new_title, new_title_ko = ai
+            else:
+                new_title = rep.title
+                new_title_ko = _make_cluster_title_ko(rep.title, rep.topic, rep.country_code)
+
+            new_severity = max(e.severity for e in sub_events)
+            new_confidence = sum(e.confidence for e in sub_events) / len(sub_events)
+            first_at = min(e.event_time for e in sub_events)
+            last_at = max(e.event_time for e in sub_events)
+            tiers = [e.source_tier for e in sub_events if e.source_tier]
+
+            age_hours = (now - last_at).total_seconds() / 3600
+            kscore, _ = _calc_kscore(
+                event_count=len(sub_events),
+                is_spike=False,
+                confidence=round(new_confidence, 3),
+                severity=new_severity,
+                independent_sources=1,
+                source_tiers=tiers,
+                age_hours=age_hours,
+            )
+
+            new_cluster = IssueCluster(
+                cluster_key=cluster.cluster_key,
+                geohash5=cluster.geohash5,
+                topic=cluster.topic,
+                sub_topic=sub,
+                entity_anchor=rep.entity_anchor,
+                country_code=cluster.country_code,
+                lat=cluster.lat,
+                lon=cluster.lon,
+                title=new_title,
+                title_ko=new_title_ko,
+                event_count=len(sub_events),
+                severity=new_severity,
+                confidence=round(new_confidence, 3),
+                kscore=kscore,
+                is_spike=False,
+                source_tiers=tiers,
+                independent_sources=1,
+                first_event_at=first_at,
+                last_event_at=last_at,
+                window_start=first_at - timedelta(minutes=WINDOW_MINUTES),
+                window_end=last_at + timedelta(minutes=WINDOW_MINUTES),
+                image_url=rep.image_url,
+                is_verified=False,
+            )
+            db.add(new_cluster)
+            await db.flush()
+
+            # ClusterEvent 이동
+            for ev in sub_events:
+                await db.execute(
+                    update(ClusterEvent)
+                    .where(
+                        ClusterEvent.cluster_id == cluster.id,
+                        ClusterEvent.event_id == ev.id,
+                    )
+                    .values(cluster_id=new_cluster.id)
+                )
+
+            splits.append((str(cluster.id), str(new_cluster.id)))
+            logger.info(
+                "클러스터 분할: %s [%s] → new %s (%d events, sub=%s)",
+                cluster.title[:40], cluster.id,
+                new_cluster.id, len(sub_events), sub,
+            )
+
+        # 5) 원본 클러스터 event_count 갱신
+        remaining = len(events) - sum(len(v) for v in split_groups.values())
+        cluster.event_count = remaining
+        cluster.sub_topic = largest_sub
+        # severity 재계산
+        keep_events = events_by_sub.get("general", []) + events_by_sub.get(largest_sub, [])
+        if keep_events:
+            cluster.severity = max(e.severity for e in keep_events)
+        cluster.updated_at = now
+
+    if splits:
+        await db.flush()
+        logger.info("총 %d개 클러스터 분할 완료", len(splits))
+
+    return splits
