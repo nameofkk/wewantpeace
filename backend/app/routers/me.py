@@ -143,7 +143,7 @@ def _parse_time(value: str, field: str) -> dt_time:
     except (ValueError, TypeError):
         raise HTTPException(
             status_code=422,
-            detail={"code": "INVALID_FORMAT", "field": field, "expected": "HH:MM"},
+            detail=f"{field} 형식이 올바르지 않습니다. HH:MM 형식이어야 합니다.",
         )
 
 
@@ -253,20 +253,12 @@ async def create_area(
     if plan == "free" and count >= FREE_AREA_LIMIT:
         raise HTTPException(
             status_code=403,
-            detail={
-                "code": "FREE_AREA_LIMIT",
-                "limit": FREE_AREA_LIMIT,
-                "upgrade_url": "/upgrade",
-            },
+            detail=f"Free 플랜은 관심 지역을 최대 {FREE_AREA_LIMIT}개까지 등록할 수 있습니다. 업그레이드해주세요.",
         )
     if plan == "pro" and count >= PRO_AREA_LIMIT:
         raise HTTPException(
             status_code=403,
-            detail={
-                "code": "PRO_AREA_LIMIT",
-                "limit": PRO_AREA_LIMIT,
-                "upgrade_url": "/upgrade",
-            },
+            detail=f"Pro 플랜은 관심 지역을 최대 {PRO_AREA_LIMIT}개까지 등록할 수 있습니다. Pro+로 업그레이드해주세요.",
         )
 
     # v7: notify_fast는 모든 플랜에서 허용 (신속 알림)
@@ -274,7 +266,7 @@ async def create_area(
     if body.notify_verified and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
         raise HTTPException(
             status_code=403,
-            detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_verified"},
+            detail="신뢰 알림 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
         )
 
     # 중복 방지: 같은 country_code가 이미 있으면 기존 레코드 반환
@@ -325,12 +317,12 @@ async def update_area(
     )
     area = result.scalar_one_or_none()
     if not area:
-        raise HTTPException(status_code=404, detail={"code": "AREA_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail="관심 지역을 찾을 수 없습니다.")
 
     if not area.is_active:
         raise HTTPException(
             status_code=403,
-            detail={"code": "AREA_INACTIVE", "upgrade_url": "/upgrade"},
+            detail="이 관심 지역은 비활성화되었습니다. 업그레이드하면 사용할 수 있습니다.",
         )
 
     if body.notify_verified is not None:
@@ -358,7 +350,7 @@ async def delete_area(
     )
     area = result.scalar_one_or_none()
     if not area:
-        raise HTTPException(status_code=404, detail={"code": "AREA_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail="관심 지역을 찾을 수 없습니다.")
 
     await db.delete(area)
     await db.flush()
@@ -403,7 +395,7 @@ async def update_preferences(
         if _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "notify_verified"},
+                detail="신뢰 알림 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
             )
 
     if body.language is not None:
@@ -420,13 +412,13 @@ async def update_preferences(
         if body.topics and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "topics"},
+                detail="토픽 필터 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
             )
         pref.topics = body.topics
     if body.timezone is not None:
         from zoneinfo import available_timezones
         if body.timezone and body.timezone not in available_timezones():
-            raise HTTPException(400, detail={"code": "INVALID_TIMEZONE", "value": body.timezone})
+            raise HTTPException(400, detail=f"유효하지 않은 타임존입니다: {body.timezone}")
         pref.timezone = body.timezone
     # quiet_hours: "" = 해제, "HH:MM" = 설정 (Pro 이상만 허용)
     if body.quiet_hours_start is not None:
@@ -435,7 +427,7 @@ async def update_preferences(
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
+                detail="방해금지 시간 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
             )
         else:
             pref.quiet_hours_start = _parse_time(body.quiet_hours_start, "quiet_hours_start")
@@ -445,7 +437,7 @@ async def update_preferences(
         elif _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
             raise HTTPException(
                 status_code=403,
-                detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "quiet_hours"},
+                detail="방해금지 시간 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
             )
         else:
             pref.quiet_hours_end = _parse_time(body.quiet_hours_end, "quiet_hours_end")
@@ -461,13 +453,13 @@ async def update_preferences(
             current_user.home_country = ""
         else:
             if len(new_hc) != 2 or not new_hc.isalpha():
-                raise HTTPException(400, detail={"code": "INVALID_COUNTRY_CODE"})
+                raise HTTPException(400, detail="유효하지 않은 국가 코드입니다.")
             new_hc = new_hc.upper()
             # Free 플랜은 BASIC 모드(빈 문자열)만 허용, 기준국가 변경 불가
             if current_user.plan.lower() == "free":
                 raise HTTPException(
                     status_code=403,
-                    detail={"code": "PLAN_REQUIRED", "required": "pro", "feature": "home_country"},
+                    detail="기준 국가 변경은 Pro 이상 플랜에서 사용할 수 있습니다.",
                 )
             pref.home_country = new_hc
             current_user.home_country = new_hc
@@ -606,7 +598,7 @@ async def mark_read(
     )
     notif = result.scalar_one_or_none()
     if not notif:
-        raise HTTPException(status_code=404, detail={"code": "NOTIFICATION_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
     notif.is_read = True
     await db.flush()
     return {"status": "ok"}
@@ -652,7 +644,7 @@ async def submit_feedback(
     )
     notif = result.scalar_one_or_none()
     if not notif:
-        raise HTTPException(status_code=404, detail={"code": "NOTIFICATION_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
     notif.feedback = body.feedback
     await db.flush()
     return {"status": "ok"}
@@ -820,7 +812,7 @@ async def mark_missed_alert_shown(
     )
     summary = result.scalar_one_or_none()
     if not summary:
-        raise HTTPException(status_code=404, detail={"code": "MISSED_ALERT_NOT_FOUND"})
+        raise HTTPException(status_code=404, detail="놓친 알림을 찾을 수 없습니다.")
     summary.is_shown = True
     await db.flush()
     return {"status": "ok"}

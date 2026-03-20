@@ -14,7 +14,9 @@ const DISMISS_HOURS = 72; // 3일
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
 const PLAY_STORE_MARKET = "market://details?id=com.wewantpeace.app";
-const APP_STORE_URL = "https://apps.apple.com/app/wewantpeace/id0000000000"; // TODO: 실제 ID로 교체
+// TODO: Replace with actual App Store ID after iOS app launch
+const APP_STORE_ID = ""; // Empty = don't show App Store banner
+const APP_STORE_URL = APP_STORE_ID ? `https://apps.apple.com/app/wewantpeace/id${APP_STORE_ID}` : "";
 
 /** Android에서 Play Store 앱으로 직접 열기, 실패 시 웹 폴백 */
 function openPlayStore() {
@@ -55,6 +57,9 @@ export function SmartAppBanner() {
     // 온보딩 미완료 유저에게는 표시 안 함 (OnboardingBanner 우선)
     if (!localStorage.getItem("onboarding_done")) return;
 
+    // iOS 전용 브라우저인데 App Store ID가 없으면 배너 표시 안 함
+    if (isIOSBrowser() && !APP_STORE_ID) return;
+
     // 72시간 내 닫은 적 있으면 무시
     const dismissed = localStorage.getItem(DISMISS_KEY);
     if (dismissed) {
@@ -89,7 +94,7 @@ export function SmartAppBanner() {
   function handleStoreClick() {
     if (isAndroidBrowser()) {
       openPlayStore();
-    } else if (isIOSBrowser()) {
+    } else if (isIOSBrowser() && APP_STORE_URL) {
       window.open(APP_STORE_URL, "_blank");
     } else {
       // PC: 웹 Play Store
@@ -189,7 +194,7 @@ export function SmartAppBanner() {
             </div>
           </button>
         )}
-        {(!isMobile || isIOSBrowser()) && (
+        {APP_STORE_URL && (!isMobile || isIOSBrowser()) && (
           <button
             onClick={() => { window.open(APP_STORE_URL, "_blank"); handleDismiss(); }}
             className="flex-1 flex items-center gap-2 rounded-lg bg-black px-3 py-2 hover:bg-zinc-900 transition-colors border border-zinc-700"

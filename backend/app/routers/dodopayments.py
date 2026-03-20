@@ -106,7 +106,7 @@ async def create_checkout(
             existing_sub.updated_at = now
             logger.info("Trial 구독 만료 처리: user=%s → 유료 전환 진행", current_user.id)
         elif existing_sub.plan == body.plan:
-            raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 같은 플랜의 활성 구독이 있습니다."})
+            raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
             existing_sub.cancelled_at = now
@@ -183,7 +183,7 @@ async def create_checkout_simple(
             existing_sub.status = "expired"
             existing_sub.updated_at = now
         elif existing_sub.plan == plan:
-            raise HTTPException(409, detail={"code": "ALREADY_SUBSCRIBED", "message": "이미 같은 플랜의 활성 구독이 있습니다."})
+            raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
             existing_sub.cancelled_at = now
