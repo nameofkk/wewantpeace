@@ -9,9 +9,9 @@ import {
   Bookmark,
   Plus,
   Pin,
-  ArrowUpDown,
   ChevronRight,
   Loader2,
+  X,
 } from "lucide-react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -31,7 +31,7 @@ const TYPES: { value: PostType; labelKey: string }[] = [
   { value: "notice", labelKey: "community_type_notice" },
 ];
 
-const TYPE_LABEL_KEYS: Record<string, string> = {
+const TYPE_LABEL: Record<string, string> = {
   discussion: "community_type_discussion",
   analysis: "community_type_analysis",
   question: "community_type_question",
@@ -45,23 +45,28 @@ function relativeTime(iso: string, lang: Lang): string {
   if (m < 60) return t(lang, "home_minutes_ago", { n: m });
   const h = Math.floor(m / 60);
   if (h < 24) return t(lang, "home_hours_ago", { n: h });
-  return t(lang, "community_days_ago", { n: Math.floor(h / 24) });
+  const d = Math.floor(h / 24);
+  if (d < 30) return t(lang, "community_days_ago", { n: d });
+  const locale = lang === "en" ? "en-US" : "ko-KR";
+  return new Date(iso).toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
-function PostCard({
+/* ── Post row ── */
+function PostRow({
   post,
   lang,
-  onBookmarkToggle,
+  onBookmark,
 }: {
   post: Post;
   lang: Lang;
-  onBookmarkToggle: (postId: string) => void;
+  onBookmark: (id: string) => void;
 }) {
   const title = lang === "en" && post.title_en ? post.title_en : post.title;
-  const typeKey = TYPE_LABEL_KEYS[post.post_type] || post.post_type;
-  const typeLabel = t(lang, typeKey as Parameters<typeof t>[1]) || post.post_type;
-  const time = relativeTime(post.created_at, lang);
-
+  const typeLabelKey = TYPE_LABEL[post.post_type];
+  const typeText = typeLabelKey
+    ? t(lang, typeLabelKey as Parameters<typeof t>[1])
+    : post.post_type;
+  const preview = post.content ? post.content.replace(/[#*>\-\[\]()]/g, "").slice(0, 80) : "";
   const imgUrl =
     post.images && post.images.length > 0
       ? post.images[0].startsWith("http")
@@ -70,61 +75,83 @@ function PostCard({
       : null;
 
   return (
-    <Link href={communityPostPath(post.id)} className="block px-4 py-3 active:bg-muted/30 transition-colors">
-      {/* Title row */}
-      <div className="flex gap-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium leading-snug line-clamp-2">
-            {post.is_pinned && <Pin className="inline w-3 h-3 text-primary mr-1 -mt-0.5" />}
-            {title}
-          </h3>
-          {post.content && (
-            <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-              {post.content.slice(0, 100)}
-            </p>
+    <Link
+      href={communityPostPath(post.id)}
+      className="flex gap-3 px-4 py-3.5 cursor-pointer active:bg-gray-50 dark:active:bg-white/5 transition-colors"
+    >
+      {/* Text content */}
+      <div className="flex-1 min-w-0">
+        {/* Title */}
+        <p className="text-[15px] font-semibold leading-snug text-foreground line-clamp-2">
+          {post.is_pinned && (
+            <Pin className="inline w-3.5 h-3.5 text-primary mr-1 -mt-0.5 shrink-0" />
           )}
-        </div>
-        {imgUrl && (
-          <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
-            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-          </div>
+          {title}
+        </p>
+
+        {/* Content preview */}
+        {preview && (
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground line-clamp-2">
+            {preview}
+          </p>
         )}
+
+        {/* Meta */}
+        <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground/80">
+          <span className="font-medium text-foreground/60">
+            {post.author_nickname || t(lang, "community_anonymous")}
+          </span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{relativeTime(post.created_at, lang)}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{typeText}</span>
+          <span className="ml-auto flex items-center gap-2.5">
+            {post.comment_count > 0 && (
+              <span className="flex items-center gap-0.5">
+                <MessageCircle className="w-3 h-3" />
+                {post.comment_count}
+              </span>
+            )}
+            <span className="flex items-center gap-0.5">
+              <Eye className="w-3 h-3" />
+              {post.view_count}
+            </span>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onBookmark(post.id);
+              }}
+              className="p-0.5 -m-0.5 cursor-pointer"
+            >
+              <Bookmark
+                className={`w-3 h-3 transition-colors ${
+                  post.is_bookmarked
+                    ? "fill-primary text-primary"
+                    : "text-muted-foreground/60 hover:text-muted-foreground"
+                }`}
+              />
+            </button>
+          </span>
+        </div>
       </div>
 
-      {/* Meta row */}
-      <div className="flex items-center gap-2 mt-2 text-[11px] text-muted-foreground">
-        <span className="font-medium text-foreground/70">
-          {post.author_nickname || t(lang, "community_anonymous")}
-        </span>
-        <span>{time}</span>
-        <span className="px-1 py-0.5 rounded bg-muted/60 text-[10px]">{typeLabel}</span>
-        <div className="flex items-center gap-2.5 ml-auto">
-          <span className="flex items-center gap-0.5">
-            <MessageCircle className="w-3 h-3" /> {post.comment_count}
-          </span>
-          <span className="flex items-center gap-0.5">
-            <Eye className="w-3 h-3" /> {post.view_count}
-          </span>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onBookmarkToggle(post.id);
-            }}
-            className="p-0.5 -m-0.5"
-          >
-            <Bookmark
-              className={`w-3 h-3 ${
-                post.is_bookmarked ? "fill-primary text-primary" : ""
-              }`}
-            />
-          </button>
+      {/* Thumbnail */}
+      {imgUrl && (
+        <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 bg-muted self-start mt-0.5">
+          <img
+            src={imgUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
         </div>
-      </div>
+      )}
     </Link>
   );
 }
 
+/* ── Main page ── */
 export default function CommunityPage() {
   const { user } = useAuth();
   const lang = useAppStore((s) => s.lang);
@@ -135,16 +162,18 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery.trim());
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Infinite scroll query
+  useEffect(() => {
+    if (showSearch) searchInputRef.current?.focus();
+  }, [showSearch]);
+
+  /* Infinite scroll */
   const {
     data,
     fetchNextPage,
@@ -162,24 +191,24 @@ export default function CommunityPage() {
         sort_by: sortBy,
         q: debouncedSearch || undefined,
       }),
-    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
     initialPageParam: undefined as string | undefined,
   });
 
-  // Hot topics
+  /* Hot topics */
   const { data: hotTopics } = useQuery<Post[]>({
     queryKey: ["hot-topics", activeType],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (activeType !== "all") params.append("post_type", activeType);
-      const res = await fetch(`${API_BASE}/community/hot-topics?${params}`);
+      const p = new URLSearchParams();
+      if (activeType !== "all") p.append("post_type", activeType);
+      const res = await fetch(`${API_BASE}/community/hot-topics?${p}`);
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 60000,
+    staleTime: 60_000,
   });
 
-  // Pinned notices
+  /* Pinned notices */
   const { data: pinnedNotices } = useQuery<Post[]>({
     queryKey: ["pinned-notices"],
     queryFn: async () => {
@@ -187,28 +216,27 @@ export default function CommunityPage() {
       if (!res.ok) return [];
       return res.json();
     },
-    staleTime: 60000,
+    staleTime: 60_000,
     enabled: activeType !== "notice",
   });
 
-  // IntersectionObserver
-  const observerRef = useRef<HTMLDivElement>(null);
+  /* Observer */
+  const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = observerRef.current;
+    const el = sentinelRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
-    observer.observe(el);
-    return () => observer.disconnect();
+    obs.observe(el);
+    return () => obs.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleBookmarkToggle = useCallback(
+  /* Bookmark toggle */
+  const handleBookmark = useCallback(
     async (postId: string) => {
       if (!user) return;
       try {
@@ -223,58 +251,60 @@ export default function CommunityPage() {
             pages: old.pages.map((page) => ({
               ...page,
               posts: page.posts.map((p) =>
-                p.id === postId ? { ...p, is_bookmarked: result.bookmarked } : p
+                p.id === postId ? { ...p, is_bookmarked: result.bookmarked } : p,
               ),
             })),
           };
         });
-      } catch {}
+      } catch { /* silent */ }
     },
-    [user, queryClient]
+    [user, queryClient],
   );
 
-  const allPosts = data?.pages.flatMap((page) => page.posts) ?? [];
+  const allPosts = data?.pages.flatMap((p) => p.posts) ?? [];
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 60px)" }}>
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border">
-        <div className="flex items-center justify-between px-4 h-12">
-          <h1 className="text-base font-bold">{t(lang, "community_title")}</h1>
-          <div className="flex items-center gap-2">
+    <div className="flex flex-col bg-background" style={{ height: "calc(100dvh - 60px)" }}>
+      {/* ── Header ── */}
+      <header className="sticky top-0 z-20 bg-background border-b border-border">
+        {/* Title bar */}
+        <div className="flex items-center justify-between px-4 h-11">
+          <h1 className="text-[17px] font-bold tracking-tight">
+            {t(lang, "community_title")}
+          </h1>
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowSearch(!showSearch)}
-              className="p-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setShowSearch(!showSearch);
+                if (showSearch) setSearchQuery("");
+              }}
+              className="p-2 rounded-full text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors"
+              aria-label="Search"
             >
-              <Search className="w-4.5 h-4.5" />
+              {showSearch ? <X className="w-[18px] h-[18px]" /> : <Search className="w-[18px] h-[18px]" />}
             </button>
             {user && (
-              <Link href="/community/bookmarks" className="p-1.5 text-muted-foreground hover:text-foreground">
-                <Bookmark className="w-4.5 h-4.5" />
+              <Link
+                href="/community/bookmarks"
+                className="p-2 rounded-full text-muted-foreground hover:bg-muted/50 cursor-pointer transition-colors"
+                aria-label="Bookmarks"
+              >
+                <Bookmark className="w-[18px] h-[18px]" />
               </Link>
             )}
-            <button
-              onClick={() => setSortBy(sortBy === "latest" ? "popular" : "latest")}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              {sortBy === "latest"
-                ? t(lang, "community_sort_latest")
-                : t(lang, "community_sort_popular")}
-            </button>
           </div>
         </div>
 
-        {/* Search bar (toggled) */}
+        {/* Search */}
         {showSearch && (
-          <div className="px-4 pb-2">
+          <div className="px-4 pb-2.5">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
               <input
+                ref={searchInputRef}
                 type="text"
-                autoFocus
                 placeholder={t(lang, "community_search_placeholder")}
-                className="w-full pl-9 pr-4 py-2 rounded-lg bg-muted/50 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                className="w-full pl-9 pr-4 py-2 rounded-lg bg-muted/40 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -282,62 +312,84 @@ export default function CommunityPage() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex overflow-x-auto scrollbar-hide">
-          {TYPES.map((type) => (
-            <button
-              key={type.value}
-              onClick={() => setActiveType(type.value)}
-              className={`shrink-0 px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
-                activeType === type.value
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground"
-              }`}
-            >
-              {t(lang, type.labelKey as Parameters<typeof t>[1])}
-            </button>
-          ))}
+        {/* Tabs + Sort */}
+        <div className="flex items-center">
+          <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+            {TYPES.map((tp) => (
+              <button
+                key={tp.value}
+                onClick={() => setActiveType(tp.value)}
+                className={`shrink-0 px-4 py-2.5 text-[13px] font-medium border-b-2 cursor-pointer transition-colors ${
+                  activeType === tp.value
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground/70"
+                }`}
+              >
+                {t(lang, tp.labelKey as Parameters<typeof t>[1])}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setSortBy(sortBy === "latest" ? "popular" : "latest")}
+            className="shrink-0 px-3 py-2.5 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            {sortBy === "latest"
+              ? t(lang, "community_sort_latest")
+              : t(lang, "community_sort_popular")}
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Scrollable content */}
+      {/* ── Content ── */}
       <div className="flex-1 overflow-y-auto">
         {/* Pinned notices */}
         {activeType !== "notice" && pinnedNotices && pinnedNotices.length > 0 && (
-          <div className="border-b border-border">
-            {pinnedNotices.map((notice) => (
-              <Link key={notice.id} href={communityPostPath(notice.id)} className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/30 transition-colors">
+          <div className="bg-muted/20 border-b border-border">
+            {pinnedNotices.map((n) => (
+              <Link
+                key={n.id}
+                href={communityPostPath(n.id)}
+                className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
+              >
                 <Pin className="w-3 h-3 text-primary shrink-0" />
-                <span className="font-medium truncate flex-1">
-                  {lang === "en" && notice.title_en ? notice.title_en : notice.title}
+                <span className="text-[13px] font-medium truncate flex-1 text-foreground/90">
+                  {lang === "en" && n.title_en ? n.title_en : n.title}
                 </span>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
               </Link>
             ))}
           </div>
         )}
 
         {/* Hot topics */}
-        {hotTopics && hotTopics.length > 0 && (
-          <div className="px-4 py-3 border-b border-border">
-            <h2 className="text-xs font-semibold text-muted-foreground mb-2">{t(lang, "community_hot_topics")}</h2>
-            <div className="space-y-1">
-              {hotTopics.slice(0, 5).map((post, i) => (
-                <Link key={post.id} href={communityPostPath(post.id)} className="flex items-center gap-2 py-1 hover:text-foreground transition-colors">
-                  <span className="text-xs font-bold text-primary w-4 text-center">{i + 1}</span>
-                  <span className="text-sm truncate flex-1">
-                    {lang === "en" && post.title_en ? post.title_en : post.title}
-                  </span>
-                </Link>
-              ))}
-            </div>
+        {hotTopics && hotTopics.length > 0 && !debouncedSearch && (
+          <div className="px-4 pt-3 pb-2 border-b border-border">
+            <h2 className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider mb-1.5">
+              {t(lang, "community_hot_topics")}
+            </h2>
+            {hotTopics.slice(0, 5).map((post, i) => (
+              <Link
+                key={post.id}
+                href={communityPostPath(post.id)}
+                className="flex items-center gap-2.5 py-1.5 cursor-pointer group"
+              >
+                <span className={`text-[12px] font-bold w-4 text-center ${
+                  i < 3 ? "text-primary" : "text-muted-foreground/60"
+                }`}>
+                  {i + 1}
+                </span>
+                <span className="text-[13px] text-foreground/90 truncate flex-1 group-hover:text-foreground transition-colors">
+                  {lang === "en" && post.title_en ? post.title_en : post.title}
+                </span>
+              </Link>
+            ))}
           </div>
         )}
 
         {/* Loading */}
         {isLoading && (
           <div className="py-20 flex justify-center">
-            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/50" />
           </div>
         )}
 
@@ -350,35 +402,37 @@ export default function CommunityPage() {
 
         {/* Empty */}
         {!isLoading && !isError && allPosts.length === 0 && (
-          <div className="py-16 text-center text-sm text-muted-foreground">
-            {t(lang, "community_no_posts")}
+          <div className="py-20 text-center">
+            <p className="text-sm text-muted-foreground">{t(lang, "community_no_posts")}</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">{t(lang, "community_no_posts_sub")}</p>
           </div>
         )}
 
         {/* Post list */}
         {allPosts.length > 0 && (
-          <div className="divide-y divide-border/50">
+          <div className="divide-y divide-border/60">
             {allPosts.map((post) => (
-              <PostCard
+              <PostRow
                 key={post.id}
                 post={post}
                 lang={lang}
-                onBookmarkToggle={handleBookmarkToggle}
+                onBookmark={handleBookmark}
               />
             ))}
           </div>
         )}
 
-        <div ref={observerRef} className="h-10" />
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="h-10" />
 
         {isFetchingNextPage && (
           <div className="py-4 flex justify-center">
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground/50" />
           </div>
         )}
 
         {!hasNextPage && allPosts.length > 0 && !isLoading && (
-          <div className="py-6 text-center text-xs text-muted-foreground">
+          <div className="py-8 text-center text-[11px] text-muted-foreground/50">
             {t(lang, "community_no_more")}
           </div>
         )}
@@ -388,9 +442,9 @@ export default function CommunityPage() {
       {user && (
         <Link
           href="/community/new"
-          className="fixed bottom-20 right-4 z-30 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+          className="fixed bottom-20 right-4 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-6 h-6" />
         </Link>
       )}
     </div>
