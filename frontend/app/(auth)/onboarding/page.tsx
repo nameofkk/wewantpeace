@@ -378,7 +378,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* 헤더 */}
-      <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="relative z-10 flex items-center justify-between px-4 pb-2" style={{ paddingTop: "var(--space-md)" }}>
         <div className="flex items-center gap-2">
           {step > 0 && (
             <button
@@ -413,7 +413,7 @@ export default function OnboardingPage() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <div className="relative z-10 flex-1 flex flex-col items-center px-4 pt-4 min-h-0">
+      <div className="relative z-10 flex-1 flex flex-col items-center px-4 min-h-0" style={{ paddingTop: "var(--space-sm)" }}>
         <div className="w-full max-w-md flex-1 flex flex-col min-h-0">
 
           {/* === Step 0: 히어로 === */}
@@ -421,7 +421,7 @@ export default function OnboardingPage() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
             <div className="flex flex-col items-center min-h-full justify-center py-2">
               {/* 로고 + 레이더 */}
-              <div className="relative flex items-center justify-center mb-6">
+              <div className="relative flex items-center justify-center" style={{ marginBottom: "var(--space-lg)" }}>
                 {/* 레이더 파동 */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="ob-radar ob-radar--1" />
@@ -441,12 +441,12 @@ export default function OnboardingPage() {
               </div>
 
               <h1 className="text-lg font-bold tracking-tight mb-1 text-white">WeWantPeace</h1>
-              <h2 className="text-xl font-bold whitespace-pre-line leading-snug text-center mb-6 text-white">
+              <h2 className="font-bold whitespace-pre-line leading-snug text-center text-white" style={{ fontSize: "var(--text-hero)", marginBottom: "var(--space-lg)" }}>
                 {t(lang, "ob_hero_title")}
               </h2>
 
               {/* 실시간 스캔 인디케이터 */}
-              <div className="flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20" style={{ marginBottom: "var(--space-lg)" }}>
                 <span className="ob-live-dot" />
                 <span className="text-xs font-semibold text-emerald-400">
                   {lang === "ko" ? "실시간 스캔 중" : "Live scanning"}
@@ -460,7 +460,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* Trust Signals */}
-              <div className="w-full space-y-2.5 mb-6">
+              <div className="w-full flex flex-col" style={{ gap: "var(--space-xs)", marginBottom: "var(--space-lg)" }}>
                 {[
                   { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
                   { icon: BarChart3, key: "ob_hero_signal_2" as const, delay: "0.1s" },
@@ -470,10 +470,10 @@ export default function OnboardingPage() {
                 ].map(({ icon: Icon, key, delay }) => (
                   <div
                     key={key}
-                    className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 px-4 py-3 ob-slide-in"
-                    style={{ animationDelay: delay }}
+                    className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 ob-slide-in"
+                    style={{ padding: "var(--space-sm) var(--space-md)", animationDelay: delay }}
                   >
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0" style={{ width: "var(--icon-sm)", height: "var(--icon-sm)" }}>
                       <Icon className="h-5 w-5 text-primary" />
                     </div>
                     <span className="text-sm font-medium text-foreground/80">
@@ -516,7 +516,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* Disquiet 랭크 배지 */}
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center ob-disquiet">
                 <iframe
                   title="disquiet-badge"
                   frameBorder={0}
@@ -532,7 +532,7 @@ export default function OnboardingPage() {
           {/* === Step 1: 국가 선택 + 알림 === */}
           {step === 1 && (
             <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
-              <div className="text-center mb-3">
+              <div className="text-center" style={{ marginBottom: "var(--space-sm)" }}>
                 <h2 className="text-xl font-bold mb-1">{t(lang, "ob_step_countries")}</h2>
                 <p className="text-sm text-muted-foreground">{t(lang, "ob_countries_desc")}</p>
               </div>
@@ -646,7 +646,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* 알림 섹션 */}
-              <div className="border-t border-border/30 pt-3 mt-2">
+              <div className="border-t border-border/30 pt-3 mt-2 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-primary" />
@@ -682,7 +682,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* 마케팅 수신 동의 */}
-              <div className="border-t border-border/30 pt-3 mt-2">
+              <div className="border-t border-border/30 pt-3 mt-2 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Rss className="h-4 w-4 text-primary" />
@@ -713,16 +713,16 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
             <div className="flex flex-col items-center min-h-full justify-center py-2">
-              <div className="mx-auto mb-6 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Lock className="h-8 w-8 text-primary" />
+              <div className="mx-auto rounded-2xl bg-primary/10 flex items-center justify-center" style={{ width: "var(--icon-md)", height: "var(--icon-md)", marginBottom: "var(--space-lg)" }}>
+                <Lock className="text-primary" style={{ width: "calc(var(--icon-md) * 0.5)", height: "calc(var(--icon-md) * 0.5)" }} />
               </div>
 
-              <h2 className="text-xl font-bold text-center whitespace-pre-line leading-snug mb-6">
+              <h2 className="text-xl font-bold text-center whitespace-pre-line leading-snug" style={{ marginBottom: "var(--space-lg)" }}>
                 {t(lang, "ob_login_title")}
               </h2>
 
               {/* 혜택 리스트 */}
-              <div className="w-full space-y-3 mb-8">
+              <div className="w-full space-y-3" style={{ marginBottom: "var(--space-xl)" }}>
                 {[
                   { key: "ob_login_sync" as const },
                   { key: "ob_login_community" as const },
@@ -816,7 +816,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* 나중에 할게요 */}
-              <div className="mt-6 text-center">
+              <div className="text-center" style={{ marginTop: "var(--space-lg)" }}>
                 <button
                   onClick={() => {
                     trackEvent("onboarding_login_skip");
@@ -847,7 +847,7 @@ export default function OnboardingPage() {
 
       {/* 하단 버튼 (Step 0, 1만) */}
       {step < 2 && (
-        <div className="relative z-10 px-4 pb-6 pt-3">
+        <div className="relative z-10 px-4" style={{ paddingBottom: "calc(var(--space-md) + var(--safe-bottom))", paddingTop: "var(--space-sm)" }}>
           <div className="w-full max-w-md mx-auto">
             <button
               onClick={handleNext}
@@ -890,8 +890,8 @@ export default function OnboardingPage() {
         }
         .ob-radar {
           position: absolute;
-          width: 80px;
-          height: 80px;
+          width: clamp(50px, 12vw, 80px);
+          height: clamp(50px, 12vw, 80px);
           border-radius: 50%;
           border: 1.5px solid rgba(99,102,241,0.3);
           animation: ob-radar-pulse 3s ease-out infinite;
@@ -972,6 +972,11 @@ export default function OnboardingPage() {
           border-radius: 2px;
         }
         .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+        /* 작은 화면에서 Disquiet 배지 숨김 */
+        @media (max-height: 640px) {
+          .ob-disquiet { display: none; }
+        }
       `}</style>
     </div>
   );

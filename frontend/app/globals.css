@@ -24,6 +24,27 @@
     --destructive-foreground: 0 0% 100%;
     --popover: 222 47% 14%;
     --popover-foreground: 210 40% 98%;
+
+    /* ── Responsive Spacing (화면 높이 비례) ── */
+    --space-xs: clamp(0.25rem, 0.8dvh, 0.5rem);
+    --space-sm: clamp(0.375rem, 1dvh, 0.75rem);
+    --space-md: clamp(0.5rem, 1.5dvh, 1rem);
+    --space-lg: clamp(0.75rem, 2dvh, 1.5rem);
+    --space-xl: clamp(1rem, 3dvh, 2rem);
+
+    /* ── Responsive Font Size (화면 너비 비례) ── */
+    --text-hero: clamp(1.125rem, 2.8vw, 1.25rem);
+    --text-title: clamp(1rem, 2.5vw, 1.125rem);
+    --text-body: clamp(0.8125rem, 2.2vw, 0.875rem);
+    --text-caption: clamp(0.6875rem, 1.8vw, 0.75rem);
+
+    /* ── Responsive Icon/Element Size ── */
+    --icon-sm: clamp(1.75rem, 5vw, 2.5rem);
+    --icon-md: clamp(2.5rem, 8vw, 4rem);
+
+    /* ── Safe Area ── */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
   }
 
   html.light {
