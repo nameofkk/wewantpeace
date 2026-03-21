@@ -1,14 +1,13 @@
 """
 /community/* 커뮤니티 API
 """
-from __future__ import annotations
 import asyncio
 import os
 import uuid
 from datetime import datetime, date, timezone
-from typing import Annotated, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -426,7 +425,7 @@ async def my_posts(
 @limiter.limit("10/minute")
 async def create_post(
     request: Request,
-    body: Annotated[PostCreate, Body()],
+    body: PostCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
