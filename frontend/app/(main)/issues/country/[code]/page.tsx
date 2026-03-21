@@ -85,11 +85,38 @@ export default function Page({ params }: Props) {
   const code = params.code.toUpperCase();
   const country = COUNTRY_NAMES[code];
 
+  const countryUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`;
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Place",
-    name: country ? `${country.ko} (${country.en})` : code,
-    url: `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`,
+    "@graph": [
+      {
+        "@type": "WebPage",
+        name: country ? `${country.ko} (${country.en}) — Tension Index` : `${code} Tension Index`,
+        url: countryUrl,
+        description: country
+          ? `Real-time tension index and conflict analysis for ${country.en} (${country.ko}). Live monitoring of security events, KScore impact scoring, and historical trend data.`
+          : `Real-time conflict monitoring for ${code}.`,
+        inLanguage: ["ko", "en"],
+        about: {
+          "@type": "Place",
+          name: country?.en || code,
+        },
+        isPartOf: {
+          "@id": "https://www.wewantpeace.live/#website",
+        },
+        publisher: {
+          "@id": "https://www.wewantpeace.live/#organization",
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.wewantpeace.live" },
+          { "@type": "ListItem", position: 2, name: "Tension Index", item: "https://www.wewantpeace.live/tension" },
+          { "@type": "ListItem", position: 3, name: country?.en || code, item: countryUrl },
+        ],
+      },
+    ],
   };
 
   return (

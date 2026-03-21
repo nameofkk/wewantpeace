@@ -1,0 +1,54 @@
+# WeWantPeace
+
+> Real-time global conflict and security monitoring platform covering 195 countries with AI-powered analysis. Track how wars, tensions, and geopolitical crises affect you personally.
+
+WeWantPeace aggregates news from hundreds of international RSS feeds, Telegram channels, GDELT, and ACLED databases. Events are collected every 3-5 minutes, classified by GPT-4o-mini for topic, severity, and geolocation, then clustered into actionable intelligence.
+
+## Core Features
+
+- [Real-time Issue Dashboard](https://www.wewantpeace.live/home): Trending global conflicts ranked by KScore, updated every 15 minutes
+- [Interactive Crisis Map](https://www.wewantpeace.live/map): Live conflict map with severity-coded markers across 195 countries
+- [Real-time Feed](https://www.wewantpeace.live/feed): Chronological stream of verified conflict events with AI classification
+- [Tension Index](https://www.wewantpeace.live/tension): Country-level tension scores (0-100) updated every 5 minutes
+- [Country Analysis](https://www.wewantpeace.live/issues/country/ua): Per-country issue timeline and tension breakdown
+
+## Key Metrics
+
+- **KScore (Key Impact Score)**: 0-10 score measuring how much a global issue impacts your home country. Combines event velocity, severity, source credibility, geographic proximity, security alliances, and economic ties.
+- **Tension Index**: 0-100 country score from EventScore (55%), ActivityScore (35%), and Spillover (10%). Levels: Stable (0-20), Caution (20-40), Elevated (40-60), High (60-80), Extreme (80-100).
+- **Severity**: 0-100 per-event score based on AI analysis of conflict intensity, casualties, and escalation potential.
+
+## Data Sources
+
+- 200+ international RSS news feeds (Reuters, AP, Al Jazeera, BBC, Guardian, etc.)
+- 50+ Telegram channels (military analysts, OSINT, regional reporters)
+- GDELT Global Database of Events, Language, and Tone
+- ACLED Armed Conflict Location & Event Data
+- UCDP Uppsala Conflict Data Program
+
+## Technology
+
+- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS, Mapbox GL
+- **Backend**: FastAPI (Python), PostgreSQL, Redis, Celery
+- **AI Pipeline**: GPT-4o-mini for topic classification, severity scoring, geo-extraction, and deduplication
+- **Platforms**: Web (PWA), Android (TWA on Google Play), Toss Mini App
+
+## Pricing
+
+- **Free**: Real-time trending issues, basic tension index, KScore alerts, 1 watched country
+- **Pro ($4.99/mo)**: Interactive map, 5 watched countries, KScore filtering, 30-day history
+- **Pro+ ($9.99/mo)**: Unlimited countries, 90-day history, quiet hours, early access
+
+## Contact
+
+- Website: https://www.wewantpeace.live
+- X (Twitter): https://x.com/wewantpeace_
+- Instagram: https://www.instagram.com/wewantpeace.live
+- Threads: https://www.threads.net/@wewantpeace.live
+- Google Play: https://play.google.com/store/apps/details?id=com.wewantpeace.app
+
+## Optional
+
+- [Terms of Service](https://www.wewantpeace.live/terms): Usage terms and conditions
+- [Privacy Policy](https://www.wewantpeace.live/privacy): Data handling and privacy practices
+- [Upgrade Plans](https://www.wewantpeace.live/upgrade): Detailed plan comparison

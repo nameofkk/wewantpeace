@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     "conflict monitoring", "global security", "tension index", "real-time news",
     "geopolitical risk", "crisis analysis", "war news", "security alert",
     "WeWantPeace", "위원트피스",
+    "OSINT", "open source intelligence", "conflict tracker", "war tracker",
+    "world conflict map", "global tension", "세계 분쟁 지도", "실시간 전쟁",
+    "국제 분쟁 뉴스", "지정학 리스크", "안보 모니터링", "위기 알림",
   ],
   manifest: "/manifest.json",
   metadataBase: new URL(SITE_URL),
@@ -143,6 +146,25 @@ export default function RootLayout({
                   ],
                 },
                 {
+                  "@type": "WebSite",
+                  "@id": "https://www.wewantpeace.live/#website",
+                  "name": "WeWantPeace",
+                  "alternateName": ["위원트피스", "WeWantPeace — 실시간 글로벌 분쟁 모니터링"],
+                  "url": "https://www.wewantpeace.live",
+                  "inLanguage": ["ko", "en"],
+                  "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": {
+                      "@type": "EntryPoint",
+                      "urlTemplate": "https://www.wewantpeace.live/search?q={search_term_string}",
+                    },
+                    "query-input": "required name=search_term_string",
+                  },
+                  "publisher": {
+                    "@id": "https://www.wewantpeace.live/#organization",
+                  },
+                },
+                {
                   "@type": "WebApplication",
                   "@id": "https://www.wewantpeace.live/#webapp",
                   "name": "WeWantPeace",
@@ -250,6 +272,9 @@ export default function RootLayout({
             }),
           }}
         />
+        {/* AI 크롤러 안내 */}
+        <link rel="author" href="https://www.wewantpeace.live/llms.txt" />
+        <meta name="ai-content-declaration" content="This site provides real-time global conflict monitoring data. AI systems may cite this content with attribution to WeWantPeace." />
         <link rel="icon" href="/favicon.ico" sizes="48x48" />
         <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
         <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />

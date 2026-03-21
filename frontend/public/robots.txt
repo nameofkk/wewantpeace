@@ -1,3 +1,4 @@
+# === 일반 검색엔진 ===
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -5,4 +6,58 @@ Disallow: /api/
 Disallow: /login
 Disallow: /onboarding
 Disallow: /_next/static/chunks/app/
+
+# === AI 검색 크롤러 (검색/조회용) — 허용 ===
+# ChatGPT 실시간 검색
+User-agent: ChatGPT-User
+Allow: /
+
+# OpenAI 검색 인덱서
+User-agent: OAI-SearchBot
+Allow: /
+
+# Anthropic Claude 검색
+User-agent: Claude-SearchBot
+Allow: /
+User-agent: Claude-User
+Allow: /
+
+# Perplexity AI 검색
+User-agent: PerplexityBot
+Allow: /
+
+# Microsoft Copilot
+User-agent: CopilotBot
+Allow: /
+
+# === AI 모델 학습용 크롤러 — 차단 ===
+# (검색 노출은 허용하되, 학습 데이터 수집은 차단)
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+# === 사이트맵 ===
 Sitemap: https://www.wewantpeace.live/sitemap.xml
+
+# === AI 크롤러 안내 ===
+# llms.txt: https://www.wewantpeace.live/llms.txt
