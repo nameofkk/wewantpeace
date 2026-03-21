@@ -309,7 +309,7 @@ export default function NewPostPage() {
                 <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`${API_BASE}${url}`}
+                    src={url.startsWith("http") ? url : `${API_BASE}${url}`}
                     alt={t(lang, "post_img_alt", { n: idx + 1 })}
                     className="w-full h-full object-cover"
                   />
