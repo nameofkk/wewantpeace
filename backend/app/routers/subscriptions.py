@@ -23,6 +23,7 @@ PROMO_CODES = {
     "PRODUCTHUNT": {"plan": "pro", "days": 7, "description": "Product Hunt launch offer"},
     "THREADS": {"plan": "pro_plus", "days": 14, "description": "Threads 친구들 전용 Pro+ 2주 체험"},
     "testerforyou": {"plan": "pro_plus", "days": 30, "description": "테스터 전용 Pro+ 1개월"},
+    "WWPranked1": {"plan": "pro_plus", "days": 14, "description": "Pro+ 2주 체험"},
 }
 
 PLANS = {
