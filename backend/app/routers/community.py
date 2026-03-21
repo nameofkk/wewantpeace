@@ -209,8 +209,30 @@ async def upload_image(
         ext = detected.split("/")[-1]  # MIME에서 추출 (jpeg, png, gif, webp)
 
     filename = f"{uuid.uuid4()}.{ext}"
-    filepath = os.path.join(settings.upload_dir, filename)
 
+    # Supabase Storage 업로드 (persistent)
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_key = os.getenv("SUPABASE_SERVICE_KEY", "")
+    if supabase_url and supabase_key:
+        import httpx
+        bucket = "community-uploads"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{supabase_url}/storage/v1/object/{bucket}/{filename}",
+                headers={
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": detected,
+                    "x-upsert": "true",
+                },
+                content=contents,
+            )
+            if resp.status_code not in (200, 201):
+                raise HTTPException(500, detail="이미지 업로드에 실패했습니다.")
+        url = f"{supabase_url}/storage/v1/object/public/{bucket}/{filename}"
+        return {"url": url}
+
+    # Fallback: 로컬 저장 (개발용)
+    filepath = os.path.join(settings.upload_dir, filename)
     os.makedirs(settings.upload_dir, exist_ok=True)
     with open(filepath, "wb") as f:
         f.write(contents)

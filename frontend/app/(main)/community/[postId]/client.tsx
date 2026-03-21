@@ -77,12 +77,12 @@ function PlanBadge({ plan }: { plan?: string | null }) {
   if (!plan || plan === "free") return null;
   if (plan === "pro_plus")
     return (
-      <span className="inline-flex items-center rounded px-1 py-px text-[9px] font-bold bg-blue-500/15 text-blue-500">
+      <span className="inline-flex items-center rounded-full px-1.5 py-px text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
         Pro+
       </span>
     );
   return (
-    <span className="inline-flex items-center rounded px-1 py-px text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400">
+    <span className="inline-flex items-center rounded-full px-1.5 py-px text-[9px] font-bold bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm">
       Pro
     </span>
   );
@@ -571,7 +571,7 @@ export default function PostDetailPage() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`${API_BASE}${url}`}
+                  src={url.startsWith("http") ? url : `${API_BASE}${url}`}
                   alt={t(lang, "post_img_alt", { n: idx + 1 })}
                   className="w-full object-cover hover:opacity-95 transition-opacity"
                   loading="lazy"
@@ -762,7 +762,7 @@ export default function PostDetailPage() {
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`${API_BASE}${post.images[lightboxIdx]}`}
+            src={post.images[lightboxIdx].startsWith("http") ? post.images[lightboxIdx] : `${API_BASE}${post.images[lightboxIdx]}`}
             alt={t(lang, "post_fullscreen_alt")}
             className="max-w-full max-h-full object-contain"
             onClick={(e) => e.stopPropagation()}
