@@ -205,7 +205,8 @@ export default function NewPostPage() {
       }
 
       const post = await res.json();
-      await queryClient.invalidateQueries({ queryKey: ["community-posts"] });
+      queryClient.setQueryData(["post", post.id], post);
+      queryClient.invalidateQueries({ queryKey: ["community-posts"] });
       router.push(communityPostPath(post.id));
     } catch (e: unknown) {
       const err = e as { message?: string };
