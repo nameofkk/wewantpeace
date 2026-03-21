@@ -1,0 +1,5 @@
+# WeWantPeace
+
+> Real-time global conflict and security monitoring platform covering 195 countries with AI-powered analysis.
+
+See full details at: https://www.wewantpeace.live/llms.txt

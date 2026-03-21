@@ -93,20 +93,53 @@ export default async function Page({ params }: Props) {
   const issue = await fetchIssueServer(params.id);
   if (!issue) notFound();
 
-  // JSON-LD NewsArticle
+  // JSON-LD NewsArticle + BreadcrumbList
+  const pageUrl = `https://www.wewantpeace.live/issues/${issue.id}`;
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: issue.title_ko || issue.title,
-    datePublished: issue.first_event_at,
-    dateModified: issue.last_event_at,
-    description: `Severity ${issue.severity}, ${issue.event_count} source reports`,
-    url: `https://www.wewantpeace.live/issues/${issue.id}`,
-    publisher: {
-      "@type": "Organization",
-      name: "WeWantPeace",
-      url: "https://www.wewantpeace.live",
-    },
+    "@graph": [
+      {
+        "@type": "NewsArticle",
+        headline: issue.title_ko || issue.title,
+        alternativeHeadline: issue.title || issue.title_ko,
+        datePublished: issue.first_event_at,
+        dateModified: issue.last_event_at,
+        description: `Severity ${issue.severity}/100 crisis. ${issue.event_count} verified source reports. Real-time conflict monitoring by WeWantPeace.`,
+        url: pageUrl,
+        mainEntityOfPage: pageUrl,
+        inLanguage: ["ko", "en"],
+        about: {
+          "@type": "Thing",
+          name: issue.topic || "Global Conflict",
+        },
+        ...(issue.country_code && {
+          spatialCoverage: {
+            "@type": "Place",
+            name: issue.country_code,
+          },
+        }),
+        publisher: {
+          "@type": "Organization",
+          "@id": "https://www.wewantpeace.live/#organization",
+          name: "WeWantPeace",
+          url: "https://www.wewantpeace.live",
+          logo: {
+            "@type": "ImageObject",
+            url: "https://www.wewantpeace.live/logo-eye.png",
+          },
+        },
+        image: `${pageUrl}/og`,
+        isAccessibleForFree: true,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.wewantpeace.live" },
+          { "@type": "ListItem", position: 2, name: "Issues", item: "https://www.wewantpeace.live/feed" },
+          { "@type": "ListItem", position: 3, name: issue.title_ko || issue.title, item: pageUrl },
+        ],
+      },
+    ],
   };
 
   return (
