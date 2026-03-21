@@ -11,8 +11,7 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { API_BASE, useMe } from "@/lib/api";
 import { communityPostPath } from "@/lib/toss-nav";
-import MarkdownToolbar from "@/components/community/MarkdownToolbar";
-import MarkdownContent from "@/components/community/MarkdownContent";
+import RichEditor from "@/components/community/RichEditor";
 
 type PostType = "discussion" | "analysis" | "question" | "notice";
 
@@ -50,7 +49,6 @@ export default function NewPostPage() {
   const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [clusterId, setClusterId] = useState("");
   const [clusterTitle, setClusterTitle] = useState("");
   const [loading, setLoading] = useState(false);
@@ -286,28 +284,11 @@ export default function NewPostPage() {
 
         {/* 내용 */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium">{t(lang, "new_post_content")}</label>
-          </div>
-          <MarkdownToolbar
-            textareaRef={contentRef as React.RefObject<HTMLTextAreaElement>}
-            onContentChange={setContent}
-          />
-          <textarea
-            ref={contentRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+          <label className="text-sm font-medium mb-2 block">{t(lang, "new_post_content")}</label>
+          <RichEditor
+            onChange={setContent}
             placeholder={t(lang, "new_post_content_placeholder")}
-            rows={8}
-            className="w-full rounded-xl rounded-t-none border border-t-0 border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
           />
-          {/* 실시간 미리보기 */}
-          {content.trim().length > 0 && (
-            <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
-              <p className="text-[10px] text-muted-foreground/60 mb-2">{t(lang, "community_preview")}</p>
-              <MarkdownContent content={content} />
-            </div>
-          )}
         </div>
 
         {/* 이미지 업로드 */}
