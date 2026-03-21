@@ -50,7 +50,6 @@ export default function NewPostPage() {
   const [postType, setPostType] = useState<PostType>("discussion");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const [clusterId, setClusterId] = useState("");
   const [clusterTitle, setClusterTitle] = useState("");
@@ -289,30 +288,25 @@ export default function NewPostPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium">{t(lang, "new_post_content")}</label>
-            <button
-              type="button"
-              onClick={() => setShowPreview(!showPreview)}
-              className="text-xs text-primary"
-            >
-              {showPreview ? t(lang, "community_edit_mode") : t(lang, "community_preview")}
-            </button>
           </div>
-          {showPreview ? (
-            <div className="rounded-xl border border-border p-3 min-h-[200px]">
+          <MarkdownToolbar
+            textareaRef={contentRef as React.RefObject<HTMLTextAreaElement>}
+            onContentChange={setContent}
+          />
+          <textarea
+            ref={contentRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder={t(lang, "new_post_content_placeholder")}
+            rows={8}
+            className="w-full rounded-xl rounded-t-none border border-t-0 border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
+          />
+          {/* 실시간 미리보기 */}
+          {content.trim().length > 0 && (
+            <div className="mt-2 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+              <p className="text-[10px] text-muted-foreground/60 mb-2">{t(lang, "community_preview")}</p>
               <MarkdownContent content={content} />
             </div>
-          ) : (
-            <>
-              <MarkdownToolbar textareaRef={contentRef as React.RefObject<HTMLTextAreaElement>} />
-              <textarea
-                ref={contentRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={t(lang, "new_post_content_placeholder")}
-                rows={10}
-                className="w-full rounded-xl rounded-t-none border border-t-0 border-border bg-card px-4 py-3 text-sm outline-none focus:border-primary resize-none"
-              />
-            </>
           )}
         </div>
 
