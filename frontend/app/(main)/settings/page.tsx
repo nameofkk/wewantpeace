@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { MapPin, Shield, Plus, X, Search, ChevronUp, ChevronDown, Check, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
+import { MapPin, Plus, X, Search, ChevronUp, ChevronDown, Check, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
@@ -1197,12 +1197,6 @@ export default function SettingsPage() {
           </h2>
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-2">
-              <Shield className={cn(
-                "h-4 w-4",
-                plan === "pro_plus" ? "text-purple-400" :
-                plan === "pro" ? "text-blue-400" :
-                "text-muted-foreground"
-              )} />
               {plan === "pro_plus" ? (
                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
                   Pro+
