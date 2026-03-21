@@ -186,7 +186,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
           <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="h-4 w-4 text-blue-400" />
-              <span className="text-sm font-bold text-blue-400">Pro</span>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm">Pro</span>
               <span className="ml-auto text-xs text-muted-foreground">
                 {lang === "ko" ? "7일 무료 체험" : "7-day free trial"}
               </span>

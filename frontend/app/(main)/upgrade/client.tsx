@@ -942,13 +942,13 @@ function UpgradeContent() {
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr] bg-muted/30 text-[11px] font-bold">
               <div className="p-3 text-muted-foreground">{lang === "ko" ? "기능" : "Feature"}</div>
               <div className={cn("p-3 text-center", currentPlan === "free" && "bg-green-500/5")}>
-                <span className="text-muted-foreground">🌐 Free</span>
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-muted text-muted-foreground">Free</span>
               </div>
               <div className={cn("p-3 text-center", currentPlan === "pro" && "bg-blue-500/5")}>
-                <span className="text-blue-400">🛡️ Pro</span>
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm">Pro</span>
               </div>
               <div className={cn("p-3 text-center", currentPlan === "pro_plus" && "bg-purple-500/5")}>
-                <span className="text-purple-400">⭐ Pro+</span>
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">Pro+</span>
               </div>
             </div>
             {/* 행 */}

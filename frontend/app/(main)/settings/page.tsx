@@ -1203,11 +1203,19 @@ export default function SettingsPage() {
                 plan === "pro" ? "text-blue-400" :
                 "text-muted-foreground"
               )} />
-              <p className="text-sm font-medium">
-                {plan === "pro_plus" ? t(lang, "settings_plan_proplus") :
-                 plan === "pro" ? t(lang, "settings_plan_pro") :
-                 t(lang, "settings_plan_free")}
-              </p>
+              {plan === "pro_plus" ? (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
+                  Pro+
+                </span>
+              ) : plan === "pro" ? (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm">
+                  Pro
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-muted text-muted-foreground">
+                  Free
+                </span>
+              )}
               {/* 체험판/유료 뱃지 */}
               {plan !== "free" && subInfo.status === "trial" && (
                 <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
