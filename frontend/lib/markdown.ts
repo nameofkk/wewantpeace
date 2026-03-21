@@ -33,6 +33,11 @@ export function renderMarkdown(text: string): string {
   const paragraphs = escaped.split(/\n\n+/);
 
   const rendered = paragraphs.map((paragraph) => {
+    // Horizontal rule
+    if (/^-{3,}$/.test(paragraph.trim())) {
+      return '<hr class="my-4 border-t border-border">';
+    }
+
     const lines = paragraph.split("\n");
     const processedLines: string[] = [];
     let inList = false;
@@ -108,8 +113,8 @@ export function renderMarkdown(text: string): string {
     return result.join("");
   });
 
-  // Join paragraphs with paragraph breaks
+  // Join paragraphs — hr stays unwrapped, others get <p>
   return rendered
-    .map((p) => `<p>${p}</p>`)
+    .map((p) => p.startsWith("<hr") ? p : `<p>${p}</p>`)
     .join("");
 }

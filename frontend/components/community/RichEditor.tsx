@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect, useState } from "react";
-import { Bold, Italic, Link as LinkIcon, Quote, List } from "lucide-react";
+import { Bold, Italic, Link as LinkIcon, Quote, List, Minus } from "lucide-react";
 import DOMPurify from "dompurify";
 import { renderMarkdown } from "@/lib/markdown";
 
@@ -26,10 +26,10 @@ function htmlToMarkdown(el: HTMLElement): string {
     switch (tag) {
       case "strong":
       case "b":
-        return `**${kids}**`;
+        return kids.trim() ? `**${kids}**` : "";
       case "em":
       case "i":
-        return `*${kids}*`;
+        return kids.trim() ? `*${kids}*` : "";
       case "a": {
         const href = element.getAttribute("href") || "";
         return `[${kids}](${href})`;
@@ -45,11 +45,14 @@ function htmlToMarkdown(el: HTMLElement): string {
         return kids;
       case "li":
         return `- ${kids}\n`;
+      case "hr":
+        return "\n\n---\n\n";
       case "br":
         return "\n";
-      case "p":
       case "div":
-        return kids + "\n\n";
+        return "\n" + kids;
+      case "p":
+        return "\n\n" + kids;
       default:
         return kids;
     }
@@ -57,11 +60,11 @@ function htmlToMarkdown(el: HTMLElement): string {
 
   let md = Array.from(el.childNodes).map(process).join("");
   md = md.replace(/\n{3,}/g, "\n\n").trim();
-  // clean up empty bold/italic
-  md = md.replace(/\*\*\*\*/g, "").replace(/\*\*/g, (m, offset, str) => {
-    // keep valid bold markers
-    return m;
-  });
+  // clean up empty/whitespace-only bold/italic markers
+  md = md.replace(/\*\*\s*\*\*/g, "");
+  md = md.replace(/(?<!\*)\*\s*\*(?!\*)/g, "");
+  // clean up trailing whitespace per line
+  md = md.replace(/ +$/gm, "");
   return md;
 }
 
@@ -166,6 +169,12 @@ export default function RichEditor({
       exec("formatBlock", "blockquote");
     }
   };
+  const handleDivider = () => {
+    editorRef.current?.focus();
+    document.execCommand("insertHTML", false, '<hr>');
+    syncMarkdown();
+    checkFormats();
+  };
   const handleLink = () => {
     const sel = window.getSelection();
     const selectedText = sel?.toString() || "";
@@ -258,6 +267,18 @@ export default function RichEditor({
         >
           <List size={18} />
         </button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <button
+          type="button"
+          className={BTN}
+          title="Divider"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            handleDivider();
+          }}
+        >
+          <Minus size={18} />
+        </button>
       </div>
 
       {/* 에디터 */}
@@ -271,7 +292,7 @@ export default function RichEditor({
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
-          className="min-h-[200px] px-4 py-3 text-sm outline-none [&_strong]:font-bold [&_em]:italic [&_a]:text-blue-400 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_blockquote]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_li]:text-sm [&_p]:min-h-[1.25em]"
+          className="min-h-[200px] px-4 py-3 text-sm outline-none [&_strong]:font-bold [&_em]:italic [&_a]:text-blue-400 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_blockquote]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_li]:text-sm [&_p]:min-h-[1.25em] [&_hr]:my-3 [&_hr]:border-t [&_hr]:border-border"
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onKeyUp={checkFormats}
