@@ -19,7 +19,7 @@ class IssueCluster(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    cluster_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True, index=True)
+    cluster_key: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     geohash5: Mapped[str] = mapped_column(String(8), nullable=False)
     topic: Mapped[str] = mapped_column(String(32), nullable=False)
     sub_topic: Mapped[str] = mapped_column(String(32), nullable=False, server_default="general")
