@@ -554,6 +554,7 @@ async def update_post(
 
     post.title = body.title[:200]
     post.content = body.content
+    post.post_type = body.post_type
     post.title_en = await _translate_to_en(body.title[:200])
     post.content_en = await _translate_to_en(body.content[:5000])
     if body.images is not None:

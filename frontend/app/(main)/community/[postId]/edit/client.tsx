@@ -136,9 +136,10 @@ export default function EditPostPage() {
         throw new Error(msg);
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["post", postId] });
-      await queryClient.invalidateQueries({ queryKey: ["community-posts"] });
-      await queryClient.invalidateQueries({ queryKey: ["my-posts"] });
+      const data = await res.json();
+      queryClient.setQueryData(["post", postId], data);
+      queryClient.invalidateQueries({ queryKey: ["community-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["my-posts"] });
       router.replace(`/community/${postId}`);
     } catch (e: unknown) {
       const err = e as { message?: string };
