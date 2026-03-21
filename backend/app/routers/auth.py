@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -331,8 +331,8 @@ async def toss_login(
 @router.post("/register", response_model=UserOut, status_code=201)
 @limiter.limit("5/minute")
 async def register(
-    body: RegisterBody,
     request: Request,
+    body: RegisterBody = Body(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Firebase 가입 후 서버 등록. 닉네임 설정 + 약관 동의 기록."""
