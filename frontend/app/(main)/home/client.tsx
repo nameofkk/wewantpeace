@@ -557,7 +557,7 @@ function ReportContent() {
                     tooltip={t(lang, "dash_section_flow_tooltip" as any)}
                   />
                 </div>
-                <div className="overflow-x-auto">
+                <div>
                   <ImpactFlowSankey
                     data={summary.impact_flow}
                     isPro={isPro}

@@ -57,7 +57,7 @@ export function WeeklyReportCard() {
         icon={<FileText className="h-3.5 w-3.5 text-cyan-400" />}
         titleKey="dash_weekly_report"
         descKey="dash_weekly_report_desc"
-        badge={{ label: "Pro+", color: "bg-cyan-500/10 text-cyan-400" }}
+        badge={{ label: "Pro+", color: "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm" }}
       />
       <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
         {/* Header toggle */}
@@ -69,7 +69,7 @@ export function WeeklyReportCard() {
             <span className="text-xs font-medium text-foreground/80">
               {lang === "ko" ? "주간 리포트" : "Weekly Report"}
             </span>
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400">
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
               Pro+
             </span>
           </div>

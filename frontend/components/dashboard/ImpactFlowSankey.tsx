@@ -267,8 +267,19 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
   }, []);
 
   const sizeClass: "sm" | "md" | "lg" = chartWidth > 1024 ? "lg" : chartWidth > 640 ? "md" : "sm";
-  const chartHeight = sizeClass === "lg" ? 300 : sizeClass === "md" ? 260 : 200;
+  const baseChartHeight = sizeClass === "lg" ? 300 : sizeClass === "md" ? 260 : 200;
   const isDesktop = sizeClass !== "sm";
+
+  // 노드 수가 많으면 차트 높이를 동적으로 늘림 (하단 잘림 방지)
+  const cols: Record<string, number> = { conflict: 0, commodity: 0, impact: 0 };
+  for (const n of data.nodes) {
+    const cat = n.category || "commodity";
+    cols[cat] = (cols[cat] ?? 0) + 1;
+  }
+  const maxNodesInCol = Math.max(cols.conflict, cols.commodity, cols.impact);
+  const sizeCfg = sizeClass === "sm" ? { minNodeH: 12, nodePad: 6, topBot: 28 } : sizeClass === "md" ? { minNodeH: 18, nodePad: 10, topBot: 30 } : { minNodeH: 22, nodePad: 14, topBot: 34 };
+  const minNeededHeight = sizeCfg.topBot + maxNodesInCol * sizeCfg.minNodeH + Math.max(0, maxNodesInCol - 1) * sizeCfg.nodePad;
+  const chartHeight = Math.max(baseChartHeight, minNeededHeight);
 
   // SSR에서 렌더링하지 않음 — hydration mismatch 방지
   if (chartWidth <= 0) {

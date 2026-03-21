@@ -571,8 +571,13 @@ export default function SettingsPage() {
                     {(me as { nickname?: string })?.nickname || firebaseUser.displayName || (lang === "ko" ? "사용자" : "User")}
                   </p>
                   <p className="text-[11px] text-muted-foreground truncate">{firebaseUser.email}</p>
-                  <span className="inline-block mt-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                    {plan.toUpperCase()}
+                  <span className={cn(
+                    "inline-block mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm",
+                    plan === "pro_plus" ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white" :
+                    plan === "pro" ? "bg-gradient-to-r from-blue-500 to-cyan-400 text-white" :
+                    "bg-muted text-muted-foreground"
+                  )}>
+                    {plan === "pro_plus" ? "Pro+" : plan === "pro" ? "Pro" : "Free"}
                   </span>
                 </div>
                 <button
@@ -1195,7 +1200,7 @@ export default function SettingsPage() {
               <Shield className={cn(
                 "h-4 w-4",
                 plan === "pro_plus" ? "text-purple-400" :
-                plan === "pro" ? "text-yellow-400" :
+                plan === "pro" ? "text-blue-400" :
                 "text-muted-foreground"
               )} />
               <p className="text-sm font-medium">
