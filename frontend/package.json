@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@apps-in-toss/cli": "^2.0.1",
-    "@apps-in-toss/web-framework": "^2.0.9",
+    "@apps-in-toss/web-framework": "^1.14.1",
     "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
     "@radix-ui/react-avatar": "^1.0.4",
