@@ -8,15 +8,13 @@ GET  /auth/find-email     — 닉네임+생년도로 이메일 찾기
 PATCH /auth/profile       — 프로필 수정
 DELETE /auth/account      — 회원 탈퇴
 """
-from __future__ import annotations
 import re
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from typing import Annotated
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -333,7 +331,7 @@ async def toss_login(
 @limiter.limit("5/minute")
 async def register(
     request: Request,
-    body: Annotated[RegisterBody, Body()],
+    body: RegisterBody,
     db: AsyncSession = Depends(get_db),
 ):
     """Firebase 가입 후 서버 등록. 닉네임 설정 + 약관 동의 기록."""
