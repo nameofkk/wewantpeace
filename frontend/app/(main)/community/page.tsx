@@ -38,6 +38,21 @@ const TYPE_LABEL: Record<string, string> = {
   notice: "community_type_notice",
 };
 
+function PlanBadge({ plan }: { plan?: string | null }) {
+  if (!plan || plan === "free") return null;
+  if (plan === "pro_plus")
+    return (
+      <span className="inline-flex items-center rounded-full px-1.5 py-px text-[9px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
+        Pro+
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center rounded-full px-1.5 py-px text-[9px] font-bold bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm">
+      Pro
+    </span>
+  );
+}
+
 function relativeTime(iso: string, lang: Lang): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -101,6 +116,7 @@ function PostRow({
           <span className="font-medium text-foreground/60">
             {post.author_nickname || t(lang, "community_anonymous")}
           </span>
+          <PlanBadge plan={post.author_plan} />
           <span className="text-muted-foreground/40">·</span>
           <span>{relativeTime(post.created_at, lang)}</span>
           <span className="text-muted-foreground/40">·</span>
