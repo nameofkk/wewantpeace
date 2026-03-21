@@ -2147,6 +2147,33 @@ async def trigger_orphan_reprocess(
         raise HTTPException(500, detail=f"오펀 재처리 실패: {str(e)}")
 
 
+# ── 미처리 raw_events 재처리 트리거 ──────────────────────────────────────────
+
+@router.post("/retry-raw-events")
+async def retry_raw_events(
+    limit: int = Query(default=200, ge=1, le=1000),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """processed=false인 raw_events를 Celery 큐에 다시 넣는다."""
+    from worker.tasks import process_raw_event
+
+    result = await db.execute(
+        text("SELECT id FROM raw_events WHERE processed = false ORDER BY collected_at ASC LIMIT :lim"),
+        {"lim": limit},
+    )
+    ids = [str(row[0]) for row in result.fetchall()]
+
+    for raw_id in ids:
+        process_raw_event.delay(raw_id)
+
+    await _log_action(db, admin, "retry_raw_events", detail={
+        "count": len(ids),
+    })
+
+    return {"status": "ok", "dispatched": len(ids)}
+
+
 # ── KPI 대시보드 ──────────────────────────────────────────────────────────────
 
 @router.get("/kpi")
