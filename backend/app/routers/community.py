@@ -6,7 +6,7 @@ import asyncio
 import os
 import uuid
 from datetime import datetime, date, timezone
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, UploadFile, File
 from pydantic import BaseModel
@@ -426,7 +426,7 @@ async def my_posts(
 @limiter.limit("10/minute")
 async def create_post(
     request: Request,
-    body: PostCreate = Body(...),
+    body: Annotated[PostCreate, Body()],
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

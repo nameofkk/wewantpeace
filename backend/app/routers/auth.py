@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
@@ -332,7 +333,7 @@ async def toss_login(
 @limiter.limit("5/minute")
 async def register(
     request: Request,
-    body: RegisterBody = Body(...),
+    body: Annotated[RegisterBody, Body()],
     db: AsyncSession = Depends(get_db),
 ):
     """Firebase 가입 후 서버 등록. 닉네임 설정 + 약관 동의 기록."""
