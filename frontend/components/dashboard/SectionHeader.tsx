@@ -37,7 +37,7 @@ export function SectionHeader({
           {badge && (
             <span
               className={cn(
-                "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
+                "text-[9px] px-1.5 py-0.5 rounded-full font-bold",
                 badge.color
               )}
             >

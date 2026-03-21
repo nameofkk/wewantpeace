@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { API_BASE } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { Megaphone } from "lucide-react";
+import { Megaphone, ChevronRight } from "lucide-react";
 import { communityPostPath } from "@/lib/toss-nav";
 
 interface Notice {
@@ -36,22 +36,27 @@ export function NoticeTicker() {
   return (
     <button
       onClick={() => router.push(communityPostPath(latest.id))}
-      className="w-full flex items-center gap-2 px-4 py-2 bg-blue-500/5 border-b border-blue-500/10 hover:bg-blue-500/10 transition-colors"
+      className="group w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-border/60 hover:bg-muted/30 transition-all"
     >
-      <span className="flex items-center gap-1.5 shrink-0">
-        <Megaphone className="h-3 w-3 text-blue-400" />
-        <span className="text-[10px] font-bold text-blue-400">
+      <span className="flex items-center justify-center h-6 w-6 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 shadow-sm shrink-0">
+        <Megaphone className="h-3 w-3 text-white" />
+      </span>
+      <span className="flex-1 min-w-0 flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-blue-400 shrink-0">
           {t(lang, "dash_notice_ticker")}
         </span>
+        <span className="text-[11px] text-foreground/80 truncate text-left">
+          {lang === "en" && latest.title_en ? latest.title_en : latest.title}
+        </span>
       </span>
-      <span className="flex-1 text-[11px] text-foreground/80 truncate text-left">
-        {lang === "en" && latest.title_en ? latest.title_en : latest.title}
-      </span>
-      <span className="text-[9px] text-muted-foreground shrink-0">
-        {new Date(latest.created_at).toLocaleDateString(
-          lang === "ko" ? "ko-KR" : "en-US",
-          { month: "short", day: "numeric" }
-        )}
+      <span className="flex items-center gap-1 shrink-0">
+        <span className="text-[9px] text-muted-foreground">
+          {new Date(latest.created_at).toLocaleDateString(
+            lang === "ko" ? "ko-KR" : "en-US",
+            { month: "short", day: "numeric" }
+          )}
+        </span>
+        <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-blue-400 transition-colors" />
       </span>
     </button>
   );

@@ -543,7 +543,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
         <h3 className="text-xs font-bold text-foreground flex-1 text-left">
           {lang === "ko" ? "산업별 리스크 분석" : "Sector Risk Analysis"}
         </h3>
-        <span className="text-[8px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium shrink-0">Pro+</span>
+        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold shadow-sm shrink-0">Pro+</span>
         {expanded ? (
           <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         ) : (

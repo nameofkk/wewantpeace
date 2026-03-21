@@ -305,7 +305,7 @@ export function TradeFlowSankey() {
         icon={<GitBranch className="h-3.5 w-3.5 text-cyan-400" />}
         titleKey="dash_trade_flow"
         descKey="dash_trade_flow_desc"
-        badge={{ label: "Pro", color: "bg-cyan-500/10 text-cyan-400" }}
+        badge={{ label: "Pro", color: "bg-gradient-to-r from-blue-500 to-cyan-400 text-white shadow-sm" }}
       />
       <div className="rounded-xl border border-border bg-card fade-in-up overflow-hidden">
         <button
