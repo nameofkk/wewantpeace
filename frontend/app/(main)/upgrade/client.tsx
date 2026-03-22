@@ -462,18 +462,16 @@ function UpgradeContent() {
       }
 
       const { checkout_url } = await res.json();
-      if (checkout_url) {
-        window.location.href = checkout_url;
-      }
+      if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
+      window.location.href = checkout_url;
       return;
     }
 
     // 일반 웹: fetch + DodoPayments overlay
     const { checkout_url } = await createDodoCheckout(planId);
-    if (checkout_url) {
-      const { DodoPayments } = await import("dodopayments-checkout");
-      await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
-    }
+    if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
+    const { DodoPayments } = await import("dodopayments-checkout");
+    await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
   }
 
   const isWeb = platform === "web";  // 토스 WebView도 웹 결제(DodoPayments) 사용

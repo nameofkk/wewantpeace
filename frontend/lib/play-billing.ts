@@ -84,9 +84,11 @@ export async function purchaseSubscription(
     }
 
     return new Promise((resolve, reject) => {
+      let settled = false;
       const handler = (e: Event) => {
         const msg = (e as CustomEvent).detail;
         if (msg?.type === "PURCHASE_RESULT") {
+          settled = true;
           window.removeEventListener("nativeMessage", handler);
           if (msg.payload.success) {
             resolve(msg.payload.purchaseToken || msg.payload.transactionId || "native");
@@ -98,6 +100,14 @@ export async function purchaseSubscription(
         }
       };
       window.addEventListener("nativeMessage", handler);
+
+      // 3분 타임아웃 — 네이티브 브릿지 무응답 시 무한 스피너 방지
+      setTimeout(() => {
+        if (!settled) {
+          window.removeEventListener("nativeMessage", handler);
+          reject(new Error("결제 응답 타임아웃"));
+        }
+      }, 180_000);
 
       const message = JSON.stringify({
         type: "PURCHASE_REQUEST",
