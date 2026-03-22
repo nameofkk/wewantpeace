@@ -148,7 +148,7 @@ export function TopIssuesAffectingMe() {
                     </span>
                   )}
                 </div>
-                <h4 className="text-[12px] font-semibold leading-snug line-clamp-1">{displayTitle}</h4>
+                <h4 className="text-[11px] font-semibold leading-snug whitespace-nowrap overflow-x-auto scrollbar-hide">{displayTitle}</h4>
               </div>
 
               {/* KScore */}

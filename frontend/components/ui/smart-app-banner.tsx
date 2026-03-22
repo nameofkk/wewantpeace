@@ -119,7 +119,7 @@ export function SmartAppBanner() {
           <p className="text-sm font-semibold">
             {lang === "en" ? "Open in browser" : "외부 브라우저에서 열기"}
           </p>
-          <p className="text-[11px] text-muted-foreground truncate">
+          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
             {lang === "en"
               ? "Open in Chrome/Safari to install the app"
               : "Chrome/Safari에서 열면 앱을 설치할 수 있어요"}
@@ -165,7 +165,7 @@ export function SmartAppBanner() {
           <p className="text-sm font-semibold">
             {lang === "en" ? "Get WeWantPeace app" : "WeWantPeace 앱 설치"}
           </p>
-          <p className="text-[11px] text-muted-foreground truncate">
+          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
             {lang === "en"
               ? "Get real-time alerts and a better experience"
               : "실시간 알림과 더 나은 경험을 받아보세요"}

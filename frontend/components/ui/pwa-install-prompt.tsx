@@ -74,7 +74,7 @@ export function PWAInstallPrompt() {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold">{t(lang, "pwa_install_title")}</p>
-        <p className="text-[11px] text-muted-foreground truncate">
+        <p className="text-[10px] text-muted-foreground whitespace-nowrap">
           {t(lang, "pwa_install_desc")}
         </p>
       </div>

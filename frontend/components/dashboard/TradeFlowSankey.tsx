@@ -280,7 +280,7 @@ export function TradeFlowSankey() {
                 )}>
                   {rp.risk.toUpperCase()}
                 </span>
-                <span className="text-[9px] text-muted-foreground truncate max-w-[140px]">
+                <span className="text-[8px] text-muted-foreground whitespace-nowrap">
                   {lang === "ko" ? rp.reason_ko : rp.reason_en}
                 </span>
               </div>

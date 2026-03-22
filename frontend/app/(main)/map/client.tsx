@@ -232,7 +232,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+          <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide mb-1">
             {cluster.is_verified && (
               <span className="rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
                 {t(lang, "map_popup_verified")}
@@ -387,7 +387,7 @@ function LayerToggleRow({
       <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
         <span className="text-sm shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-medium truncate">{label}</div>
+          <div className="text-[10px] font-medium whitespace-nowrap">{label}</div>
           {count !== undefined && count > 0 && (
             <div className="text-[9px] text-muted-foreground">{t(lang, "layer_count", { count: String(count) })}</div>
           )}
@@ -1807,9 +1807,9 @@ export default function MapPage() {
                       lang={lang}
                     />
                   ) : (
-                    <a href="/settings" className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground opacity-60 hover:opacity-80 whitespace-nowrap">
-                      <span>🚢</span>
-                      <span>{lang === "ko" ? "교역 흐름 — 기준국가를 설정하세요 →" : "Trade Flow — Set a home country →"}</span>
+                    <a href="/settings" className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] text-muted-foreground opacity-60 hover:opacity-80 whitespace-nowrap">
+                      <span className="shrink-0">🚢</span>
+                      <span>{lang === "ko" ? "교역 흐름 — 기준국가 설정 →" : "Trade Flow — Set home country →"}</span>
                     </a>
                   )}
                 </div>

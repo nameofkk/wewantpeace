@@ -316,7 +316,7 @@ function SectorDetailContent({
               {/* 헤더 행 */}
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
                     <span className="text-[11px] font-semibold">{sector.sector}</span>
                     <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0", colors.bg, colors.text)}>
                       {RISK_LABELS[lang]?.[sector.risk_level] || sector.risk_level}
@@ -336,7 +336,7 @@ function SectorDetailContent({
               <p className="text-[9px] text-muted-foreground mt-1">{sector.description}</p>
 
               {/* 교역액 + 공급차질/비용증가 뱃지 */}
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <div className="flex flex-nowrap overflow-x-auto scrollbar-hide gap-1.5 mt-1.5">
                 {sector.risk_summary && (
                   <span className={cn("text-[8px] font-medium px-1.5 py-0.5 rounded-full", colors.bg, colors.text)}>
                     {sector.risk_summary}
