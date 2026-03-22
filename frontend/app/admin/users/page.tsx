@@ -17,6 +17,7 @@ import { API_BASE } from "@/lib/admin-utils";
 interface AdminUser {
   id: string;
   email: string | null;
+  auth_provider: "google" | "apple" | "toss";
   nickname: string | null;
   display_name: string | null;
   plan: string;
@@ -45,6 +46,12 @@ const SUB_TYPE_BADGE: Record<string, { bg: string; label_ko: string; label_en: s
   promo: { bg: "bg-orange-500/20 text-orange-400", label_ko: "프로모", label_en: "Promo" },
   admin: { bg: "bg-indigo-500/20 text-indigo-400", label_ko: "관리자부여", label_en: "Admin" },
   free: { bg: "bg-secondary text-muted-foreground", label_ko: "무료", label_en: "Free" },
+};
+
+const AUTH_PROVIDER: Record<string, { icon: string; label: string }> = {
+  google: { icon: "G", label: "Google" },
+  apple: { icon: "", label: "Apple" },
+  toss: { icon: "T", label: "Toss" },
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -356,7 +363,18 @@ export default function AdminUsersPage() {
                           <p className={cn("font-medium text-sm truncate", tab === "deleted" && "line-through text-muted-foreground")}>
                             {u.nickname || u.display_name || (ko ? "이름 없음" : "No name")}
                           </p>
-                          <p className="text-[11px] text-muted-foreground truncate">{u.email || "—"}</p>
+                          <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                            {u.email || (
+                              <span className={cn(
+                                "inline-flex items-center gap-0.5 rounded px-1 py-px text-[9px] font-medium",
+                                u.auth_provider === "toss" ? "bg-blue-500/15 text-blue-400"
+                                  : u.auth_provider === "apple" ? "bg-gray-500/15 text-gray-400"
+                                  : "bg-secondary text-muted-foreground"
+                              )}>
+                                {AUTH_PROVIDER[u.auth_provider]?.icon} {AUTH_PROVIDER[u.auth_provider]?.label ?? u.auth_provider}
+                              </span>
+                            )}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -460,7 +478,18 @@ export default function AdminUsersPage() {
                       <p className={cn("font-medium text-sm", tab === "deleted" && "line-through text-muted-foreground")}>
                         {u.nickname || u.display_name || (ko ? "이름 없음" : "No name")}
                       </p>
-                      <p className="text-[11px] text-muted-foreground truncate">{u.email || "—"}</p>
+                      <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                        {u.email || (
+                          <span className={cn(
+                            "inline-flex items-center gap-0.5 rounded px-1 py-px text-[9px] font-medium",
+                            u.auth_provider === "toss" ? "bg-blue-500/15 text-blue-400"
+                              : u.auth_provider === "apple" ? "bg-gray-500/15 text-gray-400"
+                              : "bg-secondary text-muted-foreground"
+                          )}>
+                            {AUTH_PROVIDER[u.auth_provider]?.icon} {AUTH_PROVIDER[u.auth_provider]?.label ?? u.auth_provider}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   {tab === "active" && (
