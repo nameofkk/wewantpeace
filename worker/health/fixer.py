@@ -33,6 +33,7 @@ async def execute_fix(action: str, params: dict) -> str:
         "retry_sns_publish": _fix_retry_sns_publish,
         "retry_alerts": _fix_retry_alerts,
         "retry_spike_alerts": _fix_retry_alerts,  # 하위호환
+        "data_quality_cleanup": _fix_data_quality_cleanup,
     }
 
     handler = handlers.get(action)
@@ -560,3 +561,93 @@ async def _fix_retry_alerts(params: dict) -> str:
 
 # 하위호환
 _fix_retry_spike_alerts = _fix_retry_alerts
+
+
+# ── Action: data_quality_cleanup ─────────────────────────────────────────
+
+
+async def _fix_data_quality_cleanup(params: dict) -> str:
+    """데이터 품질 정리: reprocess + sev=0 비활성화 + 고아 CE 삭제 + 빈 클러스터 비활성화."""
+    results: list[str] = []
+
+    # Step 1: reprocess_topics.py --all 실행
+    try:
+        reprocess_result = await _fix_reprocess_topics(params)
+        results.append(f"1) reprocess: {reprocess_result[:100]}")
+    except Exception as e:
+        results.append(f"1) reprocess 오류: {e}")
+
+    async with AsyncSessionLocal() as db:
+        # Step 2: sev=0 활성 클러스터 비활성화
+        try:
+            sev0_result = await db.execute(
+                text(
+                    "UPDATE issue_clusters SET is_active = false,"
+                    " updated_at = :now"
+                    " WHERE severity = 0 AND is_active = true"
+                ),
+                {"now": datetime.now(timezone.utc)},
+            )
+            sev0_count = sev0_result.rowcount or 0
+            results.append(f"2) sev=0 비활성화: {sev0_count}개")
+        except Exception as e:
+            results.append(f"2) sev=0 비활성화 오류: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+        # Step 3: 고아 cluster_events 삭제
+        try:
+            orphan_result = await db.execute(
+                text("""
+                    DELETE FROM cluster_events ce
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM issue_clusters ic WHERE ic.id = ce.cluster_id
+                    ) OR NOT EXISTS (
+                        SELECT 1 FROM normalized_events ne WHERE ne.id = ce.event_id
+                    )
+                """)
+            )
+            orphan_count = orphan_result.rowcount or 0
+            results.append(f"3) 고아 CE 삭제: {orphan_count}건")
+        except Exception as e:
+            results.append(f"3) 고아 CE 삭제 오류: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+        # Step 4: 빈 클러스터 비활성화
+        try:
+            empty_result = await db.execute(
+                text("""
+                    UPDATE issue_clusters SET is_active = false,
+                        updated_at = :now
+                    WHERE is_active = true AND severity > 0
+                    AND NOT EXISTS (
+                        SELECT 1 FROM cluster_events ce
+                        WHERE ce.cluster_id = issue_clusters.id
+                    )
+                """),
+                {"now": datetime.now(timezone.utc)},
+            )
+            empty_count = empty_result.rowcount or 0
+            results.append(f"4) 빈 클러스터 비활성화: {empty_count}개")
+        except Exception as e:
+            results.append(f"4) 빈 클러스터 비활성화 오류: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+        try:
+            await db.commit()
+        except Exception as e:
+            results.append(f"commit 오류: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+    return "\n".join(results)
