@@ -229,12 +229,6 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=5, hour=0),  # 00:05 UTC = 09:05 KST (시간 분산)
         "options": {"queue": "process"},
     },
-    # ── Phase 1 마케팅 체크리스트 ──
-    "send-daily-checklist": {
-        "task": "worker.tasks.send_daily_checklist",
-        "schedule": crontab(minute=10, hour=0),  # 00:10 UTC = 09:10 KST (시간 분산)
-        "options": {"queue": "process"},
-    },
     # ── 비활성 RSS 피드 자동 복구 ──
     "recheck-inactive-feeds": {
         "task": "worker.tasks.recheck_inactive_feeds",
