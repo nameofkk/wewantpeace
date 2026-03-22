@@ -257,7 +257,7 @@ function UpgradeContent() {
       if (err.status === 409 && detail) {
         setError(detail);
       } else {
-        setError(`[DEBUG] ${err.message} (status=${err.status}, platform=${platform}, isWeb=${isWeb})`);
+        setError(detail || err.message || t(lang, "upgrade_payment_error"));
       }
     } finally {
       setLoading(null);
@@ -353,7 +353,7 @@ function UpgradeContent() {
   }
 
   async function handleAndroidPurchase(planId: string) {
-    const { purchaseSubscription } = await import("@/lib/play-billing");
+    const { purchaseSubscription, isDigitalGoodsAvailable } = await import("@/lib/play-billing");
     const { isReactNative } = await import("@/lib/platform-detect");
     const productId = GOOGLE_PRODUCT_IDS[planId];
     if (!productId) throw new Error("Invalid plan");
@@ -368,30 +368,37 @@ function UpgradeContent() {
       return;
     }
 
-    // TWA: Digital Goods API → 실패 시 웹 결제(DodoPayments) 폴백
-    try {
-      const purchaseToken = await purchaseSubscription(productId);
-      if (!purchaseToken) return;
+    // TWA: Digital Goods API 시도 → 실패 시 DodoPayments 웹 결제로 자동 폴백
+    if (isDigitalGoodsAvailable()) {
+      try {
+        const purchaseToken = await purchaseSubscription(productId);
+        if (!purchaseToken) return; // 사용자 취소
 
-      const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId, source: source || undefined }),
-      });
+        const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId, source: source || undefined }),
+        });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+        }
+
+        router.push(`/upgrade/success?plan=${planId}`);
+        return;
+      } catch (dgErr) {
+        // Digital Goods API 사용 불가 (Android 13+ DelegationService 버그 등)
+        // → DodoPayments 웹 결제로 자동 전환
+        console.warn("[Upgrade] Play Billing 불가, 웹 결제 전환:", dgErr);
       }
-
-      router.push(`/upgrade/success?plan=${planId}`);
-    } catch (dgErr) {
-      console.warn("[Upgrade] Digital Goods API 실패, 웹 결제로 폴백:", dgErr);
-      await handleDodoCheckout(planId);
     }
+
+    // Digital Goods API 미지원 또는 실패 → DodoPayments 웹 결제
+    await handleDodoCheckout(planId);
   }
 
   async function handleIOSPurchase(planId: string) {

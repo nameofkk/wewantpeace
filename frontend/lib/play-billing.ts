@@ -1,6 +1,11 @@
 /**
  * Google Play Billing - Digital Goods API + Payment Request API
  * Android TWA 환경에서만 동작
+ *
+ * 알려진 제한:
+ * - Android 13+ (API 33+)에서 DelegationService 초기화 실패 가능
+ *   (Chrome/android-browser-helper 플랫폼 버그, 미해결)
+ * - 실패 시 upgrade/client.tsx에서 DodoPayments 웹 결제로 자동 폴백
  */
 
 const PLAY_BILLING_SERVICE = "https://play.google.com/billing";
@@ -23,22 +28,27 @@ interface PaymentDetailsInit {
 }
 
 /**
+ * Digital Goods API 사용 가능 여부 확인
+ */
+export function isDigitalGoodsAvailable(): boolean {
+  return typeof window !== "undefined" && "getDigitalGoodsService" in window;
+}
+
+/**
  * Digital Goods 서비스 획득
+ * 실패 시 null 반환 (에러 로그만 출력, throw 안 함)
  */
 async function getService(): Promise<DigitalGoodsService | null> {
-  if (typeof window === "undefined" || !("getDigitalGoodsService" in window)) {
-    console.warn("[PlayBilling] getDigitalGoodsService not available on window");
+  if (!isDigitalGoodsAvailable()) {
     return null;
   }
   try {
     const service = await window.getDigitalGoodsService!(PLAY_BILLING_SERVICE);
-    if (!service) {
-      console.warn("[PlayBilling] getDigitalGoodsService returned null/undefined");
-    }
-    return service as DigitalGoodsService;
+    return (service as DigitalGoodsService) ?? null;
   } catch (e) {
-    console.error("[PlayBilling] getDigitalGoodsService threw:", e);
-    throw e; // 실제 에러를 상위로 전파 (원인 파악용)
+    // Android 13+에서 DelegationService 미초기화 → "unsupported context" / "clientAppUnavailable"
+    console.warn("[PlayBilling] Digital Goods API 실패:", e);
+    return null;
   }
 }
 
@@ -54,6 +64,7 @@ export async function getProductDetails(productIds: string[]): Promise<ItemDetai
 /**
  * Play Billing으로 구독 결제
  * @returns purchaseToken (성공 시) 또는 null (취소/실패)
+ * @throws 결제 불가 시 에러 (호출부에서 웹 결제 폴백 처리)
  *
  * React Native 환경에서는 네이티브 브릿지를 통해 결제를 처리합니다.
  */
@@ -88,7 +99,7 @@ export async function purchaseSubscription(
   // TWA 환경: Digital Goods API
   const service = await getService();
   if (!service) {
-    throw new Error("Digital Goods API를 사용할 수 없습니다.");
+    throw new Error("DGAPI_UNAVAILABLE");
   }
 
   // 상품 정보 조회
