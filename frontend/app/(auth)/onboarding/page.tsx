@@ -451,7 +451,7 @@ export default function OnboardingPage() {
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* 지도 SVG — 확대, 좌측 오프셋으로 아메리카~동아시아 표시 */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 ob-world-map"
           style={{
             backgroundImage: "url(/dotted-world-map.svg)",
             backgroundSize: "173% auto",
@@ -506,7 +506,7 @@ export default function OnboardingPage() {
 
         {/* 하단 페이드 그라데이션 */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 ob-bg-fade"
           style={{
             background: "linear-gradient(to top, rgba(15,23,42,1) 0%, rgba(15,23,42,1) 28%, rgba(15,23,42,0.98) 42%, rgba(15,23,42,0.8) 58%, rgba(15,23,42,0.3) 78%, transparent 100%)",
           }}
@@ -549,13 +549,21 @@ export default function OnboardingPage() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <div className="relative z-10 flex-1 flex flex-col items-center px-4 min-h-0" style={{ paddingTop: "var(--space-sm)" }}>
-        <div className="w-full max-w-md flex-1 flex flex-col min-h-0">
+      <div className={`relative z-10 flex-1 flex flex-col min-h-0 ${
+        step === 0
+          ? "items-center px-4 lg:flex-row lg:items-center lg:px-12 lg:gap-0"
+          : "items-center px-4"
+      }`} style={{ paddingTop: "var(--space-sm)" }}>
+        <div className={`w-full flex flex-col min-h-0 ${
+          step === 0
+            ? "flex-1 max-w-md lg:flex-none lg:max-w-none lg:w-[45%] lg:pr-12"
+            : "flex-1 max-w-md lg:max-w-lg"
+        }`}>
 
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
             <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
-            <div className="flex flex-col min-h-full justify-end py-2">
+            <div className="flex flex-col min-h-full justify-end lg:justify-center py-2">
 
               {/* 라이브 인디케이터 행 */}
               <div className="flex items-center justify-between" style={{ marginBottom: "var(--space-sm)" }}>
@@ -627,6 +635,27 @@ export default function OnboardingPage() {
                       {src}
                     </span>
                   ))}
+                </div>
+              </div>
+
+              {/* 데스크탑 전용 인라인 CTA + 풋터 */}
+              <div className="hidden lg:block" style={{ marginTop: "var(--space-sm)" }}>
+                <button
+                  onClick={handleNext}
+                  className="w-full max-w-xs relative overflow-hidden flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-bold transition-all active:scale-95 text-primary-foreground shadow-lg"
+                  style={{
+                    background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.85) 100%)",
+                    boxShadow: "0 4px 20px rgba(99,102,241,0.3)",
+                  }}
+                >
+                  <span className="ob-cta-shimmer" />{t(lang, "ob_hero_cta")} →
+                </button>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_rank")}</span>
+                  <span className="w-[3px] h-[3px] rounded-full bg-border" />
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_free")}</span>
+                  <span className="w-[3px] h-[3px] rounded-full bg-border" />
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_nologin")}</span>
                 </div>
               </div>
 
@@ -944,7 +973,7 @@ export default function OnboardingPage() {
       {/* 관심 국가 미선택 경고 */}
       {countryWarning && (
         <div className="relative z-10 mx-4 mb-1 animate-fadeIn">
-          <div className="w-full max-w-md mx-auto text-center py-2 px-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+          <div className="w-full max-w-md lg:max-w-lg mx-auto text-center py-2 px-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
             {lang === "ko" ? "최소 2개 이상 관심 국가를 선택해주세요" : "Please select at least 2 countries"}
           </div>
         </div>
@@ -952,8 +981,8 @@ export default function OnboardingPage() {
 
       {/* 하단 버튼 (Step 0, 1만) */}
       {step < 2 && (
-        <div className="relative z-10 px-4" style={{ paddingBottom: "calc(var(--space-md) + var(--safe-bottom))", paddingTop: "var(--space-sm)" }}>
-          <div className="w-full max-w-md mx-auto">
+        <div className={`relative z-10 px-4 ${step === 0 ? "lg:hidden" : ""}`} style={{ paddingBottom: "calc(var(--space-md) + var(--safe-bottom))", paddingTop: "var(--space-sm)" }}>
+          <div className={`w-full mx-auto ${step === 0 ? "max-w-md" : "max-w-md lg:max-w-lg"}`}>
             <button
               onClick={handleNext}
               disabled={!canNext}
@@ -1189,6 +1218,20 @@ export default function OnboardingPage() {
           border-radius: 2px;
         }
         .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+        /* 데스크탑: 지도를 전체 화면에 맞게 조정 */
+        @media (min-width: 1024px) {
+          .ob-world-map {
+            background-size: 120% auto !important;
+            background-position: 55% 15% !important;
+            opacity: 0.6 !important;
+          }
+          .ob-bg-fade {
+            background:
+              linear-gradient(to right, rgba(15,23,42,0.95) 35%, rgba(15,23,42,0.3) 60%, transparent 80%),
+              linear-gradient(to top, rgba(15,23,42,1) 0%, rgba(15,23,42,0.5) 30%, transparent 60%) !important;
+          }
+        }
       `}</style>
     </div>
   );
