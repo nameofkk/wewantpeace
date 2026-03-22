@@ -195,8 +195,9 @@ async def restore_purchase(
         )
         sub = existing.scalar_one_or_none()
         if sub:
-            # 소유자 변경 (복원)
-            sub.user_id = current_user.id
+            # 보안: 타인의 구독은 복원 불가 (소유자만 복원 가능)
+            if sub.user_id != current_user.id:
+                raise HTTPException(403, detail="해당 구독의 소유자가 아닙니다. 고객지원에 문의해주세요.")
             sub.status = "active"
             await db.flush()
 
@@ -225,7 +226,9 @@ async def restore_purchase(
         )
         sub = existing.scalar_one_or_none()
         if sub:
-            sub.user_id = current_user.id
+            # 보안: 타인의 구독은 복원 불가 (소유자만 복원 가능)
+            if sub.user_id != current_user.id:
+                raise HTTPException(403, detail="해당 구독의 소유자가 아닙니다. 고객지원에 문의해주세요.")
             sub.status = "active"
             await db.flush()
 
@@ -253,13 +256,13 @@ async def google_rtdn_webhook(
     """Google Play Real-Time Developer Notifications (Pub/Sub push)."""
     # Pub/Sub push 인증: URL에 포함된 토큰 검증
     webhook_token = settings.google_rtdn_webhook_token
-    if webhook_token:
-        request_token = request.query_params.get("token", "")
-        if not request_token or request_token != webhook_token:
-            logger.warning("Google RTDN: 인증 실패 (잘못된 토큰)")
-            raise HTTPException(403, detail="Forbidden")
-    else:
-        logger.warning("Google RTDN: GOOGLE_RTDN_WEBHOOK_TOKEN 미설정 — 프로덕션에서는 반드시 설정하세요")
+    if not webhook_token:
+        logger.error("Google RTDN: GOOGLE_RTDN_WEBHOOK_TOKEN 미설정 — 웹훅 거부")
+        raise HTTPException(403, detail="Webhook token not configured")
+    request_token = request.query_params.get("token", "")
+    if not request_token or request_token != webhook_token:
+        logger.warning("Google RTDN: 인증 실패 (잘못된 토큰)")
+        raise HTTPException(403, detail="Forbidden")
 
     try:
         payload = await request.json()
