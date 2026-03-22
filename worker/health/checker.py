@@ -1,9 +1,10 @@
-"""헬스체크 로직 — 18가지 시스템 건강 체크.
+"""헬스체크 로직 — 19가지 시스템 건강 체크.
 
 6시간마다 실행되어 파이프라인 품질, 소스채널 건강, 클러스터 품질,
 OpenAI API 상태, RSS 수집 지연, 워커 프로세스 상태, Celery Beat,
 API 소스, 중복률, FCM 전송, 구독 무결성, 긴장도 지수, Redis,
-고아 이벤트, SNS 포스팅, SNS 토큰, 스파이크 전송, K점수 분포를 점검합니다.
+고아 이벤트, SNS 포스팅, SNS 토큰, 스파이크 전송, K점수 분포,
+데이터 품질 감사를 점검합니다.
 """
 import asyncio
 import logging
@@ -1345,11 +1346,221 @@ async def check_kscore_distribution(db: AsyncSession) -> HealthCheckResult:
         )
 
 
+# ── Check 19: 데이터 품질 감사 ────────────────────────────────────────────
+
+
+async def check_data_quality(db: AsyncSession) -> HealthCheckResult:
+    """데이터 품질 자동 감사 — 노이즈, 토픽/국가 혼재, sev=0, 고아, 빈 클러스터 탐지."""
+    try:
+        issues: list[HealthIssue] = []
+        parts: list[str] = []
+        fix_needed = False
+        fix_params: dict = {}
+
+        # ── Q1: 엔터테인먼트/스팸 노이즈 이벤트 ──
+        try:
+            from worker.processor.normalizer import _is_entertainment_noise
+
+            noise_q = await db.execute(
+                text(
+                    "SELECT id, title, body FROM normalized_events"
+                    " WHERE created_at >= NOW() - INTERVAL '48 hours'"
+                    " AND is_duplicate = false"
+                    " AND topic != 'unknown'"
+                    " AND severity > 0"
+                    " ORDER BY created_at DESC"
+                    " LIMIT 500"
+                )
+            )
+            noise_rows = noise_q.fetchall()
+            noise_count = 0
+            for row in noise_rows:
+                combined = f"{row.title or ''} {row.body or ''}"
+                if _is_entertainment_noise(combined, row.title):
+                    noise_count += 1
+
+            parts.append(f"노이즈 이벤트: {noise_count}")
+            if noise_count > 0:
+                fix_needed = True
+                fix_params["noise_events"] = noise_count
+        except Exception as e:
+            parts.append(f"노이즈 체크 오류: {e}")
+
+        # ── Q2: 토픽 혼재 클러스터 (3종류 이상) ──
+        topic_mix_q = await db.execute(
+            text("""
+                SELECT ce.cluster_id, ic.title_ko,
+                       COUNT(DISTINCT ne.topic) as topic_cnt
+                FROM cluster_events ce
+                JOIN normalized_events ne ON ce.event_id = ne.id
+                JOIN issue_clusters ic ON ce.cluster_id = ic.id
+                WHERE ic.is_active = true AND ic.severity > 0
+                GROUP BY ce.cluster_id, ic.title_ko
+                HAVING COUNT(DISTINCT ne.topic) >= 3
+            """)
+        )
+        topic_mix_rows = topic_mix_q.fetchall()
+        parts.append(f"토픽 혼재: {len(topic_mix_rows)}개")
+        if topic_mix_rows:
+            names = ", ".join(
+                f"{(r.title_ko or '?')[:20]}({r.topic_cnt}종)"
+                for r in topic_mix_rows[:3]
+            )
+            issues.append(HealthIssue(
+                check_name="data_quality",
+                severity="warning",
+                message=f"토픽 혼재 클러스터 {len(topic_mix_rows)}개: {names}",
+                auto_fix_available=False,
+            ))
+
+        # ── Q3: 국가 혼재 클러스터 (3개국 이상) ──
+        country_mix_q = await db.execute(
+            text("""
+                SELECT ce.cluster_id, ic.title_ko,
+                       COUNT(DISTINCT ne.country_code) as country_cnt
+                FROM cluster_events ce
+                JOIN normalized_events ne ON ce.event_id = ne.id
+                JOIN issue_clusters ic ON ce.cluster_id = ic.id
+                WHERE ic.is_active = true AND ic.severity > 0
+                GROUP BY ce.cluster_id, ic.title_ko
+                HAVING COUNT(DISTINCT ne.country_code) >= 3
+            """)
+        )
+        country_mix_rows = country_mix_q.fetchall()
+        parts.append(f"국가 혼재: {len(country_mix_rows)}개")
+        if country_mix_rows:
+            names = ", ".join(
+                f"{(r.title_ko or '?')[:20]}({r.country_cnt}국)"
+                for r in country_mix_rows[:3]
+            )
+            issues.append(HealthIssue(
+                check_name="data_quality",
+                severity="warning",
+                message=f"국가 혼재 클러스터 {len(country_mix_rows)}개: {names}",
+                auto_fix_available=False,
+            ))
+
+        # ── Q4: severity=0 활성 클러스터 ──
+        sev0_q = await db.execute(
+            text(
+                "SELECT COUNT(*) FROM issue_clusters"
+                " WHERE is_active = true AND severity = 0"
+            )
+        )
+        sev0_count = sev0_q.scalar() or 0
+        parts.append(f"sev=0 활성: {sev0_count}")
+        if sev0_count > 0:
+            fix_needed = True
+            fix_params["sev0_active"] = sev0_count
+
+        # ── Q5: 고아 cluster_events ──
+        orphan_ce_q = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM cluster_events ce
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM issue_clusters ic WHERE ic.id = ce.cluster_id
+                ) OR NOT EXISTS (
+                    SELECT 1 FROM normalized_events ne WHERE ne.id = ce.event_id
+                )
+            """)
+        )
+        orphan_ce_count = orphan_ce_q.scalar() or 0
+        parts.append(f"고아 CE: {orphan_ce_count}")
+        if orphan_ce_count > 0:
+            fix_needed = True
+            fix_params["orphan_cluster_events"] = orphan_ce_count
+
+        # ── Q6: 토픽 불일치 (클러스터 topic vs 이벤트 topic 과반 불일치) ──
+        mismatch_q = await db.execute(
+            text("""
+                SELECT ce.cluster_id, ic.topic as cluster_topic,
+                       COUNT(*) FILTER (
+                           WHERE ne.topic != ic.topic AND ne.topic != 'unknown'
+                       ) as mismatch_cnt,
+                       COUNT(*) as total_cnt
+                FROM cluster_events ce
+                JOIN normalized_events ne ON ce.event_id = ne.id
+                JOIN issue_clusters ic ON ce.cluster_id = ic.id
+                WHERE ic.is_active = true AND ic.severity > 0
+                GROUP BY ce.cluster_id, ic.topic
+                HAVING COUNT(*) FILTER (
+                    WHERE ne.topic != ic.topic AND ne.topic != 'unknown'
+                ) > COUNT(*) * 0.5
+            """)
+        )
+        mismatch_rows = mismatch_q.fetchall()
+        parts.append(f"토픽 불일치: {len(mismatch_rows)}개")
+        if mismatch_rows:
+            issues.append(HealthIssue(
+                check_name="data_quality",
+                severity="warning",
+                message=f"토픽 불일치 클러스터 {len(mismatch_rows)}개 (이벤트 과반이 클러스터 토픽과 다름)",
+                auto_fix_available=False,
+            ))
+
+        # ── Q7: 빈 클러스터 (활성인데 이벤트 0개) ──
+        empty_q = await db.execute(
+            text("""
+                SELECT COUNT(*) FROM issue_clusters ic
+                WHERE ic.is_active = true AND ic.severity > 0
+                AND NOT EXISTS (
+                    SELECT 1 FROM cluster_events ce WHERE ce.cluster_id = ic.id
+                )
+            """)
+        )
+        empty_count = empty_q.scalar() or 0
+        parts.append(f"빈 클러스터: {empty_count}")
+        if empty_count > 0:
+            fix_needed = True
+            fix_params["empty_clusters"] = empty_count
+
+        # ── auto_fix 대상이 있으면 하나의 HealthIssue로 합산 ──
+        if fix_needed:
+            fix_summary_parts = []
+            if fix_params.get("noise_events"):
+                fix_summary_parts.append(f"노이즈 {fix_params['noise_events']}건")
+            if fix_params.get("sev0_active"):
+                fix_summary_parts.append(f"sev=0 활성 {fix_params['sev0_active']}개")
+            if fix_params.get("orphan_cluster_events"):
+                fix_summary_parts.append(f"고아 CE {fix_params['orphan_cluster_events']}건")
+            if fix_params.get("empty_clusters"):
+                fix_summary_parts.append(f"빈 클러스터 {fix_params['empty_clusters']}개")
+
+            issues.append(HealthIssue(
+                check_name="data_quality",
+                severity="warning",
+                message=f"자동 정리 대상: {', '.join(fix_summary_parts)}",
+                auto_fix_available=True,
+                fix_action="data_quality_cleanup",
+                fix_params=fix_params,
+            ))
+
+        status = "ok"
+        if any(i.severity == "critical" for i in issues):
+            status = "critical"
+        elif issues:
+            status = "warning"
+
+        return HealthCheckResult(
+            check_name="data_quality",
+            status=status,
+            message="\n  └ ".join(["데이터 품질 감사"] + parts),
+            issues=issues,
+        )
+    except Exception as e:
+        logger.exception("데이터 품질 감사 오류")
+        return HealthCheckResult(
+            check_name="data_quality",
+            status="warning",
+            message=f"체크 오류: {e}",
+        )
+
+
 # ── 전체 헬스체크 실행 ──────────────────────────────────────────────────────
 
 
 async def run_all_checks() -> list[HealthCheckResult]:
-    """18가지 헬스 체크를 모두 실행. 각 체크는 독립 try/except."""
+    """19가지 헬스 체크를 모두 실행. 각 체크는 독립 try/except."""
     results: list[HealthCheckResult] = []
 
     async with AsyncSessionLocal() as db:
@@ -1370,6 +1581,7 @@ async def run_all_checks() -> list[HealthCheckResult]:
             check_sns_posting_health,
             check_spike_delivery,
             check_kscore_distribution,
+            check_data_quality,
         ]
         for check_fn in db_checks:
             try:

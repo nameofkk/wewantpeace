@@ -185,6 +185,8 @@ def _get_fix_description(action: str, params: dict) -> str:
         return "미발행 SNS 포스트 재시도"
     elif action == "retry_spike_alerts":
         return "미전송 스파이크 알림 재발송"
+    elif action == "data_quality_cleanup":
+        return "데이터 품질 정리 (노이즈 재분류 + sev=0 비활성화 + 고아 정리)"
     return action
 
 
