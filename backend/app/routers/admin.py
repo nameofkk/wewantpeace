@@ -298,6 +298,14 @@ async def list_users(
     result = await db.execute(q)
     rows = result.all()
 
+    def _auth_provider(fuid: str) -> str:
+        """firebase_uid 패턴으로 로그인 방식 판별."""
+        if fuid.startswith("toss:"):
+            return "toss"
+        if fuid.startswith("apple:") or ".apple." in fuid:
+            return "apple"
+        return "google"
+
     def _sub_type(user_obj, s_status, s_billing_key, s_dodo_id):
         """구독 타입 판별: paid / trial / promo / admin / free"""
         if user_obj.plan == "free":
@@ -319,6 +327,7 @@ async def list_users(
             {
                 "id": str(u.id),
                 "email": u.email,
+                "auth_provider": _auth_provider(u.firebase_uid),
                 "nickname": u.nickname,
                 "display_name": u.display_name,
                 "plan": u.plan,
