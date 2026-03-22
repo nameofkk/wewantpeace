@@ -6,7 +6,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import httpx
 
@@ -22,8 +22,109 @@ PENDING_PREFIX = "health:pending:"
 APPROVAL_OFFSET_KEY = "health:tg_offset"
 PENDING_TTL = 86400  # 24시간
 
+# 체크 이름 → 한국어 라벨
+_CHECK_LABELS = {
+    "misclassification_rate": "미분류율",
+    "source_channels": "소스채널",
+    "cluster_quality": "클러스터 품질",
+    "openai_status": "OpenAI API",
+    "rss_freshness": "RSS 수집",
+    "api_sources": "API 소스",
+    "duplicate_rate": "중복률",
+    "fcm_push_health": "FCM Push",
+    "subscription_integrity": "구독 무결성",
+    "tension_index_health": "긴장도 지수",
+    "orphan_events": "고아 이벤트",
+    "sns_posting_health": "SNS 포스팅",
+    "sns_token_validity": "SNS 토큰",
+    "alert_delivery": "KScore 알림",
+    "kscore_distribution": "K점수 분포",
+    "data_quality": "데이터 품질",
+    "worker_resources": "리소스",
+    "celery_beat_health": "Celery Beat",
+    "redis_health": "Redis",
+}
+
 
 # ── 알림 발송 ───────────────────────────────────────────────────────────────
+
+
+def _build_report_message(results: list) -> tuple[str, list]:
+    """비서 스타일 리포트 메시지를 생성한다.
+
+    Returns:
+        (message_text, all_issues)
+    """
+    kst = timezone(timedelta(hours=9))
+    now_kst = datetime.now(kst).strftime("%m/%d %H:%M KST")
+
+    all_issues = []
+    ok_checks = []
+    warn_checks = []
+    crit_checks = []
+
+    for r in results:
+        label = _CHECK_LABELS.get(r.check_name, r.check_name)
+        for issue in r.issues:
+            all_issues.append(issue)
+        if r.status == "ok":
+            ok_checks.append(label)
+        elif r.status == "critical":
+            crit_checks.append((label, r.message))
+        else:
+            warn_checks.append((label, r.message))
+
+    total = len(results)
+    issue_count = len(crit_checks) + len(warn_checks)
+    fixable_count = sum(1 for i in all_issues if i.auto_fix_available)
+
+    # ── 요약 헤더 ──
+    if not crit_checks and not warn_checks:
+        verdict = "모든 항목 정상입니다."
+        header_icon = "\u2705"
+    elif crit_checks:
+        verdict = f"긴급 {len(crit_checks)}건, 주의 {len(warn_checks)}건 발견했습니다."
+        header_icon = "\U0001f6a8"
+    else:
+        verdict = f"주의 {len(warn_checks)}건 발견했습니다."
+        header_icon = "\u26a0\ufe0f"
+
+    lines = [
+        f"{header_icon} <b>시스템 점검 보고</b>  {now_kst}",
+        "",
+        f"\U0001f4cb <b>요약</b>: {total}개 항목 점검 완료. {verdict}",
+    ]
+
+    if fixable_count:
+        lines.append(f"\U0001f527 자동 수정 가능: {fixable_count}건 (아래 승인 버튼)")
+
+    # ── 긴급 사항 ──
+    if crit_checks:
+        lines.append("")
+        lines.append("\U0001f534 <b>긴급</b>")
+        for label, msg in crit_checks:
+            # 첫 줄만 간결하게
+            first_line = msg.split("\n")[0]
+            lines.append(f"  \u2022 <b>{label}</b>: {first_line}")
+
+    # ── 주의 사항 ──
+    if warn_checks:
+        lines.append("")
+        lines.append("\U0001f7e1 <b>주의</b>")
+        for label, msg in warn_checks:
+            first_line = msg.split("\n")[0]
+            lines.append(f"  \u2022 <b>{label}</b>: {first_line}")
+
+    # ── 정상 항목 (한 줄로) ──
+    if ok_checks:
+        lines.append("")
+        lines.append(f"\U0001f7e2 <b>정상</b> ({len(ok_checks)}개): {', '.join(ok_checks)}")
+
+    lines.append("")
+    lines.append("\u2500" * 24)
+    lines.append("WeWantPeace 시스템 비서 드림")
+
+    return "\n".join(lines), all_issues
 
 
 async def send_health_report(results: list) -> bool:
@@ -37,27 +138,8 @@ async def send_health_report(results: list) -> bool:
         logger.warning("텔레그램 봇 설정 누락 (SOCIAL_TG_BOT_TOKEN / SOCIAL_TG_CHAT_ID)")
         return False
 
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     redis = get_redis()
-
-    # 이슈가 있는 체크와 정상 체크 분리
-    all_issues = []
-    lines = [f"\U0001f3e5 시스템 헬스체크 — {now}\n"]
-
-    status_icons = {
-        "ok": "\U0001f7e2",       # 녹색 원
-        "warning": "\U0001f7e1",  # 노란 원
-        "critical": "\U0001f534", # 빨간 원
-    }
-
-    for r in results:
-        icon = status_icons.get(r.status, "\u2753")
-        lines.append(f"{icon} {r.message}")
-
-        for issue in r.issues:
-            all_issues.append(issue)
-
-    message = "\n".join(lines)
+    message, all_issues = _build_report_message(results)
 
     # 이슈 없으면 간단 메시지만 전송
     if not all_issues:
@@ -68,6 +150,7 @@ async def send_health_report(results: list) -> bool:
                     json={
                         "chat_id": SOCIAL_TG_CHAT_ID,
                         "text": message,
+                        "parse_mode": "HTML",
                         "disable_web_page_preview": True,
                     },
                 )
@@ -81,7 +164,6 @@ async def send_health_report(results: list) -> bool:
             return False
 
     # 이슈 있는 경우: 인라인 키보드와 함께 전송
-    # 먼저 메인 리포트 전송
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
@@ -89,6 +171,8 @@ async def send_health_report(results: list) -> bool:
                 json={
                     "chat_id": SOCIAL_TG_CHAT_ID,
                     "text": message,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
                 },
             )
             if resp.status_code != 200:
@@ -115,6 +199,7 @@ async def send_health_report(results: list) -> bool:
 
                 # 수정 내용 설명
                 fix_desc = _get_fix_description(issue.fix_action, issue.fix_params)
+                check_label = _CHECK_LABELS.get(issue.check_name, issue.check_name)
 
                 # 인라인 키보드
                 keyboard = {
@@ -133,8 +218,10 @@ async def send_health_report(results: list) -> bool:
                 }
 
                 issue_msg = (
-                    f"\U0001f527 수정 가능: {fix_desc}\n"
-                    f"action: {issue.fix_action}"
+                    f"\U0001f527 <b>수정 제안</b> [{check_label}]\n"
+                    f"\n"
+                    f"\u2022 조치: {fix_desc}\n"
+                    f"\u2022 승인하시면 즉시 실행합니다."
                 )
 
                 await client.post(
@@ -142,6 +229,7 @@ async def send_health_report(results: list) -> bool:
                     json={
                         "chat_id": SOCIAL_TG_CHAT_ID,
                         "text": issue_msg,
+                        "parse_mode": "HTML",
                         "reply_markup": keyboard,
                         "disable_web_page_preview": True,
                     },
@@ -211,16 +299,6 @@ async def process_approvals() -> dict:
     errors = 0
 
     try:
-        # 별도 offset 관리 — 기존 telegram_bot.py 폴링과 독립
-        # 단, 기존 봇이 이미 getUpdates로 offset을 진행시키므로,
-        # 여기서는 Redis에 저장된 pending action만 확인하는 방식으로 변경
-        # → getUpdates 대신, 기존 봇의 polling에 health callback 핸들러를 등록하는 것이 더 안전
-        #
-        # 그러나 기존 봇이 hfix:/hskip: 콜백을 모르므로,
-        # 여기서 짧은 timeout으로 별도 getUpdates를 수행합니다.
-        # 기존 봇과 offset 충돌을 피하기 위해, 이 함수는 callback만 처리하고
-        # offset을 전진시킵니다.
-
         offset_str = await redis.get(APPROVAL_OFFSET_KEY)
         offset = int(offset_str) if offset_str else 0
 
@@ -299,11 +377,14 @@ async def process_approvals() -> dict:
                     await redis.delete(pending_key)
                     skipped += 1
                     await _answer_callback(client, cq["id"], "무시됨")
+                    check_label = _CHECK_LABELS.get(
+                        action_info.get("check_name", ""), action_info["action"]
+                    )
                     await client.post(
                         f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
                         json={
                             "chat_id": SOCIAL_TG_CHAT_ID,
-                            "text": f"\u274c {username}님이 {action_info['action']} 무시함",
+                            "text": f"\u274c {username}님이 [{check_label}] 수정을 무시했습니다.",
                             "disable_web_page_preview": True,
                         },
                     )
@@ -339,15 +420,25 @@ async def _send_fix_result(
 ):
     """수정 결과를 텔레그램 채팅으로 전송."""
     try:
+        fix_desc = _get_fix_description(action, {})
+        kst = timezone(timedelta(hours=9))
+        now_kst = datetime.now(kst).strftime("%H:%M KST")
+
         text = (
-            f"\u2705 자동 수정 완료\n"
-            f"승인자: {username}\n"
-            f"Action: {action}\n"
-            f"결과: {result_msg[:500]}"
+            f"\u2705 <b>수정 완료 보고</b>  {now_kst}\n"
+            f"\n"
+            f"\u2022 조치: {fix_desc}\n"
+            f"\u2022 승인자: {username}\n"
+            f"\u2022 결과:\n{result_msg[:500]}"
         )
         await client.post(
             f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-            json={"chat_id": SOCIAL_TG_CHAT_ID, "text": text, "disable_web_page_preview": True},
+            json={
+                "chat_id": SOCIAL_TG_CHAT_ID,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            },
         )
     except Exception:
         logger.exception("수정 결과 알림 전송 오류")

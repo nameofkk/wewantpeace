@@ -3792,13 +3792,6 @@ def refresh_social_tokens(self):
         raise self.retry(exc=exc)
 
 
-@app.task(name="worker.tasks.send_daily_checklist", queue="process")
-def send_daily_checklist():
-    """Phase 1 마케팅 일일 체크리스트를 텔레그램으로 전송 (매일 KST 09:00)."""
-    from worker.social.daily_checklist import send_daily_checklist as _send
-    return _send()
-
-
 # ── 비활성 RSS 피드 자동 복구 ─────────────────────────────────────────────────
 
 
