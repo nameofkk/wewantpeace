@@ -44,14 +44,26 @@ function postToStoreKit(message: Record<string, unknown>): boolean {
   if (typeof window === "undefined") return false;
 
   // React Native 환경: 네이티브 브릿지 사용
-  if (window.__REACT_NATIVE__ && window.__nativeBridge) {
+  if (window.__REACT_NATIVE__ || window.ReactNativeWebView) {
     const action = message.action as string;
-    window.__nativeBridge.postToNative(
+    const msgType =
       action === "purchase" ? "PURCHASE_REQUEST" :
       action === "restore" ? "RESTORE_PURCHASES" :
-      action === "getProducts" ? "GET_PRODUCTS" : action,
-      message,
-    );
+      action === "getProducts" ? "GET_PRODUCTS" : action;
+
+    if (window.__nativeBridge) {
+      window.__nativeBridge.postToNative(msgType, message);
+    } else if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: msgType, payload: message }));
+    }
+
+    // __handleNativeMessage가 없으면 세팅 (결과 수신용)
+    if (!window.__handleNativeMessage) {
+      window.__handleNativeMessage = (msg: unknown) => {
+        window.dispatchEvent(new CustomEvent("nativeMessage", { detail: msg }));
+      };
+    }
+
     return true;
   }
 

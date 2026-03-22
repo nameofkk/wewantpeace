@@ -495,7 +495,7 @@ export default function SettingsPage() {
       }
     } else {
       // React Native 환경에서는 isPushSupported가 false를 반환하므로 별도 처리
-      const isRN = typeof window !== "undefined" && !!window.__REACT_NATIVE__;
+      const isRN = typeof window !== "undefined" && !!(window.__REACT_NATIVE__ || window.ReactNativeWebView);
       if (!isRN && !isPushSupported()) { setNotifStatus("unsupported"); return; }
       // 즉시 UI 반영
       setNotifStatus("done");

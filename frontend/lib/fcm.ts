@@ -51,7 +51,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 /** 알림 권한 요청 → FCM 토큰 획득 */
 export async function requestAndGetFCMToken(): Promise<string | null> {
   // React Native 환경: 네이티브 브릿지로 토큰 요청
-  if (typeof window !== "undefined" && window.__REACT_NATIVE__ && window.__nativeBridge) {
+  if (typeof window !== "undefined" && (window.__REACT_NATIVE__ || window.ReactNativeWebView)) {
+    // __handleNativeMessage가 없으면 세팅 (결과 수신용)
+    if (!window.__handleNativeMessage) {
+      window.__handleNativeMessage = (msg: unknown) => {
+        window.dispatchEvent(new CustomEvent("nativeMessage", { detail: msg }));
+      };
+    }
+
     return new Promise<string | null>((resolve) => {
       const handler = (e: Event) => {
         const msg = (e as CustomEvent).detail;
@@ -68,7 +75,15 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
         window.removeEventListener("nativeMessage", handler);
         resolve(null);
       }, 10_000);
-      window.__nativeBridge!.postToNative("GET_FCM_TOKEN", {});
+
+      if (window.__nativeBridge) {
+        window.__nativeBridge.postToNative("GET_FCM_TOKEN", {});
+      } else if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: "GET_FCM_TOKEN", payload: {} }));
+      } else {
+        window.removeEventListener("nativeMessage", handler);
+        resolve(null);
+      }
     });
   }
 
@@ -134,7 +149,7 @@ export async function requestAndGetFCMToken(): Promise<string | null> {
 /** 포그라운드 메시지 수신 리스너 등록 (탭이 활성 상태일 때) */
 export async function setupForegroundListener(): Promise<void> {
   // React Native 환경: 네이티브가 포그라운드 메시지를 처리하므로 skip
-  if (typeof window !== "undefined" && window.__REACT_NATIVE__) return;
+  if (typeof window !== "undefined" && (window.__REACT_NATIVE__ || window.ReactNativeWebView)) return;
 
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;

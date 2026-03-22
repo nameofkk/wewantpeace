@@ -73,7 +73,16 @@ export async function purchaseSubscription(
   authToken?: string,
 ): Promise<string | null> {
   // React Native 환경: 네이티브 브릿지로 결제 요청
-  if (typeof window !== "undefined" && window.__REACT_NATIVE__ && window.__nativeBridge) {
+  // ReactNativeWebView는 RN WebView가 네이티브 레벨에서 자동 주입하므로
+  // injectedJavaScriptBeforeContentLoaded 실패 시에도 항상 존재
+  if (typeof window !== "undefined" && (window.__REACT_NATIVE__ || window.ReactNativeWebView)) {
+    // __handleNativeMessage가 없으면 세팅 (결과 수신용)
+    if (!window.__handleNativeMessage) {
+      window.__handleNativeMessage = (msg: unknown) => {
+        window.dispatchEvent(new CustomEvent("nativeMessage", { detail: msg }));
+      };
+    }
+
     return new Promise((resolve, reject) => {
       const handler = (e: Event) => {
         const msg = (e as CustomEvent).detail;
@@ -89,10 +98,24 @@ export async function purchaseSubscription(
         }
       };
       window.addEventListener("nativeMessage", handler);
-      window.__nativeBridge!.postToNative("PURCHASE_REQUEST", {
-        productId,
-        authToken: authToken || "",
+
+      const message = JSON.stringify({
+        type: "PURCHASE_REQUEST",
+        payload: { productId, authToken: authToken || "" },
       });
+
+      // __nativeBridge가 있으면 사용, 없으면 ReactNativeWebView.postMessage 직접 사용
+      if (window.__nativeBridge) {
+        window.__nativeBridge.postToNative("PURCHASE_REQUEST", {
+          productId,
+          authToken: authToken || "",
+        });
+      } else if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(message);
+      } else {
+        window.removeEventListener("nativeMessage", handler);
+        reject(new Error("네이티브 브릿지를 사용할 수 없습니다."));
+      }
     });
   }
 
