@@ -291,43 +291,49 @@ def check_frontend_health() -> dict:
 
 def format_report(results: list[dict]) -> str:
     """콘솔 + 텔레그램용 텍스트 포맷."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    lines = [f"📊 WeWantPeace 서비스 상태 리포트", f"🕐 {now}", ""]
+    from datetime import timedelta
+    kst = timezone(timedelta(hours=9))
+    now_str = datetime.now(kst).strftime("%m/%d %H:%M")
 
     warnings = []
+    ok_items = []
     for r in results:
-        icon = {"ok": "✅", "warn": "⚠️", "error": "❌", "skip": "⏭️"}.get(
-            r["status"], "❓"
-        )
-        lines.append(f"{icon} {r['name']}")
-        lines.append(f"   {r.get('message', '')}")
-
-        # 세부 정보 (Railway 크레딧 등 핵심만)
-        details = r.get("details", {})
-        for k in ("credit_balance", "current_usage", "estimated_monthly",
-                   "billing_period", "services"):
-            if k in details:
-                label = {
-                    "credit_balance": "크레딧 잔액",
-                    "current_usage": "이번 달 사용량",
-                    "estimated_monthly": "예상 월 비용",
-                    "billing_period": "빌링 기간",
-                    "services": "서비스",
-                }.get(k, k)
-                lines.append(f"   └ {label}: {details[k]}")
-
-        lines.append("")
-
         if r["status"] in ("warn", "error"):
             warnings.append(r)
+        else:
+            ok_items.append(r)
 
     if warnings:
-        lines.append("━" * 35)
-        lines.append("🚨 주의 필요 항목:")
-        for w in warnings:
-            lines.append(f"  ▸ {w['name']}: {w.get('message', '')}")
+        verdict = f"{len(warnings)}개 항목에서 주의가 필요합니다."
     else:
-        lines.append("✅ 모든 서비스 정상!")
+        verdict = "모든 서비스 정상 가동 중입니다."
+
+    lines = [
+        "<b>서비스 잔량/상태 점검 보고</b>",
+        f"{now_str} 기준",
+        "",
+        f"대표님, {len(results)}개 서비스 점검 결과를 보고 드립니다. {verdict}",
+    ]
+
+    if warnings:
+        lines.append("")
+        lines.append("<b>[주의]</b>")
+        for w in warnings:
+            lines.append(f"  - {w['name']}: {w.get('message', '')}")
+            details = w.get("details", {})
+            for k in ("credit_balance", "current_usage", "estimated_monthly"):
+                if k in details:
+                    label = {"credit_balance": "크레딧", "current_usage": "사용량",
+                             "estimated_monthly": "예상 비용"}.get(k, k)
+                    lines.append(f"    {label}: {details[k]}")
+
+    if ok_items:
+        lines.append("")
+        lines.append(f"<b>[정상]</b> {len(ok_items)}개: {', '.join(r['name'] for r in ok_items)}")
+
+    lines.append("")
+    lines.append("이상 보고 드립니다.")
+    lines.append("<i>WeWantPeace 시스템 비서</i>")
 
     return "\n".join(lines)
 
