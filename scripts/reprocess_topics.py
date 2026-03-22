@@ -25,7 +25,7 @@ from sqlalchemy import text
 from backend.app.core.database import AsyncSessionLocal
 from worker.processor.normalizer import (
     _classify_topic, _classify_sub_topic, _extract_geo, _make_geohash,
-    _calculate_severity, is_relevant, NormalizeResult,
+    _calculate_severity, is_relevant, NormalizeResult, _is_entertainment_noise,
 )
 
 FORCE_ALL = "--all" in sys.argv
@@ -64,6 +64,12 @@ async def step1_reprocess_events(db):
         new_geohash = _make_geohash(new_lat, new_lon)
         new_severity = _calculate_severity(combined, new_topic)
         new_sub_topic = _classify_sub_topic(combined, new_topic)
+
+        # 엔터테인먼트/K-pop/관광 노이즈 후처리
+        if _is_entertainment_noise(combined, title=row.title):
+            new_topic = "unknown"
+            new_sub_topic = "general"
+            new_severity = 0
 
         if (not FORCE_ALL
                 and new_topic == row.topic

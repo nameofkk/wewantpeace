@@ -77,6 +77,7 @@ Given a news article title and body, classify it into exactly ONE topic and assi
 - Leader sentenced/arrested for past coup/insurrection → coup (not diplomacy)
 - Read the FULL body context before deciding. Title alone can be misleading.
 - When casualties are explicitly mentioned, severity MUST reflect the scale above.
+- Entertainment/K-pop/celebrity/tourism articles with NO conflict angle → diplomacy with severity 0. Example: "BTS comeback boosts Korean tourism" → severity 0.
 
 ## Sub-topic (optional refinement within topic):
 For "conflict": nk_provocation | military_exercise | geopolitical_response | active_combat | arms_transfer | general
@@ -1792,6 +1793,30 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"(in memory of|pay respects|laying wreaths?|wreath.laying)",
 ]]
 
+# ── 엔터테인먼트/관광 노이즈 패턴 ──────────────────────────────────────────
+# K-pop, 아이돌, 관광 등 분쟁 서비스에 무관한 콘텐츠 감지.
+# _is_entertainment_noise() 에서 strong conflict 키워드가 없을 때만 필터링됨.
+_ENTERTAINMENT_NOISE_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+    # K-pop 그룹/아이돌
+    r"\b(bts|bangtan|blackpink|exo|twice|nct|seventeen|stray kids|aespa|newjeans)\b",
+    r"\b(le sserafim|ive\b|txt\b|enhypen|ateez|itzy|mamamoo|red velvet|got7)\b",
+    r"\b(g\)?i-?dle|monsta\s*x|super\s*junior|big\s*bang|2ne1|wonder\s*girls|shinee)\b",
+    r"\b(k-?pop|k pop|hallyu|한류)\b",
+    r"\b(idol|아이돌)\b.{0,60}\b(comeback|tour|concert|album|fan|debut|chart)\b",
+    # 컴백/공연/앨범 (엔터테인먼트 맥락)
+    r"\b(comeback|컴백)\b.{0,80}\b(stage|무대|concert|콘서트|album|앨범|tour|투어|fan meeting|팬미팅)\b",
+    r"\b(concert|콘서트|fan meeting|팬미팅|music festival|음악 축제)\b.{0,60}\b(ticket|sold out|매진|lineup|라인업)\b",
+    # 음악 차트/시상식
+    r"\b(billboard|melon|spotify|music chart|album chart|gaon|hanteo)\b.{0,40}\b(chart|rank|top|hit|stream)\b",
+    # 관광 (위협 문맥 아닌 경우)
+    r"\b(tourism|관광)\b.{0,80}\b(boom|revenue|arrivals|industry|visitors|boost|growth|record|increase|증가|호황|수입|활성화)\b",
+    r"\b(tourist arrivals|관광객 증가|travel destination|여행지|inbound tourism|방한 관광)\b",
+    # 한국 엔터테인먼트/문화 수출
+    r"\b(korean wave|문화 수출|cultural export|soft power)\b.{0,60}\b(drama|music|k-?pop|film|movie|entertainment)\b",
+    # 연예 뉴스 일반
+    r"\b(celebrity|연예인|pop star|가수)\b.{0,60}\b(dating|wedding|marriage|divorce|pregnancy|baby|scandal|comeback)\b",
+]]
+
 _RESPONSE_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"정부[의가이]?\s*(대응|발표|입장|조치|방안|성명)",
     r"대응\s*(방안|책|조치|계획|전략)",
@@ -1903,6 +1928,32 @@ def _has_non_military_context(text: str) -> bool:
         if p.search(text):
             return True
     return False
+
+
+def _is_entertainment_noise(text: str, title: str | None = None) -> bool:
+    """엔터테인먼트/K-pop/관광 노이즈 감지.
+
+    패턴 매칭 후, 강력한 분쟁/테러 키워드가 없으면 노이즈로 판정.
+    제목에서 엔터테인먼트 패턴 매칭 시 → 제목에서만 분쟁 키워드 체크
+    (뉴스 라운드업에서 "BTS 복귀" + "이란 전쟁" 병기 시 분쟁으로 오분류 방지)
+    """
+    text_lower = text.lower()
+    title_lower = (title or "").lower()
+
+    # 제목에서 엔터테인먼트 패턴 매칭
+    title_match = title_lower and any(p.search(title_lower) for p in _ENTERTAINMENT_NOISE_PATTERNS)
+    body_match = any(p.search(text_lower) for p in _ENTERTAINMENT_NOISE_PATTERNS)
+
+    if not title_match and not body_match:
+        return False
+
+    # 분쟁 키워드 검사 대상: 제목 매칭이면 제목만, 아니면 전체 텍스트
+    check_text = title_lower if title_match else text_lower
+    for topic in ("conflict", "terror", "coup", "disaster"):
+        for kw in _STRONG_KEYWORDS.get(topic, set()):
+            if _kw_in_text(kw, check_text):
+                return False
+    return True
 
 
 _EN_SUFFIXES = ("s", "es", "ed", "ing", "er", "ers", "ion", "ions", "ment", "ments")
@@ -2150,6 +2201,15 @@ def normalize(
         severity = _calculate_severity(text_for_analysis, topic, title=source_title)
         sub_topic = _classify_sub_topic(text_for_analysis, topic)
         logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, _title_for_ai[:60])
+
+    # 엔터테인먼트/K-pop/관광 노이즈 후처리 — AI·규칙 분류 모두에 적용
+    _combined_text = f"{source_title or ''} {text_for_analysis}"
+    if _is_entertainment_noise(_combined_text, title=source_title):
+        logger.info("엔터테인먼트 노이즈 감지 → unknown/sev=0 (제목: %s)", _title_for_ai[:60])
+        topic = "unknown"
+        sub_topic = "general"
+        severity = 0
+
     # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
     country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
