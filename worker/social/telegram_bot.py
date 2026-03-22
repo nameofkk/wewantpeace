@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 SOCIAL_TG_BOT_TOKEN = os.getenv("SOCIAL_TG_BOT_TOKEN", "")
 SOCIAL_TG_CHAT_ID = os.getenv("SOCIAL_TG_CHAT_ID", "")
 
-_RISK_EMOJI = {"low": "\U0001f7e2", "medium": "\U0001f7e1", "high": "\U0001f534"}
 _CONTENT_TYPE_LABEL = {
     "daily_movers": "Daily Movers",
     "kscore_alert": "KScore Alert",
@@ -40,7 +39,6 @@ async def send_review_message(post: SocialPost) -> bool:
             SOCIAL_PLATFORM_THREADS_ENABLED,
         )
 
-        risk_emoji = _RISK_EMOJI.get(post.risk_level, "\u26aa")
         content_label = _CONTENT_TYPE_LABEL.get(post.content_type, post.content_type)
         hashtag_str = " ".join(post.hashtags) if post.hashtags else ""
         post_id_str = str(post.id)
@@ -50,11 +48,9 @@ async def send_review_message(post: SocialPost) -> bool:
             if SOCIAL_PLATFORM_X_ENABLED:
                 x_text = x_build_text(post)
                 x_msg = (
-                    f"\U0001d54f [X] [{content_label}]\n"
-                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-                    f"{x_text}\n"
-                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-                    f"280\uc790 \uc911 {len(x_text)}\uc790 | Risk: {risk_emoji} {post.risk_level}"
+                    f"<b>[X 미리보기]</b> {content_label}\n\n"
+                    f"{x_text}\n\n"
+                    f"{len(x_text)}/280자 | 리스크: {post.risk_level}"
                 )
                 x_keyboard = {
                     "inline_keyboard": [[
@@ -75,11 +71,9 @@ async def send_review_message(post: SocialPost) -> bool:
             if SOCIAL_PLATFORM_THREADS_ENABLED:
                 threads_text = threads_build_text(post)
                 threads_msg = (
-                    f"\U0001f9f5 [Threads] [{content_label}]\n"
-                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-                    f"{threads_text}\n"
-                    f"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-                    f"500\uc790 \uc911 {len(threads_text)}\uc790 | Risk: {risk_emoji} {post.risk_level}"
+                    f"<b>[Threads 미리보기]</b> {content_label}\n\n"
+                    f"{threads_text}\n\n"
+                    f"{len(threads_text)}/500자 | 리스크: {post.risk_level}"
                 )
                 threads_keyboard = {
                     "inline_keyboard": [[
@@ -98,7 +92,7 @@ async def send_review_message(post: SocialPost) -> bool:
 
             # 3. 요약 메시지 (항상) — 이미지 있으면 sendPhoto
             summary_text = (
-                f"\U0001f4e2 [{content_label}] \uc2b9\uc778 \uc694\uccad\n"
+                f"대표님, {content_label} 게시물 승인 요청 드립니다.\n"
                 f"ID: {post_id_str}\n"
                 f"{hashtag_str}"
             )

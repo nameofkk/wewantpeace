@@ -3543,7 +3543,13 @@ def evaluate_source_reliability(self):
                 return {"status": "no_events_this_week"}
 
             # 리포트 생성
-            lines = [f"📊 <b>소스 신뢰도 주간 리포트</b>", f"기간: {week_ago.date()} ~ {now.date()}", ""]
+            lines = [
+                f"<b>소스 신뢰도 주간 보고</b>",
+                f"{week_ago.date()} ~ {now.date()}",
+                "",
+                f"대표님, 금주 소스채널 신뢰도 분석 결과를 보고 드립니다.",
+                "",
+            ]
 
             for row in sorted(rows, key=lambda r: r.total, reverse=True):
                 ch = channels.get(row.source_channel_id)
@@ -3569,6 +3575,9 @@ def evaluate_source_reliability(self):
                     f"심각도 평균 {avg_sev} (σ {sev_dev}){warn}"
                 )
 
+            lines.append("")
+            lines.append("이상 보고 드립니다.")
+            lines.append("<i>WeWantPeace 시스템 비서</i>")
             report_text = "\n".join(lines)
 
             # Telegram 전송
