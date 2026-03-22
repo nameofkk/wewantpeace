@@ -25,12 +25,26 @@ interface AdminUser {
   created_at: string;
   last_active: string | null;
   visit_count: number;
+  sub_type: "paid" | "trial" | "promo" | "admin" | "free";
+  sub_started_at: string | null;
+  sub_expires_at: string | null;
+  sub_trial_start: string | null;
+  sub_trial_end: string | null;
+  sub_platform: string | null;
 }
 
 const PLAN_BADGE: Record<string, string> = {
   free: "bg-secondary text-muted-foreground",
   pro: "bg-yellow-500/20 text-yellow-400",
   pro_plus: "bg-purple-500/20 text-purple-400",
+};
+
+const SUB_TYPE_BADGE: Record<string, { bg: string; label_ko: string; label_en: string }> = {
+  paid: { bg: "bg-green-500/20 text-green-400", label_ko: "실결제", label_en: "Paid" },
+  trial: { bg: "bg-blue-500/20 text-blue-400", label_ko: "체험판", label_en: "Trial" },
+  promo: { bg: "bg-orange-500/20 text-orange-400", label_ko: "프로모", label_en: "Promo" },
+  admin: { bg: "bg-indigo-500/20 text-indigo-400", label_ko: "관리자부여", label_en: "Admin" },
+  free: { bg: "bg-secondary text-muted-foreground", label_ko: "무료", label_en: "Free" },
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -59,6 +73,40 @@ function timeAgo(dateStr: string | null, locale: string): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}${locale === "ko-KR" ? "일 전" : "d ago"}`;
   return new Date(dateStr).toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
+function subDateInfo(u: AdminUser, ko: boolean, locale: string): string {
+  if (u.plan === "free" || u.sub_type === "free") return "";
+  if (u.sub_type === "trial") {
+    const start = u.sub_trial_start || u.sub_started_at;
+    const end = u.sub_trial_end || u.sub_expires_at;
+    if (start && end) {
+      const s = new Date(start).toLocaleDateString(locale, { month: "short", day: "numeric" });
+      const e = new Date(end).toLocaleDateString(locale, { month: "short", day: "numeric" });
+      return `${s} ~ ${e}`;
+    }
+    if (end) {
+      const e = new Date(end).toLocaleDateString(locale, { month: "short", day: "numeric" });
+      return ko ? `~${e}` : `~${e}`;
+    }
+    return "";
+  }
+  if (u.sub_type === "paid") {
+    const d = u.sub_started_at;
+    if (d) return new Date(d).toLocaleDateString(locale, { month: "short", day: "numeric" });
+    return "";
+  }
+  // promo / admin
+  const start = u.sub_started_at;
+  const end = u.sub_expires_at;
+  if (start && end) {
+    const s = new Date(start).toLocaleDateString(locale, { month: "short", day: "numeric" });
+    const e = new Date(end).toLocaleDateString(locale, { month: "short", day: "numeric" });
+    return `${s} ~ ${e}`;
+  }
+  if (end) return `~${new Date(end).toLocaleDateString(locale, { month: "short", day: "numeric" })}`;
+  if (start) return new Date(start).toLocaleDateString(locale, { month: "short", day: "numeric" });
+  return "";
 }
 
 export default function AdminUsersPage() {
@@ -313,20 +361,33 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3" onClick={(e) => tab === "active" && e.stopPropagation()}>
-                      {tab === "active" ? (
-                        <select
-                          value={u.plan}
-                          onChange={(e) => patchMutation.mutate({ userId: u.id, body: { plan: e.target.value } })}
-                          className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold border-0 outline-none cursor-pointer", PLAN_BADGE[u.plan] || "bg-secondary")}
-                        >
-                          <option value="free">FREE</option>
-                          <option value="pro">PRO</option>
-                          <option value="pro_plus">PRO+</option>
-                        </select>
-                      ) : (
-                        <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold", PLAN_BADGE[u.plan] || "bg-secondary")}>
-                          {u.plan.toUpperCase()}
-                        </span>
+                      <div className="flex items-center gap-1.5">
+                        {tab === "active" ? (
+                          <select
+                            value={u.plan}
+                            onChange={(e) => patchMutation.mutate({ userId: u.id, body: { plan: e.target.value } })}
+                            className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold border-0 outline-none cursor-pointer shrink-0", PLAN_BADGE[u.plan] || "bg-secondary")}
+                          >
+                            <option value="free">FREE</option>
+                            <option value="pro">PRO</option>
+                            <option value="pro_plus">PRO+</option>
+                          </select>
+                        ) : (
+                          <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold shrink-0", PLAN_BADGE[u.plan] || "bg-secondary")}>
+                            {u.plan.toUpperCase()}
+                          </span>
+                        )}
+                        {u.plan !== "free" && (
+                          <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-medium whitespace-nowrap shrink-0", SUB_TYPE_BADGE[u.sub_type]?.bg || "bg-secondary")}>
+                            {ko ? SUB_TYPE_BADGE[u.sub_type]?.label_ko : SUB_TYPE_BADGE[u.sub_type]?.label_en}
+                          </span>
+                        )}
+                      </div>
+                      {u.plan !== "free" && subDateInfo(u, ko, locale) && (
+                        <p className="text-[9px] text-muted-foreground mt-0.5 whitespace-nowrap">
+                          {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : ""}
+                          {subDateInfo(u, ko, locale)}
+                        </p>
                       )}
                     </td>
                     {tab === "active" && (
@@ -410,15 +471,20 @@ export default function AdminUsersPage() {
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", PLAN_BADGE[u.plan] || "bg-secondary")}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold shrink-0", PLAN_BADGE[u.plan] || "bg-secondary")}>
                       {u.plan.toUpperCase()}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
+                    {u.plan !== "free" && (
+                      <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-medium shrink-0", SUB_TYPE_BADGE[u.sub_type]?.bg || "bg-secondary")}>
+                        {ko ? SUB_TYPE_BADGE[u.sub_type]?.label_ko : SUB_TYPE_BADGE[u.sub_type]?.label_en}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground shrink-0">
                       {ko ? "방문" : "Visits"} {u.visit_count}
                     </span>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0 ml-2">
                     <p className="text-[10px] text-muted-foreground">
                       {u.last_active && u.last_active !== u.created_at
                         ? timeAgo(u.last_active, locale)
@@ -427,6 +493,12 @@ export default function AdminUsersPage() {
                     </p>
                   </div>
                 </div>
+                {u.plan !== "free" && subDateInfo(u, ko, locale) && (
+                  <p className="text-[9px] text-muted-foreground mt-1 whitespace-nowrap">
+                    {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : u.sub_type === "trial" ? (ko ? "체험 " : "Trial ") : ""}
+                    {subDateInfo(u, ko, locale)}
+                  </p>
+                )}
                 {tab === "active" && (
                   <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
                     <select

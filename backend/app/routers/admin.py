@@ -253,10 +253,32 @@ async def list_users(
         .subquery()
     )
 
-    # paginated rows with visit_count
+    # active subscription subquery (최신 1건)
+    sub_sub = (
+        select(Subscription)
+        .where(Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]))
+        .order_by(Subscription.created_at.desc())
+        .correlate(User)
+        .limit(1)
+        .subquery()
+    )
+
+    # paginated rows with visit_count + subscription
     q = (
-        select(User, func.coalesce(visit_sub.c.visit_count, 0).label("visit_count"))
+        select(
+            User,
+            func.coalesce(visit_sub.c.visit_count, 0).label("visit_count"),
+            sub_sub.c.status.label("sub_status"),
+            sub_sub.c.billing_key.label("sub_billing_key"),
+            sub_sub.c.dodo_subscription_id.label("sub_dodo_id"),
+            sub_sub.c.started_at.label("sub_started_at"),
+            sub_sub.c.expires_at.label("sub_expires_at"),
+            sub_sub.c.trial_start.label("sub_trial_start"),
+            sub_sub.c.trial_end.label("sub_trial_end"),
+            sub_sub.c.platform.label("sub_platform"),
+        )
         .outerjoin(visit_sub, User.id == visit_sub.c.user_id)
+        .outerjoin(sub_sub, User.id == sub_sub.c.user_id)
     )
     if filters:
         q = q.where(and_(*filters))
@@ -276,6 +298,21 @@ async def list_users(
     result = await db.execute(q)
     rows = result.all()
 
+    def _sub_type(user_obj, s_status, s_billing_key, s_dodo_id):
+        """구독 타입 판별: paid / trial / promo / admin / free"""
+        if user_obj.plan == "free":
+            return "free"
+        if s_status == "trial":
+            return "trial"
+        if s_status in ("active", "grace_period", "billing_retry"):
+            if s_billing_key or s_dodo_id:
+                return "paid"
+            return "promo"
+        # 구독 없지만 plan != free → 어드민 수동 부여
+        if user_obj.admin_plan_override:
+            return "admin"
+        return "promo"
+
     return {
         "total": total,
         "users": [
@@ -290,8 +327,14 @@ async def list_users(
                 "created_at": u.created_at.isoformat(),
                 "last_active": u.last_active.isoformat() if u.last_active else None,
                 "visit_count": vc,
+                "sub_type": _sub_type(u, sub_status, sub_bk, sub_dodo),
+                "sub_started_at": sub_started.isoformat() if sub_started else None,
+                "sub_expires_at": sub_expires.isoformat() if sub_expires else None,
+                "sub_trial_start": sub_ts.isoformat() if sub_ts else None,
+                "sub_trial_end": sub_te.isoformat() if sub_te else None,
+                "sub_platform": sub_plat,
             }
-            for u, vc in rows
+            for u, vc, sub_status, sub_bk, sub_dodo, sub_started, sub_expires, sub_ts, sub_te, sub_plat in rows
         ],
     }
 
