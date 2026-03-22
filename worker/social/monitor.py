@@ -252,19 +252,21 @@ async def send_monitoring_alert(results: list[CheckResult]) -> bool:
     kst = timezone(_td(hours=9))
     now_kst = datetime.now(kst).strftime("%H:%M KST")
 
-    lines = []
+    lines = [f"<b>서비스 이상 감지 보고</b>", f"{now_kst} 기준", ""]
+
     if alerts:
-        lines.append(f"\U0001f6a8 <b>서비스 이상 보고</b>  {now_kst}\n")
+        lines.append("대표님, 아래 항목에서 이상이 감지되었습니다.")
+        lines.append("")
         lines.extend(alerts)
     if resolved:
         if alerts:
             lines.append("")
-        lines.append("\u2705 <b>해결됨</b>")
+        lines.append("<b>[해결됨]</b>")
         lines.extend(resolved)
 
     lines.append("")
-    lines.append("\u2500" * 24)
-    lines.append("WeWantPeace 시스템 비서 드림")
+    lines.append("확인 부탁드립니다.")
+    lines.append(f"<i>WeWantPeace 시스템 비서</i>")
 
     message = "\n".join(lines)
 
@@ -310,24 +312,25 @@ async def handle_status_command() -> str:
             fail_items.append(f"\u2022 {r.name}: {r.detail}")
 
     if all_ok:
-        verdict = "모든 항목 정상입니다."
+        verdict = "8개 항목 모두 정상 가동 중입니다."
     else:
-        verdict = f"{len(fail_items)}건 이상 감지했습니다."
+        verdict = f"8개 항목 중 {len(fail_items)}건에서 이상이 확인되었습니다."
 
     lines = [
-        f"\U0001f4cb <b>시스템 현황 보고</b>  {now_kst}",
+        f"<b>시스템 현황 보고</b>",
+        f"{now_kst} 기준",
         "",
-        f"\U0001f4ac <b>요약</b>: 8개 항목 점검 완료. {verdict}",
+        f"대표님, {verdict}",
     ]
 
     if fail_items:
         lines.append("")
-        lines.append("\U0001f534 <b>이상</b>")
+        lines.append("<b>[이상]</b>")
         lines.extend(fail_items)
 
     if ok_names:
         lines.append("")
-        lines.append(f"\U0001f7e2 <b>정상</b> ({len(ok_names)}개): {', '.join(ok_names)}")
+        lines.append(f"<b>[정상]</b> {len(ok_names)}개: {', '.join(ok_names)}")
 
     # 추가 통계
     try:
@@ -369,8 +372,8 @@ async def handle_status_command() -> str:
         lines.append(f"\n\u2022 통계 조회 오류: {e}")
 
     lines.append("")
-    lines.append("\u2500" * 24)
-    lines.append("WeWantPeace 시스템 비서 드림")
+    lines.append("이상 보고 드립니다.")
+    lines.append(f"<i>WeWantPeace 시스템 비서</i>")
 
     return "\n".join(lines)
 

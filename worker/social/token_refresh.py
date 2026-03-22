@@ -136,11 +136,13 @@ async def refresh_threads_token() -> dict:
         detail = f"Threads 토큰 갱신 3회 시도 실패: {last_error}"
         logger.error(detail)
         await _send_admin_alert(
-            f"\U0001f6a8 <b>긴급 보고: Threads 토큰 갱신 실패</b>\n\n"
-            f"\u2022 사유: {last_error}\n"
-            f"\u2022 3회 재시도 모두 실패했습니다.\n"
-            f"\u2022 수동 갱신이 필요합니다.\n\n"
-            f"\u2500" * 24 + f"\nWeWantPeace 시스템 비서 드림"
+            f"<b>긴급 보고: Threads 토큰 갱신 실패</b>\n"
+            f"\n"
+            f"대표님, Threads 토큰 갱신을 3회 시도했으나 모두 실패했습니다.\n"
+            f"사유: {last_error}\n"
+            f"\n"
+            f"수동 갱신이 필요하오니 확인 부탁드립니다.\n"
+            f"<i>WeWantPeace 시스템 비서</i>"
         )
         return {"status": "error", "detail": detail, "expires_in": None}
 
@@ -152,10 +154,11 @@ async def refresh_threads_token() -> dict:
         detail = f"응답에 access_token 누락: {data}"
         logger.error(detail)
         await _send_admin_alert(
-            f"\U0001f6a8 <b>긴급 보고: Threads 토큰 갱신 실패</b>\n\n"
-            f"\u2022 사유: API 응답에 access_token이 누락되었습니다.\n"
-            f"\u2022 수동 갱신이 필요합니다.\n\n"
-            + "\u2500" * 24 + "\nWeWantPeace 시스템 비서 드림"
+            f"<b>긴급 보고: Threads 토큰 갱신 실패</b>\n"
+            f"\n"
+            f"대표님, Threads API 응답에 access_token이 누락되어 갱신에 실패했습니다.\n"
+            f"수동 갱신이 필요하오니 확인 부탁드립니다.\n"
+            f"<i>WeWantPeace 시스템 비서</i>"
         )
         return {"status": "error", "detail": detail, "expires_in": None}
 
@@ -172,10 +175,11 @@ async def refresh_threads_token() -> dict:
     railway_ok = await _update_railway_env_var("THREADS_ACCESS_TOKEN", new_token)
     if not railway_ok:
         await _send_admin_alert(
-            "\u26a0\ufe0f <b>보고: Threads 토큰 갱신 부분 완료</b>\n\n"
-            "\u2022 토큰 자체는 갱신되었으나, Railway 환경변수 업데이트에 실패했습니다.\n"
-            "\u2022 Railway 대시보드에서 THREADS_ACCESS_TOKEN을 수동 업데이트해주세요.\n\n"
-            + "\u2500" * 24 + "\nWeWantPeace 시스템 비서 드림"
+            "<b>보고: Threads 토큰 갱신 부분 완료</b>\n"
+            "\n"
+            "대표님, Threads 토큰 자체는 정상 갱신되었으나 Railway 환경변수 업데이트에 실패했습니다.\n"
+            "Railway 대시보드에서 THREADS_ACCESS_TOKEN을 수동 업데이트해 주시기 바랍니다.\n"
+            "<i>WeWantPeace 시스템 비서</i>"
         )
         return {
             "status": "ok",
@@ -186,10 +190,11 @@ async def refresh_threads_token() -> dict:
     # Step 4: 성공 알림
     days = (expires_in or 0) // 86400
     await _send_admin_alert(
-        f"\u2705 <b>보고: Threads 토큰 갱신 완료</b>\n\n"
-        f"\u2022 새 토큰 만료: {days}일 후\n"
-        f"\u2022 Railway 환경변수 업데이트 완료\n\n"
-        + "\u2500" * 24 + "\nWeWantPeace 시스템 비서 드림"
+        f"<b>보고: Threads 토큰 갱신 완료</b>\n"
+        f"\n"
+        f"대표님, Threads 토큰 정상 갱신 완료했습니다.\n"
+        f"새 토큰 만료일은 {days}일 후이며, Railway 환경변수도 업데이트되었습니다.\n"
+        f"<i>WeWantPeace 시스템 비서</i>"
     )
 
     return {
