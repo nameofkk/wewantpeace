@@ -238,24 +238,33 @@ async def send_monitoring_alert(results: list[CheckResult]) -> bool:
             # 30분 내 동일 알림 방지
             if not was_bad:
                 await redis.set(cache_key, "1", ex=_ALERT_COOLDOWN)
-                alerts.append(f"🔴 {r.name}: {r.detail}")
+                alerts.append(f"\U0001f534 {r.name}: {r.detail}")
         else:
             # 이전에 이상이었다가 해결된 경우
             if was_bad:
                 await redis.delete(cache_key)
-                resolved.append(f"✅ {r.name}: 해결됨")
+                resolved.append(f"\u2022 {r.name}: 해결됨")
 
     if not alerts and not resolved:
         return False
 
+    from datetime import timedelta as _td
+    kst = timezone(_td(hours=9))
+    now_kst = datetime.now(kst).strftime("%H:%M KST")
+
     lines = []
     if alerts:
-        lines.append("⚠️ *서비스 이상 감지*\n")
+        lines.append(f"\U0001f6a8 <b>서비스 이상 보고</b>  {now_kst}\n")
         lines.extend(alerts)
     if resolved:
         if alerts:
             lines.append("")
+        lines.append("\u2705 <b>해결됨</b>")
         lines.extend(resolved)
+
+    lines.append("")
+    lines.append("\u2500" * 24)
+    lines.append("WeWantPeace 시스템 비서 드림")
 
     message = "\n".join(lines)
 
@@ -268,7 +277,7 @@ async def send_monitoring_alert(results: list[CheckResult]) -> bool:
                 json={
                     "chat_id": SOCIAL_TG_CHAT_ID,
                     "text": message,
-                    "parse_mode": "Markdown",
+                    "parse_mode": "HTML",
                     "disable_web_page_preview": True,
                 },
             )
@@ -286,13 +295,39 @@ async def handle_status_command() -> str:
     """8가지 헬스 체크 결과 + 서비스 요약을 포맷팅."""
     results = await check_service_health()
 
-    lines = ["📊 *WeWantPeace 시스템 상태*\n"]
+    from datetime import timedelta as _td
+    kst = timezone(_td(hours=9))
+    now_kst = datetime.now(kst).strftime("%H:%M KST")
+
     all_ok = True
+    ok_names = []
+    fail_items = []
     for r in results:
-        icon = "✅" if r.ok else "🔴"
-        if not r.ok:
+        if r.ok:
+            ok_names.append(r.name)
+        else:
             all_ok = False
-        lines.append(f"{icon} {r.name}: {r.detail}")
+            fail_items.append(f"\u2022 {r.name}: {r.detail}")
+
+    if all_ok:
+        verdict = "모든 항목 정상입니다."
+    else:
+        verdict = f"{len(fail_items)}건 이상 감지했습니다."
+
+    lines = [
+        f"\U0001f4cb <b>시스템 현황 보고</b>  {now_kst}",
+        "",
+        f"\U0001f4ac <b>요약</b>: 8개 항목 점검 완료. {verdict}",
+    ]
+
+    if fail_items:
+        lines.append("")
+        lines.append("\U0001f534 <b>이상</b>")
+        lines.extend(fail_items)
+
+    if ok_names:
+        lines.append("")
+        lines.append(f"\U0001f7e2 <b>정상</b> ({len(ok_names)}개): {', '.join(ok_names)}")
 
     # 추가 통계
     try:
@@ -326,15 +361,16 @@ async def handle_status_command() -> str:
             )).scalar() or 0
 
         lines.append("")
-        lines.append(f"📈 활성 클러스터: {active_clusters}개")
-        lines.append(f"📰 24h 이벤트: {events_24h}건")
-        lines.append(f"⚡ 24h KScore 알림: {kscore_alerts_24h}건")
-        lines.append(f"📝 대기 포스트: {pending_posts}건")
+        lines.append(f"\u2022 활성 클러스터: {active_clusters}개")
+        lines.append(f"\u2022 24h 이벤트: {events_24h}건")
+        lines.append(f"\u2022 24h KScore 알림: {kscore_alerts_24h}건")
+        lines.append(f"\u2022 대기 포스트: {pending_posts}건")
     except Exception as e:
-        lines.append(f"\n⚠️ 통계 조회 오류: {e}")
+        lines.append(f"\n\u2022 통계 조회 오류: {e}")
 
-    overall = "✅ 정상" if all_ok else "⚠️ 이상 감지"
-    lines.insert(1, f"상태: {overall}\n")
+    lines.append("")
+    lines.append("\u2500" * 24)
+    lines.append("WeWantPeace 시스템 비서 드림")
 
     return "\n".join(lines)
 
