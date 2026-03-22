@@ -102,32 +102,33 @@ async def send_daily_ops_report(db: AsyncSession) -> dict:
     date_str = now.strftime("%m/%d")
     time_str = now.strftime("%H:%M KST")
 
-    # 요약 한 줄
+    # 비서 보고 스타일
     if failed == 0 and published > 0:
-        summary = f"오늘 {published}건 정상 발행, 실패 없습니다."
+        summary = f"오늘 {published}건 정상 발행 완료했으며, 실패 건은 없습니다."
     elif failed > 0:
-        summary = f"오늘 {published}건 발행, {failed}건 실패 발생했습니다."
+        summary = f"오늘 {published}건 발행했으나 {failed}건 실패가 발생했습니다. 확인 부탁드립니다."
     elif created == 0:
-        summary = "오늘 생성된 포스트가 없습니다."
+        summary = "오늘은 생성된 포스트가 없어 별도 발행 건이 없습니다."
     else:
-        summary = f"오늘 {created}건 생성, {pending}건 승인 대기 중입니다."
+        summary = f"오늘 {created}건 생성되었고, {pending}건이 승인 대기 중입니다."
 
     text = (
-        f"\U0001f4cb <b>SNS 운영 일일 보고</b>  {date_str} {time_str}\n"
+        f"<b>SNS 운영 일일 보고</b>\n"
+        f"{date_str} {time_str} 기준\n"
         f"\n"
-        f"\U0001f4ac <b>요약</b>: {summary}\n"
+        f"대표님, {summary}\n"
         f"\n"
-        f"\u2022 생성 {created} | 승인 {approved} | 발행 {published}\n"
-        f"\u2022 실패 {failed} | 대기 {pending} | 거절 {rejected}\n"
+        f"생성 {created} / 승인 {approved} / 발행 {published}\n"
+        f"실패 {failed} / 대기 {pending} / 거절 {rejected}\n"
     )
 
     if type_lines:
-        text += f"\n<b>콘텐츠 타입</b>\n" + "\n".join(type_lines) + "\n"
+        text += f"\n<b>콘텐츠 타입별</b>\n" + "\n".join(type_lines) + "\n"
 
     if plat_lines:
         text += f"\n<b>플랫폼별</b>\n" + "\n".join(plat_lines) + "\n"
 
-    text += "\n" + "\u2500" * 24 + "\nWeWantPeace 시스템 비서 드림"
+    text += "\n이상 보고 드립니다.\n<i>WeWantPeace 시스템 비서</i>"
 
     sent = await _send_telegram(text)
     logger.info("일일 SNS 리포트: created=%d, published=%d, sent=%s", created, published, sent)
@@ -225,33 +226,34 @@ async def send_weekly_ops_report(db: AsyncSession) -> dict:
 
     week_label = f"{iso_cal.year}-W{iso_cal.week:02d}"
 
-    # 요약
+    # 비서 보고 스타일
     if total_failed == 0 and total_published > 0:
-        summary = f"이번 주 {total_published}건 발행, 성공률 {success_rate}%입니다."
+        summary = f"이번 주 총 {total_published}건 발행 완료, 성공률 {success_rate}%입니다. 안정적으로 운영되고 있습니다."
     elif total_failed > 0:
-        summary = f"이번 주 {total_published}건 발행, {total_failed}건 실패. 성공률 {success_rate}%."
+        summary = f"이번 주 {total_published}건 발행, {total_failed}건 실패가 있었습니다. 성공률은 {success_rate}%입니다."
     else:
-        summary = f"이번 주 {total_created}건 생성되었습니다."
+        summary = f"이번 주 {total_created}건 생성되었으나 발행된 건은 없습니다."
 
     text = (
-        f"\U0001f4cb <b>SNS 운영 주간 보고</b>  {week_label}\n"
+        f"<b>SNS 운영 주간 보고</b>\n"
+        f"{week_label}\n"
         f"\n"
-        f"\U0001f4ac <b>요약</b>: {summary}\n"
+        f"대표님, 금주 SNS 운영 현황 보고 드립니다.\n"
+        f"{summary}\n"
         f"\n"
-        f"\u2022 생성 {total_created} | 발행 {total_published} | 실패 {total_failed} | 거절 {total_rejected}\n"
-        f"\u2022 성공률: {success_rate}%\n"
+        f"생성 {total_created} / 발행 {total_published} / 실패 {total_failed} / 거절 {total_rejected}\n"
     )
 
     if type_lines:
-        text += "\n<b>콘텐츠 타입</b>\n" + "\n".join(type_lines) + "\n"
+        text += f"\n<b>콘텐츠 타입별</b>\n" + "\n".join(type_lines) + "\n"
 
     if plat_lines:
-        text += "\n<b>플랫폼별</b>\n" + "\n".join(plat_lines) + "\n"
+        text += f"\n<b>플랫폼별</b>\n" + "\n".join(plat_lines) + "\n"
 
     if daily_lines:
-        text += "\n<b>일별 추이</b>\n" + "\n".join(daily_lines) + "\n"
+        text += f"\n<b>일별 추이</b>\n" + "\n".join(daily_lines) + "\n"
 
-    text += "\n" + "\u2500" * 24 + "\nWeWantPeace 시스템 비서 드림"
+    text += "\n이상 보고 드립니다.\n<i>WeWantPeace 시스템 비서</i>"
 
     sent = await _send_telegram(text)
     logger.info(

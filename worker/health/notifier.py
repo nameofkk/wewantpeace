@@ -56,7 +56,8 @@ def _build_report_message(results: list) -> tuple[str, list]:
         (message_text, all_issues)
     """
     kst = timezone(timedelta(hours=9))
-    now_kst = datetime.now(kst).strftime("%m/%d %H:%M KST")
+    now_kst = datetime.now(kst)
+    time_str = now_kst.strftime("%m/%d %H:%M")
 
     all_issues = []
     ok_checks = []
@@ -75,54 +76,54 @@ def _build_report_message(results: list) -> tuple[str, list]:
             warn_checks.append((label, r.message))
 
     total = len(results)
-    issue_count = len(crit_checks) + len(warn_checks)
     fixable_count = sum(1 for i in all_issues if i.auto_fix_available)
 
-    # ── 요약 헤더 ──
-    if not crit_checks and not warn_checks:
-        verdict = "모든 항목 정상입니다."
-        header_icon = "\u2705"
-    elif crit_checks:
-        verdict = f"긴급 {len(crit_checks)}건, 주의 {len(warn_checks)}건 발견했습니다."
-        header_icon = "\U0001f6a8"
-    else:
-        verdict = f"주의 {len(warn_checks)}건 발견했습니다."
-        header_icon = "\u26a0\ufe0f"
+    # ── 비서 보고 ──
+    lines = [f"<b>시스템 정기 점검 보고</b>", f"{time_str} 기준", ""]
 
-    lines = [
-        f"{header_icon} <b>시스템 점검 보고</b>  {now_kst}",
-        "",
-        f"\U0001f4cb <b>요약</b>: {total}개 항목 점검 완료. {verdict}",
-    ]
+    if not crit_checks and not warn_checks:
+        lines.append(f"대표님, {total}개 항목 점검 완료했습니다. 모두 정상 가동 중이며 특이사항 없습니다.")
+    elif crit_checks and warn_checks:
+        lines.append(
+            f"대표님, {total}개 항목 점검 결과를 보고 드립니다. "
+            f"긴급 {len(crit_checks)}건, 주의 {len(warn_checks)}건이 확인되었습니다."
+        )
+    elif crit_checks:
+        lines.append(
+            f"대표님, {total}개 항목 점검 결과 긴급 {len(crit_checks)}건이 확인되었습니다. 즉시 조치가 필요합니다."
+        )
+    else:
+        lines.append(
+            f"대표님, {total}개 항목 점검 결과 주의 {len(warn_checks)}건이 확인되었습니다."
+        )
 
     if fixable_count:
-        lines.append(f"\U0001f527 자동 수정 가능: {fixable_count}건 (아래 승인 버튼)")
+        lines.append(f"자동 수정 가능한 항목이 {fixable_count}건 있으니, 아래 버튼으로 승인 부탁드립니다.")
 
     # ── 긴급 사항 ──
     if crit_checks:
         lines.append("")
-        lines.append("\U0001f534 <b>긴급</b>")
+        lines.append("<b>[긴급]</b>")
         for label, msg in crit_checks:
-            # 첫 줄만 간결하게
             first_line = msg.split("\n")[0]
-            lines.append(f"  \u2022 <b>{label}</b>: {first_line}")
+            lines.append(f"  - {label}: {first_line}")
 
     # ── 주의 사항 ──
     if warn_checks:
         lines.append("")
-        lines.append("\U0001f7e1 <b>주의</b>")
+        lines.append("<b>[주의]</b>")
         for label, msg in warn_checks:
             first_line = msg.split("\n")[0]
-            lines.append(f"  \u2022 <b>{label}</b>: {first_line}")
+            lines.append(f"  - {label}: {first_line}")
 
-    # ── 정상 항목 (한 줄로) ──
+    # ── 정상 항목 ──
     if ok_checks:
         lines.append("")
-        lines.append(f"\U0001f7e2 <b>정상</b> ({len(ok_checks)}개): {', '.join(ok_checks)}")
+        lines.append(f"<b>[정상]</b> {len(ok_checks)}개: {', '.join(ok_checks)}")
 
     lines.append("")
-    lines.append("\u2500" * 24)
-    lines.append("WeWantPeace 시스템 비서 드림")
+    lines.append("이상 보고 드립니다.")
+    lines.append(f"<i>WeWantPeace 시스템 비서</i>")
 
     return "\n".join(lines), all_issues
 
@@ -218,10 +219,10 @@ async def send_health_report(results: list) -> bool:
                 }
 
                 issue_msg = (
-                    f"\U0001f527 <b>수정 제안</b> [{check_label}]\n"
+                    f"<b>[수정 제안]</b> {check_label}\n"
                     f"\n"
-                    f"\u2022 조치: {fix_desc}\n"
-                    f"\u2022 승인하시면 즉시 실행합니다."
+                    f"조치 내용: {fix_desc}\n"
+                    f"승인해 주시면 바로 실행하겠습니다."
                 )
 
                 await client.post(
@@ -422,14 +423,18 @@ async def _send_fix_result(
     try:
         fix_desc = _get_fix_description(action, {})
         kst = timezone(timedelta(hours=9))
-        now_kst = datetime.now(kst).strftime("%H:%M KST")
+        now_kst = datetime.now(kst).strftime("%H:%M")
 
         text = (
-            f"\u2705 <b>수정 완료 보고</b>  {now_kst}\n"
+            f"<b>수정 완료 보고</b>\n"
+            f"{now_kst} 기준\n"
             f"\n"
-            f"\u2022 조치: {fix_desc}\n"
-            f"\u2022 승인자: {username}\n"
-            f"\u2022 결과:\n{result_msg[:500]}"
+            f"대표님, {username}님 승인 건 처리 완료했습니다.\n"
+            f"\n"
+            f"조치 내용: {fix_desc}\n"
+            f"결과:\n{result_msg[:500]}\n"
+            f"\n"
+            f"<i>WeWantPeace 시스템 비서</i>"
         )
         await client.post(
             f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
