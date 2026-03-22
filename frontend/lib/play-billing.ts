@@ -27,13 +27,18 @@ interface PaymentDetailsInit {
  */
 async function getService(): Promise<DigitalGoodsService | null> {
   if (typeof window === "undefined" || !("getDigitalGoodsService" in window)) {
+    console.warn("[PlayBilling] getDigitalGoodsService not available on window");
     return null;
   }
   try {
     const service = await window.getDigitalGoodsService!(PLAY_BILLING_SERVICE);
+    if (!service) {
+      console.warn("[PlayBilling] getDigitalGoodsService returned null/undefined");
+    }
     return service as DigitalGoodsService;
-  } catch {
-    return null;
+  } catch (e) {
+    console.error("[PlayBilling] getDigitalGoodsService threw:", e);
+    throw e; // 실제 에러를 상위로 전파 (원인 파악용)
   }
 }
 

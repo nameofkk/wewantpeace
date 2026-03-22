@@ -368,25 +368,30 @@ function UpgradeContent() {
       return;
     }
 
-    // TWA: Digital Goods API
-    const purchaseToken = await purchaseSubscription(productId);
-    if (!purchaseToken) return;
+    // TWA: Digital Goods API → 실패 시 웹 결제(DodoPayments) 폴백
+    try {
+      const purchaseToken = await purchaseSubscription(productId);
+      if (!purchaseToken) return;
 
-    const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId, source: source || undefined }),
-    });
+      const res = await fetch(`${API_BASE}/subscriptions/store/google/verify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ purchase_token: purchaseToken, product_id: productId, source: source || undefined }),
+      });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || t(lang, "upgrade_payment_failed"));
+      }
+
+      router.push(`/upgrade/success?plan=${planId}`);
+    } catch (dgErr) {
+      console.warn("[Upgrade] Digital Goods API 실패, 웹 결제로 폴백:", dgErr);
+      await handleDodoCheckout(planId);
     }
-
-    router.push(`/upgrade/success?plan=${planId}`);
   }
 
   async function handleIOSPurchase(planId: string) {
