@@ -151,8 +151,10 @@ export default function App() {
         // 백엔드 검증
         const verified = await verifyPurchaseWithBackend(purchase, authToken);
 
-        // 거래 완료
-        await finishPurchase(purchase);
+        // 검증 성공 시에만 거래 완료 (실패 시 미완료로 두어 스토어 자동 환불 유도)
+        if (verified) {
+          await finishPurchase(purchase);
+        }
 
         // 결과를 웹에 전달
         sendMessageToWeb({
