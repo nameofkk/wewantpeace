@@ -38,7 +38,9 @@ export function detectPlatform(): AppPlatform {
   }
 
   // React Native WebView (최우선 감지)
-  if (window.__REACT_NATIVE__) {
+  // __REACT_NATIVE__: bridge.ts의 injectedJavaScriptBeforeContentLoaded로 주입
+  // ReactNativeWebView: RN WebView가 네이티브 레벨에서 자동 주입 (JS 주입보다 먼저 존재)
+  if (window.__REACT_NATIVE__ || window.ReactNativeWebView) {
     if (window.__NATIVE_PLATFORM__ === "ios") {
       _cachedPlatform = "ios-native";
     } else {
@@ -48,6 +50,8 @@ export function detectPlatform(): AppPlatform {
   }
 
   // Android TWA: Digital Goods API 지원 여부
+  // 주의: Chrome 기반 WebView에도 getDigitalGoodsService가 존재할 수 있으므로
+  // 반드시 RN 감지 이후에 체크해야 함
   if ("getDigitalGoodsService" in window) {
     _cachedPlatform = "android-twa";
     return _cachedPlatform;
