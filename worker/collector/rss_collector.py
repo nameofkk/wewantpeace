@@ -111,6 +111,11 @@ _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"(?i)\b(recipe|cooking|lifestyle|fashion)\b",
     r"(?i)\b(book review|film review|album review)\b",
     r"(?i)\b(weather forecast|horoscope)\b",
+    # K-pop / 엔터테인먼트 / 관광 노이즈
+    r"(?i)\b(bts|bangtan|blackpink|exo|twice|nct|seventeen|stray kids|aespa|newjeans)\b",
+    r"(?i)\b(le sserafim|enhypen|ateez|itzy|mamamoo|red velvet|got7|shinee)\b",
+    r"(?i)\b(k-?pop|hallyu)\b.{0,60}\b(comeback|tour|concert|album|chart|fan|debut)\b",
+    r"(?i)\b(idol|아이돌|컴백|팬미팅)\b.{0,60}\b(comeback|concert|album|tour|무대|stage)\b",
 ]]
 
 # 연예/스포츠 태그 집합 (RSS raw_metadata["tags"] 필터링용)
@@ -120,6 +125,7 @@ _ENTERTAINMENT_TAGS: set[str] = {
     "basketball", "baseball", "cricket", "tennis", "golf", "formula one",
     "obituaries", "obituary", "lifestyle", "food", "travel", "technology reviews",
     "books", "theater", "theatre", "dance", "comedy", "gaming",
+    "k-pop", "kpop", "idol", "hallyu", "korean wave", "pop music",
 }
 
 
