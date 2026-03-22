@@ -232,7 +232,7 @@ export function NewEventBanner() {
                   {td.raw_score.toFixed(1)}{t(lang, "banner_score_suffix")}
                 </span>
               </div>
-              <p className="text-sm font-medium text-foreground truncate">
+              <p className="text-[13px] font-medium text-foreground whitespace-nowrap">
                 {flag} {countryName} {prevLabel}→{newLabel}
               </p>
             </div>

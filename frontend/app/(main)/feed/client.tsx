@@ -523,7 +523,7 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
                       return (
                         <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] whitespace-nowrap">
                           <span>{flag}</span>
-                          <span className="font-medium text-foreground/80 max-w-[140px] truncate">{title}</span>
+                          <span className="font-medium text-foreground/80 whitespace-nowrap">{title}</span>
                           {showDelta ? (
                             <>
                               <span className={cn("font-bold tabular-nums", delta > 0 ? "text-red-400" : "text-emerald-400")}>

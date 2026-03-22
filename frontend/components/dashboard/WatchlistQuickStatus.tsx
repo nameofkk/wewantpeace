@@ -95,7 +95,7 @@ export function WatchlistQuickStatus() {
             >
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="text-lg">{getFlag(code)}</span>
-                <span className="text-[11px] font-medium truncate">
+                <span className="text-[10px] font-medium whitespace-nowrap">
                   {getCountryName(code, lang)}
                 </span>
               </div>

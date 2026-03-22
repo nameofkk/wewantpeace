@@ -66,7 +66,7 @@ export function RiskSummaryHeader() {
             <span className="text-xl">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="text-sm font-semibold truncate block">
+            <span className="text-sm font-semibold whitespace-nowrap block">
               {homeCountry ? getCountryName(homeCountry, lang) : (lang === "ko" ? "홈 국가 미설정" : "No home country")}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
