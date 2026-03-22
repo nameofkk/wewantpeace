@@ -48,7 +48,7 @@ function getFirebaseAuth(): Auth | null {
 
 /** React Native WebView 환경인지 확인 */
 function isReactNativeWebView(): boolean {
-  return typeof window !== "undefined" && !!window.__REACT_NATIVE__;
+  return typeof window !== "undefined" && !!(window.__REACT_NATIVE__ || window.ReactNativeWebView);
 }
 
 // Google 로그인
