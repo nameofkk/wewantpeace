@@ -1604,6 +1604,13 @@ export const translations = {
     // 온보딩 Trust Signals
     ob_hero_signal_3_v2: "위성 · 인터넷 장애 · GPS 재밍 감지",
     ob_hero_signal_4: "관심 국가 맞춤 알림",
+    ob_hero_desc: "전 세계 뉴스·OSINT 소스를 실시간 수집하고\n위험도를 분석하여 알려드립니다",
+    ob_hero_stat_countries: "실시간 감시",
+    ob_hero_stat_sources: "수집 소스",
+    ob_hero_stat_hours: "24시간 감시",
+    ob_hero_footer_rank: "Play Store 뉴스 앱 1위",
+    ob_hero_footer_free: "무료",
+    ob_hero_footer_nologin: "가입 없이 이용",
 
     // Free 유저 데모 배너/CTA
     demo_banner_intel: "샘플 데이터입니다. Pro 구독 시 실시간 인텔리전스를 확인할 수 있습니다.",
@@ -3250,6 +3257,13 @@ export const translations = {
     // Onboarding Trust Signals
     ob_hero_signal_3_v2: "Satellite · Internet outage · GPS jamming detection",
     ob_hero_signal_4: "Custom alerts for your countries",
+    ob_hero_desc: "Collecting global news & OSINT sources in real-time\nand analyzing risk levels for you",
+    ob_hero_stat_countries: "Real-time",
+    ob_hero_stat_sources: "Sources",
+    ob_hero_stat_hours: "24h monitoring",
+    ob_hero_footer_rank: "Play Store News #1",
+    ob_hero_footer_free: "Free",
+    ob_hero_footer_nologin: "No sign-up needed",
 
     // Free user demo banners/CTA
     demo_banner_intel: "Sample data. Subscribe to Pro for real-time intelligence.",

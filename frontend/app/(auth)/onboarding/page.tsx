@@ -1,11 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Rss,
-  Satellite,
   Bell,
   BellOff,
   Lock,
@@ -15,11 +13,7 @@ import {
   ChevronDown,
   Search,
   Check,
-  Activity,
-  Shield,
   Globe,
-  BarChart3,
-  TrendingUp,
 } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -34,8 +28,33 @@ type Step = 0 | 1 | 2;
 
 // 수집처 목록 (마퀴 스크롤)
 const DATA_SOURCES = [
-  "Reuters", "Associated Press", "ACLED", "GDELT", "NASA FIRMS",
-  "UCDP", "OCHA ReliefWeb", "IODA", "Al Jazeera", "BBC",
+  "Reuters", "AP", "BBC", "ACLED", "GDELT",
+  "NASA", "UCDP", "OCHA", "Al Jazeera", "Telegram", "Bellingcat",
+];
+
+// 이벤트 팝업 데이터 (히어로 지도 위)
+const CONFLICT_EVENTS = [
+  { label: "Ukraine — 드론 공격 감지", labelEn: "Ukraine — Drone strike detected", color: "#ef4444", top: "15%", left: "53%" },
+  { label: "Gaza — 공습 보도 수집", labelEn: "Gaza — Airstrike reports collected", color: "#ef4444", top: "24%", left: "52%" },
+  { label: "Sudan — 교전 상황 업데이트", labelEn: "Sudan — Combat status update", color: "#f97316", top: "33%", left: "48%" },
+  { label: "Myanmar — 군부 충돌 보고", labelEn: "Myanmar — Military clash reported", color: "#f97316", top: "27%", left: "72%" },
+  { label: "Colombia — 무장단체 교전", labelEn: "Colombia — Armed group clash", color: "#eab308", top: "42%", left: "22%" },
+  { label: "Mexico — 카르텔 충돌", labelEn: "Mexico — Cartel conflict", color: "#eab308", top: "26%", left: "18%" },
+];
+
+// 히어로 정적 핑 위치 (% 기반)
+const HERO_PINGS: Array<{ top: string; left: string; type: string; delay?: string }> = [
+  { top: "11%", left: "56%", type: "red" },
+  { top: "14%", left: "58%", type: "red" },
+  { top: "19%", left: "55%", type: "orange" },
+  { top: "13%", left: "64%", type: "yellow" },
+  { top: "21%", left: "52%", type: "orange" },
+  { top: "10%", left: "54%", type: "red", delay: "1.4s" },
+  { top: "16%", left: "73%", type: "orange", delay: "1s" },
+  { top: "18%", left: "70%", type: "yellow", delay: "2s" },
+  { top: "22%", left: "25%", type: "yellow", delay: "1.2s" },
+  { top: "25%", left: "21%", type: "orange", delay: "2.2s" },
+  { top: "15%", left: "22%", type: "yellow", delay: "1.8s" },
 ];
 
 // 지역별 그룹핑
@@ -113,6 +132,85 @@ export default function OnboardingPage() {
   const [marketingConsent, setMarketingConsent] = useState(false);
 
   const scanCount = useScanCounter();
+
+  // 히어로 이벤트 팝업 순환
+  const [activeEventIdx, setActiveEventIdx] = useState(-1);
+  useEffect(() => {
+    if (step !== 0) return;
+    const initial = setTimeout(() => setActiveEventIdx(0), 1500);
+    const interval = setInterval(() => {
+      setActiveEventIdx(prev => (prev + 1) % CONFLICT_EVENTS.length);
+    }, 4800);
+    return () => { clearTimeout(initial); clearInterval(interval); };
+  }, [step]);
+
+  // 히어로 동적 핑 생성
+  const [dynamicPings, setDynamicPings] = useState<Array<{ id: number; top: string; left: string; type: string }>>([]);
+  const pingIdRef = useRef(0);
+  useEffect(() => {
+    if (step !== 0) return;
+    const ZONES = [
+      { x: [52, 62], y: [10, 30] },
+      { x: [65, 75], y: [22, 32] },
+      { x: [18, 28], y: [22, 45] },
+      { x: [14, 24], y: [15, 28] },
+    ];
+    const COLORS = ["red", "orange", "yellow"];
+    function spawnPing() {
+      const zone = ZONES[Math.floor(Math.random() * ZONES.length)];
+      const x = zone.x[0] + Math.random() * (zone.x[1] - zone.x[0]);
+      const y = zone.y[0] + Math.random() * (zone.y[1] - zone.y[0]);
+      const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const id = pingIdRef.current++;
+      setDynamicPings(prev => [...prev, { id, top: `${y}%`, left: `${x}%`, type: color }]);
+      setTimeout(() => {
+        setDynamicPings(prev => prev.filter(p => p.id !== id));
+      }, 3500);
+    }
+    const interval = setInterval(spawnPing, 2500);
+    const initial = setTimeout(spawnPing, 1800);
+    return () => { clearInterval(interval); clearTimeout(initial); };
+  }, [step]);
+
+  // 히어로 카운트업 애니메이션
+  const [countUps, setCountUps] = useState({ countries: 0, sources: 0, hours: 0 });
+  useEffect(() => {
+    if (step !== 0) return;
+    const configs = [
+      { key: "countries" as const, target: 195, duration: 1200, delay: 400 },
+      { key: "sources" as const, target: 100, duration: 1000, delay: 600 },
+      { key: "hours" as const, target: 24, duration: 800, delay: 800 },
+    ];
+    const cleanups: (() => void)[] = [];
+    configs.forEach(({ key, target, duration, delay }) => {
+      const timeout = setTimeout(() => {
+        let current = 0;
+        const stepVal = target / (duration / 16);
+        const interval = setInterval(() => {
+          current += stepVal;
+          if (current >= target) {
+            setCountUps(prev => ({ ...prev, [key]: target }));
+            clearInterval(interval);
+          } else {
+            setCountUps(prev => ({ ...prev, [key]: Math.round(current) }));
+          }
+        }, 16);
+        cleanups.push(() => clearInterval(interval));
+      }, delay);
+      cleanups.push(() => clearTimeout(timeout));
+    });
+    return () => cleanups.forEach(fn => fn());
+  }, [step]);
+
+  // 히어로 업데이트 타이머
+  const [updateSec, setUpdateSec] = useState(3);
+  useEffect(() => {
+    if (step !== 0) return;
+    const interval = setInterval(() => {
+      setUpdateSec(s => s >= 300 ? 1 : s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step]);
 
   // 이미 온보딩 완료면 원래 페이지로 복원 (deep link 지원)
   useEffect(() => {
@@ -349,30 +447,68 @@ export default function OnboardingPage() {
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-background overflow-hidden">
-      {/* 배경: dotted 세계지도 + 이슈 핑 애니메이션 */}
+      {/* 배경: 도트 세계지도 + 분쟁 시각화 */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* 지도 SVG */}
-        <div
-          className="absolute inset-0 opacity-60"
-          style={{
-            backgroundImage: "url(/dotted-world-map.svg)",
-            backgroundSize: "140% auto",
-            backgroundPosition: "center 40%",
-            backgroundRepeat: "no-repeat",
-          }}
-        />
-        {/* 이슈 발생 핑 애니메이션 */}
-        <span className="ob-ping" style={{ top: "28%", left: "52%" }} />
-        <span className="ob-ping ob-ping--2" style={{ top: "35%", left: "72%" }} />
-        <span className="ob-ping ob-ping--3" style={{ top: "42%", left: "58%" }} />
-        <span className="ob-ping ob-ping--4" style={{ top: "55%", left: "45%" }} />
-        <span className="ob-ping ob-ping--5" style={{ top: "30%", left: "30%" }} />
-        <span className="ob-ping ob-ping--6" style={{ top: "48%", left: "80%" }} />
-        {/* 어두운 오버레이 */}
+        {/* 지도 SVG — 확대, 좌측 오프셋으로 아메리카~동아시아 표시 */}
         <div
           className="absolute inset-0"
           style={{
-            background: "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(15,23,42,0.5) 0%, rgba(15,23,42,0.85) 70%, rgba(15,23,42,0.95) 100%)",
+            backgroundImage: "url(/dotted-world-map.svg)",
+            backgroundSize: "173% auto",
+            backgroundPosition: "18% 3%",
+            backgroundRepeat: "no-repeat",
+            opacity: 0.55,
+          }}
+        />
+
+        {/* 핫존 블러 (Step 0만) */}
+        {step === 0 && (
+          <>
+            <div className="ob-hotzone" style={{ top: "12%", left: "58%", width: "18%", height: "8%", background: "rgba(239,68,68,0.06)" }} />
+            <div className="ob-hotzone ob-hotzone--2" style={{ top: "19%", left: "53%", width: "17%", height: "7%", background: "rgba(249,115,22,0.04)" }} />
+            <div className="ob-hotzone ob-hotzone--3" style={{ top: "20%", left: "17%", width: "14%", height: "6%", background: "rgba(234,179,8,0.03)" }} />
+            <div className="ob-hotzone ob-hotzone--4" style={{ top: "15%", left: "80%", width: "12%", height: "6%", background: "rgba(249,115,22,0.03)" }} />
+          </>
+        )}
+
+        {/* 스캔라인 (Step 0만) */}
+        {step === 0 && <div className="ob-scanline" />}
+
+        {/* 분쟁 핑 — % 기반 위치 */}
+        {HERO_PINGS.map((p, i) => (
+          <span
+            key={i}
+            className={`ob-ping ${p.type === "orange" ? "ob-ping--2" : p.type === "yellow" ? "ob-ping--5" : ""}`}
+            style={{ top: p.top, left: p.left, animationDelay: p.delay || "0s" }}
+          />
+        ))}
+
+        {/* 이벤트 팝업 (Step 0만) */}
+        {step === 0 && CONFLICT_EVENTS.map((ev, i) => (
+          <div
+            key={i}
+            className={`ob-event-popup ${activeEventIdx === i ? "ob-event-popup--active" : ""}`}
+            style={{ top: ev.top, left: ev.left }}
+          >
+            <span className="ob-event-dot" style={{ background: ev.color }} />
+            <span>{lang === "ko" ? ev.label : ev.labelEn}</span>
+          </div>
+        ))}
+
+        {/* 동적 랜덤 핑 (Step 0만) */}
+        {step === 0 && dynamicPings.map(p => (
+          <span
+            key={p.id}
+            className={`ob-ping-spawn ob-ping-spawn--${p.type}`}
+            style={{ top: p.top, left: p.left }}
+          />
+        ))}
+
+        {/* 하단 페이드 그라데이션 */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(to top, rgba(15,23,42,1) 0%, rgba(15,23,42,1) 28%, rgba(15,23,42,0.98) 42%, rgba(15,23,42,0.8) 58%, rgba(15,23,42,0.3) 78%, transparent 100%)",
           }}
         />
       </div>
@@ -419,112 +555,81 @@ export default function OnboardingPage() {
           {/* === Step 0: 히어로 === */}
           {step === 0 && (
             <div className="flex-1 overflow-y-auto overflow-x-hidden animate-fadeIn">
-            <div className="flex flex-col items-center min-h-full justify-center py-2">
-              {/* 로고 + 레이더 */}
-              <div className="relative flex items-center justify-center" style={{ marginBottom: "var(--space-lg)" }}>
-                {/* 레이더 파동 */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="ob-radar ob-radar--1" />
-                  <span className="ob-radar ob-radar--2" />
-                  <span className="ob-radar ob-radar--3" />
+            <div className="flex flex-col min-h-full justify-end py-2">
+
+              {/* 라이브 인디케이터 행 */}
+              <div className="flex items-center justify-between" style={{ marginBottom: "var(--space-sm)" }}>
+                <div className="flex items-center gap-1.5">
+                  <span className="ob-live-dot" />
+                  <span className="text-[11px] font-semibold text-emerald-400">
+                    {lang === "ko" ? "실시간 스캔 중" : "Live scanning"}
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400/50 ml-0.5 tabular-nums">
+                    {scanCount.toLocaleString()}{lang === "ko" ? "건" : ""}
+                  </span>
                 </div>
-                <div className="relative z-10">
-                  <Image
-                    src="/logo-eye.png"
-                    alt="WeWantPeace"
-                    width={100}
-                    height={44}
-                    className="object-contain"
-                    priority
-                  />
-                </div>
+                <span className="text-[10px] font-medium font-mono text-muted-foreground/50 tabular-nums">
+                  {updateSec < 60 ? `${updateSec}${lang === "ko" ? "초" : "s"}` : `${Math.floor(updateSec / 60)}${lang === "ko" ? "분" : "m"}`} {lang === "ko" ? "전" : "ago"}
+                </span>
               </div>
 
-              <h1 className="text-lg font-bold tracking-tight mb-1 text-white">WeWantPeace</h1>
-              <h2 className="font-bold whitespace-pre-line leading-snug text-center text-white" style={{ fontSize: "var(--text-hero)", marginBottom: "var(--space-lg)" }}>
-                {t(lang, "ob_hero_title")}
+              {/* 브랜드명 */}
+              <h1 className="text-base font-bold tracking-tight text-white" style={{ marginBottom: "var(--space-xs)" }}>
+                WeWantPeace
+              </h1>
+
+              {/* 메인 헤드라인 — "분쟁·위기" 빨간색 강조 */}
+              <h2 className="font-extrabold leading-snug text-white" style={{ fontSize: "clamp(1.25rem, 5.5vw, 1.5rem)", letterSpacing: "-0.035em", marginBottom: "var(--space-xs)" }}>
+                {lang === "ko" ? (
+                  <>전 세계 <span className="text-red-400">분쟁·위기</span>를<br />실시간으로<br />모니터링합니다</>
+                ) : (
+                  <>Real-time global<br /><span className="text-red-400">conflict & crisis</span><br />monitoring</>
+                )}
               </h2>
 
-              {/* 실시간 스캔 인디케이터 */}
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20" style={{ marginBottom: "var(--space-lg)" }}>
-                <span className="ob-live-dot" />
-                <span className="text-xs font-semibold text-emerald-400">
-                  {lang === "ko" ? "실시간 스캔 중" : "Live scanning"}
-                </span>
-                <span className="text-xs font-mono text-emerald-400/70 tabular-nums">
-                  {scanCount.toLocaleString()}
-                </span>
-                <span className="text-xs text-emerald-400/50">
-                  {lang === "ko" ? "건" : "events"}
-                </span>
-              </div>
+              {/* 서브 설명 */}
+              <p className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-line" style={{ marginBottom: "var(--space-lg)" }}>
+                {t(lang, "ob_hero_desc")}
+              </p>
 
-              {/* Trust Signals */}
-              <div className="w-full flex flex-col" style={{ gap: "var(--space-xs)", marginBottom: "var(--space-lg)" }}>
-                {[
-                  { icon: Rss, key: "ob_hero_signal_1" as const, delay: "0s" },
-                  { icon: BarChart3, key: "ob_hero_signal_2" as const, delay: "0.1s" },
-                  { icon: TrendingUp, key: "ob_hero_impact" as const, delay: "0.2s" },
-                  { icon: Satellite, key: "ob_hero_signal_3_v2" as const, delay: "0.3s" },
-                  { icon: Bell, key: "ob_hero_signal_4" as const, delay: "0.4s" },
-                ].map(({ icon: Icon, key, delay }) => (
-                  <div
-                    key={key}
-                    className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/30 ob-slide-in"
-                    style={{ padding: "var(--space-sm) var(--space-md)", animationDelay: delay }}
-                  >
-                    <div className="rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0" style={{ width: "var(--icon-sm)", height: "var(--icon-sm)" }}>
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground/80">
-                      {t(lang, key)}
-                    </span>
+              {/* 숫자 카드 3개 */}
+              <div className="flex gap-4" style={{ marginBottom: "var(--space-md)" }}>
+                <div>
+                  <div className="flex items-baseline">
+                    <span className="font-mono text-lg font-extrabold text-foreground tracking-tight tabular-nums">{countUps.countries}</span>
+                    <span className="text-[11px] font-semibold text-muted-foreground/50 ml-0.5">{lang === "ko" ? "개국" : ""}</span>
                   </div>
-                ))}
-              </div>
-
-              {/* 하단 신뢰 지표 */}
-              <div className="w-full flex items-center justify-between px-2 mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-muted-foreground/60">
-                    <Globe className="h-3.5 w-3.5" />
-                    <span className="text-[11px] font-medium">
-                      {t(lang, "ob_hero_monitoring")}
-                    </span>
-                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_stat_countries")}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-muted-foreground/60">
-                  <Shield className="h-3.5 w-3.5" />
-                  <span className="text-[11px] font-medium">
-                    {lang === "ko" ? "SSL 암호화" : "SSL Encrypted"}
-                  </span>
+                <div>
+                  <div className="flex items-baseline">
+                    <span className="font-mono text-lg font-extrabold text-foreground tracking-tight tabular-nums">{countUps.sources}</span>
+                    <span className="text-[11px] font-semibold text-muted-foreground/50 ml-0.5">+</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_stat_sources")}</span>
+                </div>
+                <div>
+                  <div className="flex items-baseline">
+                    <span className="font-mono text-lg font-extrabold text-foreground tracking-tight tabular-nums">{countUps.hours}</span>
+                    <span className="text-[11px] font-semibold text-muted-foreground/50 ml-0.5">h</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_stat_hours")}</span>
                 </div>
               </div>
 
               {/* 수집처 마퀴 */}
-              <div className="w-full overflow-hidden relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 w-8 z-10 bg-gradient-to-r from-background to-transparent" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-8 z-10 bg-gradient-to-l from-background to-transparent" />
-                <div className="ob-marquee flex gap-6 whitespace-nowrap">
+              <div className="w-full overflow-hidden relative" style={{ marginBottom: "var(--space-md)" }}>
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-6 z-10 bg-gradient-to-r from-background to-transparent" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-6 z-10 bg-gradient-to-l from-background to-transparent" />
+                <div className="ob-marquee flex gap-1.5 whitespace-nowrap">
                   {[...DATA_SOURCES, ...DATA_SOURCES].map((src, i) => (
-                    <span key={`${src}-${i}`} className="text-[11px] font-medium text-muted-foreground/50 flex items-center gap-1.5">
-                      <span className="h-1 w-1 rounded-full bg-primary/30" />
+                    <span key={`${src}-${i}`} className="flex-shrink-0 px-2 py-0.5 rounded border border-border/40 text-[10px] font-semibold text-muted-foreground/50">
                       {src}
                     </span>
                   ))}
                 </div>
               </div>
 
-              {/* Disquiet 랭크 배지 */}
-              <div className="mt-4 flex justify-center ob-disquiet">
-                <iframe
-                  title="disquiet-badge"
-                  frameBorder={0}
-                  scrolling="no"
-                  src="https://badge.disquiet.io/rank-badge?productUrlSlug=we-want-peace&mode=dark&rank=bronze"
-                  style={{ width: 224, height: 71, border: "none", overflow: "hidden", display: "block" }}
-                />
-              </div>
             </div>
             </div>
           )}
@@ -852,7 +957,7 @@ export default function OnboardingPage() {
             <button
               onClick={handleNext}
               disabled={!canNext}
-              className={`w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-bold transition-all active:scale-95 ${
+              className={`w-full relative overflow-hidden flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-bold transition-all active:scale-95 ${
                 canNext
                   ? "text-primary-foreground shadow-lg"
                   : "bg-muted/30 text-muted-foreground cursor-not-allowed"
@@ -867,9 +972,22 @@ export default function OnboardingPage() {
                   : undefined
               }
             >
-              {step === 0 ? t(lang, "ob_hero_cta") : t(lang, "ob_next")}
-              <ChevronRight className="h-4.5 w-4.5" />
+              {step === 0 ? (
+                <><span className="ob-cta-shimmer" />{t(lang, "ob_hero_cta")} →</>
+              ) : (
+                <>{t(lang, "ob_next")}<ChevronRight className="h-4.5 w-4.5" /></>
+              )}
             </button>
+            {/* 히어로 풋터 */}
+            {step === 0 && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_rank")}</span>
+                <span className="w-[3px] h-[3px] rounded-full bg-border" />
+                <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_free")}</span>
+                <span className="w-[3px] h-[3px] rounded-full bg-border" />
+                <span className="text-[10px] font-medium text-muted-foreground/50">{t(lang, "ob_hero_footer_nologin")}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -882,22 +1000,6 @@ export default function OnboardingPage() {
         .animate-fadeIn {
           animation: fadeIn 0.35s ease-out both;
         }
-
-        /* 레이더 파동 */
-        @keyframes ob-radar-pulse {
-          0% { transform: scale(0.3); opacity: 0.6; }
-          100% { transform: scale(2.5); opacity: 0; }
-        }
-        .ob-radar {
-          position: absolute;
-          width: clamp(50px, 12vw, 80px);
-          height: clamp(50px, 12vw, 80px);
-          border-radius: 50%;
-          border: 1.5px solid rgba(99,102,241,0.3);
-          animation: ob-radar-pulse 3s ease-out infinite;
-        }
-        .ob-radar--2 { animation-delay: 1s; }
-        .ob-radar--3 { animation-delay: 2s; }
 
         /* 라이브 닷 */
         @keyframes ob-live-blink {
@@ -913,22 +1015,13 @@ export default function OnboardingPage() {
           flex-shrink: 0;
         }
 
-        /* 슬라이드 인 */
-        @keyframes ob-slide-in {
-          from { opacity: 0; transform: translateX(-12px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        .ob-slide-in {
-          animation: ob-slide-in 0.4s ease-out both;
-        }
-
         /* 수집처 마퀴 */
         @keyframes ob-marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
         .ob-marquee {
-          animation: ob-marquee 25s linear infinite;
+          animation: ob-marquee 20s linear infinite;
         }
 
         /* 이슈 발생 핑 */
@@ -939,32 +1032,156 @@ export default function OnboardingPage() {
         }
         .ob-ping {
           position: absolute;
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
           background: rgba(239, 68, 68, 0.7);
-          box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.4);
+          box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
           animation: ob-issue-ping 3s ease-out infinite;
         }
         .ob-ping::after {
           content: "";
           position: absolute;
-          inset: -2px;
+          inset: -3px;
           border-radius: 50%;
-          border: 1px solid rgba(239, 68, 68, 0.5);
-          animation: ob-issue-ping 3s ease-out infinite;
-          animation-delay: 0.3s;
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          animation: ob-ping-ripple 3s ease-out infinite;
         }
-        .ob-ping--2 { animation-delay: 0.8s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
-        .ob-ping--2::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 1.1s; }
-        .ob-ping--3 { animation-delay: 1.6s; }
-        .ob-ping--3::after { animation-delay: 1.9s; }
-        .ob-ping--4 { animation-delay: 2.2s; background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4); }
-        .ob-ping--4::after { border-color: rgba(249, 115, 22, 0.5); animation-delay: 2.5s; }
-        .ob-ping--5 { animation-delay: 0.4s; background: rgba(234, 179, 8, 0.6); box-shadow: 0 0 6px 2px rgba(234, 179, 8, 0.3); }
-        .ob-ping--5::after { border-color: rgba(234, 179, 8, 0.4); animation-delay: 0.7s; }
-        .ob-ping--6 { animation-delay: 1.2s; }
-        .ob-ping--6::after { animation-delay: 1.5s; }
+        @keyframes ob-ping-ripple {
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(5); opacity: 0; }
+        }
+        .ob-ping--2 { background: rgba(249, 115, 22, 0.7); box-shadow: 0 0 6px rgba(249, 115, 22, 0.4); }
+        .ob-ping--2::after { border-color: rgba(249, 115, 22, 0.25); }
+        .ob-ping--5 { background: rgba(234, 179, 8, 0.6); box-shadow: 0 0 5px rgba(234, 179, 8, 0.3); }
+        .ob-ping--5::after { border-color: rgba(234, 179, 8, 0.2); }
+
+        /* 핫존 블러 */
+        .ob-hotzone {
+          position: absolute;
+          border-radius: 50%;
+          z-index: 2;
+          pointer-events: none;
+          filter: blur(28px);
+          animation: ob-hotzone-pulse 5s ease-in-out infinite;
+        }
+        .ob-hotzone--2 { animation-delay: 1.5s; }
+        .ob-hotzone--3 { animation-delay: 2.5s; }
+        .ob-hotzone--4 { animation-delay: 3.5s; }
+        @keyframes ob-hotzone-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.12); }
+        }
+
+        /* 스캔라인 */
+        .ob-scanline {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 1px;
+          z-index: 3;
+          background: linear-gradient(90deg, transparent, rgba(99,102,241,0.12) 20%, rgba(99,102,241,0.3) 50%, rgba(99,102,241,0.12) 80%, transparent);
+          animation: ob-scanline-sweep 6s ease-in-out infinite;
+        }
+        @keyframes ob-scanline-sweep {
+          0% { top: 5%; opacity: 0; }
+          5% { opacity: 1; }
+          50% { top: 40%; }
+          95% { opacity: 1; }
+          100% { top: 5%; opacity: 0; }
+        }
+
+        /* 이벤트 팝업 */
+        .ob-event-popup {
+          position: absolute;
+          z-index: 4;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 8px 3px 6px;
+          border-radius: 5px;
+          background: rgba(33,40,57,0.92);
+          border: 1px solid hsl(var(--border));
+          font-size: 10px;
+          font-weight: 600;
+          color: hsl(var(--muted-foreground));
+          white-space: nowrap;
+          opacity: 0;
+          transform: translateY(3px) scale(0.96);
+          pointer-events: none;
+        }
+        .ob-event-dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .ob-event-popup--active {
+          animation: ob-event-in 4.2s ease forwards;
+        }
+        @keyframes ob-event-in {
+          0% { opacity: 0; transform: translateY(3px) scale(0.96); }
+          8% { opacity: 1; transform: translateY(0) scale(1); }
+          78% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 0; transform: translateY(-2px) scale(0.97); }
+        }
+
+        /* 동적 스폰 핑 */
+        .ob-ping-spawn {
+          position: absolute;
+          z-index: 3;
+          width: 6px;
+          height: 6px;
+          pointer-events: none;
+        }
+        .ob-ping-spawn::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          animation: ob-spawn-dot 3.5s ease forwards;
+        }
+        .ob-ping-spawn::after {
+          content: "";
+          position: absolute;
+          inset: -6px;
+          border-radius: 50%;
+          border: 1.5px solid;
+          animation: ob-spawn-ring 1.2s ease-out forwards;
+        }
+        @keyframes ob-spawn-dot {
+          0% { transform: scale(0); opacity: 0; }
+          15% { transform: scale(1.8); opacity: 1; }
+          30% { transform: scale(1); }
+          90% { opacity: 1; }
+          100% { opacity: 0; transform: scale(0.5); }
+        }
+        @keyframes ob-spawn-ring {
+          0% { transform: scale(0.5); opacity: 0.8; }
+          100% { transform: scale(6); opacity: 0; }
+        }
+        .ob-ping-spawn--red::before { background: #ef4444; box-shadow: 0 0 12px rgba(239,68,68,0.7); }
+        .ob-ping-spawn--red::after { border-color: rgba(239,68,68,0.35); }
+        .ob-ping-spawn--orange::before { background: #f97316; box-shadow: 0 0 10px rgba(249,115,22,0.6); }
+        .ob-ping-spawn--orange::after { border-color: rgba(249,115,22,0.3); }
+        .ob-ping-spawn--yellow::before { background: #eab308; box-shadow: 0 0 8px rgba(234,179,8,0.5); }
+        .ob-ping-spawn--yellow::after { border-color: rgba(234,179,8,0.25); }
+
+        /* CTA shimmer */
+        .ob-cta-shimmer {
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 60%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(99,102,241,0.08), transparent);
+          animation: ob-shimmer 3s ease-in-out infinite;
+        }
+        @keyframes ob-shimmer {
+          0% { left: -100%; }
+          50% { left: 150%; }
+          100% { left: 150%; }
+        }
 
         .scrollbar-thin::-webkit-scrollbar { width: 4px; }
         .scrollbar-thin::-webkit-scrollbar-thumb {
@@ -972,11 +1189,6 @@ export default function OnboardingPage() {
           border-radius: 2px;
         }
         .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-
-        /* 작은 화면에서 Disquiet 배지 숨김 */
-        @media (max-height: 640px) {
-          .ob-disquiet { display: none; }
-        }
       `}</style>
     </div>
   );
