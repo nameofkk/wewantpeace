@@ -21,8 +21,8 @@
     "path": "./signing-key.jks",
     "alias": "wewantpeace"
   },
-  "appVersionName": "3",
-  "appVersionCode": 3,
+  "appVersionName": "13",
+  "appVersionCode": 13,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://www.wewantpeace.live/manifest.json",
@@ -36,7 +36,7 @@
     }
   },
   "alphaDependencies": {
-    "enabled": false
+    "enabled": true
   },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
