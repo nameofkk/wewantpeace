@@ -179,8 +179,15 @@ async def handle_store_event(
         sub.cancelled_at = now
         sub.updated_at = now
 
-        # User.plan → free (만료일 지났으면)
-        if not sub.expires_at or sub.expires_at <= now:
+        # User.plan → free (다른 활성 구독이 없으면)
+        other_active = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == sub.user_id,
+                Subscription.id != sub.id,
+                Subscription.status.in_(["active", "trial"]),
+            ).limit(1)
+        )
+        if not other_active.scalar_one_or_none():
             user_result = await db.execute(select(User).where(User.id == sub.user_id))
             user = user_result.scalar_one_or_none()
             if user:
