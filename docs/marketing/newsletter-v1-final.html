@@ -20,8 +20,11 @@
     .stat-number { font-size:18px !important; }
     .side-img { width:100px !important; }
     .gauge-number { font-size:56px !important; }
+    .num-grid-cell { font-size:22px !important; }
     td[style*="padding:28px"] { padding:20px 18px !important; }
     td[style*="padding:0 28px"] { padding:0 18px !important; }
+    .feedback-btn { padding:8px 12px !important; font-size:12px !important; }
+    .quote-card-text { font-size:16px !important; }
   }
   @media (prefers-color-scheme: dark) {
     .email-bg { background-color:#1a1a1a !important; }
@@ -418,7 +421,7 @@
 <td style="background:#ffffff;padding:0 28px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#7f1d1d;border-radius:8px;overflow:hidden;">
   <tr>
-    <td>
+    <td style="position:relative;">
       <a href="https://www.wewantpeace.live/issues?country=SA" style="text-decoration:none;">
         <img src="https://www.middleeasteye.net/sites/default/files/styles/max_2600x2600/public/MEE%20BREAKING%20SLIDE_0_1.jpeg.jpg" alt="걸프 에너지 시설 위기" width="544" style="display:block;width:100%;height:auto;border:0;opacity:0.8;" />
       </a>
@@ -427,11 +430,15 @@
   <tr>
     <td style="padding:18px 20px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td><span style="display:inline-block;background:#fca5a5;color:#7f1d1d;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:0.5px;">ALERT</span></td>
+        <td>
+          <span style="display:inline-block;background:#fca5a5;color:#7f1d1d;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:0.5px;">BREAKING</span>
+          <span style="display:inline-block;background:rgba(252,165,165,0.3);color:#fca5a5;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:0.5px;margin-left:4px;">SEVERITY 100</span>
+        </td>
         <td align="right"><span style="font-family:'Space Grotesk',sans-serif;font-size:10px;color:#fca5a5;">85 events &middot; KScore 9.4</span></td>
       </tr></table>
       <p style="margin:8px 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:17px;font-weight:800;color:#ffffff;line-height:1.4;">이란, 걸프 에너지 시설에 대피 명령</p>
-      <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#fecaca;line-height:1.65;">이번 주 가장 무서운 뉴스예요. 쿠웨이트 정유소(46건)와 카타르 정유소(17건)가 실제로 공격받았어요. 유가가 급등하고 있어요.</p>
+      <p style="margin:0 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#fecaca;line-height:1.65;">이번 주 가장 무서운 뉴스예요. 쿠웨이트 정유소(46건)와 카타르 정유소(17건)가 실제로 공격받았어요. 유가가 급등하고 있어요.</p>
+      <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#fbbf24;font-weight:600;"><b>한국 영향:</b> 나프타·휘발유 원가 직결 &mdash; 주유소 가격 상승 임박</p>
     </td>
   </tr>
   </table>
@@ -896,6 +903,35 @@
       <p style="margin:1px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#a1a1aa;">매주 일요일 오전, 세계가 어디로 가고 있는지 알려드려요</p>
     </td>
   </tr>
+  </table>
+</td>
+</tr>
+
+<!-- ============================================================ -->
+<!-- 오늘의 한 줄 — 스크린샷/공유용 -->
+<!-- ============================================================ -->
+<tr>
+<td style="background:#ffffff;padding:16px 28px 8px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border-radius:10px;overflow:hidden;">
+  <tr><td style="padding:28px 24px;">
+    <p style="margin:0 0 6px;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;color:#475569;letter-spacing:2px;">QUOTE OF THE WEEK</p>
+    <p style="margin:0 0 14px;font-family:'Noto Sans KR',sans-serif;font-size:18px;font-weight:700;color:#f1f5f9;line-height:1.6;letter-spacing:-0.3px;">
+      "해협 하나 막혔는데<br>
+      <span style="color:#ef4444;">내 기름값</span>이 오르고<br>
+      <span style="color:#60a5fa;">내 주식</span>이 떨어지는 세상"
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="padding-right:10px;">
+        <div style="width:2px;height:24px;background:#475569;"></div>
+      </td>
+      <td>
+        <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#64748b;">WeWantPeace Weekly Brief Vol.1</p>
+        <p style="margin:1px 0 0;font-family:'Space Grotesk',sans-serif;font-size:10px;color:#475569;">wewantpeace.live</p>
+      </td>
+    </tr>
+    </table>
+  </td></tr>
   </table>
 </td>
 </tr>
