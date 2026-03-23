@@ -805,15 +805,17 @@ async def check_subscription_integrity(db: AsyncSession) -> HealthCheckResult:
         expired_active = expired_active_q.scalar() or 0
 
         # pro/pro_plus 플랜인데 활성 구독 없는 유저
+        # trial 구독도 포함해야 오탐 방지 (trial은 status='trial')
         orphan_plan_q = await db.execute(
             text(
                 "SELECT COUNT(*) FROM users u"
                 " WHERE u.plan IN ('pro', 'pro_plus')"
                 " AND NOT EXISTS ("
                 "   SELECT 1 FROM subscriptions s"
-                "   WHERE s.user_id = u.id AND s.status = 'active'"
+                "   WHERE s.user_id = u.id AND s.status IN ('active', 'trial')"
                 " )"
                 " AND u.referral_pro_expires_at IS NULL"
+                " AND u.admin_plan_override IS NOT TRUE"
             )
         )
         orphan_plan = orphan_plan_q.scalar() or 0
