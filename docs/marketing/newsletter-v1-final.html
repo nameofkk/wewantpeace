@@ -41,6 +41,15 @@
   }
   @media (prefers-color-scheme: dark) {
     .email-bg { background-color:#1a1a1a !important; }
+    .dm-bg { background-color:#1e1e1e !important; }
+    .dm-card { background-color:#2a2a2a !important; border-color:#3a3a3a !important; }
+    .dm-text { color:#e0e0e0 !important; }
+    .dm-text-muted { color:#a0a0a0 !important; }
+    .dm-border { border-color:#3a3a3a !important; }
+    .dm-divider div { background:#3a3a3a !important; }
+  }
+  @media only screen and (max-width:480px) {
+    .cta-full { display:block !important; width:100% !important; text-align:center !important; box-sizing:border-box !important; }
   }
 </style>
 </head>
@@ -187,7 +196,7 @@
 
 <!-- 세 줄 요약 -->
 <tr>
-<td style="background:#ffffff;padding:28px 28px 24px;">
+<td class="dm-bg" style="background:#ffffff;padding:28px 28px 24px;">
   <p style="margin:0 0 6px;font-family:'Space Grotesk','Inter',sans-serif;font-size:10px;font-weight:600;color:#a1a1aa;letter-spacing:2px;">TODAY'S BRIEF</p>
   <p style="margin:0 0 16px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#71717a;">오늘 꼭 알아야 할 세 가지</p>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -386,8 +395,9 @@
         <td><span style="display:inline-block;background:#dc2626;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:0.5px;">SEVERITY 100</span></td>
         <td align="right"><span style="font-family:'Space Grotesk',sans-serif;font-size:10px;color:#78716c;">161 events &middot; KScore 8.5</span></td>
       </tr></table>
-      <p style="margin:8px 0 6px;"><a href="https://www.wewantpeace.live/issues?country=LB" style="font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#18181b;text-decoration:none;line-height:1.4;">이스라엘 군, 레바논 남부 카시미야 다리 폭파</a></p>
+      <p style="margin:8px 0 6px;"><a href="https://www.wewantpeace.live/issues?country=LB" style="font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#18181b;text-decoration:none;line-height:1.4;" aria-label="레바논 카시미야 다리 폭파 이슈 상세 보기">이스라엘 군, 레바논 남부 카시미야 다리 폭파</a></p>
       <p style="margin:0 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#52525b;line-height:1.65;">민간인 이동 경로가 끊겼어요. 인도주의 물자 수송도 차단된 상태. 헤즈볼라는 보복을 예고했어요.</p>
+      <p style="margin:0 0 8px;font-family:'Space Grotesk','Inter',sans-serif;font-size:10px;color:#a1a1aa;">via Al Jazeera, Reuters, AP</p>
       <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#1d4ed8;line-height:1.5;"><b>왜 중요해요?</b> 다리 하나가 파괴되면 수십만 명의 민간인 이동이 막혀요. 국제사회의 인도적 개입 명분이 커지고 있어요.</p>
     </td>
   </tr>
@@ -408,7 +418,8 @@
     <td valign="top" style="padding:14px 16px;">
       <p style="margin:0;"><span style="display:inline-block;background:#fef2f2;color:#dc2626;font-family:'Space Grotesk',sans-serif;font-size:8px;font-weight:600;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;border:1px solid #fecaca;">SEV 100</span> <span style="font-family:'Space Grotesk',sans-serif;font-size:10px;color:#78716c;">80 events &middot; KScore 7.4</span></p>
       <p style="margin:4px 0 6px;"><a href="https://www.wewantpeace.live/issues?country=IQ" style="font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;color:#18181b;text-decoration:none;line-height:1.4;">이라크 미군 기지 드론 피격, NATO 임무 철수</a></p>
-      <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">이란의 보복이 미군 기지를 직접 겨냥하기 시작했어요.</p>
+      <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">이란의 보복이 미군 기지를 직접 겨냥하기 시작했어요.</p>
+      <p style="margin:0 0 6px;font-family:'Space Grotesk','Inter',sans-serif;font-size:9px;color:#a1a1aa;">via AP, Al Jazeera</p>
       <p style="margin:0;padding:6px 8px;background:#f0f7ff;border-radius:4px;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#1d4ed8;line-height:1.4;"><b>왜 중요해요?</b> 미군 철수 시 한국 주한미군 배치에도 영향 가능</p>
     </td>
   </tr>
@@ -429,7 +440,8 @@
     <td valign="top" style="padding:14px 16px;">
       <p style="margin:0;"><span style="display:inline-block;background:#fef2f2;color:#dc2626;font-family:'Space Grotesk',sans-serif;font-size:8px;font-weight:600;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;border:1px solid #fecaca;">SEV 100</span> <span style="font-family:'Space Grotesk',sans-serif;font-size:10px;color:#78716c;">101 events &middot; KScore 5.0</span></p>
       <p style="margin:4px 0 6px;"><a href="https://www.wewantpeace.live/issues?country=UA" style="font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;color:#18181b;text-decoration:none;line-height:1.4;">자포리자 드론 공격으로 2명 사망</a></p>
-      <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">이란-이스라엘에 묻혔지만, 우크라이나 전쟁은 계속되고 있어요.</p>
+      <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">이란-이스라엘에 묻혔지만, 우크라이나 전쟁은 계속되고 있어요.</p>
+      <p style="margin:0 0 6px;font-family:'Space Grotesk','Inter',sans-serif;font-size:9px;color:#a1a1aa;">via BBC, Reuters</p>
       <p style="margin:0;padding:6px 8px;background:#f0f7ff;border-radius:4px;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#1d4ed8;line-height:1.4;"><b>왜 중요해요?</b> 유럽 에너지·곡물 가격에 직접 영향 &rarr; 한국 수입 물가</p>
     </td>
   </tr>
@@ -450,7 +462,8 @@
     <td valign="top" style="padding:14px 16px;">
       <p style="margin:0;"><span style="display:inline-block;background:#fef2f2;color:#dc2626;font-family:'Space Grotesk',sans-serif;font-size:8px;font-weight:600;padding:1px 5px;border-radius:2px;letter-spacing:0.5px;border:1px solid #fecaca;">SEV 100</span> <span style="font-family:'Space Grotesk',sans-serif;font-size:10px;color:#78716c;">149 events &middot; KScore 9.0</span></p>
       <p style="margin:4px 0 6px;"><a href="https://www.wewantpeace.live/issues?country=US" style="font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:700;color:#18181b;text-decoration:none;line-height:1.4;">이란, 디에고 가르시아 미군 기지에 미사일 공격</a></p>
-      <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">인도양 핵심 전략기지가 최초로 공격받았어요.</p>
+      <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#71717a;line-height:1.55;">인도양 핵심 전략기지가 최초로 공격받았어요.</p>
+      <p style="margin:0 0 6px;font-family:'Space Grotesk','Inter',sans-serif;font-size:9px;color:#a1a1aa;">via AP, CNN, Al Jazeera</p>
       <p style="margin:0;padding:6px 8px;background:#f0f7ff;border-radius:4px;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#1d4ed8;line-height:1.4;"><b>왜 중요해요?</b> 미군 전력 투사의 핵심 거점 &mdash; 확전 리스크 급등</p>
     </td>
   </tr>
@@ -499,7 +512,8 @@
       </tr></table>
       <p style="margin:8px 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:17px;font-weight:800;color:#ffffff;line-height:1.4;">이란, 걸프 에너지 시설에 대피 명령</p>
       <p style="margin:0 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#fecaca;line-height:1.65;">이번 주 가장 무서운 뉴스예요. 쿠웨이트 정유소(46건)와 카타르 정유소(17건)가 실제로 공격받았어요. 유가가 급등하고 있어요.</p>
-      <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#fbbf24;font-weight:600;"><b>한국 영향:</b> 나프타·휘발유 원가 직결 &mdash; 주유소 가격 상승 임박</p>
+      <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#fbbf24;font-weight:600;"><b>한국 영향:</b> 나프타·휘발유 원가 직결 &mdash; 주유소 가격 상승 임박</p>
+      <p style="margin:0;font-family:'Space Grotesk','Inter',sans-serif;font-size:9px;color:#fca5a5;opacity:0.7;">via Middle East Eye, Reuters, Bloomberg</p>
     </td>
   </tr>
   </table>
@@ -514,7 +528,8 @@
     <td style="padding:14px 16px;">
       <p style="margin:0 0 6px;"><a href="https://www.wewantpeace.live/issues?country=IR" style="font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:700;color:#18181b;text-decoration:none;">이란 분쟁, 세계 에너지 공급 차질</a></p>
       <p style="margin:0 0 8px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#52525b;line-height:1.65;">나프타 가격 <b style="color:#dc2626;">20% 상승</b>, 브렌트유 <b style="color:#dc2626;">$95&rarr;$118</b>. 의약품 용기, 비닐 등 석유화학 제품 연쇄 인상 예상. JP모간은 S&amp;P500 전망을 7500&rarr;7200으로 하향했어요.</p>
-      <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#1d4ed8;"><b>한국 체감:</b> 주유소 가격 상승, 택배·배달비 인상, 난방비 급등이 곧 시작될 수 있어요</p>
+      <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#1d4ed8;"><b>한국 체감:</b> 주유소 가격 상승, 택배·배달비 인상, 난방비 급등이 곧 시작될 수 있어요</p>
+      <p style="margin:0;font-family:'Space Grotesk','Inter',sans-serif;font-size:9px;color:#a1a1aa;">via Bloomberg, JP Morgan Research, Reuters</p>
     </td>
   </tr>
   </table>
@@ -781,7 +796,7 @@
 
 <tr>
 <td align="center" style="background:#ffffff;padding:0 28px 28px;">
-  <a href="https://www.wewantpeace.live/issues?country=KR&amp;utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;">한국 관련 이슈 실시간 확인 &rarr;</a>
+  <a class="cta-full" href="https://www.wewantpeace.live/issues?country=KR&amp;utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:14px 32px;background:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;" aria-label="한국 관련 이슈 실시간 확인">한국 관련 이슈 실시간 확인 &rarr;</a>
 </td>
 </tr>
 
@@ -836,7 +851,7 @@
 
 <tr>
 <td align="center" style="background:#ffffff;padding:0 28px 28px;">
-  <a href="https://www.wewantpeace.live/map?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:13px 28px;background:#ffffff;color:#52525b;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:600;font-size:14px;border:1px solid #d4d4d8;">출장·여행 전 긴장도 확인 &rarr;</a>
+  <a class="cta-full" href="https://www.wewantpeace.live/map?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:13px 28px;background:#ffffff;color:#52525b;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:600;font-size:14px;border:1px solid #d4d4d8;" aria-label="여행 전 긴장도 확인">출장·여행 전 긴장도 확인 &rarr;</a>
 </td>
 </tr>
 
@@ -1100,7 +1115,7 @@
     <td align="center">
       <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#0f172a;">주변에 알릴 사람이 있나요?</p>
       <p style="margin:0 0 16px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#71717a;line-height:1.6;">해외 출장 가는 동료, 투자 중인 친구, 국제 뉴스에 관심 있는 지인에게 이 메일을 전달해주세요.</p>
-      <a href="https://www.wewantpeace.live/newsletter?ref=share" style="display:inline-block;padding:13px 32px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;">이 메일 전달하기 &rarr;</a>
+      <a class="cta-full" href="https://www.wewantpeace.live/newsletter?ref=share" style="display:inline-block;padding:13px 32px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;" aria-label="이 메일 친구에게 전달하기">이 메일 전달하기 &rarr;</a>
       <p style="margin:10px 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#a1a1aa;">현재 <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;color:#71717a;">102</span>명이 함께 읽고 있어요</p>
       <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:10px;color:#d4d4d8;">카카오톡 &middot; 메일 전달 &middot; 링크 복사</p>
     </td>
@@ -1147,7 +1162,7 @@
   </tr>
   <tr>
     <td align="center" style="padding:8px 24px 28px;">
-      <a href="https://www.wewantpeace.live/pricing?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:13px 40px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;">Pro 7일 무료 체험 &rarr;</a>
+      <a class="cta-full" href="https://www.wewantpeace.live/pricing?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=vol1" style="display:inline-block;padding:13px 40px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;" aria-label="Pro 7일 무료 체험 시작">Pro 7일 무료 체험 &rarr;</a>
       <p style="margin:8px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#475569;">월 4,900원 &middot; 카드 등록 불필요 &middot; 언제든 해지</p>
       <p style="margin:6px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:10px;color:#64748b;">Play Store 뉴스·잡지 1위 &middot; 4.9&#9733;</p>
     </td>
