@@ -93,19 +93,17 @@ async def create_checkout(
         raise HTTPException(500, detail="DodoPayments API 키가 설정되지 않았습니다.")
 
     # 기존 활성 구독 처리 (업그레이드/중복 방지)
+    # Trial 구독은 여기서 만료하지 않음 — subscription.active 웹훅에서 처리
+    # (체크아웃 미완료 시 trial이 조기 만료되는 버그 방지)
     existing_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "trial", "grace_period"]),
+            Subscription.status.in_(["active", "grace_period"]),
         )
     )
     now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
-        if existing_sub.status == "trial":
-            existing_sub.status = "expired"
-            existing_sub.updated_at = now
-            logger.info("Trial 구독 만료 처리: user=%s → 유료 전환 진행", current_user.id)
-        elif existing_sub.plan == body.plan:
+        if existing_sub.plan == body.plan:
             raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
@@ -170,19 +168,16 @@ async def create_checkout_simple(
     if not settings.dodo_api_key:
         raise HTTPException(500, detail="DodoPayments API 키가 설정되지 않았습니다.")
 
-    # 기존 구독 처리
+    # 기존 구독 처리 (Trial은 웹훅에서 만료 — 체크아웃 미완료 시 조기 만료 방지)
     existing_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "trial", "grace_period"]),
+            Subscription.status.in_(["active", "grace_period"]),
         )
     )
     now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
-        if existing_sub.status == "trial":
-            existing_sub.status = "expired"
-            existing_sub.updated_at = now
-        elif existing_sub.plan == plan:
+        if existing_sub.plan == plan:
             raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
@@ -321,6 +316,24 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
             next_billing_at=next_billing,
         )
         db.add(sub)
+
+    # 기존 trial/active 구독 만료 처리 (체크아웃 시작이 아닌 결제 확정 시점에 정리)
+    new_sub_id = existing.id if existing else sub.id
+    old_subs_result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(["active", "trial", "grace_period"]),
+            Subscription.id != new_sub_id,
+        )
+    )
+    for old_sub in old_subs_result.scalars().all():
+        old_sub.status = "expired" if old_sub.status == "trial" else "cancelled"
+        old_sub.cancelled_at = now
+        old_sub.updated_at = now
+        logger.info(
+            "DodoPayments 구독 활성화 → 기존 구독 정리: sub=%s status=%s→%s",
+            old_sub.id, "trial" if old_sub.status == "expired" else "active", old_sub.status,
+        )
 
     # admin 수동 설정된 유저는 웹훅으로 변경하지 않음
     if user.admin_plan_override:
