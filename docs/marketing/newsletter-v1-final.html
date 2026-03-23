@@ -10,13 +10,24 @@
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Playfair+Display:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;600;700;800&display=swap');
   @media only screen and (max-width:480px) {
     table { width:100% !important; }
-    .hero-number { font-size:100px !important; }
+    .hero-number { font-size:90px !important; letter-spacing:-3px !important; }
     .stat-number { font-size:18px !important; }
-    .side-img { width:120px !important; }
+    .side-img { width:100px !important; }
+    .gauge-number { font-size:56px !important; }
+    td[style*="padding:28px"] { padding:20px 18px !important; }
+    td[style*="padding:0 28px"] { padding:0 18px !important; }
+  }
+  @media (prefers-color-scheme: dark) {
+    .email-bg { background-color:#1a1a1a !important; }
   }
 </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f5f0;-webkit-text-size-adjust:100%;">
+
+<!-- Preheader (이메일 미리보기 텍스트) -->
+<div style="display:none;font-size:1px;color:#f5f5f0;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  지금 이 순간, 23개국이 위기. 호르무즈 해협 봉쇄로 한국 원유 70%가 위험해요. 854건의 분쟁 이벤트가 감지됐습니다. &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+</div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f0;">
 <tr><td align="center" style="padding:16px 0;">
@@ -860,9 +871,10 @@
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
     <td align="center">
-      <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#0f172a;">이 뉴스레터가 유용했다면</p>
-      <p style="margin:0 0 16px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#71717a;">동료에게 전달해주세요. 함께 알아야 대비할 수 있어요.</p>
+      <p style="margin:0 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#0f172a;">주변에 알릴 사람이 있나요?</p>
+      <p style="margin:0 0 16px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#71717a;line-height:1.6;">해외 출장 가는 동료, 투자 중인 친구, 국제 뉴스에 관심 있는 지인에게 이 메일을 전달해주세요.</p>
       <a href="https://www.wewantpeace.live/newsletter?ref=share" style="display:inline-block;padding:11px 28px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:13px;">이 메일 전달하기 &rarr;</a>
+      <p style="margin:10px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#a1a1aa;">현재 <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;color:#71717a;">102</span>명이 함께 읽고 있어요</p>
     </td>
   </tr>
   </table>
@@ -870,25 +882,42 @@
 </tr>
 
 <!-- ============================================================ -->
-<!-- Pro 업셀 -->
+<!-- Pro 업셀 — 다크 카드 -->
 <!-- ============================================================ -->
 <tr>
-<td style="background:#ffffff;padding:28px 28px;">
-  <p style="margin:0 0 6px;font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;color:#0f172a;">이 브리핑은 일주일에 한 번이에요.</p>
-  <p style="margin:0 0 16px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#71717a;line-height:1.7;">세계 정세는 매시간 바뀌고 있어요. <b style="color:#18181b;">매일</b> 실시간으로 추적하고 싶다면:</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#52525b;line-height:2;">
-  <tr><td style="padding:0;">&#10003;&nbsp; 관심 국가 긴장도 급등 시 <b style="color:#18181b;">실시간 알림</b></td></tr>
-  <tr><td style="padding:0;">&#10003;&nbsp; 7/30/90일 긴장도 <b style="color:#18181b;">트렌드 그래프</b></td></tr>
-  <tr><td style="padding:0;">&#10003;&nbsp; 1,751개 활성 클러스터 <b style="color:#18181b;">전체 분석</b></td></tr>
-  <tr><td style="padding:0;">&#10003;&nbsp; 출장·투자 대상국 <b style="color:#18181b;">맞춤 리스크 리포트</b></td></tr>
+<td style="background:#ffffff;padding:28px 28px 32px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0f172a;border-radius:10px;overflow:hidden;">
+  <tr>
+    <td style="padding:28px 24px 8px;">
+      <p style="margin:0;font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;color:#60a5fa;letter-spacing:2px;">WEWANTPEACE PRO</p>
+      <p style="margin:6px 0 4px;font-family:'Noto Sans KR',sans-serif;font-size:18px;font-weight:800;color:#ffffff;line-height:1.4;">이 브리핑은 일주일에 한 번이에요.<br><span style="color:#94a3b8;font-weight:500;font-size:14px;">세계 정세는 매시간 바뀌고 있어요.</span></p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:16px 24px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#cbd5e1;">
+      <tr><td style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <span style="color:#60a5fa;font-weight:700;">&#10003;</span>&nbsp;&nbsp;관심 국가 긴장도 급등 시 <b style="color:#f1f5f9;">실시간 알림</b>
+      </td></tr>
+      <tr><td style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <span style="color:#60a5fa;font-weight:700;">&#10003;</span>&nbsp;&nbsp;7/30/90일 긴장도 <b style="color:#f1f5f9;">트렌드 그래프</b>
+      </td></tr>
+      <tr><td style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <span style="color:#60a5fa;font-weight:700;">&#10003;</span>&nbsp;&nbsp;<span style="font-family:'Playfair Display',Georgia,serif;font-size:16px;font-weight:700;color:#ffffff;">1,751</span>개 활성 클러스터 <b style="color:#f1f5f9;">전체 분석</b>
+      </td></tr>
+      <tr><td style="padding:6px 0;">
+        <span style="color:#60a5fa;font-weight:700;">&#10003;</span>&nbsp;&nbsp;출장·투자 대상국 <b style="color:#f1f5f9;">맞춤 리스크 리포트</b>
+      </td></tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" style="padding:8px 24px 28px;">
+      <a href="https://www.wewantpeace.live/pricing" style="display:inline-block;padding:13px 40px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;">Pro 7일 무료 체험 &rarr;</a>
+      <p style="margin:10px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#475569;">월 4,900원 &middot; 카드 등록 불필요 &middot; 언제든 해지</p>
+    </td>
+  </tr>
   </table>
-</td>
-</tr>
-
-<tr>
-<td align="center" style="background:#ffffff;padding:0 28px 32px;">
-  <a href="https://www.wewantpeace.live/pricing" style="display:inline-block;padding:13px 36px;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:6px;font-family:'Noto Sans KR',sans-serif;font-weight:700;font-size:14px;">Pro 7일 무료 체험 &rarr;</a>
-  <p style="margin:8px 0 0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#a1a1aa;">월 4,900원 &middot; 언제든 해지</p>
 </td>
 </tr>
 
