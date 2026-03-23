@@ -36,8 +36,13 @@
   50% { box-shadow: 0 0 0 4px rgba(220,38,38,0.15); }
   }
   .pulse-row { animation: pulse-glow 2s ease-in-out infinite; }
+  @keyframes hero-glow {
+  0%, 100% { text-shadow: 0 0 60px rgba(239,68,68,0.25), 0 2px 4px rgba(0,0,0,0.3); }
+  50% { text-shadow: 0 0 80px rgba(239,68,68,0.45), 0 0 120px rgba(239,68,68,0.2), 0 2px 4px rgba(0,0,0,0.3); }
+  }
+  .hero-number { animation: hero-glow 3s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) {
-  .pulse-row { animation: none; }
+  .pulse-row, .hero-number { animation: none; }
   }
   @media (prefers-color-scheme: dark) {
   .email-bg { background-color:#1a1a1a !important; }
@@ -88,6 +93,9 @@
 <!-- 컨테이너 600px -->
 <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin:0 auto;">
+
+<!-- 브랜드 컬러 스트립 -->
+<tr><td style="background-color:#dc2626;background:linear-gradient(to right,#dc2626,#f97316,#1d4ed8);height:4px;font-size:0;line-height:0;">&nbsp;</td></tr>
 
 <!-- ============================================================ -->
 <!-- 상단 네비 바 -->
@@ -238,7 +246,7 @@
   <!-- 이번 호 목차 -->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
   <tr>
-  <td style="padding:10px 0 0;">
+  <td style="padding:10px 0 0 12px;border-left:3px solid #1d4ed8;">
     <p style="margin:0 0 6px;font-family:'Space Grotesk',sans-serif;font-size:9px;color:#a1a1aa;letter-spacing:1.5px;font-weight:600;">IN THIS ISSUE <span style="color:#d4d4d8;">&middot;</span> <span style="color:#15803d;">2 min read</span></p>
     <p style="margin:0;font-family:'Noto Sans KR',sans-serif;font-size:11px;color:#71717a;line-height:2;">
     <a href="#s1" style="color:#71717a;text-decoration:none;"><span style="color:#d4d4d8;">01</span> 긴장도 TOP 10</a> &nbsp;&middot;&nbsp;
