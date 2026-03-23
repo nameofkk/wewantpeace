@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeWantPeace Newsletter Vol.1 — Before vs After</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #0f172a; color: #e2e8f0; }
+.header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 32px 24px; text-align: center; border-bottom: 2px solid #dc2626; position: sticky; top: 0; z-index: 100; }
+.header h1 { font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.header p { font-size: 14px; color: #94a3b8; }
+
+.stats-bar { display: flex; justify-content: center; gap: 32px; padding: 20px 24px; background: #1e293b; border-bottom: 1px solid rgba(255,255,255,.06); flex-wrap: wrap; }
+.stat-item { text-align: center; }
+.stat-value { font-size: 28px; font-weight: 800; color: #60a5fa; }
+.stat-value.red { color: #ef4444; }
+.stat-value.green { color: #22c55e; }
+.stat-value.amber { color: #fbbf24; }
+.stat-label { font-size: 11px; color: #64748b; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
+
+.tabs { display: flex; justify-content: center; gap: 8px; padding: 16px 24px; background: #1e293b; position: sticky; top: 89px; z-index: 99; border-bottom: 1px solid rgba(255,255,255,.06); }
+.tab { padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid #334155; color: #94a3b8; background: transparent; transition: all .2s; }
+.tab:hover { border-color: #60a5fa; color: #60a5fa; }
+.tab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+.comparison-table { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+.comparison-table table { width: 100%; border-collapse: collapse; }
+.comparison-table th { background: #1e293b; color: #94a3b8; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 2px solid #334155; }
+.comparison-table td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; vertical-align: top; }
+.comparison-table tr:hover { background: rgba(37,99,235,.05); }
+.cat { font-size: 10px; font-weight: 600; letter-spacing: 1px; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-bottom: 4px; }
+.cat-size { background: rgba(34,197,94,.15); color: #22c55e; }
+.cat-a11y { background: rgba(96,165,250,.15); color: #60a5fa; }
+.cat-mobile { background: rgba(251,191,36,.15); color: #fbbf24; }
+.cat-outlook { background: rgba(168,85,247,.15); color: #a855f7; }
+.cat-copy { background: rgba(244,63,94,.15); color: #f43e5e; }
+.cat-css { background: rgba(14,165,233,.15); color: #0ea5e9; }
+.cat-ux { background: rgba(251,146,60,.15); color: #fb923c; }
+.before { color: #ef4444; opacity: .7; }
+.after { color: #22c55e; font-weight: 600; }
+.detail { color: #64748b; font-size: 12px; margin-top: 4px; }
+
+.preview-section { padding: 32px 16px; }
+.preview-wrap { max-width: 1300px; margin: 0 auto; }
+.preview-header { text-align: center; margin-bottom: 24px; }
+.preview-header h2 { font-size: 20px; font-weight: 700; color: #fff; }
+.preview-header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+.preview-frames { display: flex; gap: 24px; }
+.preview-col { flex: 1; min-width: 0; }
+.preview-label { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 10px; border-radius: 8px 8px 0 0; }
+.preview-label.old { background: #991b1b; color: #fca5a5; }
+.preview-label.new { background: #166534; color: #86efac; }
+.preview-frame { width: 100%; height: 80vh; border: 2px solid #334155; border-top: none; border-radius: 0 0 8px 8px; background: #fff; }
+
+.single-preview { max-width: 700px; margin: 0 auto; }
+.single-preview .preview-frame { height: 85vh; border-radius: 8px; border: 2px solid #334155; }
+
+@media (max-width: 900px) {
+  .preview-frames { flex-direction: column; }
+  .preview-frame { height: 60vh; }
+  .stats-bar { gap: 16px; }
+  .stat-value { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>WeWantPeace Newsletter Vol.1 — 개선 리포트</h1>
+  <p>R1~R628 · 전체 개선 내역</p>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-value green">-46%</div><div class="stat-label">파일 크기</div></div>
+  <div class="stat-item"><div class="stat-value">203</div><div class="stat-label">CSS 클래스</div></div>
+  <div class="stat-item"><div class="stat-value amber">52.4KB</div><div class="stat-label">현재 크기</div></div>
+  <div class="stat-item"><div class="stat-value red">97KB</div><div class="stat-label">피크 크기</div></div>
+  <div class="stat-item"><div class="stat-value green">52KB</div><div class="stat-label">Gmail 여유</div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('table')">비교표</button>
+  <button class="tab" onclick="showTab('sidebyside')">Before / After</button>
+  <button class="tab" onclick="showTab('final')">최종본 미리보기</button>
+</div>
+
+<div id="tab-table" class="comparison-table">
+<table>
+<thead>
+<tr>
+  <th width="25%">항목</th>
+  <th width="30%">Before (초기)</th>
+  <th width="30%">After (R628)</th>
+  <th width="15%">효과</th>
+</tr>
+</thead>
+<tbody>
+<!-- 파일 크기 -->
+<tr>
+  <td><span class="cat cat-size">SIZE</span><br>파일 크기</td>
+  <td class="before">97,041B (피크)<br>66,622B (최초 커밋)</td>
+  <td class="after">52,406B</td>
+  <td><span class="after">-46%</span><br><span class="detail">Gmail 클리핑 위험 해소</span></td>
+</tr>
+
+<!-- CSS 최적화 -->
+<tr>
+  <td><span class="cat cat-css">CSS</span><br>인라인 스타일</td>
+  <td class="before">모든 요소에 인라인 style<br>반복 속성 수백 개</td>
+  <td class="after">203개 유틸리티 CSS 클래스<br>인라인 101개 (유니크만 잔존)</td>
+  <td><span class="after">-45KB</span><br><span class="detail">가독성·유지보수↑</span></td>
+</tr>
+
+<!-- 폰트 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>타이포그래피</td>
+  <td class="before">시스템 폰트만 사용<br>숫자 강조 없음</td>
+  <td class="after">Playfair Display (숫자)<br>Noto Sans KR (본문·라벨)<br>2폰트 통합 (4→2)</td>
+  <td><span class="after">에디토리얼 품질</span><br><span class="detail">깔끔한 타이포</span></td>
+</tr>
+
+<!-- 히어로 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>히어로 섹션</td>
+  <td class="before">텍스트 중심<br>정적 레이아웃</td>
+  <td class="after">140px 대형 숫자 "23"<br>글로우 애니메이션<br>3-stat 카드 (854/11,861/187)<br>핵심 키라인 1줄 요약</td>
+  <td><span class="after">첫인상 극대화</span><br><span class="detail">스크롤 유도력↑</span></td>
+</tr>
+
+<!-- 콘텐츠 구조 -->
+<tr>
+  <td><span class="cat cat-copy">CONTENT</span><br>콘텐츠 구조</td>
+  <td class="before">단순 리스트형<br>텍스트 위주</td>
+  <td class="after">8개 섹션 + 앵커 네비<br>"왜 중요해요?" 훅<br>TOP 3 브리프 (상단)<br>한국 임팩트 전용 섹션</td>
+  <td><span class="after">완독률↑</span><br><span class="detail">매거진 구조</span></td>
+</tr>
+
+<!-- TOP 10 테이블 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>긴장도 TOP 10</td>
+  <td class="before">텍스트 테이블<br>시각적 차별화 없음</td>
+  <td class="after">모노크롬 테이블 (블랙/레드)<br>한국(8위) 볼드 하이라이트<br>"YOU" 뱃지<br>펄스 애니메이션 (1위)</td>
+  <td><span class="after">데이터 시각화</span><br><span class="detail">한국 독자 몰입↑</span></td>
+</tr>
+
+<!-- 이미지 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>이미지·비주얼</td>
+  <td class="before">이미지 없음</td>
+  <td class="after">Al Jazeera/BBC/CBS 뉴스 이미지 5장<br>호르무즈 위성사진 히어로 + VML 폴백<br>에너지 위기 풀컬러 카드</td>
+  <td><span class="after">비주얼 임팩트</span><br><span class="detail">스크린샷 공유↑</span></td>
+</tr>
+
+<!-- CTA -->
+<tr>
+  <td><span class="cat cat-copy">CONTENT</span><br>CTA (행동유도)</td>
+  <td class="before">하단 1개 CTA</td>
+  <td class="after">주요 CTA 4개<br>피드백 텍스트 링크 (유용/보통/별로)<br>카카오톡 공유 버튼<br>Pro 업셀 섹션<br>앵커 내비게이션</td>
+  <td><span class="after">전환률↑</span><br><span class="detail">섹션별 CTA</span></td>
+</tr>
+
+<!-- 카피 -->
+<tr>
+  <td><span class="cat cat-copy">CONTENT</span><br>카피라이팅</td>
+  <td class="before">설명형 어투<br>"~입니다" 문체</td>
+  <td class="after">대화형 어투 ("~거요")<br>"왜 중요해요?" 패턴<br>한국 직격 연결<br>구체적 숫자 우선<br>공감형 전환 문구</td>
+  <td><span class="after">가독성·공감↑</span><br><span class="detail">뉴닉/어피티 톤</span></td>
+</tr>
+
+<!-- Outlook -->
+<tr>
+  <td><span class="cat cat-outlook">OUTLOOK</span><br>Outlook 호환</td>
+  <td class="before">CSS background만 사용<br>배경 이미지 미표시</td>
+  <td class="after">bgcolor 폴백 9곳<br>VML 배경이미지 (호르무즈)<br>MSO 폰트 스타일<br>PixelsPerInch 메타</td>
+  <td><span class="after">호환성↑</span><br><span class="detail">Outlook 깨짐 방지</span></td>
+</tr>
+
+<!-- 모바일 -->
+<tr>
+  <td><span class="cat cat-mobile">MOBILE</span><br>모바일 반응형</td>
+  <td class="before">기본 table 레이아웃<br>모바일 미디어쿼리 없음</td>
+  <td class="after">@media (max-width:480px)<br>히어로 90px 축소<br>패딩 28→18px<br>CTA 풀-width<br>사이드 이미지 100px</td>
+  <td><span class="after">모바일 최적화</span><br><span class="detail">375px~480px 대응</span></td>
+</tr>
+
+<!-- 접근성 -->
+<tr>
+  <td><span class="cat cat-a11y">A11Y</span><br>접근성</td>
+  <td class="before">role="presentation" 일부<br>alt 텍스트 미흡<br>색상 대비 미검증</td>
+  <td class="after">role="presentation" 62개 전체<br>alt 텍스트 8개 이미지 전체<br>aria-label CTA 4개<br>aria-hidden 장식요소 2개<br>WCAG AA 색상 대비<br>prefers-reduced-motion</td>
+  <td><span class="after">WCAG AA</span><br><span class="detail">스크린리더 호환</span></td>
+</tr>
+
+<!-- 프리헤더 -->
+<tr>
+  <td><span class="cat cat-copy">CONTENT</span><br>프리헤더 텍스트</td>
+  <td class="before">프리헤더 없음 또는 기본</td>
+  <td class="after">"해협 하나 막혔는데 기름값이 뛰어요"<br>+24쌍 zwnj 패딩<br>(~140자 Gmail 미리보기 커버)</td>
+  <td><span class="after">오픈율↑</span><br><span class="detail">본문 유출 방지</span></td>
+</tr>
+
+<!-- 공유 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>공유 최적화</td>
+  <td class="before">공유 기능 없음</td>
+  <td class="after">카카오톡 공유 (인코딩 완료)<br>메일 전달하기<br>"아는 사람 한 명→무관심 하나↓"</td>
+  <td><span class="after">바이럴↑</span><br><span class="detail">K-factor 개선</span></td>
+</tr>
+
+<!-- D-DAY 캘린더 -->
+<tr>
+  <td><span class="cat cat-copy">CONTENT</span><br>D-DAY 캘린더</td>
+  <td class="before">일정 정보 없음</td>
+  <td class="after">3/23~3/26 주요 일정 4건<br>D-DAY 뱃지 (오늘)<br>해시태그 (#안보 #에너지 #한국경제)<br>한국 이벤트 KR 뱃지</td>
+  <td><span class="after">리텐션↑</span><br><span class="detail">다음 주 기대감</span></td>
+</tr>
+
+<!-- 에너지 섹션 -->
+<tr>
+  <td><span class="cat cat-ux">DESIGN</span><br>에너지 위기 카드</td>
+  <td class="before">텍스트 설명</td>
+  <td class="after">다크 비주얼 카드 (#7f1d1d)<br>BREAKING 뱃지<br>유가 텍스트 $95→$118<br>"한국 체감" 실생활 연결</td>
+  <td><span class="after">임팩트↑</span><br><span class="detail">시각적 긴장감</span></td>
+</tr>
+
+<!-- HTML 검증 -->
+<tr>
+  <td><span class="cat cat-css">QUALITY</span><br>HTML 검증</td>
+  <td class="before">bare &amp; in URLs<br>중복 class 속성 가능</td>
+  <td class="after">&amp;amp; 전체 수정<br>중복 class 속성 수정<br>모든 table에 border="0"<br>모든 ID 유니크 검증</td>
+  <td><span class="after">표준 준수</span><br><span class="detail">렌더링 안정성</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div id="tab-sidebyside" class="preview-section" style="display:none;">
+  <div class="preview-wrap">
+    <div class="preview-header">
+      <h2>Before / After 비교</h2>
+      <p>좌: 최초 버전 (b7e2517) · 우: 현재 버전 (R628)</p>
+    </div>
+    <div class="preview-frames">
+      <div class="preview-col">
+        <div class="preview-label old">BEFORE — 66.6KB (최초)</div>
+        <iframe class="preview-frame" src="newsletter-original.html"></iframe>
+      </div>
+      <div class="preview-col">
+        <div class="preview-label new">AFTER — 52.4KB (R628)</div>
+        <iframe class="preview-frame" src="newsletter-v1-final.html"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-final" class="preview-section" style="display:none;">
+  <div class="preview-wrap single-preview">
+    <div class="preview-header">
+      <h2>최종본 미리보기</h2>
+      <p>58,892 bytes · 220 CSS classes · Gmail safe</p>
+    </div>
+    <iframe class="preview-frame" src="newsletter-v1-final.html"></iframe>
+  </div>
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).style.display = 'block';
+}
+</script>
+</body>
+</html>
