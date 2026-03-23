@@ -31,6 +31,14 @@
     .feedback-btn { padding:8px 12px !important; font-size:12px !important; }
     .quote-card-text { font-size:16px !important; }
   }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    50% { box-shadow: 0 0 0 4px rgba(220,38,38,0.15); }
+  }
+  .pulse-row { animation: pulse-glow 2s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .pulse-row { animation: none; }
+  }
   @media (prefers-color-scheme: dark) {
     .email-bg { background-color:#1a1a1a !important; }
   }
@@ -241,7 +249,7 @@
     <td width="120" style="padding:8px 0;border-bottom:2px solid #18181b;"></td>
   </tr>
   <!-- 1 이스라엘/이란 — 1위 강조 -->
-  <tr style="background:#fef2f2;">
+  <tr class="pulse-row" style="background:#fef2f2;">
     <td style="padding:10px 0;font-family:'Space Grotesk',sans-serif;font-size:12px;color:#dc2626;font-weight:700;">1</td>
     <td style="padding:10px 0;font-size:14px;"><a href="https://www.wewantpeace.live/issues?country=IL" style="color:#18181b;text-decoration:none;font-weight:800;">이스라엘 / 이란</a></td>
     <td style="padding:10px 0;text-align:right;font-family:'Playfair Display',Georgia,serif;font-size:16px;font-weight:800;color:#dc2626;">100</td>
@@ -634,6 +642,14 @@
     <td style="padding:0 24px 20px;">
       <!-- 게이지 바 -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td style="padding:0 0 2px;">
+          <!-- 포인터 (96.8% 위치) -->
+          <div style="width:96.8%;text-align:right;">
+            <span style="display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #60a5fa;margin-right:-5px;"></span>
+          </div>
+        </td>
+      </tr>
       <tr>
         <td style="padding:0;">
           <div style="background:#1e293b;height:8px;border-radius:4px;overflow:hidden;">
