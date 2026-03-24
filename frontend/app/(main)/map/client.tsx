@@ -366,7 +366,7 @@ function NewsTicker({ clusters, isPreview = false }: { clusters: Cluster[]; isPr
   ));
 
   return (
-    <div className="absolute bottom-16 left-0 right-0 z-10 overflow-hidden border-t border-red-900/30 bg-black/70 backdrop-blur-sm h-9 flex items-center">
+    <div className="absolute bottom-[76px] left-0 right-0 z-10 overflow-hidden border-t border-red-900/30 bg-black/70 backdrop-blur-sm h-9 flex items-center">
       <div className={isPreview ? "ticker-track-medium" : "ticker-track"}>
         {content}
         {content}
