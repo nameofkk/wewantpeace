@@ -11,6 +11,7 @@ import { TabBar } from "@/components/admin/TabBar";
 import {
   Save, Send, ChevronDown, ChevronRight, Loader2,
   Smartphone, Monitor, AlertTriangle, FileText,
+  Mail, Clock, CheckCircle, XCircle,
 } from "lucide-react";
 
 /* ── 변수 그룹 정의 ── */
@@ -209,7 +210,7 @@ function CollapsibleSection({
 }: {
   section: SectionDef;
   lang: "ko" | "en";
-  data: Record<string, string>;
+  data: Record<string, any>;
   onChange: (key: string, value: string) => void;
   defaultOpen: boolean;
 }) {
@@ -359,18 +360,19 @@ export default function AdminNewsletterPage() {
   const { toast } = useAdminToast();
   const [editLang, setEditLang] = useState<"kr" | "us">("kr");
   const [vol, setVol] = useState(1);
-  const [data, setData] = useState<Record<string, string>>({});
+  const [data, setData] = useState<Record<string, any>>({});
   const [previewHtml, setPreviewHtml] = useState("");
   const [sizeKb, setSizeKb] = useState(0);
   const [unresolved, setUnresolved] = useState<string[]>([]);
   const [renderLoading, setRenderLoading] = useState(false);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const [confirmSend, setConfirmSend] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // 초안 로드
   const { data: draftData, isLoading: draftLoading } = useQuery({
     queryKey: ["newsletter-draft", vol, editLang],
-    queryFn: () => adminFetch<Record<string, string>>(`/admin/newsletter/draft?vol=${vol}&lang=${editLang}`),
+    queryFn: () => adminFetch<Record<string, any>>(`/admin/newsletter/draft?vol=${vol}&lang=${editLang}`),
     refetchOnWindowFocus: false,
   });
 
@@ -380,7 +382,7 @@ export default function AdminNewsletterPage() {
   }, [draftData]);
 
   // 렌더링 함수
-  const doRender = useCallback(async (renderData: Record<string, string>) => {
+  const doRender = useCallback(async (renderData: Record<string, any>) => {
     setRenderLoading(true);
     try {
       const res = await adminFetch<{ html: string; size_kb: number; unresolved: string[] }>(
@@ -390,8 +392,8 @@ export default function AdminNewsletterPage() {
       setPreviewHtml(res.html);
       setSizeKb(res.size_kb);
       setUnresolved(res.unresolved);
-    } catch {
-      // silently fail for debounced renders
+    } catch (err) {
+      console.error("[newsletter render]", err);
     } finally {
       setRenderLoading(false);
     }
@@ -433,6 +435,30 @@ export default function AdminNewsletterPage() {
       toast(lang === "ko" ? `테스트 발송 → ${r.sent_to}` : `Test sent → ${r.sent_to}`, "success");
     },
     onError: () => toast(lang === "ko" ? "발송 실패" : "Send failed", "error"),
+  });
+
+  // 전체 발송
+  const sendAllMutation = useMutation({
+    mutationFn: () =>
+      adminFetch<{ sent: number; failed: number }>("/admin/newsletter/send", {
+        method: "POST",
+        body: { vol, lang: editLang, data },
+      }),
+    onSuccess: (res) => {
+      const r = res as { sent: number; failed: number };
+      toast(lang === "ko" ? `발송 완료 — ${r.sent}명 성공, ${r.failed}명 실패` : `Sent — ${r.sent} ok, ${r.failed} failed`, "success");
+      setConfirmSend(false);
+    },
+    onError: () => {
+      toast(lang === "ko" ? "발송 실패" : "Send failed", "error");
+      setConfirmSend(false);
+    },
+  });
+
+  // 발송 기록
+  const { data: historyData } = useQuery({
+    queryKey: ["newsletter-history"],
+    queryFn: () => adminFetch<Array<{ id: number; date: string; subject: string; sent: number; failed: number; status: string }>>("/admin/newsletter/history"),
   });
 
   const langTabs = [
@@ -519,7 +545,62 @@ export default function AdminNewsletterPage() {
                 {sendTestMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 {lang === "ko" ? "테스트 발송" : "Send Test"}
               </button>
+              {!confirmSend ? (
+                <button
+                  onClick={() => setConfirmSend(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  <Mail className="h-4 w-4" />
+                  {lang === "ko" ? "전체 발송" : "Send All"}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => sendAllMutation.mutate()}
+                    disabled={sendAllMutation.isPending}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 animate-pulse"
+                  >
+                    {sendAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                    {lang === "ko" ? "정말 발송" : "Confirm"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmSend(false)}
+                    className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {lang === "ko" ? "취소" : "Cancel"}
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* 발송 기록 */}
+            {historyData && historyData.length > 0 && (
+              <div className="border border-border rounded-lg p-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {lang === "ko" ? "발송 기록" : "Send History"}
+                </h3>
+                <div className="space-y-2">
+                  {historyData.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between text-xs py-1.5 border-b border-border/40 last:border-0">
+                      <div className="flex items-center gap-2">
+                        {h.status === "completed" ? (
+                          <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                        )}
+                        <span className="text-muted-foreground">{h.subject}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-muted-foreground">
+                        <span>{h.sent}{lang === "ko" ? "명" : " sent"}</span>
+                        {h.failed > 0 && <span className="text-red-400">{h.failed}{lang === "ko" ? " 실패" : " failed"}</span>}
+                        <span>{h.date ? new Date(h.date).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US") : "—"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 프리뷰 패널 */}
