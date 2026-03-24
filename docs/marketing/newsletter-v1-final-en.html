@@ -8,7 +8,7 @@
 <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>WeWantPeace Weekly Brief — Vol.1</title>
+<title>WeWantPeace Weekly Brief — Vol.{{vol_number}}</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <!--[if mso]>
 <style type="text/css">
@@ -53,7 +53,7 @@ a { color: #18181b; }
 </td>
 <td width="8"></td>
 <td valign="middle" class="it w6 fb ls c7">
-Mar 23, Sun
+{{issue_date_short}}
 </td>
 </tr></table>
 </td>
@@ -62,15 +62,15 @@ Mar 23, Sun
 </td>
 </tr>
 <tr>
-<td background="https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg" bgcolor="#0b1120" width="600" height="180" valign="bottom" style="background-image:url('https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg');background-size:cover;background-position:center;background-color:#0b1120;">
+<td background="{{hero_image_url}}" bgcolor="#0b1120" width="600" height="180" valign="bottom" style="background-image:url('{{hero_image_url}}');background-size:cover;background-position:center;background-color:#0b1120;">
 <!--[if gte mso 9]>
 <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:180px;">
-<v:fill type="frame" src="https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg" color="#0b1120" />
+<v:fill type="frame" src="{{hero_image_url}}" color="#0b1120" />
 <v:textbox style="mso-fit-shape-to-text:false" inset="0,0,0,0">
 <![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td style="background:linear-gradient(180deg,rgba(11,17,32,.15) 0%,rgba(11,17,32,.85) 100%);height:180px;padding:0 28px 14px;" valign="bottom">
-<p class="sg w6 cw fa l2 m0" style="text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.8;">WEEKLY BRIEF · VOL.1 · 2026.03.23</p>
+<p class="sg w6 cw fa l2 m0" style="text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.8;">WEEKLY BRIEF · VOL.{{vol_number}} · {{issue_date}}</p>
 </td></tr>
 </table>
 <!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
@@ -81,13 +81,13 @@ Mar 23, Sun
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td align="center" style="padding:24px 28px 14px;">
-<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd hero-number w9 cw m0" style="font-size:140px;line-height:.85;letter-spacing:-4px;text-shadow:0 0 60px rgba(239,68,68,.25), 0 2px 4px rgba(0,0,0,.3);">23</p></a>
+<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd hero-number w9 cw m0" style="font-size:140px;line-height:.85;letter-spacing:-4px;text-shadow:0 0 60px rgba(239,68,68,.25), 0 2px 4px rgba(0,0,0,.3);">{{crisis_countries_count}}</p></a>
 </td>
 </tr>
 <tr>
 <td align="center" style="padding:10px 28px 0;">
 <p class="sg w6 fb ce m0 l4">COUNTRIES IN CRISIS</p>
-<p class="nk fb c6 m4">Crisis countries · <span class="c9">18 → <span class="w6 ce">23</span></span> · <span class="fa c4">3 weeks rising</span></p>
+<p class="nk fb c6 m4">Crisis countries · <span class="c9">{{crisis_prev}} → <span class="w6 ce">{{crisis_current}}</span></span> · <span class="fa c4">{{crisis_trend}}</span></p>
 </td>
 </tr>
 </table>
@@ -107,12 +107,12 @@ Mar 23, Sun
 <tr>
 <td width="33%" class="ac pv bG">
 <p class="sg w6 ce l1 fg mw">▲ 24H</p>
-<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="sg stat-number w7 ce ln m0 fk">854</p></a>
+<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="sg stat-number w7 ce ln m0 fk">{{events_24h}}</p></a>
 <p class="nk fa c6 m3">Detected</p>
 </td>
 <td width="34%" class="ac pv bG">
 <p class="sg w6 c6 l1 fg mw">7 DAYS</p>
-<a class="tn" href="https://www.wewantpeace.live/issues/view?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="sg stat-number w7 ln m0 fk c8">11,861</p></a>
+<a class="tn" href="https://www.wewantpeace.live/issues/view?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="sg stat-number w7 ln m0 fk c8">{{events_7d}}</p></a>
 <p class="nk fa c6 m3">7-day total</p>
 </td>
 <td width="33%" class="ac pv">
@@ -127,7 +127,7 @@ Mar 23, Sun
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr><td class="pK">
-<p class="nk ac fb c9 mw" style="letter-spacing:-.2px">Key: <span class="w6 ce">Iran 2,048 events</span>(+345%) · <span class="w6 cy">Oil $118</span>(+24%) · <span class="w6 cx">{{country_code}} {{tension_score}}</span></p>
+<p class="nk ac fb c9 mw" style="letter-spacing:-.2px">{{key_stats_line}}</p>
 <p class="sg ac f9 ls c4 m0">100+ sources analyzed</p>
 </td></tr>
 </table>
@@ -137,7 +137,7 @@ Mar 23, Sun
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td class="nk fb c6">
-2026.3.23 Sun 09:00 <span class="c4">· Inaugural</span>
+{{issue_datetime}} <span class="c4">· {{issue_label}}</span>
 </td>
 <td align="right" class="sg fb c6">
 <span class="ce">●</span>&nbsp;LIVE · 100+ sources
@@ -153,33 +153,11 @@ Mar 23, Sun
 <td class="bw pF">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td><p class="sg w6 fa ca l2 m0">TODAY'S BRIEF</p></td>
-<td align="right"><p class="nk fa c6 m0"><span aria-hidden="true" class="ib vm rc" style="width:6px;height:6px;background:#dc2626;margin-right:3px;animation:pulse-glow 2s ease-in-out infinite;"></span>Inaugural issue · Every Sunday</p></td>
+<td align="right"><p class="nk fa c6 m0"><span aria-hidden="true" class="ib vm rc" style="width:6px;height:6px;background:#dc2626;margin-right:3px;animation:pulse-glow 2s ease-in-out infinite;"></span>{{issue_label_long}} · Every Sunday</p></td>
 </tr></table>
 <p class="nk fd c7" style="margin:4px 0 16px;">Three things to know <b class="c1">before Monday</b></p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td class="r6 br pe bE">
-<p class="nk fe c2 m0 hb">
-<a class="tn" href="#s4"><span class="sg ib w7 ac fa vm cw bd rc mr wg hg lg">1</span></a><a href="#s4" class="tn c2">Iran-Israel full-scale war → <b>Hormuz de facto blockade</b></a>
-</p>
-</td>
-</tr>
-<tr><td height="8"></td></tr>
-<tr>
-<td class="r6 br pe bE">
-<p class="nk fe c2 m0 hb">
-<a class="tn" href="#s3"><span class="sg ib w7 ac fa vm cw bd rc mr wg hg lg">2</span></a><a href="#s3" class="tn c2">Gulf refinery strikes — <b>global energy disruption</b></a>
-</p>
-</td>
-</tr>
-<tr><td height="8"></td></tr>
-<tr>
-<td class="r6 bl pe bB">
-<p class="nk fe c2 m0 hb">
-<a class="tn" href="#s5"><span class="sg ib w7 ac fa vm cw rc mr bb wg hg lg">3</span></a><a href="#s5" class="tn c2">{{country_name}} tension <b class="cb">{{tension_score}}</b> — ranked #{{country_rank}}. <span class="w7 fc r3 cw bb pw">Why?</span></a>
-</p>
-</td>
-</tr>
+{{{todays_brief_items_html}}}
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="mT">
 <tr>
@@ -189,7 +167,7 @@ Mar 23, Sun
 <a href="#s1" class="tn c7"><span class="cq">01</span> Tension TOP 10</a> &nbsp;·&nbsp;
 <a href="#s2" class="tn c7"><span class="cq">02</span> Conflicts</a> &nbsp;·&nbsp;
 <a href="#s3" class="tn c7"><span class="cq">03</span> Energy Crisis</a> &nbsp;·&nbsp;
-<a href="#s4" class="tn c7"><span class="cq">04</span> Hormuz Deep Dive</a> &nbsp;·&nbsp;
+<a href="#s4" class="tn c7"><span class="cq">04</span> {{deep_dive_nav_label}}</a> &nbsp;·&nbsp;
 <a href="#s5" class="tn c7"><span class="cq">05</span> <span class="w6 cb">Your Country</span></a> &nbsp;·&nbsp;
 <a href="#s6" class="tn c7"><span class="cq">06</span> Travel Advisory</a> &nbsp;·&nbsp;
 <a href="#s7" class="tn c7"><span class="cq">07</span> Numbers</a> &nbsp;·&nbsp;
@@ -220,7 +198,7 @@ Mar 23, Sun
 <td class="bw pJ">
 {{{tension_table_html}}}
 <p class="nk fa c6 mn">* Tension Index = density + acceleration + spillover effect. It rises even without war.</p>
-<p class="nk fc c5 h6 mp"><b>Warning:</b> All top 6 scored <span class="ib w7 fb r2 cw bd py">100</span>. Last week 3 → this week 6 — doubled after full-scale war.</p>
+<p class="nk fc c5 h6 mp">{{{tension_warning_html}}}</p>
 <p class="ac mp"><a href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w6 fc c1 tu">195-country tension map →</a></p>
 </td>
 </tr>
@@ -229,107 +207,13 @@ Mar 23, Sun
 <td class="bw pH">
 <p id="s2" class="sg w6 fa cd l2 m0"><span class="ib r3 ca p1 bp mg">02</span> CONFLICT</p>
 <p class="nk w9 ln c0 ff mX">Wars · This Week</p>
-<p class="nk fd c7 h5 mk">People are dying right now. The 4 most urgent out of <b class="cd">491</b>.</p>
+<p class="nk fd c7 h5 mk">People are dying right now. The {{urgent_count}} most urgent out of <b class="cd">{{total_conflicts}}</b>.</p>
 </td>
 </tr>
-<tr>
-<td class="bw pg">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="oh" style="border-radius:8px 8px 0 0;">
-<tr>
-<td class="bd" style="padding:6px 14px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td><span class="sg w7 f9 cw l5">TOP STORY</span></td>
-<td align="right"><span class="sg f9 ck">161 events this week</span></td>
-</tr></table>
-</td>
-</tr>
-<tr>
-<td>
-<a class="tn" href="https://www.wewantpeace.live/issues/country/LB">
-<img src="https://www.aljazeera.net/wp-content/uploads/2026/03/ap_69bffa7230613-1774189170.jpg?resize=1200%2C630" alt="Qasimiyeh bridge destroyed" width="544" class="db b0 wf hA" />
-</a>
-</td>
-</tr>
-</table>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bs" style="border-top:none;border-radius:0 0 8px 8px;">
-<tr>
-<td style="padding:16px 18px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td><span class="sg ib w6 f9 r3 ls cw bd ps">Severity 100</span></td>
-<td align="right"><span class="sg fa cr">161 events · Confidence 8.5</span></td>
-</tr></table>
-<p style="margin:8px 0 6px;"><a href="https://www.wewantpeace.live/issues/country/LB?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w8 c1 h4 fi" aria-label="Qasimiyeh details">Israel destroys Qasimiyeh bridge in Lebanon</a></p>
-<p class="nk fd c5 h7 m8">Escape routes cut, aid blocked. Hezbollah vows retaliation.</p>
-<p class="sg fa c6 m8"><b class="cr">Al Jazeera</b> · <b class="cr">Reuters</b></p>
-<p class="nk fc cb h5 m0"><b>Why it matters?</b> One bridge cuts off escape for 2.1 million. UN intervention pressure rises.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td class="bw pa">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs">
-<tr>
-<td class="side-img" width="160" valign="middle">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/IQ">
-<img src="https://www.aljazeera.net/wp-content/uploads/2026/03/00001iraq-1774071019.jpg?resize=400%2C300" alt="Iraq US base strike" width="160" class="db b0 wi hA rL" />
-</a>
-</td>
-<td valign="middle" class="pl">
-<p class="m0"><span class="sg tg ls cd br bc fg">Severity 100</span> <span class="sg fa cr">80 events · Confidence 7.4</span></p>
-<p class="ms"><a href="https://www.wewantpeace.live/issues/country/IQ?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w7 fe c1 h4">Drone strike on US base in Iraq, NATO mission withdraws</a></p>
-<p class="nk fc c7 mx h9">Iran-backed forces attack US base directly.</p>
-<p class="sg f9 c6 m6">AP · Al Jazeera</p>
-<p class="nk fb cb h4 m0 bj r4 pz"><b>Why it matters?</b> US forces focused on Middle East → power vacuum elsewhere</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td class="bw pa">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs">
-<tr>
-<td class="side-img" width="160" valign="middle">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/UA">
-<img src="https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/d9be/live/f94c8cc0-24ff-11f1-ba46-637c713acadc.jpg" alt="Zaporizhzhia drone attack" width="160" class="db b0 wi hA rL" />
-</a>
-</td>
-<td valign="middle" class="pl">
-<p class="m0"><span class="sg tg ls cd br bc fg">Severity 100</span> <span class="sg fa cr">101 events · Confidence 5.0</span></p>
-<p class="ms"><a href="https://www.wewantpeace.live/issues/country/UA?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w7 fe c1 h4">Zaporizhzhia drone attack, 2 civilians killed</a></p>
-<p class="nk fc c7 mx h9"><span class="r2 bh pf">Not in the news</span>, but drones have been falling for 3 years.</p>
-<p class="sg f9 c6 m6">BBC · Reuters</p>
-<p class="nk fb cb h4 m0 bj r4 pz"><b>Why it matters?</b> European grain &amp; gas prices up → global food costs rising</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td class="bw pa">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs">
-<tr>
-<td class="side-img" width="160" valign="middle">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/US">
-<img src="https://www.aljazeera.net/wp-content/uploads/2026/03/ap_69bfb5d09af5d-1774171600.jpg?resize=1200%2C630" alt="Diego Garcia missile attack" width="160" class="db b0 wi hA rL" />
-</a>
-</td>
-<td valign="middle" class="pl">
-<p class="m0"><span class="sg tg ls cd br bc fg">Severity 100</span> <span class="sg fa cr">149 events · Confidence 9.0</span></p>
-<p class="ms"><a href="https://www.wewantpeace.live/issues/country/US?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w7 fe c1 h4">Iran missile strike on Diego Garcia US base</a></p>
-<p class="nk fc c7 mx h9"><b class="c1">Strategic Indian Ocean base</b> <span class="w6 r2 cd br pt">first-ever</span> attack.</p>
-<p class="sg f9 c6 m6">AP · CNN</p>
-<p class="nk fb cb h4 m0 bj r4 pz"><b>Why it matters?</b> US overseas base struck — retaliation → escalation</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
+{{{conflict_stories_html}}}
 <tr>
 <td align="center" class="bw" style="padding:8px 28px 20px;">
-<a href="https://www.wewantpeace.live/issues/view?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w6 fc c1 tu">All 948 active issues →</a>
+<a href="https://www.wewantpeace.live/issues/view?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w6 fc c1 tu">All {{active_issues_count}} active issues →</a>
 </td>
 </tr>
 <tr><td class="bw px"><div class="hy bq"></div></td></tr>
@@ -337,155 +221,17 @@ Mar 23, Sun
 <td class="bw pb">
 <p id="s3" class="sg w6 fa l2 co m0"><span class="ib r3 ca p1 bp mg">03</span> ENERGY CRISIS</p>
 <p class="nk w9 ln c0 ff mX">Energy Crisis — Your Wallet</p>
-<p class="nk fd c7 h5 mk">Oil from $95 to <b class="cd">$118</b> in one week. Crisis hitting your wallet.</p>
+{{{energy_section_intro_html}}}
 </td>
 </tr>
-<tr>
-<td class="bw pg">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 oh" bgcolor="#7f1d1d" style="background:#7f1d1d;">
-<tr>
-<td>
-<a class="tn" href="https://www.wewantpeace.live/issues/country/SA">
-<img src="https://www.middleeasteye.net/sites/default/files/styles/max_2600x2600/public/MEE%20BREAKING%20SLIDE_0_1.jpeg.jpg" alt="Gulf refinery struck" width="544" class="db b0 wf hA" style="opacity:.8" />
-</a>
-</td>
-</tr>
-<tr>
-<td style="padding:18px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td>
-<span class="sg ib w7 f9 r3 ls cm ps" style="background:#fca5a5">BREAKING</span>
-<span class="sg ib w6 f9 r3 ls cp ps" style="background:rgba(252,165,165,.3);margin-left:4px">Severity 100</span>
-</td>
-<td align="right"><span class="sg fa cp">85 events · Confidence 9.4</span></td>
-</tr></table>
-<p class="nk w8 cw h4 fn" style="margin:8px 0;">Gulf refinery drone strikes — Oil $118, <span class="cx">global impact</span></p>
-<p class="nk fd h7 m8 ck">Kuwait &amp; Qatar refineries hit. <b class="cy">Oil surges past $118</b>, could reach $130 without production increase.</p>
-<p class="nk w6 fc m6 cy"><b>Impact:</b> Naphtha &amp; gasoline surge — prices rising within 2 weeks</p>
-<p class="sg f9 cp m0" style="opacity:.7;">MEE · Bloomberg</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td class="bw pg">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs bO">
-<tr>
-<td class="pl">
-<p class="m6"><a href="https://www.wewantpeace.live/issues/country/IR" class="nk tn w7 c1 fm">Iran-driven energy supply disruption</a></p>
-<p class="nk fd c5 h7 mj">Naphtha <b class="cd">+20%</b> → plastics, vinyl, textiles price hikes. US markets down — global markets follow.</p>
-<p class="nk fc c5 h5 mj">Brent crude $95 → <b class="cd">$118</b> (↑24.2% over 7 days)</p>
-<p class="nk fc cb h5 m6"><b>You'll feel it:</b> gas↑ delivery↑ heating↑ — <span class="r2 br pt">already started.</span> Check at your next fill-up</p>
-<p class="sg f9 c6 m0">Bloomberg · Reuters</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<!--[if gte mso 9]>
-<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;">
-<v:fill type="frame" src="https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/16/6238b38a-ab15-47aa-bff5-bc788a77d133/thumbnail/1200x630/64c8216a7567d371c77b2edebdcd929e/takeoutfull.jpg" />
-<v:textbox style="mso-fit-shape-to-text:true" inset="0,0,0,0">
-<![endif]-->
-<td class="bn p0" style="background-image:url('https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/16/6238b38a-ab15-47aa-bff5-bc788a77d133/thumbnail/1200x630/64c8216a7567d371c77b2edebdcd929e/takeoutfull.jpg');background-size:cover;background-position:center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(15,23,42,.88);">
-<tr><td style="padding:36px 32px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td>
-<p class="pd ce" style="font-size:48px;line-height:.7;opacity:.3;margin:0 0 4px;" aria-hidden="true">"</p>
-<p class="nk w7 h7 m0 c8 fn lm">
-Iran has taken hostage the one strait<br>through which 20% of world oil passes.
-</p>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="mu">
-<tr>
-<td style="padding-right:12px;border-right:2px solid rgba(239,68,68,.3);">
-<p class="pd w9 ce m0 fl" style="letter-spacing:-1px">$200B</p>
-</td>
-<td style="padding-left:12px;">
-<p class="nk fb h4 c9 m0">US cost of Iran war</p>
-<p class="nk fa c6 m2">1/3 of South Korea's budget</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-</table>
-</td></tr>
-</table>
-</td>
-<!--[if gte mso 9]></v:textbox></v:rect><![endif]-->
-</tr>
+{{{energy_section_html}}}
 <tr>
 <td class="bw" style="padding:28px 28px 0;">
 <p id="s4" class="sg w6 fa cb l2 m0"><span class="ib r3 ca p1 bp mg">04</span> DEEP DIVE</p>
-<p class="nk w9 ln c0 ff" style="margin:2px 0 12px;">Hormuz — Why It Matters</p>
+<p class="nk w9 ln c0 ff" style="margin:2px 0 12px;">{{deep_dive_title}}</p>
 </td>
 </tr>
-<tr>
-<td class="bw pa">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/IR">
-<img src="https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg" alt="Strait of Hormuz" width="544" class="r8 db b0 wf hA" />
-</a>
-<p class="nk fa c6 mq">33km wide — 20% of world oil passes through · CBS News</p>
-</td>
-</tr>
-<tr>
-<td class="bw" style="padding:0 28px 8px;">
-<p class="nk fd c7 h6 mk">Width <b class="c1">33km</b> — <b class="c1">21 tankers</b> per day. <b class="cd">20%</b> of world oil depends on this — Iran has blockaded it — tankers headed worldwide are stopped at the strait.</p>
-</td>
-</tr>
-<tr>
-<td class="bw" style="padding:0 28px 24px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="nk fc">
-<tr>
-<td class="sg w6 f9 c6 p8 l5 bt">COUNTRY</td>
-<td class="sg w6 f9 c6 p8 l5 bt">STATUS</td>
-<td width="46" class="sg w6 ar f9 c6 p8 l5 bt">EVENTS</td>
-</tr>
-<tr class="br">
-<td class="w7 cd p8 bk">Iran</td>
-<td class="w6 cm p8 bk">Unauthorized vessel seizure</td>
-<td class="sg w6 ar cd p8 bk">32</td>
-</tr>
-<tr>
-<td class="w6 c1 bf p8">USA</td>
-<td class="w6 cd bf p8">48-hour ultimatum</td>
-<td class="sg ar c7 bf p8">88</td>
-</tr>
-<tr class="bl">
-<td class="w8 cb p8 bm"><a href="https://www.wewantpeace.live/issues/country/{{country_code}}" class="tn cb">{{country_name}}</a></td>
-<td class="w6 cb p8 bm">{{hormuz_status}}</td>
-<td class="sg w7 ar cb p8 bm">{{hormuz_events}}</td>
-</tr>
-<tr>
-<td class="w6 c1 bf p8">Japan</td>
-<td class="c5 bf p8">Escort ship deployment pressure</td>
-<td class="sg ar c7 bf p8">20</td>
-</tr>
-<tr class="ba">
-<td class="w6 c1 bf p8">France</td>
-<td class="c7 bf p8"><s>Naval support</s> withdrawn</td>
-<td class="sg ar ca bf p8">21</td>
-</tr>
-<tr>
-<td class="w6 c1 p8">UK</td>
-<td class="c5 p8">Naval deployment review</td>
-<td class="sg ar c7 p8">19</td>
-</tr>
-</table>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r6 bl mu" style="border-left:4px solid #18181b">
-<tr><td class="pl">
-<p class="sg w6 f9 cb mx l5">WHY IT MATTERS</p>
-<p class="nk fd h7 m6 ct">Iran demanded <span class="r2 bh pf">"only yuan-settled ships may pass."</span> <b>First real challenge to dollar hegemony</b>. The trade order is changing.</p>
-<p class="nk w6 fc cb m6">Choices: <span class="b2">US escort</span> vs <span class="b2">Iran negotiation</span> vs <span class="b2">independent escort</span>. Which path — next week.</p>
-<p class="nk fb c6 m0">→ <a href="https://www.wewantpeace.live/issues/country/{{country_code}}?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" class="nk tn w6 fc c1 tu">{{country_name}} details →</a></p>
-</td></tr>
-</table>
-</td>
-</tr>
+{{{deep_dive_section_html}}}
 <tr><td class="bw px"><div class="hy bq"></div></td></tr>
 <tr>
 <td class="bw pH">
@@ -571,41 +317,10 @@ Iran has taken hostage the one strait<br>through which 20% of world oil passes.
 <td class="bw pb">
 <p id="s6" class="sg w6 fa cd l2 m0"><span class="ib r3 ca p1 bp mg">06</span> TRAVEL ADVISORY</p>
 <p class="nk w9 ln c0 ff mY">Travel Advisory</p>
-<p class="nk fd c7 h5 mk">Check before departure. 3 countries added.</p>
+{{{travel_advisory_intro_html}}}
 </td>
 </tr>
-<tr>
-<td class="bw pa">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 br bc">
-<tr>
-<td class="pk">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td><span class="sg ib w7 f9 r3 ls cw bd pu">LEVEL 4</span></td>
-<td align="right"><span class="pd w8 cd fl">20</span><span class="nk fb cm"> countries</span></td>
-</tr></table>
-<p class="nk w7 fc cm mn">Do Not Travel <span class="fa cd w5">(+2: Iran · Lebanon)</span></p>
-<p class="nk fb h6 m4 ck2">Afghanistan, Belarus, Burkina Faso, Central African Republic, Haiti, Iraq, <b>Iran</b> <span class="sg ib w6 vm r2 cw bd fg p2">NEW</span>, North Korea, <b>Lebanon</b> <span class="sg ib w6 vm r2 cw bd fg p2">NEW</span>, Libya, Mali, Myanmar, Niger, Russia, Somalia, South Sudan, Sudan, Syria, Ukraine, Yemen</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td class="bw" style="padding:0 28px 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 by b7">
-<tr>
-<td class="pk">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td><span class="sg ib w7 f9 r3 ls cw pu" style="background:#b45309">LEVEL 3</span></td>
-<td align="right"><span class="pd w8 co fl">29</span><span class="nk fb co2"> countries</span></td>
-</tr></table>
-<p class="nk w7 fc co2 mn">Reconsider Travel <span class="fa co w5">(+3 this week)</span></p>
-<p class="nk fb h6 m4" style="color:#78350f;"><b>UAE</b> <span class="sg ib w6 vm r2 cw bd fg p2">NEW</span>, <b>Jordan</b> <span class="sg ib w6 vm r2 cw bd fg p2">NEW</span>, <b>Kuwait</b> <span class="sg ib w6 vm r2 cw bd fg p2">NEW</span> · Saudi Arabia · Qatar · Bahrain + 23 more</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
+{{{travel_advisory_html}}}
 <tr>
 <td align="center" class="bw pi">
 <a class="nk cta-full tn ib w6 fe r6 c5 bw" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1" style="padding:13px 28px;border:1px solid #d4d4d8;" aria-label="Check risk before travel">Check risk before departure →</a>
@@ -620,101 +335,7 @@ Iran has taken hostage the one strait<br>through which 20% of world oil passes.
 </tr>
 <tr>
 <td class="bw pi">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td width="33%" style="padding:0 4px 6px 0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bc bT">
-<tr><td align="center" class="pc">
-<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd w8 cd m0 fj">854</p></a>
-<p class="nk fa c7 m4 w5">24h Conflicts</p>
-<p class="sg w6 f9 cd m2">↑ 12%</p>
-</td></tr>
-</table>
-</td>
-<td width="34%" style="padding:0 3px 6px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 br bc bT">
-<tr><td align="center" class="pc">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/IR?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd w8 cd m0 fj">2,048</p></a>
-<p class="nk w6 fa cm m4">Iran 7-day</p>
-<p class="sg w7 f9 cd m2">↑ 345%</p>
-</td></tr>
-</table>
-</td>
-<td width="33%" style="padding:0 0 6px 4px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs" style="border-top:3px solid #18181b;">
-<tr><td align="center" class="pc">
-<a class="tn" href="https://www.wewantpeace.live/issues/country/IL?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd w8 c1 m0 fj">1,133</p></a>
-<p class="nk fa c7 m4 w5">Israel 7-day</p>
-<p class="sg w6 f9 cd m2">↑ 210%</p>
-</td></tr>
-</table>
-</td>
-</tr>
-<tr>
-<td style="padding:0 4px 0 0;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bc bT">
-<tr><td align="center" class="pc">
-<a class="tn" href="https://www.wewantpeace.live/map?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd w8 cd m0 fj">23</p></a>
-<p class="nk fa c7 m4 w5">Crisis Countries</p>
-</td></tr>
-</table>
-</td>
-<td class="pt">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs bU">
-<tr><td align="center" class="pc">
-<a class="tn" href="https://www.wewantpeace.live/issues/view?utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1"><p class="pd w8 c1 m0 fj">948</p></a>
-<p class="nk fa c7 m4 w5">Active Issues</p>
-</td></tr>
-</table>
-</td>
-<td style="padding:0 0 0 4px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bs bU">
-<tr><td align="center" class="pc">
-<p class="pd w8 c1 m0 fj">100+</p>
-<p class="nk fa c7 m4 w5">Monitored Sources</p>
-</td></tr>
-</table>
-</td>
-</tr>
-</table>
-<p class="nk ac fb c5 h5 mp"><b class="cd">Iran's 2,048 events</b> is <b>4.5x</b> the usual 460. Surged in 3 weeks — wartime level.</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="r8 bn" bgcolor="#0f172a" style="margin:16px 0 0;">
-<tr><td class="pl">
-<p class="sg w6 f9 c4 l2 m8">WEEK-OVER-WEEK <span class="c6 l0 w4">Weekly Change</span></p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td class="f9 c4 p3 bz"></td>
-<td width="48" class="ar f9 c4 p3 bz">Prev</td>
-<td width="52" class="ar f9 c4 p3 bz">This week</td>
-<td width="46" class="ar f9 c4 p3 bz">Change</td>
-</tr>
-<tr>
-<td class="fb p5 c9">Crisis Countries</td>
-<td class="ar fb c6 p5">18</td>
-<td class="w7 ar fc ce p5">23</td>
-<td class="w6 ar fa ce p5">+5</td>
-</tr>
-<tr>
-<td class="fb p5 c9">Oil (Brent)</td>
-<td class="ar fb c6 p5">$95</td>
-<td class="w7 ar fc p5 cy">$118</td>
-<td class="w6 ar fa ce p5">+24%</td>
-</tr>
-<tr>
-<td class="fb p5 c9">Iran Conflicts</td>
-<td class="ar fb c6 p5">460</td>
-<td class="w7 ar fc ce p5">2,048</td>
-<td class="w6 ar fa ce p5">+345%</td>
-</tr>
-<tr>
-<td class="fb p5 c9">{{country_code}} Tension</td>
-<td class="ar fb c6 p5">{{prev_tension}}</td>
-<td class="w7 ar fc p5 cx">{{tension_score}}</td>
-<td class="w6 ar fa ce p5">{{tension_change}}</td>
-</tr>
-</table>
-</td></tr>
-</table>
+{{{numbers_section_html}}}
 </td>
 </tr>
 <tr><td class="bw px"><div class="hy bq"></div></td></tr>
@@ -737,26 +358,10 @@ Iran has taken hostage the one strait<br>through which 20% of world oil passes.
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td><p class="pd w7 fa m0" style="letter-spacing:2.5px;color:#b5a384;text-transform:uppercase;">Editor's Note</p></td>
-<td align="right"><span class="nk fa" style="color:#c9b896;">Vol.1 · 2026.03.23</span></td>
+<td align="right"><span class="nk fa" style="color:#c9b896;">Vol.{{vol_number}} · {{issue_date}}</span></td>
 </tr>
 </table>
-<p class="nk w9 m0" style="font-size:20px;letter-spacing:-.3px;color:#2d2418;margin-top:14px;margin-bottom:20px;">A Word from the Editor</p>
-<p class="nk fe h8 m0" style="color:#3d3428;margin-bottom:14px;">
-What makes this week different: <b>one strait proved it can shake the entire world.</b>
-</p>
-<p class="nk fe h8 m0" style="color:#3d3428;margin-bottom:14px;">
-Iran locked the strait and demanded a change in payment currency. <span style="background:#f5f0e4;padding:0 3px;border-radius:2px;">Energy as a weapon, the dollar under siege</span>.
-</p>
-<p class="nk fe h8 m0" style="color:#3d3428;">
-20% of the world's oil passes through here. <b style="color:#8b2500;background:#fef5f0;padding:1px 4px;border-radius:3px;">When missiles fly in the Middle East, gas prices change at your local station</b>.
-</p>
-<p class="nk fd h6 m0" style="color:#7d7262;margin-top:22px;">
-Next week: the world <b style="color:#4a4035;">48 hours later</b>.<br>
-Stay safe — see you Sunday.
-</p>
-<p class="nk fc h6 m0" style="color:#7d7262;margin-top:16px;font-style:italic;">
-P.S. Forward this to one person. <b style="color:#4a4035;font-style:normal;">One more reader = one less person unaware.</b>
-</p>
+{{{editors_note_html}}}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;border-top:1px solid #e0d8c8;padding-top:16px;">
 <tr>
 <td>
@@ -777,18 +382,8 @@ P.S. Forward this to one person. <b style="color:#4a4035;font-style:normal;">One
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;border-radius:10px;">
 <tr><td style="padding:16px 20px;">
 <p class="sg w6 fa l5 c7 m0">NEXT WEEK</p>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">
-<tr>
-<td style="padding:4px 0;"><span style="display:inline-block;width:6px;height:6px;background:#ef4444;border-radius:50%;vertical-align:middle;margin-right:8px;"></span><span class="nk fc c5" style="font-size:13px;">48-hour deadline passes — bombing? diplomatic reversal?</span></td>
-</tr>
-<tr>
-<td style="padding:4px 0;"><span style="display:inline-block;width:6px;height:6px;background:#f59e0b;border-radius:50%;vertical-align:middle;margin-right:8px;"></span><span class="nk fc c5" style="font-size:13px;">Global stock market impact assessment</span></td>
-</tr>
-<tr>
-<td style="padding:4px 0;"><span style="display:inline-block;width:6px;height:6px;background:#f59e0b;border-radius:50%;vertical-align:middle;margin-right:8px;"></span><span class="nk fc c5" style="font-size:13px;">Oil $130 — strategic reserves countdown</span></td>
-</tr>
-</table>
-<p class="nk fa c7" style="margin:12px 0 0;font-size:12px;">Vol.2 · Next Sunday 09:00 — <a href="https://www.wewantpeace.live/?ref=next-week&amp;utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1&amp;utm_content=next_week" class="nk w6 c1 tn">Subscribe →</a></p>
+{{{next_week_items_html}}}
+<p class="nk fa c7" style="margin:12px 0 0;font-size:12px;">Vol.{{next_vol_number}} · Next Sunday 09:00 — <a href="https://www.wewantpeace.live/?ref=next-week&amp;utm_source=nl&amp;utm_medium=em&amp;utm_campaign=v1&amp;utm_content=next_week" class="nk w6 c1 tn">Subscribe →</a></p>
 </td></tr>
 </table>
 </td>
@@ -814,12 +409,12 @@ P.S. Forward this to one person. <b style="color:#4a4035;font-style:normal;">One
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 <tr>
 <td align="center">
-<p class="nk w8 mx c0 fi">The world looks different from 2 minutes ago.</p>
-<p class="nk fd c7 h6 mk">Colleagues, investors, anyone who cares about the world — share with one.</p>
+<p class="nk w8 mx c0 fi">{{share_headline}}</p>
+<p class="nk fd c7 h6 mk">{{share_subtext}}</p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="ma">
 <tr>
 <td class="py">
-<a class="nk tn ib w7 fd r6" href="mailto:?subject=WeWantPeace%20Weekly%20Brief%20%E2%80%94%20Strait%20of%20Hormuz%20blocked%2C%20{{country_name}}%20impact&amp;body=The%20Strait%20of%20Hormuz%20is%20blocked%20%E2%80%94%20see%20how%20it%20affects%20{{country_name}}.%20A%202-minute%20read%3A%20https%3A%2F%2Fwww.wewantpeace.live%2F%3Fref%3Dshare" style="display:inline-block;padding:11px 20px;background:#18181b;color:#fff;text-decoration:none;">
+<a class="nk tn ib w7 fd r6" href="mailto:?subject={{mailto_subject}}&amp;body={{mailto_body}}" style="display:inline-block;padding:11px 20px;background:#18181b;color:#fff;text-decoration:none;">
 <img src="icons/mail-forward.png" alt="" width="16" height="16" style="display:inline-block;vertical-align:middle;margin-right:6px;border:0;" />
 <span style="vertical-align:middle;">Forward this email</span>
 </a>
@@ -841,8 +436,8 @@ P.S. Forward this to one person. <b style="color:#4a4035;font-style:normal;">One
 <td><p class="sg w6 fa l2 cx m0">WEWANTPEACE PRO</p></td>
 <td align="right"><span class="sg ib w7 r3 ls cw fg ps bY">POPULAR</span></td>
 </tr></table>
-<p class="nk cw h4" style="margin:10px 0 4px;font-size:15px;">When {{country_name}} tension surged —<br>Pro users got <b class="cy">instant</b> alerts.</p>
-<p class="nk fb c9 m4">You're reading this on Sunday.</p>
+<p class="nk cw h4" style="margin:10px 0 4px;font-size:15px;">{{{pro_cta_headline_html}}}</p>
+<p class="nk fb c9 m4">{{pro_cta_subtext}}</p>
 </td>
 </tr>
 <tr>
