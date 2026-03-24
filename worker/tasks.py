@@ -1440,6 +1440,17 @@ def expire_subscriptions(self):
                         )
                         continue
 
+                    # lifetime 구독이 있으면 만료 체크 건너뜀
+                    lifetime_result = await db.execute(
+                        select(Subscription).where(
+                            Subscription.user_id == user.id,
+                            Subscription.status == "active",
+                            Subscription.billing_interval == "lifetime",
+                        ).limit(1)
+                    )
+                    if lifetime_result.scalar_one_or_none() is not None:
+                        continue
+
                     # 아직 유효한(expires_at > now) 구독이 있는지 확인
                     # active뿐 아니라 cancelled(만료일까지 유효)·grace_period·billing_retry도 포함
                     sub_result = await db.execute(

@@ -28,20 +28,51 @@ router = APIRouter(prefix="/payments/dodo", tags=["dodopayments"])
 # ── 헬퍼 ────────────────────────────────────────────────────────────────────
 
 def _dodo_product_to_plan(product_id: str) -> str | None:
-    """product_id → plan 매핑."""
-    if product_id == settings.dodo_product_pro:
-        return "pro"
-    if product_id == settings.dodo_product_proplus:
-        return "pro_plus"
+    """product_id → plan 매핑 (base plan + billing_interval)."""
+    _map = {
+        settings.dodo_product_pro: ("pro", "monthly"),
+        settings.dodo_product_proplus: ("pro_plus", "monthly"),
+        settings.dodo_product_pro_annual: ("pro", "annual"),
+        settings.dodo_product_proplus_annual: ("pro_plus", "annual"),
+        settings.dodo_product_pro_lifetime: ("pro", "lifetime"),
+        settings.dodo_product_proplus_lifetime: ("pro_plus", "lifetime"),
+    }
+    result = _map.get(product_id)
+    if result:
+        return result[0]  # base plan for backward compat
     return None
 
 
-def _plan_to_dodo_product(plan: str) -> str | None:
-    """plan → product_id 매핑."""
-    if plan == "pro":
-        return settings.dodo_product_pro
-    if plan == "pro_plus":
-        return settings.dodo_product_proplus
+def _dodo_product_to_billing_interval(product_id: str) -> str:
+    """product_id → billing_interval."""
+    _map = {
+        settings.dodo_product_pro: "monthly",
+        settings.dodo_product_proplus: "monthly",
+        settings.dodo_product_pro_annual: "annual",
+        settings.dodo_product_proplus_annual: "annual",
+        settings.dodo_product_pro_lifetime: "lifetime",
+        settings.dodo_product_proplus_lifetime: "lifetime",
+    }
+    return _map.get(product_id, "monthly")
+
+
+def _plan_to_dodo_product(plan: str, billing_interval: str = "monthly") -> str | None:
+    """plan + billing_interval → product_id 매핑."""
+    if billing_interval == "annual":
+        if plan == "pro":
+            return settings.dodo_product_pro_annual
+        if plan == "pro_plus":
+            return settings.dodo_product_proplus_annual
+    elif billing_interval == "lifetime":
+        if plan == "pro":
+            return settings.dodo_product_pro_lifetime
+        if plan == "pro_plus":
+            return settings.dodo_product_proplus_lifetime
+    else:  # monthly
+        if plan == "pro":
+            return settings.dodo_product_pro
+        if plan == "pro_plus":
+            return settings.dodo_product_proplus
     return None
 
 
@@ -66,11 +97,13 @@ def _get_dodo_client() -> DodoPayments:
 
 class CheckoutBody(BaseModel):
     plan: str  # "pro" | "pro_plus"
+    billing_interval: str = "monthly"  # "monthly" | "annual" | "lifetime"
 
 
 class TossCheckoutBody(BaseModel):
     plan: str  # "pro" | "pro_plus"
     token: str  # Firebase ID Token (Toss WebView에서는 Authorization 헤더 대신 body로 전달)
+    billing_interval: str = "monthly"
 
 
 # ── Checkout 생성 ─────────────────────────────────────────────────────────────
@@ -84,8 +117,10 @@ async def create_checkout(
     """DodoPayments Checkout URL 생성."""
     if body.plan not in ("pro", "pro_plus"):
         raise HTTPException(422, detail="유효하지 않은 플랜입니다. pro 또는 pro_plus만 가능합니다.")
+    if body.billing_interval not in ("monthly", "annual", "lifetime"):
+        raise HTTPException(422, detail="유효하지 않은 결제 주기입니다.")
 
-    product_id = _plan_to_dodo_product(body.plan)
+    product_id = _plan_to_dodo_product(body.plan, body.billing_interval)
     if not product_id:
         raise HTTPException(500, detail="DodoPayments 상품 ID가 설정되지 않았습니다.")
 
@@ -125,12 +160,12 @@ async def create_checkout(
         product_cart=[{"product_id": product_id, "quantity": 1}],
         customer={"email": customer_email, "name": current_user.display_name or "사용자"},
         return_url="https://www.wewantpeace.live/upgrade/success",
-        metadata={"user_id": str(current_user.id), "plan": body.plan},
+        metadata={"user_id": str(current_user.id), "plan": body.plan, "billing_interval": body.billing_interval},
     )
 
     logger.info(
-        "DodoPayments checkout 생성: user=%s plan=%s product=%s",
-        current_user.id, body.plan, product_id,
+        "DodoPayments checkout 생성: user=%s plan=%s billing=%s product=%s",
+        current_user.id, body.plan, body.billing_interval, product_id,
     )
 
     return {
@@ -145,6 +180,7 @@ async def create_checkout(
 async def create_checkout_simple(
     plan: str = Form(...),
     token: str = Form(...),
+    billing_interval: str = Form("monthly"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -160,8 +196,10 @@ async def create_checkout_simple(
 
     if plan not in ("pro", "pro_plus"):
         raise HTTPException(422, detail="유효하지 않은 플랜입니다.")
+    if billing_interval not in ("monthly", "annual", "lifetime"):
+        billing_interval = "monthly"
 
-    product_id = _plan_to_dodo_product(plan)
+    product_id = _plan_to_dodo_product(plan, billing_interval)
     if not product_id:
         raise HTTPException(500, detail="DodoPayments 상품 ID가 설정되지 않았습니다.")
 
@@ -195,13 +233,13 @@ async def create_checkout_simple(
             product_cart=[{"product_id": product_id, "quantity": 1}],
             customer={"email": customer_email, "name": current_user.display_name or "토스 사용자"},
             return_url="https://www.wewantpeace.live/upgrade/success",
-            metadata={"user_id": str(current_user.id), "plan": plan},
+            metadata={"user_id": str(current_user.id), "plan": plan, "billing_interval": billing_interval},
         )
     except Exception as e:
         logger.error("DodoPayments create-checkout-simple 실패: user=%s error=%s", current_user.id, e)
         raise HTTPException(502, detail=f"결제 생성 실패: {str(e)[:200]}")
 
-    logger.info("DodoPayments simple checkout: user=%s plan=%s", current_user.id, plan)
+    logger.info("DodoPayments simple checkout: user=%s plan=%s billing=%s", current_user.id, plan, billing_interval)
     return {"checkout_url": session.checkout_url, "plan": plan}
 
 
@@ -290,12 +328,15 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
     next_billing = data.next_billing_date
     expires_at = data.expires_at or next_billing
 
+    billing_interval = _dodo_product_to_billing_interval(product_id)
+
     # 기존 DodoPayments 구독이 있으면 업데이트
     existing = await _find_sub_by_dodo_id(dodo_sub_id, db)
     if existing:
         existing.status = "active"
         existing.plan = plan
         existing.dodo_product_id = product_id
+        existing.billing_interval = billing_interval
         existing.expires_at = expires_at
         existing.next_billing_at = next_billing
         existing.updated_at = now
@@ -307,13 +348,14 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
             platform="dodopayments",
             amount=data.recurring_pre_tax_amount,
             currency=str(data.currency),
+            billing_interval=billing_interval,
             dodo_subscription_id=dodo_sub_id,
             dodo_customer_id=customer.customer_id if customer else None,
             dodo_product_id=product_id,
-            auto_renewing=not data.cancel_at_next_billing_date,
+            auto_renewing=not data.cancel_at_next_billing_date if billing_interval != "lifetime" else False,
             started_at=now,
-            expires_at=expires_at,
-            next_billing_at=next_billing,
+            expires_at=expires_at if billing_interval != "lifetime" else None,
+            next_billing_at=next_billing if billing_interval != "lifetime" else None,
         )
         db.add(sub)
 

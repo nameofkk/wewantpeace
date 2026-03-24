@@ -655,8 +655,8 @@ async def list_subscriptions(
 class AppSettings(BaseModel):
     maintenance_mode: bool = False
     allow_signup: bool = True
-    pro_price: int = 390
-    pro_plus_price: int = 690
+    pro_price: int = 699
+    pro_plus_price: int = 999
     notice_banner: str = ""
 
 

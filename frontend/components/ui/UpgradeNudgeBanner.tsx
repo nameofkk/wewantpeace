@@ -42,6 +42,9 @@ export function UpgradeNudgeBanner() {
       <p className="text-xs text-blue-400 leading-relaxed pr-6">
         {t(lang, "upgrade_nudge_message", { count: missedAlertCount })}
       </p>
+      <p className="text-[10px] text-blue-300/60 mt-0.5">
+        {lang === "ko" ? "Pro $6.99/월 · 연간 25% 할인" : "Pro $6.99/mo · 25% off annual"}
+      </p>
 
       <Link
         href="/upgrade"

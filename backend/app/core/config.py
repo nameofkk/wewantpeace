@@ -135,8 +135,12 @@ class Settings(BaseSettings):
     # DodoPayments
     dodo_api_key: str = ""           # DODO_API_KEY
     dodo_webhook_key: str = ""       # DODO_WEBHOOK_KEY
-    dodo_product_pro: str = ""       # DodoPayments Pro 상품 ID
-    dodo_product_proplus: str = ""   # DodoPayments Pro+ 상품 ID
+    dodo_product_pro: str = ""       # DodoPayments Pro 월간 상품 ID
+    dodo_product_proplus: str = ""   # DodoPayments Pro+ 월간 상품 ID
+    dodo_product_pro_annual: str = ""       # DodoPayments Pro 연간 상품 ID
+    dodo_product_proplus_annual: str = ""   # DodoPayments Pro+ 연간 상품 ID
+    dodo_product_pro_lifetime: str = ""     # DodoPayments Pro Lifetime 상품 ID
+    dodo_product_proplus_lifetime: str = "" # DodoPayments Pro+ Lifetime 상품 ID
     dodo_environment: str = "live_mode"  # "test_mode" | "live_mode"
 
     # SMTP (마케팅 메일링)

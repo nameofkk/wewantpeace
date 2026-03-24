@@ -1240,14 +1240,23 @@ export default function SettingsPage() {
                 {(() => {
                   const daysLeft = Math.max(0, Math.ceil((new Date(subInfo.trial_end!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
                   return (
-                    <p className="text-[10px] font-semibold text-amber-400">
-                      {t(lang, "trial_remaining_days", { n: daysLeft })}
-                    </p>
+                    <>
+                      <p className="text-[10px] font-semibold text-amber-400">
+                        {t(lang, "trial_remaining_days", { n: daysLeft })}
+                      </p>
+                      <div className="h-1.5 rounded-full bg-amber-500/20 overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
+                             style={{ width: `${Math.max(5, ((7 - daysLeft) / 7) * 100)}%` }} />
+                      </div>
+                    </>
                   );
                 })()}
                 <p className="text-[10px] text-muted-foreground">{t(lang, "trial_upgrade_prompt")}</p>
+                <p className="text-[10px] text-green-500">
+                  {lang === "ko" ? "연간 구독 시 $5.25/월 (25% 할인)" : "Annual: $5.25/mo (25% off)"}
+                </p>
                 <Link href="/upgrade" className="mt-1 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2 text-center text-xs font-bold text-white">
-                  {t(lang, "settings_upgrade_btn")}
+                  {lang === "ko" ? "지금 Pro 구독하기 — $6.99/월" : "Subscribe Pro — $6.99/mo"}
                 </Link>
               </div>
             )}
