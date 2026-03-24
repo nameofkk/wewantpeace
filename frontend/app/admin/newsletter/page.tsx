@@ -12,7 +12,7 @@ import {
   Save, Send, ChevronDown, ChevronRight, Loader2,
   Smartphone, Monitor, AlertTriangle, FileText,
   Mail, Clock, CheckCircle, XCircle,
-  ChevronsUpDown, Search, Copy, Check, Hash,
+  ChevronsUpDown, Search, Copy, Check, Hash, Eye,
 } from "lucide-react";
 
 /* ── 변수 그룹 정의 ── */
@@ -239,6 +239,94 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/* ── 필드 에디터 컴포넌트 ── */
+function FieldEditor({
+  field,
+  data,
+  onChange,
+}: {
+  field: FieldDef;
+  data: Record<string, any>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const [showPreview, setShowPreview] = useState(false);
+  const value = data[field.key] ?? "";
+  const strVal = String(value);
+  const isHtml = field.label.includes("HTML");
+  const lineCount = strVal.split("\n").length;
+  const isEmpty = strVal.trim() === "";
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {isHtml && <Hash className="h-3 w-3 text-amber-400/60" />}
+          <span>{field.label}</span>
+          {field.maxLength && (
+            <span className={cn(
+              "ml-1 tabular-nums",
+              strVal.length > field.maxLength ? "text-red-400 font-medium" : "text-muted-foreground/60",
+            )}>
+              {strVal.length}/{field.maxLength}
+            </span>
+          )}
+          {field.type === "textarea" && !isEmpty && (
+            <span className="text-[10px] text-muted-foreground/40 tabular-nums">{lineCount}L · {strVal.length}ch</span>
+          )}
+          {field.hint && (
+            <span className="text-[10px] text-muted-foreground/40 ml-1 hidden sm:inline">{field.hint}</span>
+          )}
+        </label>
+        <div className="flex items-center gap-1">
+          {isHtml && strVal.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className="p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+                title="Preview HTML"
+              >
+                <Eye className="h-3 w-3" />
+              </button>
+              <CopyButton text={strVal} />
+            </>
+          )}
+        </div>
+      </div>
+      {field.type === "input" ? (
+        <input
+          type="text"
+          value={strVal}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          placeholder={field.placeholder}
+          className={cn(
+            "w-full px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/30",
+            isEmpty && "border-dashed border-muted-foreground/30",
+          )}
+        />
+      ) : (
+        <>
+          <textarea
+            value={strVal}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            rows={field.rows || 4}
+            placeholder={field.placeholder}
+            className={cn(
+              "w-full px-3 py-1.5 text-xs font-mono bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y placeholder:text-muted-foreground/30",
+              isHtml && "bg-slate-950/30",
+              isEmpty && "border-dashed border-muted-foreground/30",
+            )}
+          />
+          {showPreview && isHtml && strVal.length > 0 && (
+            <div className="mt-1 p-3 bg-white text-black text-xs rounded border border-border overflow-auto max-h-48">
+              <div dangerouslySetInnerHTML={{ __html: strVal }} />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── 접이식 섹션 컴포넌트 ── */
 function CollapsibleSection({
   section,
@@ -299,53 +387,9 @@ function CollapsibleSection({
       </button>
       {(open || (searchQuery && visibleFields.length > 0)) && (
         <div className="p-4 space-y-3">
-          {visibleFields.map((field) => {
-            const value = data[field.key] ?? "";
-            const strVal = String(value);
-            const isHtml = field.label.includes("HTML");
-            return (
-              <div key={field.key}>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    {isHtml && <Hash className="h-3 w-3 text-amber-400/60" />}
-                    <span>{field.label}</span>
-                    {field.maxLength && (
-                      <span className={cn(
-                        "ml-1 tabular-nums",
-                        strVal.length > field.maxLength ? "text-red-400 font-medium" : "text-muted-foreground/60",
-                      )}>
-                        {strVal.length}/{field.maxLength}
-                      </span>
-                    )}
-                    {field.hint && (
-                      <span className="text-[10px] text-muted-foreground/40 ml-1">{field.hint}</span>
-                    )}
-                  </label>
-                  {isHtml && strVal.length > 0 && <CopyButton text={strVal} />}
-                </div>
-                {field.type === "input" ? (
-                  <input
-                    type="text"
-                    value={strVal}
-                    onChange={(e) => onChange(field.key, e.target.value)}
-                    placeholder={field.placeholder}
-                    className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/30"
-                  />
-                ) : (
-                  <textarea
-                    value={strVal}
-                    onChange={(e) => onChange(field.key, e.target.value)}
-                    rows={field.rows || 4}
-                    placeholder={field.placeholder}
-                    className={cn(
-                      "w-full px-3 py-1.5 text-xs font-mono bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y placeholder:text-muted-foreground/30",
-                      isHtml && "bg-slate-950/30",
-                    )}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {visibleFields.map((field) => (
+            <FieldEditor key={field.key} field={field} data={data} onChange={onChange} />
+          ))}
         </div>
       )}
     </div>
@@ -531,6 +575,18 @@ export default function AdminNewsletterPage() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
+
+  // 자동 저장 (2분마다, dirty 상태일 때만)
+  const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => {
+    clearInterval(autoSaveRef.current);
+    autoSaveRef.current = setInterval(() => {
+      if (isDirty && Object.keys(data).length > 0) {
+        saveMutation.mutate();
+      }
+    }, 120_000);
+    return () => clearInterval(autoSaveRef.current);
+  }, [isDirty, data]);
 
   // 렌더링 함수
   const doRender = useCallback(async (renderData: Record<string, any>) => {
