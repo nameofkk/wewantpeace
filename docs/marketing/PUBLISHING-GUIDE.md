@@ -1,6 +1,8 @@
 # WeWantPeace Newsletter — Weekly Publishing Guide
 
 > 매주 일요일 09:00 발행. 금~토 작성, 토요일 밤 최종 확인.
+>
+> **R656-R663 기준** · EN/KO 이중 템플릿 · 55개 Handlebars 변수
 
 ---
 
@@ -137,7 +139,44 @@ newsletter-v{N}-rendered-{country_code}.html # 렌더 결과
 
 ---
 
-## 6. 트러블슈팅
+## 6. 이메일 제목줄 (Subject Line)
+
+오픈율에 가장 큰 영향. 모바일에서 35자 내로 보이므로 핵심을 앞에.
+
+### 공식
+
+```
+[WeWantPeace] {긴급도} — {핵심 팩트} ({한국/독자 관련})
+```
+
+### 예시 — KR
+
+| Subject | 왜 좋은지 |
+|---------|-----------|
+| `[WWP] 호르무즈 봉쇄 — 한국 원유 70% 직격` | 핵심 사건 + 독자 연관 |
+| `[WWP] 23개국 위기 — 기름값 왜 오르는지 2분` | 숫자 + 호기심 + 시간 |
+| `[WWP] 이란 2,048건 폭증 — 당신 주유소 가격표가 바뀝니다` | 구체적 숫자 + 개인 영향 |
+
+### 예시 — EN
+
+| Subject | Why it works |
+|---------|-------------|
+| `[WWP] Hormuz blocked — 23 countries in crisis` | Event + scale |
+| `[WWP] Oil $118, Iran 2,048 events — how it hits your wallet` | Numbers + personal |
+| `[WWP] Your country ranked #9 in tension. Here's why.` | Personalized + curiosity |
+
+### 제목줄 규칙
+
+1. **35자 이내** (모바일 가시 영역)
+2. **숫자 포함** (23개국, $118, 96.8점)
+3. **개인 연관** (한국, 내 지갑, 당신)
+4. **긴급감** (봉쇄, 폭증, 급등)
+5. **emoji 금지** (스팸 필터 트리거)
+6. **대문자 남용 금지** (ALL CAPS → 스팸)
+
+---
+
+## 7. 트러블슈팅
 
 | 문제 | 원인 | 해결 |
 |------|------|------|
