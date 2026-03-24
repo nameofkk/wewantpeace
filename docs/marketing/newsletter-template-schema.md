@@ -1,8 +1,8 @@
 # WeWantPeace Newsletter — Handlebars Template Schema
 
-> **Template file:** `newsletter-v1-final-en.html`
-> **Total variables:** 55 (37 text + 18 HTML blocks)
-> **Last updated:** 2026-03-24 (R656)
+> **Template files:** `newsletter-v1-final-en.html` (EN) · `newsletter-v1-final-ko.html` (KO)
+> **Total variables:** 55 (37 text + 18 HTML blocks) — identical in both templates
+> **Last updated:** 2026-03-24 (R659)
 
 ---
 
@@ -79,15 +79,19 @@ These use triple-brace syntax to render raw HTML without escaping.
 
 ## Static Content (Not Templatized)
 
-These elements are intentional constants:
-- Section labels: `TENSION INDEX`, `CONFLICT`, `ENERGY CRISIS`, `DEEP DIVE`, `YOUR COUNTRY`, `TRAVEL ADVISORY`, `BY THE NUMBERS`, `THIS WEEK`
-- Feedback buttons: Useful / OK / Not great
-- Pro features list (4 items)
-- Footer: branding, links (Web/App/Pro/Unsubscribe), disclaimer, copyright
-- "Got this forwarded?" subscribe CTA
-- UTM parameter structure (`utm_source=nl&utm_medium=em&utm_campaign=v1`)
-- "2 min read" badge
-- Tension Index footnote formula explanation
+These elements are intentional constants (localized per template):
+
+| Element | EN Template | KO Template |
+|---------|-------------|-------------|
+| Section labels | `TENSION INDEX`, `CONFLICT`, etc. | Same English labels (brand identity) |
+| Feedback buttons | Useful / OK / Not great | 유용했어요 / 보통 / 별로 |
+| Pro features | 4 English items | 4 Korean items |
+| Footer disclaimer | Not investment advice | 투자 조언 아님 |
+| Subscribe CTA | Subscribe → | 다음 호 받기 → |
+| Reading badge | 2 min read | 2분 소요 |
+| Tension footnote | density + acceleration + spillover | 밀도 + 가속도 + 파급효과 |
+| Share buttons | Email forward only | KakaoTalk + Email forward |
+| UTM structure | `utm_source=nl&utm_medium=em&utm_campaign=v1` | Same |
 
 ---
 
@@ -98,3 +102,33 @@ These elements are intentional constants:
 3. **Country personalization:** Variables 21-30 change per recipient based on their country setting
 4. **Hero image:** Use a high-quality 1200x630px news photo related to the week's top story
 5. **Gmail 102KB limit:** After variable injection, total HTML must stay under 102KB to avoid clipping
+6. **Language selection:** Use `--template newsletter-v1-final-ko.html` for Korean, default is EN
+
+---
+
+## Rendering Commands
+
+```bash
+# EN — US personalization
+python render-newsletter.py --data vol1-us-sample.json --output newsletter-v1-rendered-us.html
+
+# KO — KR personalization
+python render-newsletter.py --template newsletter-v1-final-ko.html --data vol1-kr-sample.json --output newsletter-v1-rendered-kr.html
+```
+
+## File Structure
+
+```
+docs/marketing/
+├── newsletter-v1-final-en.html       # EN Handlebars template (55 vars)
+├── newsletter-v1-final-ko.html       # KO Handlebars template (55 vars)
+├── render-newsletter.py              # Renderer (chevron/Mustache)
+├── extract-blocks.py                 # Block extractor utility
+├── newsletter-template-schema.md     # This file
+├── vol1-us-sample.json               # Vol.1 US data
+├── vol1-kr-sample.json               # Vol.1 KR data
+├── newsletter-v1-rendered-*.html     # Rendered outputs
+└── blocks/
+    ├── vol1-us-*.html                # 15 EN-US block files
+    └── vol1-kr-*.html                # 15 KO-KR block files
+```
