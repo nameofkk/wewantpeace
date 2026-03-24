@@ -385,14 +385,26 @@ function CollapsibleSection({
         {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
         {section.icon && <span className="text-sm shrink-0">{section.icon}</span>}
         <span className="text-sm font-medium">{label}</span>
-        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* 미니 프로그레스 바 */}
+          <div className="w-12 h-1 bg-secondary rounded-full overflow-hidden hidden sm:block">
+            <div
+              className={cn("h-full rounded-full transition-all", allFilled ? "bg-green-400" : filledCount > 0 ? "bg-amber-400" : "bg-muted-foreground/20")}
+              style={{ width: `${(filledCount / totalCount) * 100}%` }}
+            />
+          </div>
           <span className={cn(
-            "text-[10px] font-mono",
+            "text-[10px] font-mono tabular-nums",
             allFilled ? "text-green-400" : "text-muted-foreground",
           )}>
             {filledCount}/{totalCount}
           </span>
           {allFilled && <Check className="h-3 w-3 text-green-400" />}
+          {!allFilled && !open && totalCount - filledCount > 0 && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 tabular-nums">
+              {totalCount - filledCount}
+            </span>
+          )}
         </div>
       </button>
       {(open || (searchQuery && visibleFields.length > 0)) && (
@@ -803,9 +815,21 @@ export default function AdminNewsletterPage() {
             {t(lang, "admin_newsletter")}
             {isDirty && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Unsaved changes" />}
           </h1>
-          <p className="text-xs text-muted-foreground">
-            Vol.{vol} · {data.issue_date || "—"} · {filledFields}/{totalFields} {lang === "ko" ? "필드" : "fields"}
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-xs text-muted-foreground">
+              Vol.{vol} · {data.issue_date || "—"} · {filledFields}/{totalFields}
+            </p>
+            <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  filledFields === totalFields ? "bg-green-400" : filledFields > 0 ? "bg-primary" : "bg-muted-foreground/20",
+                )}
+                style={{ width: `${(filledFields / totalFields) * 100}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground tabular-nums">{Math.round((filledFields / totalFields) * 100)}%</span>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <label className="text-xs text-muted-foreground">Vol</label>
