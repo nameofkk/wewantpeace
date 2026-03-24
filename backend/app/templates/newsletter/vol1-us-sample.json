@@ -1,0 +1,71 @@
+{
+  "_comment": "WeWantPeace Newsletter Vol.1 — US Sample Data",
+  "_template": "newsletter-v1-final-en.html",
+
+  "vol_number": 1,
+  "next_vol_number": 2,
+  "issue_date": "2026.03.23",
+  "issue_date_short": "Mar 23, Sun",
+  "issue_datetime": "2026.3.23 Sun 09:00",
+  "issue_label": "Inaugural",
+  "issue_label_long": "Inaugural issue",
+
+  "preheader_text": "One strait blocked — oil prices surging. 23 countries in crisis. US tension 96.8 — how it hits your gas, stocks & budget. 2 min read.",
+  "hero_image_url": "https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg",
+
+  "crisis_countries_count": 23,
+  "crisis_prev": 18,
+  "crisis_current": 23,
+  "crisis_trend": "3 weeks rising",
+  "events_24h": 854,
+  "events_7d": "11,861",
+  "key_stats_line": "Key: <span class=\"w6 ce\">Iran 2,048 events</span>(+345%) · <span class=\"w6 cy\">Oil $118</span>(+24%) · <span class=\"w6 cx\">US 96.8</span>",
+
+  "hero_headline_html": "The US is leading strikes<br>\non Iran.<br>\n<span class=\"ce\">$200B+ war budget</span><br>and gas past $5/gallon",
+
+  "deep_dive_nav_label": "Hormuz Deep Dive",
+  "deep_dive_title": "Hormuz — Why It Matters",
+
+  "total_conflicts": 491,
+  "urgent_count": 4,
+  "active_issues_count": 948,
+
+  "country_name": "United States",
+  "country_code": "US",
+  "country_rank": 9,
+  "tension_level": 4,
+  "tension_score": "96.8",
+  "tension_level_text": "Crisis",
+  "tension_change": "▲8.2",
+  "prev_tension": "88.6",
+  "streak_text": "3 weeks rising",
+  "country_summary": "US leading Iran strikes — $200B+ war budget, gas past $5/gal, defense stocks surging but broader market falling.",
+
+  "share_headline": "The world looks different from 2 minutes ago.",
+  "share_subtext": "Colleagues, investors, anyone who cares about the world — share with one.",
+  "mailto_subject": "WeWantPeace%20Weekly%20Brief%20%E2%80%94%20Strait%20of%20Hormuz%20blocked%2C%20United%20States%20impact",
+  "mailto_body": "The%20Strait%20of%20Hormuz%20is%20blocked%20%E2%80%94%20see%20how%20it%20affects%20United%20States.%20A%202-minute%20read%3A%20https%3A%2F%2Fwww.wewantpeace.live%2F%3Fref%3Dshare",
+
+  "pro_cta_headline_html": "When United States tension surged —<br>Pro users got <b class=\"cy\">instant</b> alerts.",
+  "pro_cta_subtext": "You're reading this on Sunday.",
+
+  "unsubscribe_url": "#",
+
+  "tension_warning_html": "<b>Warning:</b> All top 6 scored <span class=\"ib w7 fb r2 cw bd py\">100</span>. Last week 3 → this week 6 — doubled after full-scale war.",
+
+  "tension_table_html": "@file:blocks/vol1-us-tension-table.html",
+  "todays_brief_items_html": "@file:blocks/vol1-us-todays-brief.html",
+  "conflict_stories_html": "@file:blocks/vol1-us-conflicts.html",
+  "energy_section_intro_html": "@file:blocks/vol1-us-energy-intro.html",
+  "energy_section_html": "@file:blocks/vol1-us-energy.html",
+  "deep_dive_section_html": "@file:blocks/vol1-us-deep-dive.html",
+  "country_issues_html": "@file:blocks/vol1-us-country-issues.html",
+  "country_impact_html": "@file:blocks/vol1-us-country-impact.html",
+  "did_you_know_html": "@file:blocks/vol1-us-did-you-know.html",
+  "travel_advisory_intro_html": "@file:blocks/vol1-us-travel-intro.html",
+  "travel_advisory_html": "@file:blocks/vol1-us-travel.html",
+  "numbers_section_html": "@file:blocks/vol1-us-numbers.html",
+  "calendar_html": "@file:blocks/vol1-us-calendar.html",
+  "editors_note_html": "@file:blocks/vol1-us-editors-note.html",
+  "next_week_items_html": "@file:blocks/vol1-us-next-week.html"
+}

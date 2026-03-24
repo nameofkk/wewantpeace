@@ -1286,6 +1286,7 @@ export const translations = {
     admin_links: "단축 링크",
     admin_reports_perf: "성과 리포트",
     admin_weekly_report: "주간 리포트",
+    admin_newsletter: "뉴스레터",
     admin_guide: "운영 매뉴얼",
     admin_social: "SNS 관리",
     admin_social_pending: "승인 대기",
@@ -1621,6 +1622,18 @@ export const translations = {
 
     // Paywall Intel
     paywall_pro_feature_intel: "위성·센서 인텔리전스 레이어 · 교역 흐름",
+
+    // 결제 주기 / 가격
+    billing_monthly: "월간",
+    billing_annual: "연간",
+    billing_lifetime: "평생",
+    billing_annual_hint: "연간 구독 시 25% 할인",
+    billing_lifetime_hint: "한 번 결제, 평생 이용",
+    trial_upgrade_banner_title: "무료 체험 중",
+    trial_upgrade_banner_annual: "💡 연간 구독 시 3개월 무료!",
+    trial_upgrade_banner_desc: "체험 종료 후 Free 플랜으로 전환됩니다. 지금 구독하면 중단 없이 계속 이용하세요.",
+    paywall_annual_hint: "연간 구독 시 25% 할인 ($5.25/월)",
+    paywall_proplus_hint: "Pro+ ($9.99/월)에서 무제한 기능 사용",
 
     // 투어 새 스텝
     tour_map_markers_toggle: "마커 버튼으로 이슈 마커를 표시/숨김할 수 있습니다.",
@@ -2939,6 +2952,7 @@ export const translations = {
     admin_links: "Short Links",
     admin_reports_perf: "Performance",
     admin_weekly_report: "Weekly Report",
+    admin_newsletter: "Newsletter",
     admin_guide: "Admin Guide",
     admin_social: "Social Posts",
     admin_social_pending: "Pending",
@@ -3274,6 +3288,18 @@ export const translations = {
 
     // Paywall Intel
     paywall_pro_feature_intel: "Satellite & sensor intelligence layers · Trade flow",
+
+    // Billing cycle / pricing
+    billing_monthly: "Monthly",
+    billing_annual: "Annual",
+    billing_lifetime: "Lifetime",
+    billing_annual_hint: "Save 25% with annual plan",
+    billing_lifetime_hint: "Pay once, use forever",
+    trial_upgrade_banner_title: "Free Trial Active",
+    trial_upgrade_banner_annual: "💡 Get 3 months free with annual!",
+    trial_upgrade_banner_desc: "After trial ends, you'll switch to Free. Subscribe now for uninterrupted access.",
+    paywall_annual_hint: "Save 25% with annual ($5.25/mo)",
+    paywall_proplus_hint: "Unlock everything with Pro+ ($9.99/mo)",
 
     // Tour new steps
     tour_map_markers_toggle: "Toggle issue markers on/off with the marker button.",

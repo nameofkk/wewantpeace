@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Layers, Activity, FileText,
   Settings, ArrowLeft, Menu, X, Shield, Globe, LogOut, Radio,
   MessageSquare, TrendingUp, MessageCircleQuestion,
-  Mail, ScrollText, Workflow, BarChart3,
+  Mail, ScrollText, Workflow, BarChart3, Newspaper,
   Handshake, Link2, FileBarChart, BookOpen, Share2, ShieldCheck,
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
@@ -72,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/partners", icon: Handshake, labelKey: "admin_partners" },
       { href: "/admin/links", icon: Link2, labelKey: "admin_links" },
       { href: "/admin/weekly-report", icon: FileBarChart, labelKey: "admin_weekly_report" },
+      { href: "/admin/newsletter", icon: Newspaper, labelKey: "admin_newsletter" },
       { href: "/admin/guide", icon: BookOpen, labelKey: "admin_guide" },
       { href: "/admin/social", icon: Share2, labelKey: "admin_social" },
     ],
