@@ -47,6 +47,8 @@ reportlab>=4.1.0
 matplotlib>=3.8.0
 # 시장 데이터
 yfinance>=0.2.36
+# 뉴스레터 템플릿
+chevron==0.14.0
 # 유틸
 geohash2==1.1
 tenacity==8.3.0
