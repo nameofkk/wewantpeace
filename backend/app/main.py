@@ -20,6 +20,7 @@ from backend.app.routers import links as links_router
 from backend.app.routers import public as public_router
 from backend.app.routers import impact as impact_router
 from backend.app.routers import signals as signals_router
+from backend.app.routers import newsletter as newsletter_router
 import structlog
 
 logger = structlog.get_logger()
@@ -263,6 +264,7 @@ app.include_router(links_router.router)
 app.include_router(public_router.router)
 app.include_router(impact_router.router)
 app.include_router(signals_router.router)
+app.include_router(newsletter_router.router)
 
 
 @app.get("/health")

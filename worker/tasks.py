@@ -4222,3 +4222,71 @@ def cleanup_old_data(self):
     except Exception as exc:
         logger.error("cleanup_old_data 오류: %s", exc)
         raise self.retry(exc=exc)
+
+
+# ── 뉴스레터 초안 자동 생성 ──────────────────────────────────────────────────
+@app.task(
+    bind=True,
+    name="worker.tasks.generate_newsletter_draft",
+    queue="process",
+    max_retries=1,
+    default_retry_delay=120,
+)
+def generate_newsletter_draft(self):
+    """월요일 자동 뉴스레터 초안 생성 (KR + EN)."""
+    import subprocess
+    import sys
+
+    _record_heartbeat("generate_newsletter_draft")
+
+    import redis as sync_redis
+    r = sync_redis.from_url(
+        os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+        decode_responses=True,
+    )
+
+    # 현재 최대 vol 번호 탐색
+    keys = r.keys("newsletter:draft:vol*")
+    max_vol = 0
+    for k in keys:
+        try:
+            vol_part = k.split("vol")[1].split("-")[0]
+            max_vol = max(max_vol, int(vol_part))
+        except (IndexError, ValueError):
+            pass
+    next_vol = max_vol + 1
+
+    script_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "scripts",
+        "generate_newsletter_data.py",
+    )
+
+    results = {}
+    for lang in ["kr", "us"]:
+        try:
+            result = subprocess.run(
+                [sys.executable, script_path, "--vol", str(next_vol), "--lang", lang],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ},
+            )
+            logger.info(
+                "newsletter draft %s: exit=%d", lang, result.returncode
+            )
+            if result.returncode != 0:
+                logger.error(
+                    "newsletter draft %s failed: %s",
+                    lang,
+                    result.stderr[:500],
+                )
+            results[lang] = {
+                "exit_code": result.returncode,
+                "stdout": result.stdout[-200:] if result.stdout else "",
+            }
+        except Exception as e:
+            logger.error("newsletter draft %s error: %s", lang, e)
+            results[lang] = {"error": str(e)}
+
+    return {"status": "ok", "vol": next_vol, "results": results}

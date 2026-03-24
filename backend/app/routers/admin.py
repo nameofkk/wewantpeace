@@ -2,8 +2,10 @@
 /admin/* 어드민 전용 API (role=admin만 접근 가능)
 """
 from __future__ import annotations
+import hmac
 import logging
 import uuid
+from hashlib import sha256
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
@@ -4102,7 +4104,6 @@ async def send_newsletter_all(
     with open(tpl_path, "r", encoding="utf-8") as f:
         template = f.read()
 
-    html = chevron.render(template, body.data)
     vol = body.data.get("vol_number", body.vol)
     subject_text = f"WeWantPeace Newsletter Vol.{vol}"
 
@@ -4127,11 +4128,16 @@ async def send_newsletter_all(
 
         for u in users:
             try:
+                # 유저별 수신거부 URL 생성
+                token = hmac.new(settings.secret_key.encode(), str(u.id).encode(), sha256).hexdigest()[:32]
+                user_data = {**body.data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+                user_html = chevron.render(template, user_data)
+
                 msg = MIMEMultipart("alternative")
                 msg["From"] = settings.smtp_user
                 msg["To"] = u.email
                 msg["Subject"] = subject_text
-                msg.attach(MIMEText(html, "html", "utf-8"))
+                msg.attach(MIMEText(user_html, "html", "utf-8"))
                 smtp.sendmail(settings.smtp_user, u.email, msg.as_string())
                 sent += 1
             except Exception:
@@ -4149,6 +4155,14 @@ async def send_newsletter_all(
     log.status = "completed"
     await db.flush()
     await _log_action(db, admin, "newsletter_send", detail={"vol": vol, "lang": body.lang, "sent": sent, "failed": failed})
+
+    # 아카이브용 HTML 저장 (수신거부 URL을 #으로 대체한 범용 버전)
+    try:
+        archive_html = chevron.render(template, {**body.data, "unsubscribe_url": "#"})
+        r = get_redis()
+        await r.set(f"newsletter:archive:{log.id}", archive_html, ex=365 * 86400)
+    except Exception:
+        pass  # 아카이브 저장 실패해도 발송은 성공으로 처리
 
     return {"status": "ok", "sent": sent, "failed": failed}
 

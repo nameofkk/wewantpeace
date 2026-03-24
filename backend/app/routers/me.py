@@ -13,7 +13,7 @@ from datetime import datetime, timezone, time as dt_time
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from pydantic import BaseModel
 from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from backend.app.models.user import User, UserArea, UserPushToken, UserPreferenc
 from backend.app.models.notification import Notification
 from backend.app.models.paywall_event import PaywallEvent
 from backend.app.models.app_event import AppEvent
+from backend.app.models.terms import UserConsent
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -187,6 +188,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @router.patch("", response_model=UserOut)
 async def patch_me(
     body: ProfilePatchBody,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -207,6 +209,7 @@ async def patch_me(
     if body.profile_image_url is not None:
         current_user.profile_image_url = body.profile_image_url
     if body.marketing_agreed_at is not None:
+        turning_on = body.marketing_agreed_at != ""
         if body.marketing_agreed_at == "":
             current_user.marketing_agreed_at = None
         else:
@@ -219,6 +222,14 @@ async def patch_me(
                     )
                 except (ValueError, AttributeError):
                     raise HTTPException(422, detail="marketing_agreed_at: 올바른 ISO datetime 형식이 아닙니다.")
+        # UserConsent 기록 (마케팅 동의/해제 이력)
+        db.add(UserConsent(
+            user_id=current_user.id,
+            term_type="marketing" if turning_on else "marketing_revoke",
+            term_version="1.0",
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent", "")[:500] if request else None,
+        ))
     await db.flush()
     return _me_to_out(current_user)
 

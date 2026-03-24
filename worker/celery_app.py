@@ -303,6 +303,12 @@ app.conf.beat_schedule = {
         "schedule": 25 * 60,  # 25분마다 (캐시 TTL 30분보다 빠르게)
         "options": {"queue": "process"},
     },
+    # ── 뉴스레터 초안 자동 생성 (매주 월요일) ──
+    "generate-newsletter-draft": {
+        "task": "worker.tasks.generate_newsletter_draft",
+        "schedule": crontab(minute=0, hour=0, day_of_week=1),  # Monday 00:00 UTC = 09:00 KST
+        "options": {"queue": "process"},
+    },
     # ── Beat heartbeat ──
     "beat-heartbeat": {
         "task": "beat_heartbeat",
