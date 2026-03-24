@@ -13,7 +13,7 @@ import {
   Smartphone, Monitor, AlertTriangle, FileText,
   Mail, Clock, CheckCircle, XCircle,
   ChevronsUpDown, Search, Copy, Check, Hash, Eye,
-  Download, Upload, Filter,
+  Download, Upload, Filter, ExternalLink,
 } from "lucide-react";
 
 /* ── 변수 그룹 정의 ── */
@@ -407,6 +407,8 @@ function CollapsibleSection({
 }
 
 /* ── 프리뷰 패널 ── */
+const ZOOM_LEVELS = [50, 75, 100, 125] as const;
+
 function PreviewPanel({
   html,
   sizeKb,
@@ -421,14 +423,28 @@ function PreviewPanel({
   lang: "ko" | "en";
 }) {
   const [mobileView, setMobileView] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [showSource, setShowSource] = useState(false);
+  const [copied, setCopied] = useState(false);
   const maxKb = 102;
   const pct = Math.min((sizeKb / maxKb) * 100, 100);
   const isOver = sizeKb > maxKb;
 
+  const copyHtml = () => {
+    navigator.clipboard.writeText(html);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const openInNewTab = () => {
+    const w = window.open();
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* 상단 메타 */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border flex-nowrap">
+      <div className="flex items-center gap-2 pb-3 border-b border-border flex-nowrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <FileText className="h-3.5 w-3.5 shrink-0" />
@@ -450,45 +466,99 @@ function PreviewPanel({
             {unresolved.length}
           </div>
         )}
-        <div className="flex gap-1 shrink-0">
-          <button
-            onClick={() => setMobileView(false)}
-            className={cn(
-              "p-1.5 rounded",
-              !mobileView ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Monitor className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setMobileView(true)}
-            className={cn(
-              "p-1.5 rounded",
-              mobileView ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Smartphone className="h-4 w-4" />
-          </button>
-        </div>
       </div>
 
-      {/* iframe */}
-      <div className="flex-1 mt-3 flex justify-center overflow-auto bg-secondary/20 rounded-lg">
-        {html ? (
+      {/* 도구 바 */}
+      <div className="flex items-center gap-1 py-2 flex-nowrap overflow-x-auto scrollbar-hide">
+        {/* 뷰포트 */}
+        <button
+          onClick={() => setMobileView(false)}
+          className={cn("p-1.5 rounded shrink-0", !mobileView ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+          title="Desktop"
+        >
+          <Monitor className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => setMobileView(true)}
+          className={cn("p-1.5 rounded shrink-0", mobileView ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+          title="Mobile (390px)"
+        >
+          <Smartphone className="h-3.5 w-3.5" />
+        </button>
+        <div className="w-px h-4 bg-border/40 mx-1 shrink-0" />
+        {/* 줌 */}
+        {ZOOM_LEVELS.map((z) => (
+          <button
+            key={z}
+            onClick={() => setZoom(z)}
+            className={cn(
+              "px-1.5 py-1 text-[10px] rounded shrink-0 tabular-nums",
+              zoom === z ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {z}%
+          </button>
+        ))}
+        <div className="w-px h-4 bg-border/40 mx-1 shrink-0" />
+        {/* 소스/미리보기 토글 */}
+        <button
+          onClick={() => setShowSource(!showSource)}
+          className={cn(
+            "px-2 py-1 text-[10px] rounded shrink-0",
+            showSource ? "bg-amber-500/10 text-amber-400" : "text-muted-foreground hover:text-foreground",
+          )}
+          title={showSource ? "Preview" : "Source"}
+        >
+          {showSource ? "Preview" : "Source"}
+        </button>
+        {/* 복사 */}
+        {html && (
+          <button
+            onClick={copyHtml}
+            className="p-1.5 rounded text-muted-foreground hover:text-foreground shrink-0"
+            title="Copy HTML"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+        )}
+        {/* 새 탭 열기 */}
+        {html && (
+          <button
+            onClick={openInNewTab}
+            className="p-1.5 rounded text-muted-foreground hover:text-foreground shrink-0"
+            title={lang === "ko" ? "새 탭에서 열기" : "Open in new tab"}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* iframe or source */}
+      <div className="flex-1 mt-1 flex justify-center overflow-auto bg-secondary/20 rounded-lg">
+        {!html ? (
+          <div className="flex items-center justify-center h-96 text-muted-foreground text-sm">
+            {lang === "ko" ? "데이터를 입력하면 미리보기가 표시됩니다" : "Enter data to see preview"}
+          </div>
+        ) : showSource ? (
+          <pre className="w-full p-4 text-[10px] font-mono text-muted-foreground overflow-auto whitespace-pre-wrap break-all max-h-[calc(100vh-16rem)]">
+            {html}
+          </pre>
+        ) : (
           <iframe
             srcDoc={html}
             className={cn(
               "border-0 bg-white rounded shadow-lg transition-all",
               mobileView ? "w-[390px]" : "w-full",
             )}
-            style={{ minHeight: 600, height: "100%" }}
+            style={{
+              minHeight: 600,
+              height: "100%",
+              transform: zoom !== 100 ? `scale(${zoom / 100})` : undefined,
+              transformOrigin: "top center",
+            }}
             sandbox="allow-same-origin"
             title="Newsletter Preview"
           />
-        ) : (
-          <div className="flex items-center justify-center h-96 text-muted-foreground text-sm">
-            {lang === "ko" ? "데이터를 입력하면 미리보기가 표시됩니다" : "Enter data to see preview"}
-          </div>
         )}
       </div>
     </div>
