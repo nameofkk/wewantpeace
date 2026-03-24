@@ -1668,6 +1668,23 @@ export const translations = {
     settings_engagement_on: "일일 브리핑 알림을 켰습니다",
     settings_engagement_off: "일일 브리핑 알림을 껐습니다",
     error_generic: "오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+
+    // 뉴스레터 CTA
+    newsletter_title: "주간 분쟁 브리핑",
+    newsletter_desc: "매주 월요일, 세계 긴장 상황을 이메일로 받아보세요",
+    newsletter_toggle_label: "이메일로 받기",
+    newsletter_toggle_sub: "뉴스레터·마케팅",
+    newsletter_preview: "미리보기",
+    newsletter_subscribers: "{n}명 구독 중 · 무료 · 언제든 해지",
+    newsletter_login_subscribe: "로그인하고 구독",
+    newsletter_login_sub: "로그인 후 무료 구독",
+    newsletter_subscribed: "구독 중",
+    newsletter_next_send: "구독 중 · 다음 발송 월요일",
+    newsletter_archive_title: "뉴스레터 아카이브",
+    newsletter_archive_desc: "지난 뉴스레터를 확인해보세요",
+    newsletter_archive_empty: "아직 발송된 뉴스레터가 없습니다",
+    newsletter_archive_cta: "이런 뉴스레터를 매주 받아보세요",
+    newsletter_web_version: "웹 버전으로 보기",
   },
   en: {
     // bottom nav
@@ -3334,6 +3351,23 @@ export const translations = {
     settings_engagement_on: "Daily briefing enabled",
     settings_engagement_off: "Daily briefing disabled",
     error_generic: "Something went wrong. Please try again later.",
+
+    // Newsletter CTA
+    newsletter_title: "Weekly Conflict Briefing",
+    newsletter_desc: "Get world tension updates delivered to your inbox every Monday",
+    newsletter_toggle_label: "Get via email",
+    newsletter_toggle_sub: "Newsletter & marketing",
+    newsletter_preview: "Preview",
+    newsletter_subscribers: "{n} subscribers · Free · Cancel anytime",
+    newsletter_login_subscribe: "Login to subscribe",
+    newsletter_login_sub: "Free after login",
+    newsletter_subscribed: "Subscribed",
+    newsletter_next_send: "Subscribed · Next issue Monday",
+    newsletter_archive_title: "Newsletter Archive",
+    newsletter_archive_desc: "Browse past newsletters",
+    newsletter_archive_empty: "No newsletters have been sent yet",
+    newsletter_archive_cta: "Get newsletters like this every week",
+    newsletter_web_version: "View web version",
   },
 } as const;
 

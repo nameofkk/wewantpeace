@@ -25,6 +25,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { NoticeTicker } from "@/components/dashboard/NoticeTicker";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { Disclaimer } from "@/components/ui/Disclaimer";
+import { NewsletterCTA } from "@/components/NewsletterCTA";
 import { SmartSummaryCardFull, SmartSummaryCompact } from "@/components/dashboard/SmartSummaryCard";
 import { RiskRadar } from "@/components/dashboard/RiskRadar";
 import { ImpactFlowSankey } from "@/components/dashboard/ImpactFlowSankey";
@@ -958,6 +959,9 @@ function ReportContent() {
             />
             <SectorImpactCard embedded />
           </m.section>
+
+          {/* ═══════════════ Newsletter CTA ═══════════════ */}
+          <NewsletterCTA />
 
           {/* ═══════════════ Disclaimer ═══════════════ */}
           <Disclaimer />

@@ -438,6 +438,7 @@ function PreviewPanel({
   const [zoom, setZoom] = useState(100);
   const [showSource, setShowSource] = useState(false);
   const [copied, setCopied] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const maxKb = 102;
   const pct = Math.min((sizeKb / maxKb) * 100, 100);
   const isOver = sizeKb > maxKb;
@@ -452,6 +453,19 @@ function PreviewPanel({
     const w = window.open();
     if (w) { w.document.write(html); w.document.close(); }
   };
+
+  const handleIframeLoad = useCallback(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    try {
+      const h = iframe.contentDocument?.body?.scrollHeight;
+      if (h && h > 0) {
+        iframe.style.height = `${h}px`;
+      }
+    } catch {
+      // sandbox cross-origin guard
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -557,14 +571,15 @@ function PreviewPanel({
           </pre>
         ) : (
           <iframe
+            ref={iframeRef}
             srcDoc={html}
+            onLoad={handleIframeLoad}
             className={cn(
               "border-0 bg-white rounded shadow-lg transition-all",
               mobileView ? "w-[390px]" : "w-full",
             )}
             style={{
               minHeight: 600,
-              height: "100%",
               transform: zoom !== 100 ? `scale(${zoom / 100})` : undefined,
               transformOrigin: "top center",
             }}
