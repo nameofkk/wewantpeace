@@ -37,6 +37,12 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 ADMIN_SETTINGS_KEY = "admin:settings:v1"
 
 
+@router.get("/ping")
+async def admin_ping(admin: User = Depends(require_admin)):
+    """어드민 권한 확인용 경량 엔드포인트 (DB 쿼리 없음)."""
+    return {"ok": True}
+
+
 async def _log_action(
     db: AsyncSession,
     admin: User,
@@ -106,44 +112,42 @@ async def get_stats(
         select(func.count()).select_from(UserPushToken)
     )).scalar() or 0
 
-    # ── 데이터 품질 KPI (최근 24시간) ──
+    # ── 데이터 품질 KPI (최근 24시간) — 단일 쿼리로 통합 ──
     cutoff_24h = now - timedelta(hours=24)
 
-    events_24h = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent)
-        .where(NormalizedEvent.created_at >= cutoff_24h)
-    )).scalar() or 0
-
-    unclassified_24h = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent)
-        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.topic == "unknown")
-    )).scalar() or 0
-
-    translation_fail_24h = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent)
-        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.title_ko == None)
-    )).scalar() or 0
-
-    geo_fail_24h = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent)
-        .where(NormalizedEvent.created_at >= cutoff_24h, NormalizedEvent.country_code == None)
-    )).scalar() or 0
+    quality_q = await db.execute(text("""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE topic = 'unknown') AS unclassified,
+            COUNT(*) FILTER (WHERE title_ko IS NULL) AS translation_fail,
+            COUNT(*) FILTER (WHERE country_code IS NULL) AS geo_fail
+        FROM normalized_events
+        WHERE created_at >= :cutoff
+    """), {"cutoff": cutoff_24h})
+    qr = quality_q.fetchone()
+    events_24h = qr[0] or 0
+    unclassified_24h = qr[1] or 0
+    translation_fail_24h = qr[2] or 0
+    geo_fail_24h = qr[3] or 0
 
     unclassified_rate = round(unclassified_24h / max(1, events_24h) * 100, 1)
     translation_fail_rate = round(translation_fail_24h / max(1, events_24h) * 100, 1)
     geo_fail_rate = round(geo_fail_24h / max(1, events_24h) * 100, 1)
 
-    # ── 주간 비교 (이번 주 vs 지난 주) ──
+    # ── 주간 비교 (이번 주 vs 지난 주) — 2개 쿼리로 통합 ──
     this_week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     last_week_start = this_week_start - timedelta(days=7)
     last_week_end = this_week_start
 
-    wc_new_users_this = (await db.execute(
-        select(func.count()).select_from(User).where(User.created_at >= this_week_start)
-    )).scalar() or 0
-    wc_new_users_last = (await db.execute(
-        select(func.count()).select_from(User).where(User.created_at >= last_week_start, User.created_at < last_week_end)
-    )).scalar() or 0
+    wc_q1 = await db.execute(text("""
+        SELECT
+            COUNT(*) FILTER (WHERE created_at >= :tw) AS users_this,
+            COUNT(*) FILTER (WHERE created_at >= :lw AND created_at < :lwe) AS users_last
+        FROM users WHERE created_at >= :lw
+    """), {"tw": this_week_start, "lw": last_week_start, "lwe": last_week_end})
+    wr1 = wc_q1.fetchone()
+    wc_new_users_this = wr1[0] or 0
+    wc_new_users_last = wr1[1] or 0
 
     wc_events_this = (await db.execute(
         select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= this_week_start)
@@ -152,31 +156,19 @@ async def get_stats(
         select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= last_week_start, NormalizedEvent.created_at < last_week_end)
     )).scalar() or 0
 
-    wc_subs_this = (await db.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.created_at >= this_week_start,
-            Subscription.status.in_(["active", "trial"]),
-        )
-    )).scalar() or 0
-    wc_subs_last = (await db.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.created_at >= last_week_start,
-            Subscription.created_at < last_week_end,
-            Subscription.status.in_(["active", "trial"]),
-        )
-    )).scalar() or 0
-
-    wc_trials_this = (await db.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.trial_start >= this_week_start,
-        )
-    )).scalar() or 0
-    wc_trials_last = (await db.execute(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.trial_start >= last_week_start,
-            Subscription.trial_start < last_week_end,
-        )
-    )).scalar() or 0
+    wc_q2 = await db.execute(text("""
+        SELECT
+            COUNT(*) FILTER (WHERE created_at >= :tw AND status IN ('active','trial')) AS subs_this,
+            COUNT(*) FILTER (WHERE created_at >= :lw AND created_at < :lwe AND status IN ('active','trial')) AS subs_last,
+            COUNT(*) FILTER (WHERE trial_start >= :tw) AS trials_this,
+            COUNT(*) FILTER (WHERE trial_start >= :lw AND trial_start < :lwe) AS trials_last
+        FROM subscriptions WHERE (created_at >= :lw OR trial_start >= :lw)
+    """), {"tw": this_week_start, "lw": last_week_start, "lwe": last_week_end})
+    wr2 = wc_q2.fetchone()
+    wc_subs_this = wr2[0] or 0
+    wc_subs_last = wr2[1] or 0
+    wc_trials_this = wr2[2] or 0
+    wc_trials_last = wr2[3] or 0
 
     return {
         "total_users": total_users,

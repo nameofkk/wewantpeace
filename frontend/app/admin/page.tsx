@@ -82,13 +82,13 @@ export default function AdminDashboard() {
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["admin-stats"],
     queryFn: () => adminFetch("/admin/stats"),
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
   });
 
   const { data: dailyCounts } = useQuery<{ date: string; count: number }[]>({
     queryKey: ["admin-events-daily"],
     queryFn: () => adminFetch("/admin/events/daily-counts?days=7"),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: 10 * 60_000,
   });
 
   const { data: tensionData } = useQuery<
@@ -96,13 +96,13 @@ export default function AdminDashboard() {
   >({
     queryKey: ["admin-tension-all"],
     queryFn: () => adminFetch("/admin/tension"),
-    refetchInterval: 5 * 60_000,
+    refetchInterval: 10 * 60_000,
   });
 
   const { data: pipelineStats } = useQuery<PipelineStats>({
     queryKey: ["pipeline-stats-dash"],
     queryFn: () => adminFetch("/admin/pipeline/stats"),
-    refetchInterval: 60_000,
+    refetchInterval: 3 * 60_000,
   });
 
   const top10Tension = (tensionData ?? []).slice(0, 10);

@@ -208,9 +208,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const { waitForAuth } = await import("@/lib/auth");
         await waitForAuth();
         const token = await user!.getIdToken(retry); // retry=true면 강제 갱신
-        const res = await fetch(`${API_BASE}/admin/stats`, {
+        const res = await fetch(`${API_BASE}/admin/ping`, {
           headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(8_000),
+          signal: AbortSignal.timeout(5_000),
         });
         if (cancelled) return;
         if (res.ok) {
