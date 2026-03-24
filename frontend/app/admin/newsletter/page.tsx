@@ -13,6 +13,7 @@ import {
   Smartphone, Monitor, AlertTriangle, FileText,
   Mail, Clock, CheckCircle, XCircle,
   ChevronsUpDown, Search, Copy, Check, Hash, Eye,
+  Download, Upload, Filter,
 } from "lucide-react";
 
 /* ── 변수 그룹 정의 ── */
@@ -336,6 +337,7 @@ function CollapsibleSection({
   open,
   onToggle,
   searchQuery,
+  showEmptyOnly,
 }: {
   section: SectionDef;
   lang: "ko" | "en";
@@ -344,6 +346,7 @@ function CollapsibleSection({
   open: boolean;
   onToggle: () => void;
   searchQuery: string;
+  showEmptyOnly: boolean;
 }) {
   const label = lang === "ko" ? section.labelKo : section.labelEn;
   const filledCount = section.fields.filter((f) => {
@@ -353,18 +356,25 @@ function CollapsibleSection({
   const totalCount = section.fields.length;
   const allFilled = filledCount === totalCount;
 
-  // 검색 필터링: 검색어가 있으면 매칭 필드만 표시
-  const visibleFields = searchQuery
-    ? section.fields.filter((f) =>
-        f.key.toLowerCase().includes(searchQuery) ||
-        f.label.toLowerCase().includes(searchQuery) ||
-        (f.hint && f.hint.toLowerCase().includes(searchQuery)) ||
-        String(data[f.key] ?? "").toLowerCase().includes(searchQuery)
-      )
-    : section.fields;
+  // 필터링: 검색 + 빈 필드만 보기
+  let visibleFields = section.fields;
+  if (searchQuery) {
+    visibleFields = visibleFields.filter((f) =>
+      f.key.toLowerCase().includes(searchQuery) ||
+      f.label.toLowerCase().includes(searchQuery) ||
+      (f.hint && f.hint.toLowerCase().includes(searchQuery)) ||
+      String(data[f.key] ?? "").toLowerCase().includes(searchQuery)
+    );
+  }
+  if (showEmptyOnly) {
+    visibleFields = visibleFields.filter((f) => {
+      const v = data[f.key];
+      return v === undefined || v === null || String(v).trim() === "";
+    });
+  }
 
-  // 검색 중인데 이 섹션에 매칭 필드가 없으면 렌더링 안 함
-  if (searchQuery && visibleFields.length === 0) return null;
+  // 필터 결과 없으면 렌더링 안 함
+  if ((searchQuery || showEmptyOnly) && visibleFields.length === 0) return null;
 
   return (
     <div id={`section-${section.id}`} className="border border-border rounded-lg overflow-hidden">
@@ -502,8 +512,39 @@ export default function AdminNewsletterPage() {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["basic"]));
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedData, setLastSavedData] = useState<Record<string, any>>({});
+  const [showEmptyOnly, setShowEmptyOnly] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // JSON 내보내기
+  const exportJson = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `newsletter-vol${vol}-${editLang}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // JSON 가져오기
+  const importJson = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string);
+        if (typeof imported === "object" && imported !== null) {
+          setData(imported);
+          setIsDirty(true);
+          toast(lang === "ko" ? "JSON 가져오기 완료" : "JSON imported", "success");
+        }
+      } catch {
+        toast(lang === "ko" ? "JSON 파싱 실패" : "Invalid JSON", "error");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // 전체 열기/닫기
   const allOpen = openSections.size === SECTIONS.length;
@@ -753,15 +794,53 @@ export default function AdminNewsletterPage() {
                   </button>
                 )}
               </div>
+              {/* 빈 필드만 보기 */}
+              <button
+                onClick={() => setShowEmptyOnly(!showEmptyOnly)}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 text-xs border rounded-md transition-colors shrink-0",
+                  showEmptyOnly
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                    : "bg-secondary/30 border-border/40 text-muted-foreground hover:text-foreground hover:bg-secondary/50",
+                )}
+                title={lang === "ko" ? "빈 필드만 보기" : "Show empty only"}
+              >
+                <Filter className="h-3.5 w-3.5" />
+              </button>
               {/* 전체 열기/닫기 */}
               <button
                 onClick={toggleAllSections}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary/30 border border-border/40 rounded-md hover:bg-secondary/50 transition-colors shrink-0"
+                className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary/30 border border-border/40 rounded-md hover:bg-secondary/50 transition-colors shrink-0"
                 title={allOpen ? "Collapse all" : "Expand all"}
               >
                 <ChevronsUpDown className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{allOpen ? (lang === "ko" ? "접기" : "Collapse") : (lang === "ko" ? "펼치기" : "Expand")}</span>
               </button>
+              {/* JSON export/import */}
+              <button
+                onClick={exportJson}
+                className="p-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary/30 border border-border/40 rounded-md hover:bg-secondary/50 transition-colors shrink-0"
+                title="Export JSON"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary/30 border border-border/40 rounded-md hover:bg-secondary/50 transition-colors shrink-0"
+                title="Import JSON"
+              >
+                <Upload className="h-3.5 w-3.5" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importJson(f);
+                  e.target.value = "";
+                }}
+              />
             </div>
 
             {/* 섹션 빠른 점프 */}
@@ -805,6 +884,7 @@ export default function AdminNewsletterPage() {
                 open={openSections.has(section.id)}
                 onToggle={() => toggleSection(section.id)}
                 searchQuery={searchQuery}
+                showEmptyOnly={showEmptyOnly}
               />
             ))}
 
