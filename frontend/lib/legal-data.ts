@@ -28,7 +28,7 @@ export const TERMS_KO = [
   },
   {
     title: "제7조 (유료서비스 및 결제)",
-    content: `① Pro 구독: 월 $3.90 / Pro+ 구독: 월 $6.90 (USD, 부가세 별도)\n② 결제는 Google Play, Apple App Store 인앱결제(IAP) 또는 웹 결제(DodoPayments)로 처리됩니다.\n③ 구독 취소는 각 스토어(Google Play/App Store)에서 직접 진행하며, 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 결제 관련 문의: ${CONTACT_EMAIL}`,
+    content: `① Pro 구독: 월 $6.99 / 연 $62.99 / 평생 $149.99\n   Pro+ 구독: 월 $9.99 / 연 $89.99 / 평생 $199.99 (USD, 부가세 별도)\n② 결제는 Google Play, Apple App Store 인앱결제(IAP) 또는 웹 결제(DodoPayments)로 처리됩니다.\n③ 구독 취소는 각 스토어(Google Play/App Store)에서 직접 진행하며, 취소 시 현재 기간 만료까지 서비스 이용 가능합니다.\n④ 평생(Lifetime) 결제는 일회성이며, 취소 및 환불 정책은 별도 안내를 따릅니다.\n⑤ 결제 관련 문의: ${CONTACT_EMAIL}`,
   },
   {
     title: "제8조 (책임제한)",
@@ -79,7 +79,7 @@ export const TERMS_EN = [
   },
   {
     title: "Article 7 (Paid Services and Payment)",
-    content: `① Pro subscription: $3.90/month / Pro+ subscription: $6.90/month (USD, tax not included)\n② Payment is processed via Google Play, Apple App Store in-app purchase (IAP), or web payment (DodoPayments).\n③ Cancellation must be done through the respective store (Google Play/App Store). Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Payment inquiries: ${CONTACT_EMAIL}`,
+    content: `① Pro subscription: $6.99/month / $62.99/year / $149.99 lifetime\n   Pro+ subscription: $9.99/month / $89.99/year / $199.99 lifetime (USD, tax not included)\n② Payment is processed via Google Play, Apple App Store in-app purchase (IAP), or web payment (DodoPayments).\n③ Cancellation must be done through the respective store (Google Play/App Store). Upon cancellation, the Service remains accessible until the end of the current billing period.\n④ Lifetime purchases are one-time payments; cancellation and refund policies are subject to separate terms.\n⑤ Payment inquiries: ${CONTACT_EMAIL}`,
   },
   {
     title: "Article 8 (Limitation of Liability)",

@@ -16,8 +16,11 @@ class Subscription(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     billing_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     customer_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=390)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=699)
     currency: Mapped[str] = mapped_column(String(4), nullable=False, default="USD")
+    billing_interval: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="monthly", server_default="monthly",
+    )
     # 스토어 IAP 필드 (promo:XXXX 형식 지원을 위해 32자)
     platform: Mapped[str] = mapped_column(String(32), nullable=False, default="web")
     store_product_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -487,10 +487,10 @@ export function usePatchCluster() {
 }
 
 // --- DodoPayments 웹 결제 ---
-export async function createDodoCheckout(plan: string): Promise<{ checkout_url: string }> {
+export async function createDodoCheckout(plan: string, billing_interval: string = "monthly"): Promise<{ checkout_url: string }> {
   return apiFetch("/payments/dodo/create-checkout", undefined, {
     method: "POST",
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, billing_interval }),
   });
 }
 

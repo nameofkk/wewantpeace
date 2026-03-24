@@ -115,6 +115,16 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
   pro_plus: "com.wewantpeace.proplus.monthly",
 };
 
+type BillingCycle = "monthly" | "annual" | "lifetime";
+
+const PRICING = {
+  pro:      { monthly: 6.99, annual: 62.99, annualPerMonth: 5.25, lifetime: 149.99 },
+  pro_plus: { monthly: 9.99, annual: 89.99, annualPerMonth: 7.50, lifetime: 199.99 },
+} as const;
+
+const ANNUAL_DISCOUNT = 25; // %
+const ANNUAL_MONTHS_FREE = 3;
+
 function FeatureValue({
   val, planId, lang,
 }: { val: boolean | string | { ko: string; en: string }; planId: string; lang: Lang }) {
@@ -208,6 +218,7 @@ function UpgradeContent() {
   ], [lang]);
 
   const [selected, setSelected] = useState<"pro" | "pro_plus">("pro");
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("annual");
   const [platform, setPlatform] = useState<AppPlatform>("web");
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
 
@@ -447,6 +458,7 @@ function UpgradeContent() {
       const params = new URLSearchParams();
       params.set("plan", planId);
       params.set("token", token);
+      params.set("billing_interval", billingCycle);
 
       const res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
         method: "POST",
@@ -468,7 +480,7 @@ function UpgradeContent() {
     }
 
     // 일반 웹: fetch + DodoPayments overlay
-    const { checkout_url } = await createDodoCheckout(planId);
+    const { checkout_url } = await createDodoCheckout(planId, billingCycle);
     if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
     const { DodoPayments } = await import("dodopayments-checkout");
     await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
@@ -587,7 +599,7 @@ function UpgradeContent() {
         )}
 
         {/* 타이틀 */}
-        <div className="text-center mb-10" style={{ animation: "fadeSlideUp 0.4s ease both" }}>
+        <div className="text-center mb-6" style={{ animation: "fadeSlideUp 0.4s ease both" }}>
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 mb-4">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-semibold text-primary">
@@ -599,6 +611,66 @@ function UpgradeContent() {
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">{t(lang, "upgrade_subtitle")}</p>
         </div>
+
+        {/* 결제 주기 토글 — Claude/ChatGPT 스타일 */}
+        <div className="flex justify-center mb-8" style={{ animation: "fadeSlideUp 0.45s ease both" }}>
+          <div className="inline-flex rounded-xl bg-muted/50 border border-border p-1 gap-0.5">
+            {(["monthly", "annual", "lifetime"] as BillingCycle[]).map((cycle) => (
+              <button
+                key={cycle}
+                onClick={() => setBillingCycle(cycle)}
+                className={cn(
+                  "relative rounded-lg px-3.5 py-2 text-xs font-semibold transition-all duration-200",
+                  billingCycle === cycle
+                    ? "bg-card text-foreground shadow-sm border border-border/50"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {cycle === "monthly" ? (lang === "ko" ? "월간" : "Monthly") :
+                 cycle === "annual" ? (
+                   <span className="flex items-center gap-1.5">
+                     {lang === "ko" ? "연간" : "Annual"}
+                     <span className="rounded-full bg-green-500/15 text-green-500 text-[9px] font-bold px-1.5 py-0.5 whitespace-nowrap">
+                       -{ANNUAL_DISCOUNT}%
+                     </span>
+                   </span>
+                 ) :
+                 (lang === "ko" ? "평생" : "Lifetime")}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 체험판 중 결제 유도 배너 */}
+        {isCurrentlyTrial && trialEnd && (() => {
+          const daysLeft = Math.max(0, Math.ceil((new Date(trialEnd).getTime() - Date.now()) / 86400000));
+          return (
+            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4" style={{ animation: "fadeSlideUp 0.45s ease both" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-amber-400">
+                  {lang === "ko" ? "무료 체험 중" : "Free Trial Active"}
+                </span>
+                <span className="text-xs font-semibold text-amber-400">
+                  {t(lang, "trial_remaining_days", { n: daysLeft })}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-amber-500/20 overflow-hidden mb-3">
+                <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all"
+                     style={{ width: `${Math.max(5, ((7 - daysLeft) / 7) * 100)}%` }} />
+              </div>
+              <p className="text-[11px] text-foreground/70 mb-2">
+                {lang === "ko"
+                  ? "체험 종료 후 Free 플랜으로 전환됩니다. 지금 구독하면 중단 없이 계속 이용하세요."
+                  : "After trial ends, you'll switch to Free. Subscribe now for uninterrupted access."}
+              </p>
+              {billingCycle === "annual" && (
+                <p className="text-[11px] font-semibold text-green-500">
+                  {lang === "ko" ? "💡 연간 구독 시 3개월 무료!" : "💡 Get 3 months free with annual!"}
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {error && (
           <div className="mb-6 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive text-center">
@@ -691,14 +763,25 @@ function UpgradeContent() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
+                  {billingCycle === "annual" && (
+                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${PRICING.pro.monthly.toFixed(2)}/mo</p>
+                  )}
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-xs text-blue-400 font-medium">$</span>
                     <span className={cn(
                       "text-2xl font-black text-blue-400",
                       selected === "pro" && "shimmer-text"
-                    )}>3.90</span>
+                    )}>
+                      {billingCycle === "monthly" ? PRICING.pro.monthly.toFixed(2)
+                       : billingCycle === "annual" ? PRICING.pro.annualPerMonth.toFixed(2)
+                       : PRICING.pro.lifetime.toFixed(2)}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월 · 세금 별도" : "/mo · excl. tax"}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {billingCycle === "monthly" ? (lang === "ko" ? "/월" : "/mo")
+                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${PRICING.pro.annual}/년` : `/mo · $${PRICING.pro.annual}/yr`)
+                     : (lang === "ko" ? "일회성 결제" : "one-time")}
+                  </p>
                 </div>
               </div>
 
@@ -718,6 +801,24 @@ function UpgradeContent() {
                   </div>
                 ))}
               </div>
+
+              {/* 절약 배지 */}
+              {billingCycle === "annual" && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
+                  <Tag className="h-3 w-3 text-green-500 shrink-0" />
+                  <span className="text-[11px] text-green-500 font-medium whitespace-nowrap">
+                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(PRICING.pro.monthly * 12 - PRICING.pro.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(PRICING.pro.monthly * 12 - PRICING.pro.annual).toFixed(2)}/yr`}
+                  </span>
+                </div>
+              )}
+              {billingCycle === "lifetime" && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                  <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                  <span className="text-[11px] text-amber-500 font-medium whitespace-nowrap">
+                    {lang === "ko" ? "한 번 결제, 평생 이용" : "Pay once, use forever"}
+                  </span>
+                </div>
+              )}
 
               {/* 구독 버튼 */}
               {currentPlan === "pro" && isCurrentlyTrial ? (
@@ -861,14 +962,25 @@ function UpgradeContent() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
+                  {billingCycle === "annual" && (
+                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${PRICING.pro_plus.monthly.toFixed(2)}/mo</p>
+                  )}
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-xs text-purple-400 font-medium">$</span>
                     <span className={cn(
                       "text-2xl font-black text-purple-400",
                       selected === "pro_plus" && "shimmer-text"
-                    )}>6.90</span>
+                    )}>
+                      {billingCycle === "monthly" ? PRICING.pro_plus.monthly.toFixed(2)
+                       : billingCycle === "annual" ? PRICING.pro_plus.annualPerMonth.toFixed(2)
+                       : PRICING.pro_plus.lifetime.toFixed(2)}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "/월 · 세금 별도" : "/mo · excl. tax"}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {billingCycle === "monthly" ? (lang === "ko" ? "/월" : "/mo")
+                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${PRICING.pro_plus.annual}/년` : `/mo · $${PRICING.pro_plus.annual}/yr`)
+                     : (lang === "ko" ? "일회성 결제" : "one-time")}
+                  </p>
                 </div>
               </div>
 
@@ -888,6 +1000,24 @@ function UpgradeContent() {
                   </div>
                 ))}
               </div>
+
+              {/* Pro+ 절약 배지 */}
+              {billingCycle === "annual" && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
+                  <Tag className="h-3 w-3 text-green-500 shrink-0" />
+                  <span className="text-[11px] text-green-500 font-medium whitespace-nowrap">
+                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(PRICING.pro_plus.monthly * 12 - PRICING.pro_plus.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(PRICING.pro_plus.monthly * 12 - PRICING.pro_plus.annual).toFixed(2)}/yr`}
+                  </span>
+                </div>
+              )}
+              {billingCycle === "lifetime" && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                  <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                  <span className="text-[11px] text-amber-500 font-medium whitespace-nowrap">
+                    {lang === "ko" ? "한 번 결제, 평생 이용" : "Pay once, use forever"}
+                  </span>
+                </div>
+              )}
 
               {/* 구독 버튼 */}
               {currentPlan === "pro_plus" ? (
@@ -1032,8 +1162,8 @@ function UpgradeContent() {
         <div className="mt-8 text-center text-[11px] text-muted-foreground space-y-1 pb-4">
           <p style={{ wordBreak: "keep-all", lineHeight: "1.7" }}>
             {lang === "ko"
-              ? "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능"
-              : "Cancel anytime · Service continues until current billing period ends"}
+              ? "구독 취소 시 현재 결제 기간 만료까지 서비스 이용 가능 · 세금 별도"
+              : "Cancel anytime · Service continues until current billing period ends · Excl. tax"}
           </p>
           <p>
             <Link href="/terms" className="hover:underline">{t(lang, "terms_title")}</Link>

@@ -941,6 +941,9 @@ function FeedPageContent() {
             <p className="text-sm font-semibold text-amber-400">
               {t(lang, "trial_expiry_banner", { n: daysLeft })}
             </p>
+            <p className="text-[10px] text-green-500/80 mt-0.5">
+              {lang === "ko" ? "연간 구독 시 $5.25/월 (25% 할인)" : "Annual: $5.25/mo (25% off)"}
+            </p>
             <Link href="/upgrade" className="text-xs text-primary font-medium hover:underline">
               {t(lang, "trial_expiry_cta")}
             </Link>
@@ -966,6 +969,9 @@ function FeedPageContent() {
                 {t(lang, "fomo_banner_discount", { n: fomoDiscountDaysLeft })}
               </p>
             )}
+            <p className="text-[10px] text-blue-300/80 mt-0.5">
+              {lang === "ko" ? "Pro $6.99/월부터 · 연간 시 25% 할인" : "Pro from $6.99/mo · 25% off annual"}
+            </p>
             <Link href="/upgrade" className="text-xs text-primary font-medium hover:underline">
               {t(lang, "trial_expiry_cta")}
             </Link>
