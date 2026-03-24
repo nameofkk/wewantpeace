@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import {
   Save, Send, ChevronDown, ChevronRight, Loader2,
   Smartphone, Monitor, AlertTriangle, FileText,
   Mail, Clock, CheckCircle, XCircle,
+  ChevronsUpDown, Search, Copy, Check, Hash,
 } from "lucide-react";
 
 /* ── 변수 그룹 정의 ── */
@@ -21,12 +22,15 @@ interface FieldDef {
   type: "input" | "textarea";
   rows?: number;
   maxLength?: number;
+  placeholder?: string;
+  hint?: string;
 }
 
 interface SectionDef {
   id: string;
   labelKo: string;
   labelEn: string;
+  icon?: string;
   fields: FieldDef[];
 }
 
@@ -35,170 +39,205 @@ const SECTIONS: SectionDef[] = [
     id: "basic",
     labelKo: "기본 정보",
     labelEn: "Basic Info",
+    icon: "📋",
     fields: [
-      { key: "vol_number", label: "Vol Number", type: "input" },
-      { key: "issue_date", label: "Issue Date", type: "input" },
-      { key: "issue_date_short", label: "Date Short", type: "input" },
-      { key: "issue_datetime", label: "Date Time", type: "input" },
-      { key: "issue_label", label: "Issue Label", type: "input" },
-      { key: "issue_label_long", label: "Label Long", type: "input" },
+      { key: "vol_number", label: "Vol Number", type: "input", placeholder: "1", hint: "호수 번호" },
+      { key: "issue_date", label: "Issue Date", type: "input", placeholder: "2026년 3월 24일", hint: "전체 날짜 표시" },
+      { key: "issue_date_short", label: "Date Short", type: "input", placeholder: "2026.3.24", hint: "짧은 날짜" },
+      { key: "issue_datetime", label: "Date Time", type: "input", placeholder: "2026-03-24T09:00:00+09:00", hint: "ISO 8601" },
+      { key: "issue_label", label: "Issue Label", type: "input", placeholder: "Vol.1", hint: "짧은 라벨" },
+      { key: "issue_label_long", label: "Label Long", type: "input", placeholder: "Vol.1 — 2026.3.24", hint: "전체 라벨" },
     ],
   },
   {
     id: "preheader",
     labelKo: "프리헤더",
     labelEn: "Preheader",
+    icon: "👁",
     fields: [
-      { key: "preheader_text", label: "Preheader Text", type: "input", maxLength: 120 },
+      { key: "preheader_text", label: "Preheader Text", type: "input", maxLength: 120, placeholder: "받은편지함에 보이는 미리보기 텍스트...", hint: "Gmail 미리보기, 120자 이내 권장" },
     ],
   },
   {
     id: "hero",
     labelKo: "히어로",
     labelEn: "Hero",
+    icon: "🎯",
     fields: [
-      { key: "hero_image_url", label: "Hero Image URL", type: "input" },
-      { key: "hero_headline_html", label: "Hero Headline (HTML)", type: "textarea", rows: 3 },
-      { key: "crisis_countries_count", label: "Crisis Countries", type: "input" },
-      { key: "crisis_prev", label: "Crisis Prev", type: "input" },
-      { key: "crisis_current", label: "Crisis Current", type: "input" },
-      { key: "crisis_trend", label: "Crisis Trend", type: "input" },
-      { key: "events_24h", label: "Events 24h", type: "input" },
-      { key: "events_7d", label: "Events 7d", type: "input" },
-      { key: "key_stats_line", label: "Key Stats (HTML)", type: "textarea", rows: 2 },
+      { key: "hero_image_url", label: "Hero Image URL", type: "input", placeholder: "https://...", hint: "1200x630 권장" },
+      { key: "hero_headline_html", label: "Hero Headline (HTML)", type: "textarea", rows: 3, hint: "메인 타이틀, HTML 가능" },
+      { key: "crisis_countries_count", label: "Crisis Countries", type: "input", placeholder: "42", hint: "위기 국가 수" },
+      { key: "crisis_prev", label: "Crisis Prev", type: "input", placeholder: "38", hint: "전주 위기 국가 수" },
+      { key: "crisis_current", label: "Crisis Current", type: "input", placeholder: "42", hint: "이번주 위기 국가 수" },
+      { key: "crisis_trend", label: "Crisis Trend", type: "input", placeholder: "↑ 4", hint: "↑↓ + 숫자" },
+      { key: "events_24h", label: "Events 24h", type: "input", placeholder: "2,048", hint: "24시간 이벤트 수" },
+      { key: "events_7d", label: "Events 7d", type: "input", placeholder: "12,340", hint: "7일 이벤트 수" },
+      { key: "key_stats_line", label: "Key Stats (HTML)", type: "textarea", rows: 2, hint: "히어로 하단 핵심 통계 HTML" },
     ],
   },
   {
     id: "nav",
     labelKo: "내비",
     labelEn: "Navigation",
+    icon: "🧭",
     fields: [
-      { key: "deep_dive_nav_label", label: "Deep Dive Nav", type: "input" },
+      { key: "deep_dive_nav_label", label: "Deep Dive Nav", type: "input", placeholder: "호르무즈 해협", hint: "딥다이브 네비 라벨" },
     ],
   },
   {
     id: "stats",
     labelKo: "통계",
     labelEn: "Statistics",
+    icon: "📊",
     fields: [
-      { key: "total_conflicts", label: "Total Conflicts", type: "input" },
-      { key: "urgent_count", label: "Urgent Count", type: "input" },
-      { key: "active_issues_count", label: "Active Issues", type: "input" },
+      { key: "total_conflicts", label: "Total Conflicts", type: "input", placeholder: "56", hint: "총 분쟁 수" },
+      { key: "urgent_count", label: "Urgent Count", type: "input", placeholder: "12", hint: "긴급 이슈 수" },
+      { key: "active_issues_count", label: "Active Issues", type: "input", placeholder: "948", hint: "진행 중 이슈 수" },
     ],
   },
   {
     id: "brief",
     labelKo: "Today's Brief",
     labelEn: "Today's Brief",
+    icon: "📰",
     fields: [
-      { key: "todays_brief_items_html", label: "Brief Items (HTML)", type: "textarea", rows: 10 },
+      { key: "todays_brief_items_html", label: "Brief Items (HTML)", type: "textarea", rows: 10, hint: "오늘의 브리프 항목 HTML 블록" },
     ],
   },
   {
     id: "tension",
     labelKo: "긴장도 TOP 10",
     labelEn: "Tension Index",
+    icon: "🔥",
     fields: [
-      { key: "tension_table_html", label: "Tension Table (HTML)", type: "textarea", rows: 12 },
-      { key: "tension_warning_html", label: "Tension Warning (HTML)", type: "textarea", rows: 3 },
+      { key: "tension_table_html", label: "Tension Table (HTML)", type: "textarea", rows: 12, hint: "긴장도 순위 테이블 HTML" },
+      { key: "tension_warning_html", label: "Tension Warning (HTML)", type: "textarea", rows: 3, hint: "경고 메시지 HTML" },
     ],
   },
   {
     id: "conflict",
     labelKo: "전쟁·분쟁",
     labelEn: "Conflicts",
+    icon: "⚔",
     fields: [
-      { key: "conflict_stories_html", label: "Conflict Stories (HTML)", type: "textarea", rows: 12 },
+      { key: "conflict_stories_html", label: "Conflict Stories (HTML)", type: "textarea", rows: 12, hint: "분쟁 스토리 HTML 블록" },
     ],
   },
   {
     id: "energy",
     labelKo: "에너지",
     labelEn: "Energy",
+    icon: "⛽",
     fields: [
-      { key: "energy_section_intro_html", label: "Energy Intro (HTML)", type: "textarea", rows: 3 },
-      { key: "energy_section_html", label: "Energy Section (HTML)", type: "textarea", rows: 12 },
+      { key: "energy_section_intro_html", label: "Energy Intro (HTML)", type: "textarea", rows: 3, hint: "에너지 섹션 도입부" },
+      { key: "energy_section_html", label: "Energy Section (HTML)", type: "textarea", rows: 12, hint: "에너지 본문 HTML 블록" },
     ],
   },
   {
     id: "deepdive",
     labelKo: "딥다이브",
     labelEn: "Deep Dive",
+    icon: "🔬",
     fields: [
-      { key: "deep_dive_title", label: "Deep Dive Title", type: "input" },
-      { key: "deep_dive_section_html", label: "Deep Dive (HTML)", type: "textarea", rows: 12 },
+      { key: "deep_dive_title", label: "Deep Dive Title", type: "input", placeholder: "호르무즈 해협 위기", hint: "딥다이브 제목" },
+      { key: "deep_dive_section_html", label: "Deep Dive (HTML)", type: "textarea", rows: 12, hint: "딥다이브 본문 HTML 블록" },
     ],
   },
   {
     id: "country",
     labelKo: "국가 섹션",
     labelEn: "Country",
+    icon: "🌏",
     fields: [
-      { key: "country_name", label: "Country Name", type: "input" },
-      { key: "country_code", label: "Country Code", type: "input" },
-      { key: "country_rank", label: "Rank", type: "input" },
-      { key: "tension_level", label: "Tension Level", type: "input" },
-      { key: "tension_score", label: "Tension Score", type: "input" },
-      { key: "tension_level_text", label: "Level Text", type: "input" },
-      { key: "tension_change", label: "Change", type: "input" },
-      { key: "prev_tension", label: "Prev Tension", type: "input" },
-      { key: "streak_text", label: "Streak Text", type: "input" },
-      { key: "country_summary", label: "Country Summary", type: "textarea", rows: 3 },
-      { key: "country_issues_html", label: "Country Issues (HTML)", type: "textarea", rows: 8 },
-      { key: "country_impact_html", label: "Country Impact (HTML)", type: "textarea", rows: 8 },
+      { key: "country_name", label: "Country Name", type: "input", placeholder: "한국 / South Korea", hint: "국가명" },
+      { key: "country_code", label: "Country Code", type: "input", placeholder: "KR", hint: "ISO 2자리 코드" },
+      { key: "country_rank", label: "Rank", type: "input", placeholder: "8", hint: "긴장도 순위" },
+      { key: "tension_level", label: "Tension Level", type: "input", placeholder: "4", hint: "1~5 레벨" },
+      { key: "tension_score", label: "Tension Score", type: "input", placeholder: "96.8", hint: "긴장도 점수" },
+      { key: "tension_level_text", label: "Level Text", type: "input", placeholder: "LEVEL 4", hint: "레벨 텍스트" },
+      { key: "tension_change", label: "Change", type: "input", placeholder: "↑24%", hint: "변동 표시" },
+      { key: "prev_tension", label: "Prev Tension", type: "input", placeholder: "78.2", hint: "전주 점수" },
+      { key: "streak_text", label: "Streak Text", type: "input", placeholder: "3주 연속 상승", hint: "추세 텍스트" },
+      { key: "country_summary", label: "Country Summary", type: "textarea", rows: 3, hint: "국가 요약 설명" },
+      { key: "country_issues_html", label: "Country Issues (HTML)", type: "textarea", rows: 8, hint: "국가 이슈 상세 HTML" },
+      { key: "country_impact_html", label: "Country Impact (HTML)", type: "textarea", rows: 8, hint: "국가 영향 분석 HTML" },
     ],
   },
   {
     id: "travel",
     labelKo: "여행경보",
     labelEn: "Travel Advisory",
+    icon: "✈",
     fields: [
-      { key: "travel_advisory_intro_html", label: "Travel Intro (HTML)", type: "textarea", rows: 3 },
-      { key: "travel_advisory_html", label: "Travel Advisory (HTML)", type: "textarea", rows: 8 },
-      { key: "did_you_know_html", label: "Did You Know (HTML)", type: "textarea", rows: 4 },
+      { key: "travel_advisory_intro_html", label: "Travel Intro (HTML)", type: "textarea", rows: 3, hint: "여행경보 도입부" },
+      { key: "travel_advisory_html", label: "Travel Advisory (HTML)", type: "textarea", rows: 8, hint: "여행경보 본문 HTML" },
+      { key: "did_you_know_html", label: "Did You Know (HTML)", type: "textarea", rows: 4, hint: "알고 계셨나요? HTML" },
     ],
   },
   {
     id: "numbers",
     labelKo: "숫자·캘린더",
     labelEn: "Numbers & Calendar",
+    icon: "🔢",
     fields: [
-      { key: "numbers_section_html", label: "Numbers Section (HTML)", type: "textarea", rows: 10 },
-      { key: "calendar_html", label: "Calendar (HTML)", type: "textarea", rows: 10 },
+      { key: "numbers_section_html", label: "Numbers Section (HTML)", type: "textarea", rows: 10, hint: "이번주 숫자 HTML" },
+      { key: "calendar_html", label: "Calendar (HTML)", type: "textarea", rows: 10, hint: "다음주 캘린더 HTML" },
     ],
   },
   {
     id: "editor",
     labelKo: "에디터 노트",
     labelEn: "Editor's Note",
+    icon: "✏",
     fields: [
-      { key: "editors_note_html", label: "Editor's Note (HTML)", type: "textarea", rows: 6 },
-      { key: "next_week_items_html", label: "Next Week (HTML)", type: "textarea", rows: 6 },
+      { key: "editors_note_html", label: "Editor's Note (HTML)", type: "textarea", rows: 6, hint: "에디터 인사말 HTML" },
+      { key: "next_week_items_html", label: "Next Week (HTML)", type: "textarea", rows: 6, hint: "다음주 예고 HTML" },
     ],
   },
   {
     id: "share",
     labelKo: "공유·CTA",
     labelEn: "Share & CTA",
+    icon: "📤",
     fields: [
-      { key: "share_headline", label: "Share Headline", type: "input" },
-      { key: "share_subtext", label: "Share Subtext", type: "input" },
-      { key: "mailto_subject", label: "Mailto Subject", type: "input" },
-      { key: "mailto_body", label: "Mailto Body", type: "textarea", rows: 3 },
-      { key: "pro_cta_headline_html", label: "Pro CTA Headline (HTML)", type: "textarea", rows: 3 },
-      { key: "pro_cta_subtext", label: "Pro CTA Subtext", type: "input" },
+      { key: "share_headline", label: "Share Headline", type: "input", placeholder: "친구에게 공유", hint: "공유 제목" },
+      { key: "share_subtext", label: "Share Subtext", type: "input", placeholder: "이 뉴스레터가 도움이 됐다면...", hint: "공유 부제" },
+      { key: "mailto_subject", label: "Mailto Subject", type: "input", placeholder: "WeWantPeace 뉴스레터 추천", hint: "공유 이메일 제목" },
+      { key: "mailto_body", label: "Mailto Body", type: "textarea", rows: 3, hint: "공유 이메일 본문" },
+      { key: "pro_cta_headline_html", label: "Pro CTA Headline (HTML)", type: "textarea", rows: 3, hint: "PRO 업그레이드 CTA HTML" },
+      { key: "pro_cta_subtext", label: "Pro CTA Subtext", type: "input", placeholder: "더 깊은 분석...", hint: "PRO CTA 부제" },
     ],
   },
   {
     id: "system",
     labelKo: "시스템",
     labelEn: "System",
+    icon: "⚙",
     fields: [
-      { key: "unsubscribe_url", label: "Unsubscribe URL", type: "input" },
-      { key: "next_vol_number", label: "Next Vol Number", type: "input" },
+      { key: "unsubscribe_url", label: "Unsubscribe URL", type: "input", placeholder: "https://...", hint: "수신거부 URL" },
+      { key: "next_vol_number", label: "Next Vol Number", type: "input", placeholder: "2", hint: "다음호 번호" },
     ],
   },
 ];
+
+/* ── 복사 버튼 ── */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+      title="Copy"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
 
 /* ── 접이식 섹션 컴포넌트 ── */
 function CollapsibleSection({
@@ -206,59 +245,107 @@ function CollapsibleSection({
   lang,
   data,
   onChange,
-  defaultOpen,
+  open,
+  onToggle,
+  searchQuery,
 }: {
   section: SectionDef;
   lang: "ko" | "en";
   data: Record<string, any>;
   onChange: (key: string, value: string) => void;
-  defaultOpen: boolean;
+  open: boolean;
+  onToggle: () => void;
+  searchQuery: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const label = lang === "ko" ? section.labelKo : section.labelEn;
+  const filledCount = section.fields.filter((f) => {
+    const v = data[f.key];
+    return v !== undefined && v !== null && String(v).trim() !== "";
+  }).length;
+  const totalCount = section.fields.length;
+  const allFilled = filledCount === totalCount;
+
+  // 검색 필터링: 검색어가 있으면 매칭 필드만 표시
+  const visibleFields = searchQuery
+    ? section.fields.filter((f) =>
+        f.key.toLowerCase().includes(searchQuery) ||
+        f.label.toLowerCase().includes(searchQuery) ||
+        (f.hint && f.hint.toLowerCase().includes(searchQuery)) ||
+        String(data[f.key] ?? "").toLowerCase().includes(searchQuery)
+      )
+    : section.fields;
+
+  // 검색 중인데 이 섹션에 매칭 필드가 없으면 렌더링 안 함
+  if (searchQuery && visibleFields.length === 0) return null;
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div id={`section-${section.id}`} className="border border-border rounded-lg overflow-hidden">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/30 hover:bg-secondary/50 transition-colors text-left"
       >
         {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+        {section.icon && <span className="text-sm shrink-0">{section.icon}</span>}
         <span className="text-sm font-medium">{label}</span>
-        <span className="text-[10px] text-muted-foreground ml-auto">{section.fields.length}</span>
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          <span className={cn(
+            "text-[10px] font-mono",
+            allFilled ? "text-green-400" : "text-muted-foreground",
+          )}>
+            {filledCount}/{totalCount}
+          </span>
+          {allFilled && <Check className="h-3 w-3 text-green-400" />}
+        </div>
       </button>
-      {open && (
+      {(open || (searchQuery && visibleFields.length > 0)) && (
         <div className="p-4 space-y-3">
-          {section.fields.map((field) => (
-            <div key={field.key}>
-              <label className="block text-xs text-muted-foreground mb-1">
-                {field.label}
-                {field.maxLength && (
-                  <span className={cn(
-                    "ml-2",
-                    (data[field.key]?.length || 0) > field.maxLength ? "text-red-400" : "text-muted-foreground/60",
-                  )}>
-                    {data[field.key]?.length || 0}/{field.maxLength}
-                  </span>
+          {visibleFields.map((field) => {
+            const value = data[field.key] ?? "";
+            const strVal = String(value);
+            const isHtml = field.label.includes("HTML");
+            return (
+              <div key={field.key}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {isHtml && <Hash className="h-3 w-3 text-amber-400/60" />}
+                    <span>{field.label}</span>
+                    {field.maxLength && (
+                      <span className={cn(
+                        "ml-1 tabular-nums",
+                        strVal.length > field.maxLength ? "text-red-400 font-medium" : "text-muted-foreground/60",
+                      )}>
+                        {strVal.length}/{field.maxLength}
+                      </span>
+                    )}
+                    {field.hint && (
+                      <span className="text-[10px] text-muted-foreground/40 ml-1">{field.hint}</span>
+                    )}
+                  </label>
+                  {isHtml && strVal.length > 0 && <CopyButton text={strVal} />}
+                </div>
+                {field.type === "input" ? (
+                  <input
+                    type="text"
+                    value={strVal}
+                    onChange={(e) => onChange(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/30"
+                  />
+                ) : (
+                  <textarea
+                    value={strVal}
+                    onChange={(e) => onChange(field.key, e.target.value)}
+                    rows={field.rows || 4}
+                    placeholder={field.placeholder}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-xs font-mono bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y placeholder:text-muted-foreground/30",
+                      isHtml && "bg-slate-950/30",
+                    )}
+                  />
                 )}
-              </label>
-              {field.type === "input" ? (
-                <input
-                  type="text"
-                  value={data[field.key] ?? ""}
-                  onChange={(e) => onChange(field.key, e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              ) : (
-                <textarea
-                  value={data[field.key] ?? ""}
-                  onChange={(e) => onChange(field.key, e.target.value)}
-                  rows={field.rows || 4}
-                  className="w-full px-3 py-1.5 text-xs font-mono bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-y"
-                />
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -367,7 +454,42 @@ export default function AdminNewsletterPage() {
   const [renderLoading, setRenderLoading] = useState(false);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [confirmSend, setConfirmSend] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["basic"]));
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedData, setLastSavedData] = useState<Record<string, any>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // 전체 열기/닫기
+  const allOpen = openSections.size === SECTIONS.length;
+  const toggleAllSections = () => {
+    if (allOpen) {
+      setOpenSections(new Set());
+    } else {
+      setOpenSections(new Set(SECTIONS.map((s) => s.id)));
+    }
+  };
+
+  // 섹션 토글
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // 채움 통계
+  const totalFields = useMemo(() => SECTIONS.reduce((n, s) => n + s.fields.length, 0), []);
+  const filledFields = useMemo(() => {
+    return SECTIONS.reduce((n, s) => {
+      return n + s.fields.filter((f) => {
+        const v = data[f.key];
+        return v !== undefined && v !== null && String(v).trim() !== "";
+      }).length;
+    }, 0);
+  }, [data]);
 
   // 초안 로드
   const { data: draftData, isLoading: draftLoading } = useQuery({
@@ -378,8 +500,37 @@ export default function AdminNewsletterPage() {
 
   // draftData 변경 시 data에 반영
   useEffect(() => {
-    if (draftData) setData(draftData);
+    if (draftData) {
+      setData(draftData);
+      setLastSavedData(draftData);
+      setIsDirty(false);
+    }
   }, [draftData]);
+
+  // 키보드 단축키: Ctrl+S = 저장, Ctrl+Shift+F = 검색
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        saveMutation.mutate();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "f" && e.shiftKey) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  // 미저장 상태에서 페이지 떠날 때 경고
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) { e.preventDefault(); }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   // 렌더링 함수
   const doRender = useCallback(async (renderData: Record<string, any>) => {
@@ -410,6 +561,7 @@ export default function AdminNewsletterPage() {
   // 필드 변경
   const handleChange = useCallback((key: string, value: string) => {
     setData((prev) => ({ ...prev, [key]: value }));
+    setIsDirty(true);
   }, []);
 
   // 저장
@@ -419,7 +571,11 @@ export default function AdminNewsletterPage() {
         method: "PUT",
         body: { vol, lang: editLang, data },
       }),
-    onSuccess: () => toast(lang === "ko" ? "초안 저장됨" : "Draft saved", "success"),
+    onSuccess: () => {
+      toast(lang === "ko" ? "초안 저장됨" : "Draft saved", "success");
+      setLastSavedData(data);
+      setIsDirty(false);
+    },
     onError: () => toast(lang === "ko" ? "저장 실패" : "Save failed", "error"),
   });
 
@@ -476,9 +632,12 @@ export default function AdminNewsletterPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between flex-nowrap">
         <div>
-          <h1 className="text-lg font-bold">{t(lang, "admin_newsletter")}</h1>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            {t(lang, "admin_newsletter")}
+            {isDirty && <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" title="Unsaved changes" />}
+          </h1>
           <p className="text-xs text-muted-foreground">
-            Vol.{vol} · {data.issue_date || "—"}
+            Vol.{vol} · {data.issue_date || "—"} · {filledFields}/{totalFields} {lang === "ko" ? "필드" : "fields"}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -516,26 +675,100 @@ export default function AdminNewsletterPage() {
             "w-full lg:w-1/2 xl:w-5/12 space-y-2",
             mobileTab !== "edit" && "hidden lg:block",
           )}>
-            {SECTIONS.map((section, i) => (
+            {/* 에디터 도구 바 */}
+            <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+              {/* 검색 */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value.toLowerCase())}
+                  placeholder={lang === "ko" ? "필드 검색 (Ctrl+Shift+F)" : "Search fields (Ctrl+Shift+F)"}
+                  className="w-full pl-8 pr-8 py-1.5 text-xs bg-secondary/30 border border-border/40 rounded-md focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/40"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {/* 전체 열기/닫기 */}
+              <button
+                onClick={toggleAllSections}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary/30 border border-border/40 rounded-md hover:bg-secondary/50 transition-colors shrink-0"
+                title={allOpen ? "Collapse all" : "Expand all"}
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{allOpen ? (lang === "ko" ? "접기" : "Collapse") : (lang === "ko" ? "펼치기" : "Expand")}</span>
+              </button>
+            </div>
+
+            {/* 섹션 빠른 점프 */}
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+              {SECTIONS.map((s) => {
+                const filled = s.fields.filter((f) => {
+                  const v = data[f.key];
+                  return v !== undefined && v !== null && String(v).trim() !== "";
+                }).length;
+                const total = s.fields.length;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setOpenSections((prev) => new Set([...prev, s.id]));
+                      document.getElementById(`section-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-1 text-[10px] rounded-full border whitespace-nowrap transition-colors shrink-0",
+                      filled === total
+                        ? "border-green-500/30 bg-green-500/10 text-green-400"
+                        : filled > 0
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                        : "border-border/40 bg-secondary/20 text-muted-foreground",
+                    )}
+                  >
+                    {s.icon && <span>{s.icon}</span>}
+                    <span>{lang === "ko" ? s.labelKo : s.labelEn}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {SECTIONS.map((section) => (
               <CollapsibleSection
                 key={section.id}
                 section={section}
                 lang={lang}
                 data={data}
                 onChange={handleChange}
-                defaultOpen={i === 0}
+                open={openSections.has(section.id)}
+                onToggle={() => toggleSection(section.id)}
+                searchQuery={searchQuery}
               />
             ))}
 
             {/* 액션 버튼 */}
-            <div className="flex gap-3 pt-4 pb-8 sticky bottom-0 bg-background/80 backdrop-blur-sm">
+            <div className="flex gap-3 pt-4 pb-8 sticky bottom-0 bg-background/80 backdrop-blur-sm z-10">
               <button
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors relative",
+                  isDirty
+                    ? "bg-amber-500 text-white hover:bg-amber-600"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                )}
               >
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {lang === "ko" ? "저장" : "Save"}
+                <kbd className="hidden sm:inline text-[9px] opacity-60 ml-1 px-1 py-0.5 border border-current/20 rounded">
+                  Ctrl+S
+                </kbd>
               </button>
               <button
                 onClick={() => sendTestMutation.mutate()}
