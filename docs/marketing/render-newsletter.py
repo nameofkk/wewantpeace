@@ -3,10 +3,12 @@
 WeWantPeace Newsletter Renderer
 --------------------------------
 Renders the Handlebars template with data from a JSON file.
+Optionally inlines CSS for better email client compatibility.
 
 Usage:
     python render-newsletter.py --data vol1-us.json --output newsletter-rendered.html
     python render-newsletter.py --data vol1-kr.json --template newsletter-v1-final-ko.html
+    python render-newsletter.py --data vol1-kr.json --inline-css --output newsletter-inlined.html
 
 Template: newsletter-v1-final-en.html (default)
 """
@@ -23,7 +25,7 @@ except ImportError:
     sys.exit(1)
 
 
-def render(template_path: str, data_path: str, output_path: str) -> None:
+def render(template_path: str, data_path: str, output_path: str, inline_css: bool = False) -> None:
     template_dir = Path(template_path).parent
 
     with open(template_path, "r", encoding="utf-8") as f:
@@ -43,6 +45,23 @@ def render(template_path: str, data_path: str, output_path: str) -> None:
                 print(f"Warning: referenced file not found: {ref_path}")
 
     rendered = chevron.render(template, data)
+
+    # Inline CSS for email client compatibility
+    if inline_css:
+        try:
+            from premailer import transform
+            rendered = transform(
+                rendered,
+                keep_style_tags=True,       # Keep <style> for @keyframes, @media queries
+                strip_important=False,      # Keep !important
+                disable_validation=True,    # Don't validate CSS
+                exclude_pseudoclasses=True, # Skip :hover etc.
+            )
+            # Note: Inlining typically adds 40-50KB. Only use if targeting
+            # very old Outlook clients that strip <style> tags.
+            print("CSS inlined successfully")
+        except ImportError:
+            print("WARNING: premailer not installed. Run: pip install premailer")
 
     # Check Gmail 102KB limit
     size_kb = len(rendered.encode("utf-8")) / 1024
@@ -77,6 +96,11 @@ def main():
         default="newsletter-rendered.html",
         help="Output HTML file (default: newsletter-rendered.html)",
     )
+    parser.add_argument(
+        "--inline-css",
+        action="store_true",
+        help="Inline CSS styles for email client compatibility",
+    )
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -91,7 +115,7 @@ def main():
         print(f"Error: data file not found: {data_path}")
         sys.exit(1)
 
-    render(str(template_path), str(data_path), str(output_path))
+    render(str(template_path), str(data_path), str(output_path), args.inline_css)
 
 
 if __name__ == "__main__":
