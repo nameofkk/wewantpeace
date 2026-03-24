@@ -522,6 +522,7 @@ export interface MySubscription {
   plan: string;
   status: string;
   amount?: number;
+  billing_interval?: string;
   platform?: string;
   auto_renewing?: boolean;
   started_at?: string;

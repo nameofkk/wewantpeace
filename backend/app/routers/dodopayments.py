@@ -138,15 +138,15 @@ async def create_checkout(
     )
     now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
-        if existing_sub.plan == body.plan:
-            raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
+        if existing_sub.plan == body.plan and existing_sub.billing_interval == body.billing_interval:
+            raise HTTPException(409, detail="이미 같은 플랜·결제 주기의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
             existing_sub.cancelled_at = now
             existing_sub.updated_at = now
             logger.info(
-                "기존 구독 취소: user=%s plan=%s → 새 플랜 %s 전환",
-                current_user.id, existing_sub.plan, body.plan,
+                "기존 구독 취소: user=%s plan=%s/%s → 새 플랜 %s/%s 전환",
+                current_user.id, existing_sub.plan, existing_sub.billing_interval, body.plan, body.billing_interval,
             )
 
     # 이메일이 없는 유저(토스 등) → 플레이스홀더 사용
@@ -215,8 +215,8 @@ async def create_checkout_simple(
     )
     now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
-        if existing_sub.plan == plan:
-            raise HTTPException(409, detail="이미 같은 플랜의 활성 구독이 있습니다.")
+        if existing_sub.plan == plan and existing_sub.billing_interval == billing_interval:
+            raise HTTPException(409, detail="이미 같은 플랜·결제 주기의 활성 구독이 있습니다.")
         else:
             existing_sub.status = "cancelled"
             existing_sub.cancelled_at = now
@@ -491,30 +491,115 @@ async def _handle_subscription_retry(data, db: AsyncSession) -> None:
 
 
 async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
-    """payment.succeeded: PaymentHistory 기록."""
+    """payment.succeeded: PaymentHistory 기록 + lifetime 일회성 결제 처리."""
     payment_id = data.payment_id
-    dodo_sub_id = data.subscription_id
+    dodo_sub_id = getattr(data, "subscription_id", None)
 
-    # 구독 결제인 경우에만 기록
-    if not dodo_sub_id:
-        logger.info("DodoPayments 일회성 결제 성공 (구독 아님): payment_id=%s", payment_id)
+    # 구독 결제인 경우: PaymentHistory만 기록 (구독 활성화는 subscription.active에서 처리)
+    if dodo_sub_id:
+        sub = await _find_sub_by_dodo_id(dodo_sub_id, db)
+        if not sub:
+            logger.warning("DodoPayments payment_succeeded: 구독을 찾을 수 없음 dodo_sub=%s", dodo_sub_id)
+            return
+
+        history = PaymentHistory(
+            user_id=sub.user_id,
+            subscription_id=sub.id,
+            amount=data.total_amount,
+            currency=str(data.currency),
+            status="success",
+            platform="dodopayments",
+            pg_transaction_id=payment_id,
+        )
+        db.add(history)
+        await db.flush()
+
+        logger.info("DodoPayments 결제 성공 기록: payment_id=%s dodo_sub=%s", payment_id, dodo_sub_id)
         return
 
-    sub = await _find_sub_by_dodo_id(dodo_sub_id, db)
-    if not sub:
-        logger.warning("DodoPayments payment_succeeded: 구독을 찾을 수 없음 dodo_sub=%s", dodo_sub_id)
+    # 일회성 결제 (lifetime): metadata에서 사용자 정보 추출하여 구독 생성
+    product_id = getattr(data, "product_id", None)
+    metadata = getattr(data, "metadata", None) or {}
+    user_id_str = metadata.get("user_id", "")
+
+    if not product_id:
+        logger.info("DodoPayments 일회성 결제 성공 (product_id 없음): payment_id=%s", payment_id)
         return
 
+    billing_interval = _dodo_product_to_billing_interval(product_id)
+    plan = _dodo_product_to_plan(product_id)
+
+    if billing_interval != "lifetime" or not plan:
+        logger.info("DodoPayments 일회성 결제 성공 (non-lifetime): payment_id=%s product=%s", payment_id, product_id)
+        return
+
+    if not user_id_str:
+        logger.error("DodoPayments lifetime 결제: user_id 누락 (metadata=%s, payment=%s)", metadata, payment_id)
+        return
+
+    try:
+        user_id = _uuid.UUID(user_id_str)
+    except ValueError:
+        logger.error("DodoPayments lifetime 결제: 유효하지 않은 user_id=%s", user_id_str)
+        return
+
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        logger.error("DodoPayments lifetime 결제: 사용자를 찾을 수 없음 user_id=%s", user_id_str)
+        return
+
+    now = datetime.now(timezone.utc)
+
+    # 기존 활성 구독 모두 만료 처리
+    old_subs_result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(["active", "trial", "grace_period"]),
+        )
+    )
+    for old_sub in old_subs_result.scalars().all():
+        old_sub.status = "expired" if old_sub.status == "trial" else "cancelled"
+        old_sub.cancelled_at = now
+        old_sub.updated_at = now
+
+    # lifetime 구독 레코드 생성
+    sub = Subscription(
+        user_id=user_id,
+        plan=plan,
+        status="active",
+        platform="dodopayments",
+        amount=data.total_amount,
+        currency=str(getattr(data, "currency", "USD")),
+        billing_interval="lifetime",
+        dodo_product_id=product_id,
+        auto_renewing=False,
+        started_at=now,
+        expires_at=None,
+        next_billing_at=None,
+    )
+    db.add(sub)
+
+    # PaymentHistory 기록
     history = PaymentHistory(
-        user_id=sub.user_id,
+        user_id=user_id,
         subscription_id=sub.id,
         amount=data.total_amount,
-        currency=str(data.currency),
+        currency=str(getattr(data, "currency", "USD")),
         status="success",
         platform="dodopayments",
         pg_transaction_id=payment_id,
     )
     db.add(history)
+
+    # user.plan 업데이트
+    if not user.admin_plan_override:
+        user.plan = plan
+        await sync_area_activation(user_id, plan, db)
+
     await db.flush()
 
-    logger.info("DodoPayments 결제 성공 기록: payment_id=%s dodo_sub=%s", payment_id, dodo_sub_id)
+    logger.info(
+        "DodoPayments lifetime 결제 처리 완료: user=%s plan=%s payment=%s",
+        user_id, plan, payment_id,
+    )
