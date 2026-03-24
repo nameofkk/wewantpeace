@@ -937,37 +937,6 @@ export default function AdminNewsletterPage() {
               />
             </div>
 
-            {/* 섹션 빠른 점프 */}
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
-              {SECTIONS.map((s) => {
-                const filled = s.fields.filter((f) => {
-                  const v = data[f.key];
-                  return v !== undefined && v !== null && String(v).trim() !== "";
-                }).length;
-                const total = s.fields.length;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setOpenSections((prev) => new Set([...prev, s.id]));
-                      document.getElementById(`section-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                    className={cn(
-                      "flex items-center gap-1 px-2 py-1 text-[10px] rounded-full border whitespace-nowrap transition-colors shrink-0",
-                      filled === total
-                        ? "border-green-500/30 bg-green-500/10 text-green-400"
-                        : filled > 0
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                        : "border-border/40 bg-secondary/20 text-muted-foreground",
-                    )}
-                  >
-                    {s.icon && <span>{s.icon}</span>}
-                    <span>{lang === "ko" ? s.labelKo : s.labelEn}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             {SECTIONS.map((section) => (
               <CollapsibleSection
                 key={section.id}
