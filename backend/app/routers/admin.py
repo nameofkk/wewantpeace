@@ -4058,3 +4058,122 @@ async def list_newsletter_templates(
         "sample_kr": sample_kr,
         "sample_us": sample_us,
     }
+
+
+class NewsletterSendAllBody(BaseModel):
+    vol: int
+    lang: str = "kr"
+    data: dict
+
+
+@router.post("/newsletter/send")
+async def send_newsletter_all(
+    body: NewsletterSendAllBody,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 마케팅 동의 유저에게 뉴스레터 발송."""
+    import chevron
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from backend.app.core.config import settings
+
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(503, detail="SMTP not configured")
+
+    # 대상 유저
+    result = await db.execute(
+        select(User).where(
+            User.marketing_agreed_at != None, User.status != "deleted", User.email != None
+        )
+    )
+    users = result.scalars().all()
+    if not users:
+        raise HTTPException(400, detail="No recipients")
+
+    # 렌더링
+    tpl_dir = _newsletter_template_dir()
+    tpl_name = "newsletter-v1-final-ko.html" if body.lang == "kr" else "newsletter-v1-final-en.html"
+    tpl_path = tpl_dir / tpl_name
+    if not tpl_path.exists():
+        raise HTTPException(404, detail=f"Template not found: {tpl_name}")
+
+    with open(tpl_path, "r", encoding="utf-8") as f:
+        template = f.read()
+
+    html = chevron.render(template, body.data)
+    vol = body.data.get("vol_number", body.vol)
+    subject_text = f"WeWantPeace Newsletter Vol.{vol}"
+
+    # 로그 생성
+    log = MarketingEmailLog(
+        admin_id=admin.id,
+        subject=subject_text,
+        body=f"[newsletter-vol{vol}-{body.lang}]",
+        sent_count=0,
+        failed_count=0,
+        status="sending",
+    )
+    db.add(log)
+    await db.flush()
+
+    sent = 0
+    failed = 0
+    try:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+
+        for u in users:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["From"] = settings.smtp_user
+                msg["To"] = u.email
+                msg["Subject"] = subject_text
+                msg.attach(MIMEText(html, "html", "utf-8"))
+                smtp.sendmail(settings.smtp_user, u.email, msg.as_string())
+                sent += 1
+            except Exception:
+                failed += 1
+
+        smtp.quit()
+    except Exception as e:
+        log.status = "failed"
+        log.failed_count = len(users)
+        await db.flush()
+        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+
+    log.sent_count = sent
+    log.failed_count = failed
+    log.status = "completed"
+    await db.flush()
+    await _log_action(db, admin, "newsletter_send", detail={"vol": vol, "lang": body.lang, "sent": sent, "failed": failed})
+
+    return {"status": "ok", "sent": sent, "failed": failed}
+
+
+@router.get("/newsletter/history")
+async def newsletter_history(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """뉴스레터 발송 기록."""
+    result = await db.execute(
+        select(MarketingEmailLog)
+        .where(MarketingEmailLog.subject.contains("Newsletter"))
+        .order_by(MarketingEmailLog.created_at.desc())
+        .limit(20)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": l.id,
+            "date": l.created_at.isoformat() if l.created_at else None,
+            "subject": l.subject,
+            "sent": l.sent_count,
+            "failed": l.failed_count,
+            "status": l.status,
+        }
+        for l in logs
+    ]
