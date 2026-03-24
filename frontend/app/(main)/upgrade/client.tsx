@@ -172,6 +172,7 @@ function UpgradeContent() {
   const [promoCode, setPromoCode] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoSuccess, setPromoSuccess] = useState(false);
+  const [currentBillingInterval, setCurrentBillingInterval] = useState<string>("monthly");
 
   // trial 사용 이력 확인: /subscriptions/my 에서 status가 trial인 이력이 있으면 사용됨
   useEffect(() => {
@@ -197,6 +198,9 @@ function UpgradeContent() {
             setIsCurrentlyTrial(true);
             setTrialUsed(true);
             if (data.trial_end) setTrialEnd(data.trial_end);
+          }
+          if (data.billing_interval) {
+            setCurrentBillingInterval(data.billing_interval);
           }
         }
       } catch { /* ignore */ }
@@ -249,6 +253,29 @@ function UpgradeContent() {
     if (planId === "free") return;
     if (authLoading) return;
     if (!user) { window.location.href = "/login?returnUrl=/upgrade"; return; }
+
+    // 라이프타임 구독자가 월간/연간으로 전환 시도 → 차단
+    if (currentPlan === planId && currentBillingInterval === "lifetime" && billingCycle !== "lifetime") {
+      setError(lang === "ko"
+        ? "이미 평생 이용권을 보유하고 있습니다. 월간/연간 전환이 필요하지 않습니다."
+        : "You already have a lifetime plan. No need to switch to monthly/annual.");
+      return;
+    }
+
+    // 같은 플랜인데 결제 주기만 바꾸는 경우 확인
+    if (currentPlan === planId && billingCycle !== currentBillingInterval && !isCurrentlyTrial) {
+      const cycleLabel = billingCycle === "annual"
+        ? (lang === "ko" ? "연간" : "Annual")
+        : billingCycle === "lifetime"
+          ? (lang === "ko" ? "평생" : "Lifetime")
+          : (lang === "ko" ? "월간" : "Monthly");
+      const confirmed = confirm(
+        lang === "ko"
+          ? `현재 구독을 ${cycleLabel} 결제로 전환하시겠습니까? 기존 구독은 즉시 취소되고 새 결제가 진행됩니다.`
+          : `Switch to ${cycleLabel} billing? Your current subscription will be cancelled and a new payment will be processed.`
+      );
+      if (!confirmed) return;
+    }
 
     setLoading(planId);
     setError(null);
@@ -849,10 +876,31 @@ function UpgradeContent() {
                     ) : isWeb ? t(lang, "web_subscribe_button") : t(lang, "upgrade_subscribe")}
                   </button>
                 </div>
-              ) : currentPlan === "pro" && !isCurrentlyTrial ? (
+              ) : currentPlan === "pro" && !isCurrentlyTrial && billingCycle === currentBillingInterval ? (
                 <div className="mt-5 w-full rounded-xl py-3 text-xs font-semibold text-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {t(lang, "upgrade_current_plan")}
                 </div>
+              ) : currentPlan === "pro" && !isCurrentlyTrial && billingCycle !== currentBillingInterval ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSubscribe("pro"); }}
+                  disabled={loading === "pro"}
+                  className={cn(
+                    "btn-shine mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                    "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+                    "hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5",
+                    "active:scale-[0.98] active:shadow-none",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {loading === "pro" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      {isWeb ? t(lang, "web_subscribe_loading") : t(lang, "upgrade_processing")}
+                    </span>
+                  ) : lang === "ko"
+                    ? `${billingCycle === "annual" ? "연간" : billingCycle === "lifetime" ? "평생" : "월간"}으로 전환`
+                    : `Switch to ${billingCycle === "annual" ? "Annual" : billingCycle === "lifetime" ? "Lifetime" : "Monthly"}`}
+                </button>
               ) : currentPlan === "pro_plus" ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDowngrade(); }}
@@ -1020,10 +1068,31 @@ function UpgradeContent() {
               )}
 
               {/* 구독 버튼 */}
-              {currentPlan === "pro_plus" ? (
+              {currentPlan === "pro_plus" && billingCycle === currentBillingInterval ? (
                 <div className="mt-5 w-full rounded-xl py-3 text-xs font-semibold text-center bg-purple-500/10 text-purple-400 border border-purple-500/20">
                   {t(lang, "upgrade_current_plan")}
                 </div>
+              ) : currentPlan === "pro_plus" && billingCycle !== currentBillingInterval ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSubscribe("pro_plus"); }}
+                  disabled={loading === "pro_plus"}
+                  className={cn(
+                    "btn-shine mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200",
+                    "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+                    "hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5",
+                    "active:scale-[0.98] active:shadow-none",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {loading === "pro_plus" ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      {isWeb ? t(lang, "web_subscribe_loading") : t(lang, "upgrade_processing")}
+                    </span>
+                  ) : lang === "ko"
+                    ? `${billingCycle === "annual" ? "연간" : billingCycle === "lifetime" ? "평생" : "월간"}으로 전환`
+                    : `Switch to ${billingCycle === "annual" ? "Annual" : billingCycle === "lifetime" ? "Lifetime" : "Monthly"}`}
+                </button>
               ) : !isWeb ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSubscribe("pro_plus"); }}

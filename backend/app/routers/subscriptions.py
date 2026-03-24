@@ -100,6 +100,7 @@ async def get_my_subscription(
         "plan": sub.plan,
         "status": sub.status,
         "amount": sub.amount,
+        "billing_interval": sub.billing_interval,
         "platform": sub.platform,
         "auto_renewing": sub.auto_renewing,
         "started_at": sub.started_at.isoformat(),
