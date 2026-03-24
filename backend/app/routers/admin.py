@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -3879,3 +3880,181 @@ async def weekly_report_history(
         }
         for l in logs
     ]
+
+
+# ────────────────────────────────────────────────────────────────
+# Newsletter (Handlebars template editor + renderer)
+# ────────────────────────────────────────────────────────────────
+
+class NewsletterDraftBody(BaseModel):
+    vol: int
+    lang: str  # "kr" | "us"
+    data: dict
+
+
+class NewsletterRenderBody(BaseModel):
+    lang: str  # "kr" | "us"
+    data: dict
+
+
+class NewsletterSendTestBody(BaseModel):
+    lang: str = "kr"
+    data: dict
+
+
+def _newsletter_template_dir() -> Path:
+    """Return the path to backend/app/templates/newsletter/."""
+    import os
+    return Path(os.path.dirname(__file__)).parent / "templates" / "newsletter"
+
+
+def _load_sample_data(lang: str) -> dict:
+    """Load vol1 sample JSON and resolve @file: block references."""
+    tpl_dir = _newsletter_template_dir()
+    fname = "vol1-kr-sample.json" if lang == "kr" else "vol1-us-sample.json"
+    sample_path = tpl_dir / fname
+    if not sample_path.exists():
+        return {}
+    import json as _json
+    with open(sample_path, "r", encoding="utf-8") as f:
+        data = _json.load(f)
+    # Resolve @file: references so the editor gets actual HTML
+    for key, value in list(data.items()):
+        if isinstance(value, str) and value.startswith("@file:"):
+            ref_path = tpl_dir.parent.parent.parent.parent / "docs" / "marketing" / value[6:]
+            if not ref_path.exists():
+                ref_path = tpl_dir / value[6:]
+            if ref_path.exists():
+                with open(ref_path, "r", encoding="utf-8") as f:
+                    data[key] = f.read()
+    # Strip internal keys
+    data.pop("_comment", None)
+    data.pop("_template", None)
+    return data
+
+
+@router.get("/newsletter/draft")
+async def get_newsletter_draft(
+    vol: int = Query(1),
+    lang: str = Query("kr"),
+    admin: User = Depends(require_admin),
+):
+    """뉴스레터 초안 로드. Redis에 없으면 샘플 데이터 반환."""
+    import json as _json
+
+    redis = await get_redis()
+    draft_key = f"admin:newsletter:draft:vol{vol}-{lang}"
+    raw = await redis.get(draft_key)
+    if raw:
+        return _json.loads(raw)
+    # 기본 샘플 데이터 반환
+    return _load_sample_data(lang)
+
+
+@router.put("/newsletter/draft")
+async def save_newsletter_draft(
+    body: NewsletterDraftBody,
+    admin: User = Depends(require_admin),
+):
+    """뉴스레터 초안 저장 (Redis, TTL 90일)."""
+    import json as _json
+
+    redis = await get_redis()
+    draft_key = f"admin:newsletter:draft:vol{body.vol}-{body.lang}"
+    await redis.set(draft_key, _json.dumps(body.data, ensure_ascii=False), ex=90 * 24 * 3600)
+    return {"status": "ok"}
+
+
+@router.post("/newsletter/render")
+async def render_newsletter(
+    body: NewsletterRenderBody,
+    admin: User = Depends(require_admin),
+):
+    """Chevron(Mustache)으로 뉴스레터 렌더링 → HTML + 사이즈 + 미해결 변수."""
+    import chevron
+    import re
+
+    tpl_dir = _newsletter_template_dir()
+    tpl_name = "newsletter-v1-final-ko.html" if body.lang == "kr" else "newsletter-v1-final-en.html"
+    tpl_path = tpl_dir / tpl_name
+    if not tpl_path.exists():
+        raise HTTPException(404, detail=f"Template not found: {tpl_name}")
+
+    with open(tpl_path, "r", encoding="utf-8") as f:
+        template = f.read()
+
+    rendered = chevron.render(template, body.data)
+    size_kb = round(len(rendered.encode("utf-8")) / 1024, 1)
+
+    # 미해결 변수 탐지
+    unresolved = list(set(re.findall(r"\{\{([^}]+)\}\}", rendered)))
+
+    return {"html": rendered, "size_kb": size_kb, "unresolved": unresolved}
+
+
+@router.post("/newsletter/send-test")
+async def send_newsletter_test(
+    body: NewsletterSendTestBody,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """어드민 본인에게 렌더된 뉴스레터 테스트 발송."""
+    import chevron
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from backend.app.core.config import settings
+
+    if not settings.smtp_user or not settings.smtp_password:
+        raise HTTPException(503, detail="SMTP not configured")
+    if not admin.email:
+        raise HTTPException(400, detail="Admin email not found")
+
+    # 렌더링
+    tpl_dir = _newsletter_template_dir()
+    tpl_name = "newsletter-v1-final-ko.html" if body.lang == "kr" else "newsletter-v1-final-en.html"
+    tpl_path = tpl_dir / tpl_name
+    if not tpl_path.exists():
+        raise HTTPException(404, detail=f"Template not found: {tpl_name}")
+
+    with open(tpl_path, "r", encoding="utf-8") as f:
+        template = f.read()
+
+    html = chevron.render(template, body.data)
+
+    vol = body.data.get("vol_number", "?")
+    subject = f"[TEST] WeWantPeace Newsletter Vol.{vol}"
+
+    try:
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+        msg = MIMEMultipart("alternative")
+        msg["From"] = settings.smtp_user
+        msg["To"] = admin.email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        smtp.sendmail(settings.smtp_user, admin.email, msg.as_string())
+        smtp.quit()
+    except Exception as e:
+        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+
+    await _log_action(db, admin, "newsletter_test_send", detail={"vol": vol, "lang": body.lang})
+    return {"status": "ok", "sent_to": admin.email}
+
+
+@router.get("/newsletter/templates")
+async def list_newsletter_templates(
+    admin: User = Depends(require_admin),
+):
+    """사용 가능한 템플릿 목록 + 변수 키 목록."""
+    sample_kr = _load_sample_data("kr")
+    sample_us = _load_sample_data("us")
+    return {
+        "templates": [
+            {"lang": "kr", "name": "newsletter-v1-final-ko.html", "variable_count": len(sample_kr)},
+            {"lang": "us", "name": "newsletter-v1-final-en.html", "variable_count": len(sample_us)},
+        ],
+        "sample_kr": sample_kr,
+        "sample_us": sample_us,
+    }
