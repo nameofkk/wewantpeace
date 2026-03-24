@@ -67,15 +67,15 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 <body>
 <div class="header">
   <h1>WeWantPeace Newsletter Vol.1 — 개선 리포트</h1>
-  <p>R1~R628 · 전체 개선 내역</p>
+  <p>R1~R634 · 전체 개선 내역</p>
 </div>
 
 <div class="stats-bar">
   <div class="stat-item"><div class="stat-value green">-46%</div><div class="stat-label">파일 크기</div></div>
   <div class="stat-item"><div class="stat-value">203</div><div class="stat-label">CSS 클래스</div></div>
-  <div class="stat-item"><div class="stat-value amber">52.4KB</div><div class="stat-label">현재 크기</div></div>
+  <div class="stat-item"><div class="stat-value amber">53.1KB</div><div class="stat-label">현재 크기</div></div>
   <div class="stat-item"><div class="stat-value red">97KB</div><div class="stat-label">피크 크기</div></div>
-  <div class="stat-item"><div class="stat-value green">52KB</div><div class="stat-label">Gmail 여유</div></div>
+  <div class="stat-item"><div class="stat-value green">51KB</div><div class="stat-label">Gmail 여유</div></div>
 </div>
 
 <div class="tabs">
@@ -90,7 +90,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 <tr>
   <th width="25%">항목</th>
   <th width="30%">Before (초기)</th>
-  <th width="30%">After (R628)</th>
+  <th width="30%">After (R634)</th>
   <th width="15%">효과</th>
 </tr>
 </thead>
@@ -99,7 +99,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
 <tr>
   <td><span class="cat cat-size">SIZE</span><br>파일 크기</td>
   <td class="before">97,041B (피크)<br>66,622B (최초 커밋)</td>
-  <td class="after">52,406B</td>
+  <td class="after">53,067B</td>
   <td><span class="after">-46%</span><br><span class="detail">Gmail 클리핑 위험 해소</span></td>
 </tr>
 
@@ -230,6 +230,14 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
   <td class="after">&amp;amp; 전체 수정<br>중복 class 속성 수정<br>모든 table에 border="0"<br>모든 ID 유니크 검증</td>
   <td><span class="after">표준 준수</span><br><span class="detail">렌더링 안정성</span></td>
 </tr>
+
+<!-- URL + CTA (R634) -->
+<tr>
+  <td><span class="cat cat-ux">UX</span><br>URL · CTA</td>
+  <td class="before">404 링크 다수<br>/issues (존재 안함)<br>/pricing (존재 안함)<br>CTA 라벨 모호<br>로고 비율 왜곡</td>
+  <td class="after">전체 URL 검증 완료 (39줄)<br>/issues/view, /issues/country/XX<br>/upgrade 등 정확한 라우트<br>CTA: "한국 이슈 상세 보기" 등<br>로고 585:255 비율 정상화</td>
+  <td><span class="after">UX↑</span><br><span class="detail">모든 링크 200 OK</span></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -238,7 +246,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
   <div class="preview-wrap">
     <div class="preview-header">
       <h2>Before / After 비교</h2>
-      <p>좌: 최초 버전 (b7e2517) · 우: 현재 버전 (R628)</p>
+      <p>좌: 최초 버전 (b7e2517) · 우: 현재 버전 (R634)</p>
     </div>
     <div class="preview-frames">
       <div class="preview-col">
@@ -246,7 +254,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
         <iframe class="preview-frame" src="newsletter-original.html"></iframe>
       </div>
       <div class="preview-col">
-        <div class="preview-label new">AFTER — 52.4KB (R628)</div>
+        <div class="preview-label new">AFTER — 53.1KB (R634)</div>
         <iframe class="preview-frame" src="newsletter-v1-final.html"></iframe>
       </div>
     </div>
@@ -257,7 +265,7 @@ body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; backgrou
   <div class="preview-wrap single-preview">
     <div class="preview-header">
       <h2>최종본 미리보기</h2>
-      <p>58,892 bytes · 220 CSS classes · Gmail safe</p>
+      <p>53,067 bytes · 203 CSS classes · Gmail safe</p>
     </div>
     <iframe class="preview-frame" src="newsletter-v1-final.html"></iframe>
   </div>
