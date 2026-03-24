@@ -1,0 +1,71 @@
+{
+  "_comment": "WeWantPeace Newsletter Vol.1 — KR 한국 Sample Data",
+  "_template": "newsletter-v1-final-ko.html",
+
+  "vol_number": 1,
+  "next_vol_number": 2,
+  "issue_date": "2026.03.23",
+  "issue_date_short": "3.23 일요일",
+  "issue_datetime": "2026.3.23 일 09:00",
+  "issue_label": "창간",
+  "issue_label_long": "창간호",
+
+  "preheader_text": "해협 하나 막혔는데 기름값이 뛰어요. 23개국 위기, 854건 감지. 한국 긴장도 96.8 — 내가 왜 영향받는지, 2분.",
+  "hero_image_url": "https://assets1.cbsnewsstatic.com/hub/i/r/2026/03/15/255e621f-d516-483f-a1a2-8e3f13e5358c/thumbnail/1200x630/561032b2a597c293dbabb80505abdef0/strait-of-hormuz-1920.jpg",
+
+  "crisis_countries_count": 23,
+  "crisis_prev": 18,
+  "crisis_current": 23,
+  "crisis_trend": "3주 연속 ↑",
+  "events_24h": 854,
+  "events_7d": "11,861",
+  "key_stats_line": "핵심: <span class=\"w6 ce\">이란 2,048건</span>(+345%) · <span class=\"w6 cy\">유가 $118</span>(+24%) · <span class=\"w6 cx\">한국 96.8</span>",
+
+  "hero_headline_html": "호르무즈 해협이 막혔는데,<br>\n<span class=\"ce\">한국 원유 70%</span>가<br>거길 지나요",
+
+  "deep_dive_nav_label": "호르무즈 딥다이브",
+  "deep_dive_title": "호르무즈 해협 — 72시간 타임라인",
+
+  "total_conflicts": 491,
+  "urgent_count": 4,
+  "active_issues_count": 948,
+
+  "country_name": "한국",
+  "country_code": "KR",
+  "country_rank": 8,
+  "tension_level": 4,
+  "tension_score": "96.8",
+  "tension_level_text": "위기",
+  "tension_change": "▲8.2",
+  "prev_tension": "88.6",
+  "streak_text": "3주 연속 상승",
+  "country_summary": "에너지·반도체·증시·물가 동시 타격. 과장? 하나면 그래 보이죠. 동시면 다르죠.",
+
+  "share_headline": "2분 전과 세상이 달라 보이죠.",
+  "share_subtext": "출장 동료, 주식 보는 친구, 기름값 걱정 부모님 — 한 명에게.",
+  "mailto_subject": "WeWantPeace%20Weekly%20Brief%20%E2%80%94%20%ED%98%B8%EB%A5%B4%EB%AC%B4%EC%A6%88%20%ED%95%B4%ED%98%91%20%EB%B4%89%EC%87%84%2C%20%ED%95%9C%EA%B5%AD%20%EC%9B%90%EC%9C%A0%2070%25%20%EC%A7%81%EA%B2%A9",
+  "mailto_body": "%ED%98%B8%EB%A5%B4%EB%AC%B4%EC%A6%88%20%ED%95%B4%ED%98%91%EC%9D%B4%20%EB%A7%89%ED%98%94%EB%8A%94%EB%8D%B0%2C%20%ED%95%9C%EA%B5%AD%20%EC%9B%90%EC%9C%A0%2070%25%EA%B0%80%20%EA%B1%B0%EA%B8%B8%20%EC%A7%80%EB%82%98%EC%9A%94.%202%EB%B6%84%EC%9D%B4%EB%A9%B4%20%EC%9D%BD%EC%96%B4%EC%9A%94%3A%20https%3A%2F%2Fwww.wewantpeace.live%2F%3Fref%3Dshare",
+
+  "pro_cta_headline_html": "한국 긴장도 96.8 급등 —<br>Pro는 <b class=\"cy\">그 순간</b> 알림을 받아요.",
+  "pro_cta_subtext": "당신은 일요일에 읽고 있죠.",
+
+  "unsubscribe_url": "#",
+
+  "tension_warning_html": "<b>이상 신호:</b> TOP 6이 전부 <span class=\"ib w7 fb r2 cw bd py\">100점</span>이에요. 지난주 3 → 이번 주 6 — 전면전 뒤 <b>2배</b>.",
+
+  "tension_table_html": "@file:blocks/vol1-kr-tension-table.html",
+  "todays_brief_items_html": "@file:blocks/vol1-kr-todays-brief.html",
+  "conflict_stories_html": "@file:blocks/vol1-kr-conflicts.html",
+  "energy_section_intro_html": "@file:blocks/vol1-kr-energy-intro.html",
+  "energy_section_html": "@file:blocks/vol1-kr-energy.html",
+  "deep_dive_section_html": "@file:blocks/vol1-kr-deep-dive.html",
+  "country_issues_html": "@file:blocks/vol1-kr-country-issues.html",
+  "country_impact_html": "@file:blocks/vol1-kr-country-impact.html",
+  "did_you_know_html": "@file:blocks/vol1-kr-did-you-know.html",
+  "travel_advisory_intro_html": "@file:blocks/vol1-kr-travel-intro.html",
+  "travel_advisory_html": "@file:blocks/vol1-kr-travel.html",
+  "numbers_section_html": "@file:blocks/vol1-kr-numbers.html",
+  "calendar_html": "@file:blocks/vol1-kr-calendar.html",
+  "editors_note_html": "@file:blocks/vol1-kr-editors-note.html",
+  "next_week_items_html": "@file:blocks/vol1-kr-next-week.html"
+}
