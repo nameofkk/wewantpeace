@@ -439,6 +439,7 @@ function PreviewPanel({
   const [showSource, setShowSource] = useState(false);
   const [copied, setCopied] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const maxKb = 102;
   const pct = Math.min((sizeKb / maxKb) * 100, 100);
   const isOver = sizeKb > maxKb;
@@ -454,18 +455,39 @@ function PreviewPanel({
     if (w) { w.document.write(html); w.document.close(); }
   };
 
+  // 뉴스레터 HTML은 width=620px 고정 테이블 → 컨테이너보다 넓을 수 있음
+  // iframe을 620px로 고정하고, 컨테이너 폭에 맞게 scale-down
+  const CONTENT_WIDTH = 620;
+  const [autoScale, setAutoScale] = useState(1);
+
+  const updateScale = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || mobileView) return;
+    const availW = container.clientWidth - 8;
+    if (availW < CONTENT_WIDTH && availW > 0) {
+      setAutoScale(availW / CONTENT_WIDTH);
+    } else {
+      setAutoScale(1);
+    }
+  }, [mobileView]);
+
+  useEffect(() => {
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    return () => window.removeEventListener("resize", updateScale);
+  }, [updateScale]);
+
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     try {
       const h = iframe.contentDocument?.body?.scrollHeight;
-      if (h && h > 0) {
-        iframe.style.height = `${h}px`;
-      }
+      if (h && h > 0) iframe.style.height = `${h}px`;
     } catch {
       // sandbox cross-origin guard
     }
-  }, []);
+    updateScale();
+  }, [updateScale]);
 
   return (
     <div className="flex flex-col h-full">
@@ -560,7 +582,7 @@ function PreviewPanel({
       </div>
 
       {/* iframe or source */}
-      <div className="flex-1 mt-1 flex justify-center overflow-auto bg-secondary/20 rounded-lg">
+      <div ref={containerRef} className="flex-1 mt-1 flex justify-center overflow-auto bg-secondary/20 rounded-lg">
         {!html ? (
           <div className="flex items-center justify-center h-96 text-muted-foreground text-sm">
             {lang === "ko" ? "데이터를 입력하면 미리보기가 표시됩니다" : "Enter data to see preview"}
@@ -574,13 +596,15 @@ function PreviewPanel({
             ref={iframeRef}
             srcDoc={html}
             onLoad={handleIframeLoad}
-            className={cn(
-              "border-0 bg-white rounded shadow-lg transition-all",
-              mobileView ? "w-[390px]" : "w-full",
-            )}
+            className="border-0 bg-white rounded shadow-lg transition-all"
             style={{
+              width: mobileView ? 390 : CONTENT_WIDTH,
               minHeight: 600,
-              transform: zoom !== 100 ? `scale(${zoom / 100})` : undefined,
+              transform: zoom !== 100
+                ? `scale(${zoom / 100})`
+                : !mobileView && autoScale < 1
+                  ? `scale(${autoScale})`
+                  : undefined,
               transformOrigin: "top center",
             }}
             sandbox="allow-same-origin"
@@ -610,6 +634,8 @@ export default function AdminNewsletterPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedData, setLastSavedData] = useState<Record<string, any>>({});
   const [showEmptyOnly, setShowEmptyOnly] = useState(false);
+  const [schedule, setSchedule] = useState<any>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -688,6 +714,12 @@ export default function AdminNewsletterPage() {
       setIsDirty(false);
     }
   }, [draftData]);
+
+  // 뉴스레터 발송 예약 상태 조회
+  const fetchSchedule = useCallback(() => {
+    adminFetch<any>("/admin/newsletter/schedule").then(setSchedule).catch(() => {});
+  }, []);
+  useEffect(() => { fetchSchedule(); }, [fetchSchedule]);
 
   // 키보드 단축키: Ctrl+S = 저장, Ctrl+Shift+F = 검색
   useEffect(() => {
@@ -1015,6 +1047,75 @@ export default function AdminNewsletterPage() {
                     className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
                   >
                     {lang === "ko" ? "취소" : "Cancel"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 자동 발송 예약 상태 */}
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                {lang === "ko" ? "자동 발송 예약" : "Auto-Send Schedule"}
+              </h3>
+              {schedule?.armed ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-green-400 font-medium">
+                    {"\u{1F7E2}"} Vol.{schedule.vol} {lang === "ko" ? "발송 예약됨" : "Scheduled"}
+                  </p>
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>Asia: {schedule.schedule?.asia}</p>
+                    <p>Europe: {schedule.schedule?.europe}</p>
+                    <p>Americas: {schedule.schedule?.americas}</p>
+                  </div>
+                  {schedule.ttl_seconds > 0 && (
+                    <p className="text-[10px] text-muted-foreground/60">
+                      TTL: {Math.floor(schedule.ttl_seconds / 3600)}h {Math.floor((schedule.ttl_seconds % 3600) / 60)}m
+                    </p>
+                  )}
+                  <button
+                    disabled={scheduleLoading}
+                    onClick={async () => {
+                      setScheduleLoading(true);
+                      try {
+                        await adminFetch("/admin/newsletter/schedule", {
+                          method: "POST",
+                          body: { vol: schedule.vol, action: "disarm" },
+                        });
+                        toast(lang === "ko" ? "자동 발송 취소됨" : "Schedule disarmed", "success");
+                        fetchSchedule();
+                      } catch { toast(lang === "ko" ? "취소 실패" : "Failed", "error"); }
+                      setScheduleLoading(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 disabled:opacity-50"
+                  >
+                    {scheduleLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
+                    {lang === "ko" ? "예약 취소" : "Disarm"}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {"\u26AA"} {lang === "ko" ? "자동 발송 미예약" : "No schedule armed"}
+                  </p>
+                  <button
+                    disabled={scheduleLoading}
+                    onClick={async () => {
+                      setScheduleLoading(true);
+                      try {
+                        await adminFetch("/admin/newsletter/schedule", {
+                          method: "POST",
+                          body: { vol, action: "arm" },
+                        });
+                        toast(lang === "ko" ? `Vol.${vol} 자동 발송 예약됨` : `Vol.${vol} scheduled`, "success");
+                        fetchSchedule();
+                      } catch { toast(lang === "ko" ? "예약 실패" : "Failed", "error"); }
+                      setScheduleLoading(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {scheduleLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                    {lang === "ko" ? `Vol.${vol} 예약하기` : `Schedule Vol.${vol}`}
                   </button>
                 </div>
               )}
