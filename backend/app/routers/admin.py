@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func, and_, or_, cast, Date, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -4191,3 +4191,53 @@ async def newsletter_history(
         }
         for l in logs
     ]
+
+
+@router.post("/newsletter/schedule")
+async def schedule_newsletter_send(
+    body: dict = Body(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """뉴스레터 자동 발송 예약/취소. body: {vol: 1, action: "arm" | "disarm"}"""
+    vol = body.get("vol")
+    action = body.get("action", "arm")
+
+    redis = await get_redis()
+
+    if action == "arm":
+        # Set the ready flag — Celery beat tasks will pick this up
+        await redis.set("newsletter:send:ready", str(vol), ex=7 * 86400)  # 7-day TTL
+        await _log_action(db, admin, "newsletter_schedule_arm", detail={"vol": vol})
+        return {"status": "armed", "vol": vol, "schedule": {
+            "asia": "Monday 09:00 KST (00:00 UTC)",
+            "europe": "Monday 09:00 CET (08:00 UTC)",
+            "americas": "Monday 09:00 EST (14:00 UTC)",
+        }}
+    elif action == "disarm":
+        await redis.delete("newsletter:send:ready")
+        await _log_action(db, admin, "newsletter_schedule_disarm", detail={"vol": vol})
+        return {"status": "disarmed"}
+    else:
+        raise HTTPException(400, detail=f"Invalid action: {action}")
+
+
+@router.get("/newsletter/schedule")
+async def get_newsletter_schedule(
+    admin: User = Depends(require_admin),
+):
+    """현재 뉴스레터 발송 예약 상태."""
+    redis = await get_redis()
+    ready_vol = await redis.get("newsletter:send:ready")
+    ttl = await redis.ttl("newsletter:send:ready") if ready_vol else -1
+
+    return {
+        "armed": ready_vol is not None,
+        "vol": int(ready_vol) if ready_vol else None,
+        "ttl_seconds": ttl,
+        "schedule": {
+            "asia": "Monday 09:00 KST (00:00 UTC)",
+            "europe": "Monday 09:00 CET (08:00 UTC)",
+            "americas": "Monday 09:00 EST (14:00 UTC)",
+        } if ready_vol else None,
+    }

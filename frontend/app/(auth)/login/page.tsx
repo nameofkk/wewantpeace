@@ -1008,6 +1008,7 @@ export default function LoginPage() {
                 </span>
               </div>
             ))}
+            <p className="text-[10px] text-blue-400 ml-8">{t(lang, "marketing_newsletter_benefit")}</p>
           </div>
 
           <button type="submit" disabled={loading || nicknameAvailable === false}
@@ -1108,6 +1109,7 @@ export default function LoginPage() {
                 </span>
               </div>
             ))}
+            <p className="text-[10px] text-blue-400 ml-8">{t(lang, "marketing_newsletter_benefit")}</p>
           </div>
 
           <button type="submit" disabled={registerDisabled}

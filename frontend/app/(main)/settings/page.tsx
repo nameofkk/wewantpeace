@@ -1153,6 +1153,9 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-sm font-medium">{t(lang, "settings_marketing_toggle")}</p>
                   <p className="text-[10px] text-muted-foreground">{t(lang, "settings_marketing_desc")}</p>
+                  {!me?.marketing_agreed_at && (
+                    <p className="text-[10px] text-blue-400 mt-0.5">{t(lang, "marketing_newsletter_benefit")}</p>
+                  )}
                 </div>
                 <button
                   disabled={patchProfile.isPending}

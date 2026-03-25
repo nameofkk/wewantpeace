@@ -4290,3 +4290,167 @@ def generate_newsletter_draft(self):
             results[lang] = {"error": str(e)}
 
     return {"status": "ok", "vol": next_vol, "results": results}
+
+
+# ── 뉴스레터 시간대별 자동 발송 ────────────────────────────────────────────────
+@app.task(
+    bind=True,
+    name="worker.tasks.send_newsletter_scheduled",
+    queue="process",
+    max_retries=1,
+    default_retry_delay=120,
+)
+def send_newsletter_scheduled(self, tz_group: str):
+    """시간대 그룹별 뉴스레터 자동 발송.
+
+    tz_group: "asia", "europe", "americas"
+    """
+    _record_heartbeat("send_newsletter_scheduled")
+
+    TIMEZONE_GROUPS = {
+        "asia": [
+            "Asia/Seoul", "Asia/Tokyo", "Asia/Shanghai", "Asia/Hong_Kong",
+            "Asia/Singapore", "Asia/Taipei", "Asia/Kolkata", "Asia/Bangkok",
+            "Australia/Sydney", "Pacific/Auckland",
+        ],
+        "europe": [
+            "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Rome",
+            "Europe/Madrid", "Europe/Moscow", "Europe/Istanbul", "Europe/Warsaw",
+            "Africa/Cairo", "Africa/Lagos", "Africa/Johannesburg",
+        ],
+        "americas": [
+            "America/New_York", "America/Chicago", "America/Denver",
+            "America/Los_Angeles", "America/Sao_Paulo", "America/Mexico_City",
+            "America/Toronto", "America/Buenos_Aires",
+        ],
+    }
+
+    allowed_tz = TIMEZONE_GROUPS.get(tz_group, [])
+    if not allowed_tz:
+        logger.warning(f"Unknown tz_group: {tz_group}")
+        return {"error": f"Unknown tz_group: {tz_group}"}
+
+    async def _send():
+        from backend.app.core.config import settings
+        from backend.app.core.redis import get_redis
+        from backend.app.models.user import User, UserPreference
+        from sqlalchemy import select
+        import chevron
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        import hmac as _hmac
+        from hashlib import sha256 as _sha256
+        import json
+
+        redis = get_redis()
+
+        # Find the latest draft that's been marked ready for sending
+        # Admin marks a draft as "ready" by setting newsletter:send:ready key
+        ready_key = await redis.get("newsletter:send:ready")
+        if not ready_key:
+            logger.info(f"No newsletter ready for sending (tz_group={tz_group})")
+            return {"status": "no_draft_ready"}
+
+        # ready_key format: vol number string, e.g. "1"
+        vol_match = ready_key  # e.g., "1"
+
+        # Get draft data from Redis
+        draft_kr_raw = await redis.get(f"newsletter:draft:vol{vol_match}-kr")
+        draft_en_raw = await redis.get(f"newsletter:draft:vol{vol_match}-us")
+
+        if not draft_kr_raw and not draft_en_raw:
+            logger.warning(f"Draft not found for vol {vol_match}")
+            return {"status": "draft_not_found"}
+
+        draft_kr = json.loads(draft_kr_raw) if draft_kr_raw else None
+        draft_en = json.loads(draft_en_raw) if draft_en_raw else None
+
+        # Load templates
+        from pathlib import Path
+        tpl_dir = Path(__file__).parent.parent / "backend" / "app" / "templates" / "newsletter"
+
+        tpl_kr = None
+        tpl_en = None
+        kr_path = tpl_dir / "newsletter-v1-final-ko.html"
+        en_path = tpl_dir / "newsletter-v1-final-en.html"
+        if kr_path.exists():
+            tpl_kr = kr_path.read_text(encoding="utf-8")
+        if en_path.exists():
+            tpl_en = en_path.read_text(encoding="utf-8")
+
+        if not settings.smtp_user or not settings.smtp_password:
+            logger.error("SMTP not configured, skipping newsletter send")
+            return {"status": "smtp_not_configured"}
+
+        async with AsyncSessionLocal() as db:
+            # Get users with marketing consent
+            result = await db.execute(
+                select(User, UserPreference).join(
+                    UserPreference, User.id == UserPreference.user_id, isouter=True
+                ).where(
+                    User.marketing_agreed_at != None,
+                    User.status != "deleted",
+                    User.email != None,
+                )
+            )
+            rows = result.all()
+
+            # Filter by timezone group
+            users_to_send = []
+            for user, pref in rows:
+                user_tz = pref.timezone if pref else "Asia/Seoul"
+                if user_tz in allowed_tz:
+                    user_lang = pref.language if pref else "ko"
+                    users_to_send.append((user, user_lang))
+
+            if not users_to_send:
+                logger.info(f"No users in tz_group={tz_group}")
+                return {"status": "no_users", "tz_group": tz_group}
+
+            sent = 0
+            failed = 0
+            try:
+                smtp_conn = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+                smtp_conn.starttls()
+                smtp_conn.login(settings.smtp_user, settings.smtp_password)
+
+                for user, user_lang in users_to_send:
+                    try:
+                        # Choose template and data based on user language
+                        if user_lang == "en" and tpl_en and draft_en:
+                            template = tpl_en
+                            data = draft_en
+                        elif tpl_kr and draft_kr:
+                            template = tpl_kr
+                            data = draft_kr
+                        else:
+                            continue
+
+                        token = _hmac.new(settings.secret_key.encode(), str(user.id).encode(), _sha256).hexdigest()[:32]
+                        user_data = {**data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+                        html = chevron.render(template, user_data)
+
+                        vol = data.get("vol_number", "?")
+                        subject = f"WeWantPeace Newsletter Vol.{vol}"
+
+                        msg = MIMEMultipart("alternative")
+                        msg["From"] = settings.smtp_user
+                        msg["To"] = user.email
+                        msg["Subject"] = subject
+                        msg.attach(MIMEText(html, "html", "utf-8"))
+                        smtp_conn.sendmail(settings.smtp_user, user.email, msg.as_string())
+                        sent += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to send to {user.email}: {e}")
+                        failed += 1
+
+                smtp_conn.quit()
+            except Exception as e:
+                logger.error(f"SMTP connection error: {e}")
+                return {"status": "smtp_error", "error": str(e)}
+
+        logger.info(f"Newsletter sent: tz_group={tz_group}, sent={sent}, failed={failed}")
+        return {"status": "ok", "tz_group": tz_group, "sent": sent, "failed": failed}
+
+    return run_async(_send())
