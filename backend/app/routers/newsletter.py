@@ -183,17 +183,21 @@ async def newsletter_archive_detail(log_id: int):
 # ── GET /newsletter/sample ─────────────────────────────────────────────────
 
 @router.get("/sample")
-async def newsletter_sample(lang: str = Query("kr", regex="^(kr|us)$")):
-    """샘플 뉴스레터 HTML 반환 (공개, Redis 24h 캐시)."""
+async def newsletter_sample(
+    lang: str = Query("kr", regex="^(kr|us)$"),
+    refresh: int = Query(0),
+):
+    """샘플 뉴스레터 HTML 반환 (공개, Redis 24h 캐시). ?refresh=1 로 캐시 갱신."""
     import chevron
     import json as _json
     import os
 
     redis = get_redis()
     cache_key = f"newsletter:sample:{lang}"
-    cached = await redis.get(cache_key)
-    if cached:
-        return HTMLResponse(content=cached)
+    if not refresh:
+        cached = await redis.get(cache_key)
+        if cached:
+            return HTMLResponse(content=cached)
 
     tpl_dir = Path(os.path.dirname(__file__)).parent / "templates" / "newsletter"
     tpl_name = "newsletter-v1-final-ko.html" if lang == "kr" else "newsletter-v1-final-en.html"
