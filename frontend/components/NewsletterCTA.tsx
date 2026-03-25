@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { useMe, usePatchProfile } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { isTossMiniApp } from "@/lib/platform";
 import { Mail, X, Eye, ArrowRight, CheckCircle } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.wewantpeace.live";
@@ -177,7 +178,15 @@ export function NewsletterCTA() {
 
               {/* 미리보기 버튼 — 항상 표시 */}
               <button
-                onClick={() => { setPreviewLang(lang === "ko" ? "kr" : "us"); setShowPreview(true); }}
+                onClick={() => {
+                  const pl = lang === "ko" ? "kr" : "us";
+                  if (isTossMiniApp()) {
+                    // Toss WebView에서 iframe srcDoc 미지원 → 새 창으로 열기
+                    window.open(`${API}/newsletter/sample?lang=${pl}`, "_blank");
+                    return;
+                  }
+                  setPreviewLang(pl); setShowPreview(true);
+                }}
                 className="w-full h-8 rounded-lg border border-border/60 text-[10px] font-medium text-muted-foreground hover:border-blue-500/30 hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
               >
                 <Eye className="h-3 w-3" />

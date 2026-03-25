@@ -240,6 +240,8 @@ function UpgradeContent() {
             }
           },
         });
+      }).catch((err) => {
+        console.error("[Upgrade] DodoPayments SDK load failed:", err);
       });
     }
   }, []);
@@ -487,10 +489,24 @@ function UpgradeContent() {
       params.set("token", token);
       params.set("billing_interval", billingCycle);
 
-      const res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
-        method: "POST",
-        body: params, // Content-Type: application/x-www-form-urlencoded 자동 설정
-      });
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 15000);
+
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
+          method: "POST",
+          body: params, // Content-Type: application/x-www-form-urlencoded 자동 설정
+          signal: ctrl.signal,
+        });
+      } catch (e) {
+        clearTimeout(tid);
+        if ((e as Error).name === "AbortError") {
+          throw new Error(lang === "ko" ? "결제 서버 응답 시간 초과 (15초). 잠시 후 다시 시도해주세요." : "Payment server timeout. Please try again.");
+        }
+        throw new Error(lang === "ko" ? "결제 서버에 연결할 수 없습니다." : "Cannot reach payment server.");
+      }
+      clearTimeout(tid);
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -501,8 +517,9 @@ function UpgradeContent() {
       }
 
       const { checkout_url } = await res.json();
-      if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
-      window.location.href = checkout_url;
+      if (!checkout_url) throw new Error(lang === "ko" ? "결제 URL을 생성하지 못했습니다." : "Failed to create checkout URL.");
+      // Toss WebView: window.open으로 인앱 브라우저에서 열기 (location.href는 WebView 자체를 이동시켜 행 걸림)
+      window.open(checkout_url, "_blank");
       return;
     }
 
