@@ -1067,72 +1067,60 @@ export default function AdminNewsletterPage() {
               )}
             </div>
 
-            {/* 자동 발송 예약 상태 */}
+            {/* 자동 발송 토글 */}
             <div className="border border-border rounded-lg p-4 space-y-3">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {lang === "ko" ? "자동 발송 예약" : "Auto-Send Schedule"}
-              </h3>
-              {schedule?.armed ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-green-400 font-medium">
-                    {"\u{1F7E2}"} Vol.{schedule.vol} {lang === "ko" ? "발송 예약됨" : "Scheduled"}
-                  </p>
-                  <div className="text-xs text-muted-foreground space-y-0.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {lang === "ko" ? "자동 발송" : "Auto-Send"}
+                </h3>
+                <button
+                  disabled={scheduleLoading}
+                  onClick={async () => {
+                    setScheduleLoading(true);
+                    try {
+                      const next = !schedule?.enabled;
+                      await adminFetch("/admin/newsletter/schedule", {
+                        method: "POST",
+                        body: { enabled: next },
+                      });
+                      toast(
+                        next
+                          ? (lang === "ko" ? "자동 발송 ON" : "Auto-send enabled")
+                          : (lang === "ko" ? "자동 발송 OFF" : "Auto-send disabled"),
+                        "success",
+                      );
+                      fetchSchedule();
+                    } catch { toast(lang === "ko" ? "변경 실패" : "Failed", "error"); }
+                    setScheduleLoading(false);
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                    schedule?.enabled ? "bg-green-500" : "bg-secondary"
+                  } disabled:opacity-50`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                    schedule?.enabled ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+              </div>
+              {schedule?.enabled && (
+                <div className="space-y-1.5">
+                  {schedule.latest_vol && (
+                    <p className="text-xs text-muted-foreground">
+                      {lang === "ko" ? `최신 드래프트: Vol.${schedule.latest_vol}` : `Latest draft: Vol.${schedule.latest_vol}`}
+                    </p>
+                  )}
+                  <div className="text-xs text-muted-foreground/70 space-y-0.5">
                     <p>Asia: {schedule.schedule?.asia}</p>
                     <p>Europe: {schedule.schedule?.europe}</p>
                     <p>Americas: {schedule.schedule?.americas}</p>
                   </div>
-                  {schedule.ttl_seconds > 0 && (
-                    <p className="text-[10px] text-muted-foreground/60">
-                      TTL: {Math.floor(schedule.ttl_seconds / 3600)}h {Math.floor((schedule.ttl_seconds % 3600) / 60)}m
-                    </p>
-                  )}
-                  <button
-                    disabled={scheduleLoading}
-                    onClick={async () => {
-                      setScheduleLoading(true);
-                      try {
-                        await adminFetch("/admin/newsletter/schedule", {
-                          method: "POST",
-                          body: { vol: schedule.vol, action: "disarm" },
-                        });
-                        toast(lang === "ko" ? "자동 발송 취소됨" : "Schedule disarmed", "success");
-                        fetchSchedule();
-                      } catch { toast(lang === "ko" ? "취소 실패" : "Failed", "error"); }
-                      setScheduleLoading(false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 disabled:opacity-50"
-                  >
-                    {scheduleLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
-                    {lang === "ko" ? "예약 취소" : "Disarm"}
-                  </button>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {"\u26AA"} {lang === "ko" ? "자동 발송 미예약" : "No schedule armed"}
-                  </p>
-                  <button
-                    disabled={scheduleLoading}
-                    onClick={async () => {
-                      setScheduleLoading(true);
-                      try {
-                        await adminFetch("/admin/newsletter/schedule", {
-                          method: "POST",
-                          body: { vol, action: "arm" },
-                        });
-                        toast(lang === "ko" ? `Vol.${vol} 자동 발송 예약됨` : `Vol.${vol} scheduled`, "success");
-                        fetchSchedule();
-                      } catch { toast(lang === "ko" ? "예약 실패" : "Failed", "error"); }
-                      setScheduleLoading(false);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    {scheduleLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
-                    {lang === "ko" ? `Vol.${vol} 예약하기` : `Schedule Vol.${vol}`}
-                  </button>
-                </div>
+              )}
+              {!schedule?.enabled && (
+                <p className="text-xs text-muted-foreground">
+                  {lang === "ko" ? "OFF 상태에서는 발송되지 않습니다" : "No newsletters will be sent while disabled"}
+                </p>
               )}
             </div>
 

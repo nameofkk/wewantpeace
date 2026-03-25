@@ -4289,6 +4289,9 @@ def generate_newsletter_draft(self):
             logger.error("newsletter draft %s error: %s", lang, e)
             results[lang] = {"error": str(e)}
 
+    # 최신 draft vol 번호 저장 (자동 발송에서 사용)
+    r.set("newsletter:latest_draft_vol", str(next_vol))
+
     return {"status": "ok", "vol": next_vol, "results": results}
 
 
@@ -4345,15 +4348,17 @@ def send_newsletter_scheduled(self, tz_group: str):
 
         redis = get_redis()
 
-        # Find the latest draft that's been marked ready for sending
-        # Admin marks a draft as "ready" by setting newsletter:send:ready key
-        ready_key = await redis.get("newsletter:send:ready")
-        if not ready_key:
-            logger.info(f"No newsletter ready for sending (tz_group={tz_group})")
-            return {"status": "no_draft_ready"}
+        # 자동 발송 토글 확인 (기본값: ON)
+        auto_send = await redis.get("newsletter:auto_send")
+        if auto_send == "0":
+            logger.info(f"Auto-send disabled (tz_group={tz_group})")
+            return {"status": "auto_send_disabled"}
 
-        # ready_key format: vol number string, e.g. "1"
-        vol_match = ready_key  # e.g., "1"
+        # 최신 draft vol 번호 가져오기
+        vol_match = await redis.get("newsletter:latest_draft_vol")
+        if not vol_match:
+            logger.info(f"No draft vol available (tz_group={tz_group})")
+            return {"status": "no_draft_ready"}
 
         # Get draft data from Redis
         draft_kr_raw = await redis.get(f"newsletter:draft:vol{vol_match}-kr")

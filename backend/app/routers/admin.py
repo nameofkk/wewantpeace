@@ -4202,45 +4202,41 @@ async def schedule_newsletter_send(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """뉴스레터 자동 발송 예약/취소. body: {vol: 1, action: "arm" | "disarm"}"""
-    vol = body.get("vol")
-    action = body.get("action", "arm")
+    """뉴스레터 자동 발송 ON/OFF 토글. body: {enabled: true/false}"""
+    enabled = body.get("enabled", True)
 
     redis = await get_redis()
+    await redis.set("newsletter:auto_send", "1" if enabled else "0")
+    await _log_action(db, admin, "newsletter_auto_send_toggle", detail={"enabled": enabled})
 
-    if action == "arm":
-        # Set the ready flag — Celery beat tasks will pick this up
-        await redis.set("newsletter:send:ready", str(vol), ex=7 * 86400)  # 7-day TTL
-        await _log_action(db, admin, "newsletter_schedule_arm", detail={"vol": vol})
-        return {"status": "armed", "vol": vol, "schedule": {
+    return {
+        "enabled": enabled,
+        "schedule": {
             "asia": "Monday 09:00 KST (00:00 UTC)",
             "europe": "Monday 09:00 CET (08:00 UTC)",
             "americas": "Monday 09:00 EST (14:00 UTC)",
-        }}
-    elif action == "disarm":
-        await redis.delete("newsletter:send:ready")
-        await _log_action(db, admin, "newsletter_schedule_disarm", detail={"vol": vol})
-        return {"status": "disarmed"}
-    else:
-        raise HTTPException(400, detail=f"Invalid action: {action}")
+        },
+    }
 
 
 @router.get("/newsletter/schedule")
 async def get_newsletter_schedule(
     admin: User = Depends(require_admin),
 ):
-    """현재 뉴스레터 발송 예약 상태."""
+    """현재 뉴스레터 자동 발송 상태."""
     redis = await get_redis()
-    ready_vol = await redis.get("newsletter:send:ready")
-    ttl = await redis.ttl("newsletter:send:ready") if ready_vol else -1
+    auto_send = await redis.get("newsletter:auto_send")
+    # 기본값: ON (사용자 요청 — 항상 켜진 상태가 기본)
+    enabled = auto_send != "0"
+    latest_vol_raw = await redis.get("newsletter:latest_draft_vol")
+    latest_vol = int(latest_vol_raw) if latest_vol_raw else None
 
     return {
-        "armed": ready_vol is not None,
-        "vol": int(ready_vol) if ready_vol else None,
-        "ttl_seconds": ttl,
+        "enabled": enabled,
+        "latest_vol": latest_vol,
         "schedule": {
             "asia": "Monday 09:00 KST (00:00 UTC)",
             "europe": "Monday 09:00 CET (08:00 UTC)",
             "americas": "Monday 09:00 EST (14:00 UTC)",
-        } if ready_vol else None,
+        },
     }
