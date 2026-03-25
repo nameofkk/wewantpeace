@@ -41,7 +41,7 @@ def _send_email(to: str, subject: str, html: str, from_addr: str | None = None):
         req = urllib.request.Request(
             "https://api.resend.com/emails",
             data=data,
-            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json", "User-Agent": "WeWantPeace/1.0"},
         )
         urllib.request.urlopen(req, timeout=15)
     else:
