@@ -68,6 +68,7 @@ def _send_via_resend(api_key: str, to: str, subject: str, html: str, from_addr: 
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "WeWantPeace/1.0",
         },
     )
     resp = urllib.request.urlopen(req, timeout=15)
