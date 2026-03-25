@@ -38,23 +38,111 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _smtp_connect(host: str, port: int, user: str, password: str, timeout: int = 15):
-    """Gmail SMTP 연결. SSL(465) 우선, 실패 시 STARTTLS(587) 폴백."""
+def _send_email(to: str, subject: str, html: str, from_addr: str | None = None):
+    """이메일 발송. RESEND_API_KEY 있으면 Resend HTTP API, 없으면 SMTP 폴백."""
+    import os
+    resend_key = os.environ.get("RESEND_API_KEY")
+
+    if resend_key:
+        return _send_via_resend(resend_key, to, subject, html, from_addr)
+    else:
+        return _send_via_smtp(to, subject, html, from_addr)
+
+
+def _send_via_resend(api_key: str, to: str, subject: str, html: str, from_addr: str | None = None):
+    """Resend HTTP API로 발송 (Railway SMTP 차단 우회)."""
+    import json
+    import urllib.request
+
+    sender = from_addr or "WeWantPeace <noreply@wewantpeace.live>"
+    data = json.dumps({
+        "from": sender,
+        "to": [to],
+        "subject": subject,
+        "html": html,
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    resp = urllib.request.urlopen(req, timeout=15)
+    result = json.loads(resp.read())
+    return result
+
+
+def _send_via_smtp(to: str, subject: str, html: str, from_addr: str | None = None):
+    """SMTP 폴백 (로컬 개발용)."""
     import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from backend.app.core.config import settings
 
-    # 1) SMTP_SSL (port 465) — Railway 등 클라우드에서 587이 차단될 때 대비
-    try:
-        smtp = smtplib.SMTP_SSL(host, 465, timeout=timeout)
-        smtp.login(user, password)
-        return smtp
-    except Exception:
-        pass
+    sender = from_addr or settings.smtp_user
+    msg = MIMEMultipart("alternative")
+    msg["From"] = sender
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html, "html", "utf-8"))
 
-    # 2) STARTTLS (port 587) — 일반 환경
-    smtp = smtplib.SMTP(host, port, timeout=timeout)
+    smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
     smtp.starttls()
-    smtp.login(user, password)
-    return smtp
+    smtp.login(settings.smtp_user, settings.smtp_password)
+    smtp.sendmail(sender, to, msg.as_string())
+    smtp.quit()
+
+
+def _send_email_bulk(recipients: list[tuple[str, str, str]], from_addr: str | None = None):
+    """여러 수신자에게 발송. [(to, subject, html), ...]"""
+    import os
+    resend_key = os.environ.get("RESEND_API_KEY")
+
+    sent = 0
+    failed = 0
+    errors = []
+
+    if resend_key:
+        for to, subject, html in recipients:
+            try:
+                _send_via_resend(resend_key, to, subject, html, from_addr)
+                sent += 1
+            except Exception as e:
+                failed += 1
+                errors.append(f"{to}: {e}")
+    else:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from backend.app.core.config import settings
+
+        sender = from_addr or settings.smtp_user
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
+        smtp.starttls()
+        smtp.login(settings.smtp_user, settings.smtp_password)
+
+        for to, subject, html in recipients:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["From"] = sender
+                msg["To"] = to
+                msg["Subject"] = subject
+                msg.attach(MIMEText(html, "html", "utf-8"))
+                smtp.sendmail(sender, to, msg.as_string())
+                sent += 1
+            except Exception as e:
+                failed += 1
+                errors.append(f"{to}: {e}")
+
+        try:
+            smtp.quit()
+        except Exception:
+            pass
+
+    return {"sent": sent, "failed": failed, "errors": errors}
 
 ADMIN_SETTINGS_KEY = "admin:settings:v1"
 
@@ -1813,15 +1901,7 @@ async def send_marketing_email(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """SMTP로 마케팅 이메일 발송."""
-    from backend.app.core.config import settings
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-
-    if not settings.smtp_user or not settings.smtp_password:
-        raise HTTPException(503, detail="SMTP 설정이 되어 있지 않습니다.")
-
+    """마케팅 이메일 발송."""
     # 대상 유저 조회
     q = select(User.email).where(
         User.marketing_agreed_at != None, User.status != "deleted", User.email != None
@@ -1846,30 +1926,17 @@ async def send_marketing_email(
     db.add(log)
     await db.flush()
 
-    # SMTP 발송
-    sent = 0
-    failed = 0
+    # 발송
     try:
-        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
-
-        for email in emails:
-            try:
-                msg = MIMEMultipart("alternative")
-                msg["From"] = settings.smtp_user
-                msg["To"] = email
-                msg["Subject"] = body.subject
-                msg.attach(MIMEText(body.body, "html", "utf-8"))
-                smtp.sendmail(settings.smtp_user, email, msg.as_string())
-                sent += 1
-            except Exception:
-                failed += 1
-
-        smtp.quit()
+        recipients = [(email, body.subject, body.body) for email in emails]
+        result = _send_email_bulk(recipients)
+        sent = result["sent"]
+        failed = result["failed"]
     except Exception as e:
         log.status = "failed"
         log.failed_count = len(emails)
         await db.flush()
-        raise HTTPException(500, detail=f"SMTP 연결 실패: {str(e)}")
+        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
 
     log.sent_count = sent
     log.failed_count = failed
@@ -3644,15 +3711,8 @@ async def send_weekly_report_test(
     db: AsyncSession = Depends(get_db),
 ):
     """어드민 본인에게 테스트 발송."""
-    from backend.app.core.config import settings
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
     from mako.template import Template
     import json as _json
-
-    if not settings.smtp_user or not settings.smtp_password:
-        raise HTTPException(503, detail="SMTP not configured")
 
     if not admin.email:
         raise HTTPException(400, detail="Admin email not found")
@@ -3720,16 +3780,9 @@ async def send_weekly_report_test(
 
     # 발송
     try:
-        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
-        msg = MIMEMultipart("alternative")
-        msg["From"] = settings.smtp_user
-        msg["To"] = admin.email
-        msg["Subject"] = "[TEST] WeWantPeace Weekly Report"
-        msg.attach(MIMEText(html, "html", "utf-8"))
-        smtp.sendmail(settings.smtp_user, admin.email, msg.as_string())
-        smtp.quit()
+        _send_email(admin.email, "[TEST] WeWantPeace Weekly Report", html)
     except Exception as e:
-        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
 
     await _log_action(db, admin, "weekly_report_test_send")
     return {"status": "ok", "sent_to": admin.email}
@@ -3825,42 +3878,36 @@ async def send_weekly_report_all(
     db.add(log)
     await db.flush()
 
-    sent = 0
-    failed = 0
+    # 각 유저별 렌더링 + 발송
+    recipients = []
+    for u in users:
+        try:
+            lang = getattr(u, "lang", None) or "ko"
+            is_pro = getattr(u, "plan", "free") != "free"
+            note = draft.get(f"editor_note_{lang}", "") or draft.get("editor_note_ko", "")
+            html = tpl.render(
+                lang=lang,
+                user=u,
+                issues=issues,
+                tensions=tensions if is_pro else [],
+                stats=stats_data,
+                is_pro=is_pro,
+                editor_note=note,
+            )
+            subj = "WeWantPeace 주간 리포트" if lang == "ko" else "WeWantPeace Weekly Report"
+            recipients.append((u.email, subj, html))
+        except Exception:
+            pass
+
     try:
-        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
-
-        for u in users:
-            try:
-                lang = getattr(u, "lang", None) or "ko"
-                is_pro = getattr(u, "plan", "free") != "free"
-                note = draft.get(f"editor_note_{lang}", "") or draft.get("editor_note_ko", "")
-                html = tpl.render(
-                    lang=lang,
-                    user=u,
-                    issues=issues,
-                    tensions=tensions if is_pro else [],
-                    stats=stats_data,
-                    is_pro=is_pro,
-                    editor_note=note,
-                )
-                subj = "WeWantPeace 주간 리포트" if lang == "ko" else "WeWantPeace Weekly Report"
-                msg = MIMEMultipart("alternative")
-                msg["From"] = settings.smtp_user
-                msg["To"] = u.email
-                msg["Subject"] = subj
-                msg.attach(MIMEText(html, "html", "utf-8"))
-                smtp.sendmail(settings.smtp_user, u.email, msg.as_string())
-                sent += 1
-            except Exception:
-                failed += 1
-
-        smtp.quit()
+        result = _send_email_bulk(recipients)
+        sent = result["sent"]
+        failed = result["failed"]
     except Exception as e:
         log.status = "failed"
         log.failed_count = len(users)
         await db.flush()
-        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
 
     log.sent_count = sent
     log.failed_count = failed
@@ -4014,13 +4061,7 @@ async def send_newsletter_test(
 ):
     """어드민 본인에게 렌더된 뉴스레터 테스트 발송."""
     import chevron
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    from backend.app.core.config import settings
 
-    if not settings.smtp_user or not settings.smtp_password:
-        raise HTTPException(503, detail="SMTP not configured")
     if not admin.email:
         raise HTTPException(400, detail="Admin email not found")
 
@@ -4040,20 +4081,9 @@ async def send_newsletter_test(
     subject = f"[TEST] WeWantPeace Newsletter Vol.{vol}"
 
     try:
-        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
-        msg = MIMEMultipart("alternative")
-        msg["From"] = settings.smtp_user
-        msg["To"] = admin.email
-        msg["Subject"] = subject
-        msg.attach(MIMEText(html, "html", "utf-8"))
-        smtp.sendmail(settings.smtp_user, admin.email, msg.as_string())
-        smtp.quit()
-    except smtplib.SMTPAuthenticationError as e:
-        raise HTTPException(500, detail=f"SMTP 인증 실패: {str(e)}")
-    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, TimeoutError, OSError) as e:
-        raise HTTPException(500, detail=f"SMTP 연결 실패 ({settings.smtp_host}:{settings.smtp_port}): {str(e)}")
+        _send_email(admin.email, subject, html)
     except Exception as e:
-        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
 
     await _log_action(db, admin, "newsletter_test_send", detail={"vol": vol, "lang": body.lang})
     return {"status": "ok", "sent_to": admin.email}
@@ -4133,34 +4163,27 @@ async def send_newsletter_all(
     db.add(log)
     await db.flush()
 
-    sent = 0
-    failed = 0
+    # 유저별 렌더링 + 발송
+    from backend.app.core.config import settings as _cfg
+    recipients = []
+    for u in users:
+        try:
+            token = hmac.new(_cfg.secret_key.encode(), str(u.id).encode(), sha256).hexdigest()[:32]
+            user_data = {**body.data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+            user_html = chevron.render(template, user_data)
+            recipients.append((u.email, subject_text, user_html))
+        except Exception:
+            pass
+
     try:
-        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
-
-        for u in users:
-            try:
-                # 유저별 수신거부 URL 생성
-                token = hmac.new(settings.secret_key.encode(), str(u.id).encode(), sha256).hexdigest()[:32]
-                user_data = {**body.data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
-                user_html = chevron.render(template, user_data)
-
-                msg = MIMEMultipart("alternative")
-                msg["From"] = settings.smtp_user
-                msg["To"] = u.email
-                msg["Subject"] = subject_text
-                msg.attach(MIMEText(user_html, "html", "utf-8"))
-                smtp.sendmail(settings.smtp_user, u.email, msg.as_string())
-                sent += 1
-            except Exception:
-                failed += 1
-
-        smtp.quit()
+        result = _send_email_bulk(recipients)
+        sent = result["sent"]
+        failed = result["failed"]
     except Exception as e:
         log.status = "failed"
         log.failed_count = len(users)
         await db.flush()
-        raise HTTPException(500, detail=f"SMTP error: {str(e)}")
+        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
 
     log.sent_count = sent
     log.failed_count = failed

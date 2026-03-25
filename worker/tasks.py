@@ -30,21 +30,39 @@ def _get_sync_redis() -> _sync_redis.Redis:
     return _sync_redis_client
 
 
-def _smtp_connect(host: str, port: int, user: str, password: str, timeout: int = 15):
-    """Gmail SMTP 연결. SSL(465) 우선, 실패 시 STARTTLS(587) 폴백."""
-    import smtplib
-
-    try:
-        smtp = smtplib.SMTP_SSL(host, 465, timeout=timeout)
-        smtp.login(user, password)
-        return smtp
-    except Exception:
-        pass
-
-    smtp = smtplib.SMTP(host, port, timeout=timeout)
-    smtp.starttls()
-    smtp.login(user, password)
-    return smtp
+def _send_email(to: str, subject: str, html: str, from_addr: str | None = None):
+    """이메일 발송. RESEND_API_KEY 있으면 Resend HTTP API, 없으면 SMTP 폴백."""
+    resend_key = os.environ.get("RESEND_API_KEY")
+    if resend_key:
+        import json
+        import urllib.request
+        sender = from_addr or "WeWantPeace <noreply@wewantpeace.live>"
+        data = json.dumps({"from": sender, "to": [to], "subject": subject, "html": html}).encode()
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=data,
+            headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=15)
+    else:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_user = os.environ.get("SMTP_USER", "")
+        smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+        sender = from_addr or smtp_user
+        msg = MIMEMultipart("alternative")
+        msg["From"] = sender
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
+        smtp.starttls()
+        smtp.login(smtp_user, smtp_pass)
+        smtp.sendmail(sender, to, msg.as_string())
+        smtp.quit()
 
 
 def _record_heartbeat(task_name: str) -> None:
@@ -1864,9 +1882,7 @@ async def _send_trial_email(user_email: str, user_name: str, subject: str, templ
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
-        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
-        smtp.sendmail(sender, user_email, msg.as_string())
-        smtp.quit()
+        _send_email(user_email, subject, html_body, sender)
     except Exception as e:
         logger.error("trial 이메일 발송 실패: %s → %s", user_email, e)
 
@@ -2628,12 +2644,6 @@ async def _send_weekly_report_impl():
     failed_total = 0
     batch_size = 50
 
-    try:
-        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
-    except Exception as e:
-        logger.error("send_weekly_report: SMTP 연결 실패: %s", e)
-        return {"status": "error", "reason": str(e)}
-
     async with AsyncSessionLocal() as db:
       for batch_start in range(0, len(all_users), batch_size):
         batch = all_users[batch_start:batch_start + batch_size]
@@ -2699,12 +2709,7 @@ async def _send_weekly_report_impl():
                 )
 
                 # 이메일 발송
-                msg = MIMEMultipart("alternative")
-                msg["From"] = sender
-                msg["To"] = user.email
-                msg["Subject"] = subject
-                msg.attach(MIMEText(html_body, "html", "utf-8"))
-                smtp.sendmail(sender, user.email, msg.as_string())
+                _send_email(user.email, subject, html_body, sender)
 
                 # 발송 로그 기록
                 async with db.begin():
@@ -2747,11 +2752,6 @@ async def _send_weekly_report_impl():
         if batch_start + batch_size < len(all_users):
             import asyncio as _asyncio
             await _asyncio.sleep(0.5)
-
-    try:
-        smtp.quit()
-    except Exception:
-        logger.debug("send_weekly_report: SMTP quit 실패 (무시)", exc_info=True)
 
     logger.info(
         "send_weekly_report 완료: sent=%d, failed=%d",
@@ -2822,23 +2822,15 @@ async def _send_kpi_alert_email(alerts: list[dict], week_start) -> None:
     </body></html>"""
 
     try:
-        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
-
         for admin in admins:
             try:
-                msg = MIMEMultipart("alternative")
-                msg["From"] = sender
-                msg["To"] = admin.email
-                msg["Subject"] = f"[WeWantPeace] KPI Alert — Week of {week_start}"
-                msg.attach(MIMEText(html, "html", "utf-8"))
-                smtp.sendmail(sender, admin.email, msg.as_string())
+                _send_email(admin.email, f"[WeWantPeace] KPI Alert — Week of {week_start}", html, sender)
             except Exception as e:
                 logger.warning("KPI alert 이메일 발송 실패 [%s]: %s", admin.email, e)
 
-        smtp.quit()
         logger.info("KPI alert 이메일 발송 완료: %d명 admin", len(admins))
     except Exception as e:
-        logger.error("KPI alert SMTP 연결 실패: %s", e)
+        logger.error("KPI alert 이메일 발송 실패: %s", e)
 
 
 # ── Admin Ops v0.9: Weekly KPI Snapshot ──────────────────────────────────────
@@ -4426,43 +4418,29 @@ def send_newsletter_scheduled(self, tz_group: str):
 
             sent = 0
             failed = 0
-            try:
-                smtp_conn = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
+            for user, user_lang in users_to_send:
+                try:
+                    if user_lang == "en" and tpl_en and draft_en:
+                        template = tpl_en
+                        data = draft_en
+                    elif tpl_kr and draft_kr:
+                        template = tpl_kr
+                        data = draft_kr
+                    else:
+                        continue
 
-                for user, user_lang in users_to_send:
-                    try:
-                        # Choose template and data based on user language
-                        if user_lang == "en" and tpl_en and draft_en:
-                            template = tpl_en
-                            data = draft_en
-                        elif tpl_kr and draft_kr:
-                            template = tpl_kr
-                            data = draft_kr
-                        else:
-                            continue
+                    token = _hmac.new(settings.secret_key.encode(), str(user.id).encode(), _sha256).hexdigest()[:32]
+                    user_data = {**data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+                    html = chevron.render(template, user_data)
 
-                        token = _hmac.new(settings.secret_key.encode(), str(user.id).encode(), _sha256).hexdigest()[:32]
-                        user_data = {**data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
-                        html = chevron.render(template, user_data)
+                    vol = data.get("vol_number", "?")
+                    subject = f"WeWantPeace Newsletter Vol.{vol}"
 
-                        vol = data.get("vol_number", "?")
-                        subject = f"WeWantPeace Newsletter Vol.{vol}"
-
-                        msg = MIMEMultipart("alternative")
-                        msg["From"] = settings.smtp_user
-                        msg["To"] = user.email
-                        msg["Subject"] = subject
-                        msg.attach(MIMEText(html, "html", "utf-8"))
-                        smtp_conn.sendmail(settings.smtp_user, user.email, msg.as_string())
-                        sent += 1
-                    except Exception as e:
-                        logger.warning(f"Failed to send to {user.email}: {e}")
-                        failed += 1
-
-                smtp_conn.quit()
-            except Exception as e:
-                logger.error(f"SMTP connection error: {e}")
-                return {"status": "smtp_error", "error": str(e)}
+                    _send_email(user.email, subject, html)
+                    sent += 1
+                except Exception as e:
+                    logger.warning(f"Failed to send to {user.email}: {e}")
+                    failed += 1
 
         logger.info(f"Newsletter sent: tz_group={tz_group}, sent={sent}, failed={failed}")
         return {"status": "ok", "tz_group": tz_group, "sent": sent, "failed": failed}
