@@ -37,6 +37,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+def _smtp_connect(host: str, port: int, user: str, password: str, timeout: int = 15):
+    """Gmail SMTP 연결. SSL(465) 우선, 실패 시 STARTTLS(587) 폴백."""
+    import smtplib
+
+    # 1) SMTP_SSL (port 465) — Railway 등 클라우드에서 587이 차단될 때 대비
+    try:
+        smtp = smtplib.SMTP_SSL(host, 465, timeout=timeout)
+        smtp.login(user, password)
+        return smtp
+    except Exception:
+        pass
+
+    # 2) STARTTLS (port 587) — 일반 환경
+    smtp = smtplib.SMTP(host, port, timeout=timeout)
+    smtp.starttls()
+    smtp.login(user, password)
+    return smtp
+
 ADMIN_SETTINGS_KEY = "admin:settings:v1"
 
 
@@ -1831,9 +1850,7 @@ async def send_marketing_email(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
 
         for email in emails:
             try:
@@ -3703,9 +3720,7 @@ async def send_weekly_report_test(
 
     # 발송
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
         msg = MIMEMultipart("alternative")
         msg["From"] = settings.smtp_user
         msg["To"] = admin.email
@@ -3813,9 +3828,7 @@ async def send_weekly_report_all(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
 
         for u in users:
             try:
@@ -4027,9 +4040,7 @@ async def send_newsletter_test(
     subject = f"[TEST] WeWantPeace Newsletter Vol.{vol}"
 
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
         msg = MIMEMultipart("alternative")
         msg["From"] = settings.smtp_user
         msg["To"] = admin.email
@@ -4125,9 +4136,7 @@ async def send_newsletter_all(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        smtp = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
 
         for u in users:
             try:
