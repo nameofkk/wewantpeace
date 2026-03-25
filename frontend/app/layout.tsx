@@ -387,8 +387,9 @@ export default function RootLayout({
               0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
               40% { opacity: 1; transform: scale(1.2); }
             }
-            /* SSR onboarding: 세계지도 div가 HTML에 있으면 인라인 스플래시 숨김 → LCP 즉시 */
-            html:has(.ob-world-map) #__splash { display: none !important; }
+            /* SSR onboarding: 세계지도 div가 HTML에 있으면 스플래시 숨김 → LCP/SI 즉시 */
+            html:has(.ob-world-map) #__splash,
+            html:has(.ob-world-map) #react-splash { display: none !important; }
           ` }} />
         </div>
         <Providers>
