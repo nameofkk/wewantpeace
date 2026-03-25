@@ -92,8 +92,8 @@ export function NewsletterCTA() {
                   }`}
                 >
                   {isSubscribed
-                    ? lang === "ko" ? "구독 중" : "Subscribed"
-                    : lang === "ko" ? "무료 구독" : "Subscribe Free"}
+                    ? lang === "ko" ? "구독 중 ✓" : "Subscribed ✓"
+                    : lang === "ko" ? "무료로 받아보기" : "Get it free"}
                 </button>
                 {latestId !== null && (
                   <button
@@ -109,7 +109,7 @@ export function NewsletterCTA() {
               <>
                 <Link href="/login" className="flex-1">
                   <div className="h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center text-[11px] font-semibold hover:bg-blue-600 transition-colors active:scale-[0.98]">
-                    {lang === "ko" ? "로그인하고 구독" : "Login to Subscribe"}
+                    {t(lang, "newsletter_login_subscribe")}
                   </div>
                 </Link>
                 {latestId !== null && (
@@ -128,8 +128,8 @@ export function NewsletterCTA() {
           {/* 하단 부가 정보 */}
           <p className="text-[9px] text-muted-foreground/40 text-center mt-2">
             {lang === "ko"
-              ? "매주 월요일 발송 · 무료 · 언제든 해지"
-              : "Every Monday · Free · Cancel anytime"}
+              ? "무료 · 3분 분량 · 언제든 해지"
+              : "Free · 3 min read · Cancel anytime"}
           </p>
         </div>
       </div>
