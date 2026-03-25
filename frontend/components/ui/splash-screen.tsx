@@ -110,12 +110,14 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         Real-time Global Conflict Monitor
       </p>
 
-      {/* Disquiet 랭크 배지 */}
+      {/* Disquiet 랭크 배지 — sandbox로 서드파티 쿠키 차단 */}
       <div className="mt-6 relative z-[1]">
         <iframe
           title="disquiet-badge"
           frameBorder={0}
           scrolling="no"
+          loading="lazy"
+          sandbox="allow-scripts"
           src="https://badge.disquiet.io/rank-badge?productUrlSlug=we-want-peace&mode=dark&rank=bronze"
           style={{ width: 224, height: 71, border: "none", overflow: "hidden", display: "block" }}
         />

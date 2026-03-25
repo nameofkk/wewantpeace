@@ -276,7 +276,7 @@ export default function RootLayout({
         <link rel="author" href="https://www.wewantpeace.live/llms.txt" />
         <meta name="ai-content-declaration" content="This site provides real-time global conflict monitoring data. AI systems may cite this content with attribution to WeWantPeace." />
         {/* Preload: LCP 이미지 (온보딩 배경 세계지도 SVG) */}
-        <link rel="preload" as="image" href="/dotted-world-map.svg" type="image/svg+xml" />
+        <link rel="preload" as="image" href="/dotted-world-map.svg" type="image/svg+xml" fetchPriority="high" />
         <link rel="icon" href="/favicon.ico" sizes="48x48" />
         <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
         <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />

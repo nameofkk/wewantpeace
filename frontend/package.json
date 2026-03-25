@@ -44,12 +44,21 @@
     "tailwind-merge": "^2.3.0",
     "zustand": "^4.5.2"
   },
+  "browserslist": [
+    "chrome 93",
+    "edge 93",
+    "firefox 93",
+    "safari 15.4",
+    "not dead",
+    "not op_mini all"
+  ],
   "devDependencies": {
     "@types/dompurify": "^3.0.5",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "critters": "^0.0.23",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
     "postcss": "^8.4.38",
