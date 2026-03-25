@@ -443,6 +443,9 @@ function PreviewPanel({
   const maxKb = 102;
   const pct = Math.min((sizeKb / maxKb) * 100, 100);
   const isOver = sizeKb > maxKb;
+  const CONTENT_WIDTH = 620;
+  const [iframeH, setIframeH] = useState(800);
+  const [containerW, setContainerW] = useState(9999);
 
   const copyHtml = () => {
     navigator.clipboard.writeText(html);
@@ -455,39 +458,31 @@ function PreviewPanel({
     if (w) { w.document.write(html); w.document.close(); }
   };
 
-  // 뉴스레터 HTML은 width=620px 고정 테이블 → 컨테이너보다 넓을 수 있음
-  // iframe을 620px로 고정하고, 컨테이너 폭에 맞게 scale-down
-  const CONTENT_WIDTH = 620;
-  const [autoScale, setAutoScale] = useState(1);
-
-  const updateScale = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || mobileView) return;
-    const availW = container.clientWidth - 8;
-    if (availW < CONTENT_WIDTH && availW > 0) {
-      setAutoScale(availW / CONTENT_WIDTH);
-    } else {
-      setAutoScale(1);
-    }
-  }, [mobileView]);
-
+  // 컨테이너 폭 추적
   useEffect(() => {
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, [updateScale]);
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setContainerW(e.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     try {
       const h = iframe.contentDocument?.body?.scrollHeight;
-      if (h && h > 0) iframe.style.height = `${h}px`;
-    } catch {
-      // sandbox cross-origin guard
-    }
-    updateScale();
-  }, [updateScale]);
+      if (h && h > 0) setIframeH(h);
+    } catch { /* sandbox */ }
+  }, []);
+
+  // 실효 스케일: 줌 > autofit > 1
+  const rawW = mobileView ? 390 : CONTENT_WIDTH;
+  const effectiveScale = zoom !== 100
+    ? zoom / 100
+    : containerW < rawW ? Math.max(containerW / rawW, 0.3) : 1;
 
   return (
     <div className="flex flex-col h-full">
@@ -582,7 +577,7 @@ function PreviewPanel({
       </div>
 
       {/* iframe or source */}
-      <div ref={containerRef} className="flex-1 mt-1 flex justify-center overflow-auto bg-secondary/20 rounded-lg">
+      <div ref={containerRef} className="flex-1 mt-1 overflow-auto bg-secondary/20 rounded-lg">
         {!html ? (
           <div className="flex items-center justify-center h-96 text-muted-foreground text-sm">
             {lang === "ko" ? "데이터를 입력하면 미리보기가 표시됩니다" : "Enter data to see preview"}
@@ -592,24 +587,36 @@ function PreviewPanel({
             {html}
           </pre>
         ) : (
-          <iframe
-            ref={iframeRef}
-            srcDoc={html}
-            onLoad={handleIframeLoad}
-            className="border-0 bg-white rounded shadow-lg transition-all"
-            style={{
-              width: mobileView ? 390 : CONTENT_WIDTH,
-              minHeight: 600,
-              transform: zoom !== 100
-                ? `scale(${zoom / 100})`
-                : !mobileView && autoScale < 1
-                  ? `scale(${autoScale})`
-                  : undefined,
-              transformOrigin: "top center",
-            }}
-            sandbox="allow-same-origin"
-            title="Newsletter Preview"
-          />
+          <div className="flex justify-center p-1">
+            {/* wrapper: 레이아웃 크기 = 시각 크기 (scale 반영) */}
+            <div
+              style={{
+                width: rawW * effectiveScale,
+                height: iframeH * effectiveScale,
+                flexShrink: 0,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <iframe
+                ref={iframeRef}
+                srcDoc={html}
+                onLoad={handleIframeLoad}
+                className="border-0 bg-white rounded shadow-lg"
+                style={{
+                  width: rawW,
+                  height: iframeH,
+                  transform: effectiveScale !== 1 ? `scale(${effectiveScale})` : undefined,
+                  transformOrigin: "top left",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                }}
+                sandbox="allow-same-origin"
+                title="Newsletter Preview"
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
