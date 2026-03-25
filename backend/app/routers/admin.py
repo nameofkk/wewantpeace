@@ -248,13 +248,12 @@ async def list_users(
         .subquery()
     )
 
-    # active subscription subquery (최신 1건)
+    # active subscription subquery (유저별 최신 1건 — DISTINCT ON)
     sub_sub = (
         select(Subscription)
         .where(Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]))
-        .order_by(Subscription.created_at.desc())
-        .correlate(User)
-        .limit(1)
+        .distinct(Subscription.user_id)
+        .order_by(Subscription.user_id, Subscription.created_at.desc())
         .subquery()
     )
 
