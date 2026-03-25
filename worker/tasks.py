@@ -1847,7 +1847,7 @@ async def _send_trial_email(user_email: str, user_name: str, subject: str, templ
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(smtp_user, smtp_pass)
         smtp.sendmail(sender, user_email, msg.as_string())
@@ -2614,7 +2614,7 @@ async def _send_weekly_report_impl():
     batch_size = 50
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(smtp_user, smtp_pass)
     except Exception as e:
@@ -2809,7 +2809,7 @@ async def _send_kpi_alert_email(alerts: list[dict], week_start) -> None:
     </body></html>"""
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port)
+        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(smtp_user, smtp_pass)
 
@@ -4411,7 +4411,7 @@ def send_newsletter_scheduled(self, tz_group: str):
             sent = 0
             failed = 0
             try:
-                smtp_conn = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+                smtp_conn = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
                 smtp_conn.starttls()
                 smtp_conn.login(settings.smtp_user, settings.smtp_password)
 
