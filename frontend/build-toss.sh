@@ -30,7 +30,7 @@ mv "app/(main)/community/[postId]/page.tsx" "app/(main)/community/[postId]/_page
 mv "app/(main)/community/[postId]/edit" "app/(main)/community/[postId]/_edit_bak" 2>/dev/null || true
 
 # 3) granite build
-npx granite build
+npx ait build
 
 # 4) 동적 라우트 복원
 mv "app/(main)/issues/[id]/_page.tsx.bak" "app/(main)/issues/[id]/page.tsx" 2>/dev/null || true
