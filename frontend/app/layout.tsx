@@ -82,8 +82,8 @@ export const viewport: Viewport = {
   themeColor: "#0f1729",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({
@@ -275,6 +275,13 @@ export default function RootLayout({
         {/* AI 크롤러 안내 */}
         <link rel="author" href="https://www.wewantpeace.live/llms.txt" />
         <meta name="ai-content-declaration" content="This site provides real-time global conflict monitoring data. AI systems may cite this content with attribution to WeWantPeace." />
+        {/* Preload: LCP 이미지 (온보딩 배경 세계지도 SVG) */}
+        <link rel="preload" as="image" href="/dotted-world-map.svg" type="image/svg+xml" />
+        {/* Preconnect: 크리티컬 서드파티 (Lighthouse 권장) */}
+        <link rel="preconnect" href="https://badge.disquiet.io" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://wewantpeace-14660.firebaseapp.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://apis.google.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://ebsuvlkkztshxfnyxxsh.supabase.co" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="48x48" />
         <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
         <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
@@ -369,10 +376,10 @@ export default function RootLayout({
               100% { transform: translate(-50%,-50%) scale(4); opacity: 0; }
             }
             @keyframes splash-scan {
-              0% { top: 15%; opacity: 0; }
+              0% { transform: translateY(15vh); opacity: 0; }
               10% { opacity: 1; }
               90% { opacity: 1; }
-              100% { top: 85%; opacity: 0; }
+              100% { transform: translateY(85vh); opacity: 0; }
             }
             @keyframes splash-glow {
               0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
@@ -389,7 +396,9 @@ export default function RootLayout({
         </div>
         <Providers>
           <OnboardingGuard>
-            {children}
+            <main id="main-content">
+              {children}
+            </main>
           </OnboardingGuard>
         </Providers>
       </body>

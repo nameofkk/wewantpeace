@@ -120,7 +120,7 @@ export function NewsletterCTA() {
             <div className="mt-3.5 space-y-2">
               {isLoggedIn ? (
                 isSubscribed ? (
-                  /* 구독 중 — 중앙정렬된 상태 표시 */}
+                  /* 구독 중 — 중앙정렬된 상태 표시 */
                   <div className="h-9 rounded-lg bg-muted/20 flex items-center justify-center gap-1.5">
                     <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
                     <span className="text-[11px] font-medium text-muted-foreground">
