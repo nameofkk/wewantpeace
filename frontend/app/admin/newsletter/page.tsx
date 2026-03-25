@@ -472,10 +472,21 @@ function PreviewPanel({
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    try {
-      const h = iframe.contentDocument?.body?.scrollHeight;
-      if (h && h > 0) setIframeH(h);
-    } catch { /* sandbox */ }
+    const measure = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc?.body) return;
+        // body 전체 + documentElement 둘 다 비교해서 큰 쪽 사용
+        const h = Math.max(
+          doc.body.scrollHeight || 0,
+          doc.documentElement?.scrollHeight || 0,
+        );
+        if (h > 0) setIframeH(h + 20); // 여유 20px
+      } catch { /* sandbox */ }
+    };
+    // 렌더링 완료 후 측정 (폰트 로드 등 고려)
+    measure();
+    requestAnimationFrame(() => setTimeout(measure, 200));
   }, []);
 
   // 실효 스케일: 줌 > autofit > 1
@@ -588,16 +599,6 @@ function PreviewPanel({
           </pre>
         ) : (
           <div className="flex justify-center p-1">
-            {/* wrapper: 레이아웃 크기 = 시각 크기 (scale 반영) */}
-            <div
-              style={{
-                width: rawW * effectiveScale,
-                height: iframeH * effectiveScale,
-                flexShrink: 0,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
               <iframe
                 ref={iframeRef}
                 srcDoc={html}
@@ -606,16 +607,11 @@ function PreviewPanel({
                 style={{
                   width: rawW,
                   height: iframeH,
-                  transform: effectiveScale !== 1 ? `scale(${effectiveScale})` : undefined,
-                  transformOrigin: "top left",
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
+                  zoom: effectiveScale !== 1 ? effectiveScale : undefined,
                 }}
                 sandbox="allow-same-origin"
                 title="Newsletter Preview"
               />
-            </div>
           </div>
         )}
       </div>
