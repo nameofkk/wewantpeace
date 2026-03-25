@@ -322,10 +322,11 @@ app.conf.beat_schedule = {
         "args": ["americas"],
         "options": {"queue": "process"},
     },
-    # ── 뉴스레터 초안 자동 생성 (매주 월요일) ──
+    # ── 뉴스레터 초안 자동 생성 (일요일 15:00 UTC = 월요일 00:00 KST) ──
+    # 월요일 발송 전에 어드민이 확인·편집할 시간 확보 (최소 9시간 전)
     "generate-newsletter-draft": {
         "task": "worker.tasks.generate_newsletter_draft",
-        "schedule": crontab(minute=0, hour=0, day_of_week=1),  # Monday 00:00 UTC = 09:00 KST
+        "schedule": crontab(minute=0, hour=15, day_of_week=0),  # Sunday 15:00 UTC = Mon 00:00 KST
         "options": {"queue": "process"},
     },
     # ── Beat heartbeat ──
