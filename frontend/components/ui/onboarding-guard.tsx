@@ -28,8 +28,14 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
     const pathname = window.location.pathname;
-    const isOnboardingPage = pathname === "/onboarding";
+    // middleware rewrite: `/`에서 onboarding 콘텐츠를 SSR로 제공하므로 `/`도 온보딩 페이지로 인식
+    const isOnboardingPage = pathname === "/onboarding" || pathname === "/";
     const isAdminPage = pathname.startsWith("/admin");
+
+    // onboarding_done → 쿠키 동기화 (middleware SSR 최적화용)
+    if (done) {
+      document.cookie = "onboarding_done=true; path=/; max-age=31536000; SameSite=Lax";
+    }
 
     // 로그인 상태면 온보딩 자동 완료 처리 (이중 리다이렉트 방지)
     const auth = getFirebaseAuth();
@@ -37,6 +43,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       !!localStorage.getItem("dev_uid") || !!auth?.currentUser;
     if (!done && isLoggedIn) {
       localStorage.setItem("onboarding_done", "true");
+      document.cookie = "onboarding_done=true; path=/; max-age=31536000; SameSite=Lax";
       setChecked(true);
       return;
     }
@@ -56,12 +63,16 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 마운트 시 1회만 실행
 
-  // 온보딩 체크 + auth 로딩 완료 시 최소 800ms 보장 후 스플래시 해제
+  // 온보딩 체크 + auth 로딩 완료 시 스플래시 해제
   useEffect(() => {
     if (!checked || authLoading) return;
 
+    const pathname = window.location.pathname;
+    const isOnboardingSSR = pathname === "/" || pathname === "/onboarding";
     const elapsed = Date.now() - mountTime.current;
-    const remaining = Math.max(0, 800 - elapsed);
+    // SSR 온보딩: 콘텐츠가 이미 HTML에 있으므로 스플래시 즉시 해제
+    const minTime = isOnboardingSSR ? 0 : 800;
+    const remaining = Math.max(0, minTime - elapsed);
 
     const timer = setTimeout(() => setSplashVisible(false), remaining);
     return () => clearTimeout(timer);
