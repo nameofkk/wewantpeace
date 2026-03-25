@@ -33,12 +33,26 @@ const withPWA = require("next-pwa")({
   ],
 });
 
+const path = require("path");
+
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
     optimizeCss: true,
+  },
+  webpack: (config, { isServer, webpack }) => {
+    if (!isServer) {
+      // 모던 브라우저 (Chrome 93+, Safari 15.4+) 에서 불필요한 폴리필 제거 → ~11KB 절감
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(
+          /[\\/]polyfill-module\.js$/,
+          path.join(__dirname, "lib/empty-polyfill.js")
+        )
+      );
+    }
+    return config;
   },
   typescript: {
     ignoreBuildErrors: false,

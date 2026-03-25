@@ -95,6 +95,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
           alt="WeWantPeace"
           width={184}
           height={80}
+          quality={60}
           className="relative z-[1] h-20 w-auto object-contain"
           style={{ filter: "drop-shadow(0 0 20px rgba(59,130,246,0.2))" }}
           priority
@@ -111,14 +112,13 @@ export function SplashScreen({ visible }: SplashScreenProps) {
         Real-time Global Conflict Monitor
       </p>
 
-      {/* Disquiet 랭크 배지 — sandbox로 서드파티 쿠키 차단 */}
+      {/* Disquiet 랭크 배지 */}
       <div className="mt-6 relative z-[1]">
         <iframe
           title="disquiet-badge"
           frameBorder={0}
           scrolling="no"
           loading="lazy"
-          sandbox="allow-scripts"
           src="https://badge.disquiet.io/rank-badge?productUrlSlug=we-want-peace&mode=dark&rank=bronze"
           style={{ width: 224, height: 71, border: "none", overflow: "hidden", display: "block" }}
         />
