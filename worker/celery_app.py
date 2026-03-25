@@ -303,6 +303,25 @@ app.conf.beat_schedule = {
         "schedule": 25 * 60,  # 25분마다 (캐시 TTL 30분보다 빠르게)
         "options": {"queue": "process"},
     },
+    # ── 뉴스레터 시간대별 자동 발송 ──
+    "newsletter-send-asia": {
+        "task": "worker.tasks.send_newsletter_scheduled",
+        "schedule": crontab(minute=0, hour=0, day_of_week=1),  # Mon 00:00 UTC = 09:00 KST
+        "args": ["asia"],
+        "options": {"queue": "process"},
+    },
+    "newsletter-send-europe": {
+        "task": "worker.tasks.send_newsletter_scheduled",
+        "schedule": crontab(minute=0, hour=8, day_of_week=1),  # Mon 08:00 UTC = 09:00 CET
+        "args": ["europe"],
+        "options": {"queue": "process"},
+    },
+    "newsletter-send-americas": {
+        "task": "worker.tasks.send_newsletter_scheduled",
+        "schedule": crontab(minute=0, hour=14, day_of_week=1),  # Mon 14:00 UTC = 09:00 EST
+        "args": ["americas"],
+        "options": {"queue": "process"},
+    },
     # ── 뉴스레터 초안 자동 생성 (매주 월요일) ──
     "generate-newsletter-draft": {
         "task": "worker.tasks.generate_newsletter_draft",
