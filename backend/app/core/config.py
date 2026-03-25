@@ -98,7 +98,7 @@ class Settings(BaseSettings):
         return v
 
     # Alert pipeline mode (shadow → primary)
-    alert_pipeline_mode: str = "shadow"
+    alert_pipeline_mode: str = "primary"
 
     # 앱 설정
     app_name: str = "WeWantPeace API"

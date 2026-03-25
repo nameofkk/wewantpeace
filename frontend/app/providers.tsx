@@ -5,7 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { setupForegroundListener } from "@/lib/fcm";
+import { setupForegroundListener, refreshTokenIfNeeded } from "@/lib/fcm";
 import { isTossMiniApp } from "@/lib/platform";
 
 function ThemeSync() {
@@ -23,6 +23,8 @@ function FCMForegroundInit() {
     // 토스 WebView에서는 Service Worker 미지원 → FCM 초기화 스킵
     if (isTossMiniApp()) return;
     setupForegroundListener();
+    // 앱 로드 시 FCM 토큰 자동 갱신 (12시간 간격)
+    refreshTokenIfNeeded();
   }, []);
   return null;
 }

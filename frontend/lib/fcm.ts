@@ -202,3 +202,103 @@ export function clearStoredFCMToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(FCM_TOKEN_KEY);
 }
+
+const TOKEN_REFRESH_KEY = "fcm_token_refreshed_at";
+const TOKEN_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12시간
+
+/**
+ * 앱 로드 시 FCM 토큰을 자동 갱신하여 서버에 재등록.
+ * - 이미 알림 허용된 경우에만 동작 (권한 팝업 안 띄움)
+ * - 12시간 이내 갱신했으면 스킵
+ * - 서버에 POST /me/push-tokens → 같은 토큰이면 last_used 갱신, 새 토큰이면 등록
+ */
+export async function refreshTokenIfNeeded(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  // 토스 미니앱: 푸시 미지원
+  if (process.env.NEXT_PUBLIC_IS_TOSS_MINIAPP === "true") return;
+
+  // 12시간 이내 갱신했으면 스킵
+  const lastRefresh = localStorage.getItem(TOKEN_REFRESH_KEY);
+  if (lastRefresh && Date.now() - Number(lastRefresh) < TOKEN_REFRESH_INTERVAL) return;
+
+  // React Native: 네이티브 브릿지로 토큰 갱신
+  if (window.__REACT_NATIVE__ || window.ReactNativeWebView) {
+    try {
+      const token = await requestAndGetFCMToken();
+      if (token) {
+        await _registerTokenToServer(token, "android");
+        localStorage.setItem(TOKEN_REFRESH_KEY, String(Date.now()));
+      }
+    } catch (e) {
+      console.warn("[FCM] 네이티브 토큰 갱신 실패:", e);
+    }
+    return;
+  }
+
+  // 웹: 이미 알림 허용된 경우에만 (권한 팝업 안 띄움)
+  if (!isPushSupported()) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+
+  try {
+    const { initializeApp, getApps } = await import("firebase/app");
+    const { getMessaging, getToken } = await import("firebase/messaging");
+
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+    const sw = await registerFCMServiceWorker();
+
+    const token = await withTimeout(
+      getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: sw || undefined,
+      }),
+      15_000,
+      "getToken(refresh)",
+    );
+
+    if (token) {
+      localStorage.setItem(FCM_TOKEN_KEY, token);
+      await _registerTokenToServer(token, "web");
+      localStorage.setItem(TOKEN_REFRESH_KEY, String(Date.now()));
+      console.log("[FCM] 토큰 자동 갱신 완료");
+    }
+  } catch (e) {
+    console.warn("[FCM] 토큰 자동 갱신 실패:", e);
+  }
+}
+
+/** 서버에 토큰 등록/갱신 (apiFetch 의존 없이 직접 fetch) */
+async function _registerTokenToServer(fcmToken: string, platform: string): Promise<void> {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  let authHeaders: Record<string, string> = {};
+
+  const devUid = localStorage.getItem("dev_uid");
+  if (devUid) {
+    authHeaders = { "X-Dev-UID": devUid };
+  } else {
+    try {
+      const { waitForAuth, getIdToken } = await import("./auth");
+      await waitForAuth();
+      const idToken = await getIdToken();
+      if (idToken) authHeaders = { Authorization: `Bearer ${idToken}` };
+    } catch { /* 미인증 → 스킵 */ }
+  }
+
+  if (!authHeaders.Authorization && !authHeaders["X-Dev-UID"]) return;
+
+  await fetch(`${API_BASE}/me/push-tokens`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders },
+    body: JSON.stringify({ fcm_token: fcmToken, platform }),
+  });
+}
