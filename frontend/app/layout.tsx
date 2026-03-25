@@ -277,11 +277,6 @@ export default function RootLayout({
         <meta name="ai-content-declaration" content="This site provides real-time global conflict monitoring data. AI systems may cite this content with attribution to WeWantPeace." />
         {/* Preload: LCP 이미지 (온보딩 배경 세계지도 SVG) */}
         <link rel="preload" as="image" href="/dotted-world-map.svg" type="image/svg+xml" />
-        {/* Preconnect: 크리티컬 서드파티 (Lighthouse 권장) */}
-        <link rel="preconnect" href="https://badge.disquiet.io" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://wewantpeace-14660.firebaseapp.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://apis.google.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://ebsuvlkkztshxfnyxxsh.supabase.co" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="48x48" />
         <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
         <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
@@ -392,6 +387,8 @@ export default function RootLayout({
               0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
               40% { opacity: 1; transform: scale(1.2); }
             }
+            /* SSR onboarding: 세계지도 div가 HTML에 있으면 인라인 스플래시 숨김 → LCP 즉시 */
+            html:has(.ob-world-map) #__splash { display: none !important; }
           ` }} />
         </div>
         <Providers>
