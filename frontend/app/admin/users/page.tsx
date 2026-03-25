@@ -82,6 +82,13 @@ function timeAgo(dateStr: string | null, locale: string): string {
   return new Date(dateStr).toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
+/** sub_platform에서 프로모 코드 추출 (예: "promo:WWPRANKED1" → "WWPRANKED1") */
+function promoCode(u: AdminUser): string | null {
+  if (u.sub_type !== "promo" || !u.sub_platform) return null;
+  const m = u.sub_platform.match(/^promo:(.+)$/);
+  return m ? m[1] : null;
+}
+
 function subDateInfo(u: AdminUser, ko: boolean, locale: string): string {
   if (u.plan === "free" || u.sub_type === "free") return "";
   if (u.sub_type === "trial") {
@@ -407,6 +414,9 @@ export default function AdminUsersPage() {
                           {subDateInfo(u, ko, locale)}
                         </p>
                       )}
+                      {promoCode(u) && (
+                        <p className="text-[9px] text-orange-400/70 mt-0.5 whitespace-nowrap font-mono">{promoCode(u)}</p>
+                      )}
                     </td>
                     {tab === "active" && (
                       <td className="px-3 py-3">
@@ -526,6 +536,7 @@ export default function AdminUsersPage() {
                   <p className="text-[9px] text-muted-foreground mt-1 whitespace-nowrap">
                     {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : u.sub_type === "trial" ? (ko ? "체험 " : "Trial ") : u.sub_type === "promo" ? (ko ? "프로모 " : "Promo ") : ""}
                     {subDateInfo(u, ko, locale)}
+                    {promoCode(u) && <span className="text-orange-400/70 font-mono ml-1">{promoCode(u)}</span>}
                   </p>
                 )}
                 {tab === "active" && (
