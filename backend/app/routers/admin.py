@@ -1831,7 +1831,7 @@ async def send_marketing_email(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
 
@@ -3703,7 +3703,7 @@ async def send_weekly_report_test(
 
     # 발송
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
         msg = MIMEMultipart("alternative")
@@ -3813,7 +3813,7 @@ async def send_weekly_report_all(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
 
@@ -4027,7 +4027,7 @@ async def send_newsletter_test(
     subject = f"[TEST] WeWantPeace Newsletter Vol.{vol}"
 
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
         msg = MIMEMultipart("alternative")
@@ -4037,6 +4037,10 @@ async def send_newsletter_test(
         msg.attach(MIMEText(html, "html", "utf-8"))
         smtp.sendmail(settings.smtp_user, admin.email, msg.as_string())
         smtp.quit()
+    except smtplib.SMTPAuthenticationError as e:
+        raise HTTPException(500, detail=f"SMTP 인증 실패: {str(e)}")
+    except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, TimeoutError, OSError) as e:
+        raise HTTPException(500, detail=f"SMTP 연결 실패 ({settings.smtp_host}:{settings.smtp_port}): {str(e)}")
     except Exception as e:
         raise HTTPException(500, detail=f"SMTP error: {str(e)}")
 
@@ -4121,7 +4125,7 @@ async def send_newsletter_all(
     sent = 0
     failed = 0
     try:
-        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
         smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
 

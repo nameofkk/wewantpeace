@@ -828,7 +828,10 @@ export default function AdminNewsletterPage() {
       const r = res as { sent_to: string };
       toast(lang === "ko" ? `테스트 발송 → ${r.sent_to}` : `Test sent → ${r.sent_to}`, "success");
     },
-    onError: () => toast(lang === "ko" ? "발송 실패" : "Send failed", "error"),
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      toast(lang === "ko" ? `발송 실패: ${msg}` : `Send failed: ${msg}`, "error");
+    },
   });
 
   // 전체 발송
