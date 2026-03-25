@@ -1105,19 +1105,21 @@ export default function OnboardingPage() {
         /* 스캔라인 */
         .ob-scanline {
           position: absolute;
+          top: 0;
           left: 0;
           right: 0;
           height: 1px;
           z-index: 3;
           background: linear-gradient(90deg, transparent, rgba(99,102,241,0.12) 20%, rgba(99,102,241,0.3) 50%, rgba(99,102,241,0.12) 80%, transparent);
+          will-change: transform, opacity;
           animation: ob-scanline-sweep 6s ease-in-out infinite;
         }
         @keyframes ob-scanline-sweep {
-          0% { top: 5%; opacity: 0; }
+          0% { transform: translateY(5vh); opacity: 0; }
           5% { opacity: 1; }
-          50% { top: 40%; }
+          50% { transform: translateY(40vh); }
           95% { opacity: 1; }
-          100% { top: 5%; opacity: 0; }
+          100% { transform: translateY(5vh); opacity: 0; }
         }
 
         /* 이벤트 팝업 */
@@ -1200,16 +1202,17 @@ export default function OnboardingPage() {
         .ob-cta-shimmer {
           position: absolute;
           top: 0;
-          left: -100%;
+          left: 0;
           width: 60%;
           height: 100%;
           background: linear-gradient(90deg, transparent, rgba(99,102,241,0.08), transparent);
+          will-change: transform, opacity;
           animation: ob-shimmer 3s ease-in-out infinite;
         }
         @keyframes ob-shimmer {
-          0% { left: -100%; }
-          50% { left: 150%; }
-          100% { left: 150%; }
+          0% { transform: translateX(-160%); }
+          50% { transform: translateX(250%); }
+          100% { transform: translateX(250%); }
         }
 
         .scrollbar-thin::-webkit-scrollbar { width: 4px; }

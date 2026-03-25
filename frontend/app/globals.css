@@ -399,10 +399,10 @@
 }
 
 @keyframes splash-scan {
-  0%   { top: 15%; opacity: 0; }
+  0%   { transform: translateY(15vh); opacity: 0; }
   10%  { opacity: 1; }
   90%  { opacity: 1; }
-  100% { top: 85%; opacity: 0; }
+  100% { transform: translateY(85vh); opacity: 0; }
 }
 .splash-scan {
   animation: splash-scan 3s ease-in-out infinite;

@@ -1067,6 +1067,27 @@ export default function AdminNewsletterPage() {
               )}
             </div>
 
+            {/* 샘플 데이터 리셋 */}
+            <div className="flex items-center gap-2 pb-2">
+              <button
+                onClick={async () => {
+                  if (!confirm(lang === "ko" ? "저장된 초안을 삭제하고 샘플 데이터를 다시 불러옵니다. 계속?" : "Delete saved draft and reload sample data?")) return;
+                  try {
+                    await adminFetch(`/admin/newsletter/draft?vol=${vol}&lang=${editLang}`, { method: "DELETE" });
+                    toast(lang === "ko" ? "초안 삭제됨. 새로고침 중..." : "Draft deleted. Refreshing...", "success");
+                    window.location.reload();
+                  } catch {
+                    toast(lang === "ko" ? "삭제 실패" : "Delete failed", "error");
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-lg hover:bg-secondary/50"
+              >
+                <Download className="h-3 w-3" />
+                {lang === "ko" ? "샘플 데이터 리셋" : "Reset to Sample"}
+              </button>
+              <span className="text-[10px] text-muted-foreground">중복 섹션 등 데이터 문제 시 사용</span>
+            </div>
+
             {/* 자동 발송 토글 */}
             <div className="border border-border rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
