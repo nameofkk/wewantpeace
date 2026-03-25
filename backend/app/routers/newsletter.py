@@ -1,16 +1,18 @@
 """
-/newsletter/* 뉴스레터 수신거부 + 아카이브 + 통계 API (인증 불필요)
+/newsletter/* 뉴스레터 수신거부 + 아카이브 + 통계 + 샘플 API (인증 불필요)
 
 GET  /newsletter/unsubscribe?token=xxx  -- 마스킹된 이메일 + 확인 UI 데이터
 POST /newsletter/unsubscribe            -- 수신거부 실행
 GET  /newsletter/archive                -- 발송된 뉴스레터 목록 (public)
 GET  /newsletter/archive/{log_id}       -- 특정 뉴스레터 HTML (public)
 GET  /newsletter/stats                  -- 구독자 수 (public)
+GET  /newsletter/sample?lang=kr|us      -- 샘플 뉴스레터 HTML (public)
 """
 from __future__ import annotations
 
 import hmac
 from hashlib import sha256
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
@@ -175,4 +177,52 @@ async def newsletter_archive_detail(log_id: int):
     html = await redis.get(f"newsletter:archive:{log_id}")
     if not html:
         raise HTTPException(404, detail="Newsletter not found")
+    return HTMLResponse(content=html)
+
+
+# ── GET /newsletter/sample ─────────────────────────────────────────────────
+
+@router.get("/sample")
+async def newsletter_sample(lang: str = Query("kr", regex="^(kr|us)$")):
+    """샘플 뉴스레터 HTML 반환 (공개, Redis 24h 캐시)."""
+    import chevron
+    import json as _json
+    import os
+
+    redis = get_redis()
+    cache_key = f"newsletter:sample:{lang}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return HTMLResponse(content=cached)
+
+    tpl_dir = Path(os.path.dirname(__file__)).parent / "templates" / "newsletter"
+    tpl_name = "newsletter-v1-final-ko.html" if lang == "kr" else "newsletter-v1-final-en.html"
+    tpl_path = tpl_dir / tpl_name
+    if not tpl_path.exists():
+        raise HTTPException(404, detail="Template not found")
+
+    with open(tpl_path, "r", encoding="utf-8") as f:
+        template = f.read()
+
+    # 샘플 데이터 로드
+    sample_name = "vol1-kr-sample.json" if lang == "kr" else "vol1-us-sample.json"
+    sample_path = tpl_dir / sample_name
+    data: dict = {}
+    if sample_path.exists():
+        with open(sample_path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        # @file: 참조 해소
+        for key, value in list(data.items()):
+            if isinstance(value, str) and value.startswith("@file:"):
+                ref_path = tpl_dir.parent.parent.parent.parent / "docs" / "marketing" / value[6:]
+                if not ref_path.exists():
+                    ref_path = tpl_dir / value[6:]
+                if ref_path.exists():
+                    with open(ref_path, "r", encoding="utf-8") as f:
+                        data[key] = f.read()
+        data.pop("_comment", None)
+        data.pop("_template", None)
+
+    html = chevron.render(template, data)
+    await redis.set(cache_key, html, ex=86400)  # 24h
     return HTMLResponse(content=html)

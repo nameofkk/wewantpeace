@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useAppStore } from "@/lib/store";
 import { useMe, usePatchProfile } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { Mail, X, Eye, ArrowRight } from "lucide-react";
+import { Mail, X, Eye, ArrowRight, CheckCircle } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.wewantpeace.live";
 const DISMISSED_KEY = "wwp-newsletter-cta-dismissed";
@@ -17,9 +17,10 @@ export function NewsletterCTA() {
 
   const [dismissed, setDismissed] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
-  const [latestId, setLatestId] = useState<number | null>(null);
+  const [previewLang, setPreviewLang] = useState<"kr" | "us">("kr");
   const [subCount, setSubCount] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
@@ -30,14 +31,16 @@ export function NewsletterCTA() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API}/newsletter/archive`)
-      .then((r) => r.json())
-      .then((d) => { if (Array.isArray(d) && d.length > 0) setLatestId(d[0].id); })
-      .catch(() => {});
     fetch(`${API}/newsletter/stats`)
       .then((r) => r.json())
       .then((d) => setSubCount(d.subscriber_count))
       .catch(() => {});
+  }, []);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
   const handleDismiss = useCallback(() => {
@@ -48,22 +51,22 @@ export function NewsletterCTA() {
   const isLoggedIn = !!me?.id;
   const isSubscribed = !!me?.marketing_agreed_at;
 
-  const handleSubscribe = () => {
+  const handleSubscribe = useCallback(() => {
     if (!isLoggedIn) return;
     const turningOn = !isSubscribed;
     patchProfile.mutate(
       { marketing_agreed_at: turningOn ? "now" : "" },
       {
         onSuccess: () => {
-          const msg = turningOn
-            ? lang === "ko" ? "구독 완료! 매주 월요일 브리핑을 보내드릴게요" : "Subscribed! You'll get briefings every Monday"
-            : lang === "ko" ? "구독이 해지되었습니다" : "Unsubscribed";
-          setToast(msg);
-          setTimeout(() => setToast(null), 3000);
+          showToast(
+            turningOn
+              ? lang === "ko" ? "구독 완료! 매주 월요일 브리핑을 보내드릴게요" : "Subscribed! Briefings every Monday"
+              : lang === "ko" ? "구독이 해지되었습니다" : "Unsubscribed",
+          );
         },
       },
     );
-  };
+  }, [isLoggedIn, isSubscribed, lang, patchProfile, showToast]);
 
   if (dismissed) return null;
 
@@ -73,16 +76,18 @@ export function NewsletterCTA() {
       : `${subCount.toLocaleString("en-US")} readers`
     : null;
 
+  // 미리보기 URL: archive에 있으면 archive, 없으면 sample API
+  const previewUrl = `${API}/newsletter/sample?lang=${previewLang}`;
+
   return (
     <>
       {/* ── 그래디언트 보더 카드 ── */}
       <div className="group relative rounded-xl p-[1px] bg-gradient-to-r from-blue-500/60 via-indigo-500/60 to-blue-400/60 transition-all duration-500 hover:from-blue-400 hover:via-indigo-400 hover:to-blue-300">
-        {/* Glow (호버 시 은은하게 퍼짐) */}
+        {/* Glow */}
         <div className="absolute -inset-2 rounded-2xl bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-400 opacity-0 blur-xl transition-opacity duration-700 group-hover:opacity-[0.08]" />
 
         {/* 카드 본체 */}
         <div className="relative rounded-[11px] bg-card overflow-hidden">
-          {/* 닫기 */}
           <button
             onClick={handleDismiss}
             className="absolute top-2.5 right-2.5 z-10 p-1 rounded-full hover:bg-muted/50 transition-colors"
@@ -92,7 +97,7 @@ export function NewsletterCTA() {
           </button>
 
           <div className="px-4 pt-4 pb-3.5">
-            {/* 상태 뱃지 + 소셜프루프 */}
+            {/* 상태 뱃지 */}
             <div className="flex items-center gap-1.5 mb-2.5">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -111,32 +116,23 @@ export function NewsletterCTA() {
               {t(lang, "newsletter_desc")}
             </p>
 
-            {/* 액션 영역 */}
-            <div className="flex items-center gap-2 mt-3.5">
+            {/* 액션 버튼 — 항상 full-width 중앙정렬 */}
+            <div className="mt-3.5 space-y-2">
               {isLoggedIn ? (
                 isSubscribed ? (
-                  /* 구독 중 → 심플 상태 표시 */
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className="flex-1 h-9 rounded-lg bg-muted/20 flex items-center justify-center gap-1.5">
-                      <span className="text-[11px] font-medium text-muted-foreground">
-                        {lang === "ko" ? "구독 중" : "Subscribed"}
-                      </span>
-                      <span className="text-emerald-400 text-[11px]">&#10003;</span>
-                    </div>
-                    <button
-                      onClick={handleSubscribe}
-                      disabled={patchProfile.isPending}
-                      className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0"
-                    >
-                      {lang === "ko" ? "해지" : "Cancel"}
-                    </button>
+                  /* 구독 중 — 중앙정렬된 상태 표시 */}
+                  <div className="h-9 rounded-lg bg-muted/20 flex items-center justify-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {lang === "ko" ? "구독 중 · 매주 월요일 발송" : "Subscribed · Every Monday"}
+                    </span>
                   </div>
                 ) : (
-                  /* 미구독 → CTA 버튼 (shine sweep 효과) */
+                  /* 미구독 — CTA 버튼 */
                   <button
                     onClick={handleSubscribe}
                     disabled={patchProfile.isPending}
-                    className="relative flex-1 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-semibold overflow-hidden
+                    className="relative w-full h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-semibold overflow-hidden
                       hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] transition-all
                       before:absolute before:inset-0 before:rounded-[inherit]
                       before:bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.15)_50%,transparent_75%)]
@@ -152,7 +148,7 @@ export function NewsletterCTA() {
                 )
               ) : (
                 /* 비로그인 */
-                <Link href="/login" className="flex-1">
+                <Link href="/login" className="block">
                   <div className="relative h-9 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[11px] font-semibold overflow-hidden
                     hover:from-blue-500 hover:to-indigo-500 active:scale-[0.98] transition-all
                     before:absolute before:inset-0 before:rounded-[inherit]
@@ -168,24 +164,33 @@ export function NewsletterCTA() {
                 </Link>
               )}
 
-              {/* 샘플 보기 */}
-              {latestId !== null && (
-                <button
-                  onClick={() => setShowPreview(true)}
-                  className="h-9 px-3 rounded-lg border border-border/60 text-[10px] font-medium text-muted-foreground hover:border-blue-500/30 hover:text-foreground transition-colors flex items-center gap-1 shrink-0"
-                >
-                  <Eye className="h-3 w-3" />
-                  {lang === "ko" ? "샘플" : "Sample"}
-                </button>
-              )}
+              {/* 미리보기 버튼 — 항상 표시 */}
+              <button
+                onClick={() => { setPreviewLang(lang === "ko" ? "kr" : "us"); setShowPreview(true); }}
+                className="w-full h-8 rounded-lg border border-border/60 text-[10px] font-medium text-muted-foreground hover:border-blue-500/30 hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Eye className="h-3 w-3" />
+                {lang === "ko" ? "지난 뉴스레터 미리보기" : "Preview past newsletter"}
+              </button>
             </div>
 
             {/* 하단 */}
-            <p className="text-[9px] text-muted-foreground/30 text-center mt-2.5">
-              {lang === "ko"
-                ? "무료 · 3분 분량 · 언제든 해지"
-                : "Free · 3 min read · Cancel anytime"}
-            </p>
+            {isLoggedIn && isSubscribed && (
+              <button
+                onClick={handleSubscribe}
+                disabled={patchProfile.isPending}
+                className="block mx-auto mt-2 text-[9px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
+              >
+                {lang === "ko" ? "구독 해지" : "Unsubscribe"}
+              </button>
+            )}
+            {!(isLoggedIn && isSubscribed) && (
+              <p className="text-[9px] text-muted-foreground/30 text-center mt-2">
+                {lang === "ko"
+                  ? "무료 · 3분 분량 · 언제든 해지"
+                  : "Free · 3 min read · Cancel anytime"}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -193,28 +198,53 @@ export function NewsletterCTA() {
       {/* ── 토스트 ── */}
       {toast && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[110] animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 shadow-lg shadow-emerald-500/20">
-            <span className="text-white text-[11px] font-medium">{toast}</span>
+          <div className="flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2.5 shadow-lg shadow-emerald-500/20">
+            <CheckCircle className="h-3.5 w-3.5 text-white shrink-0" />
+            <span className="text-white text-[11px] font-medium whitespace-nowrap">{toast}</span>
           </div>
         </div>
       )}
 
       {/* ── 미리보기 모달 ── */}
-      {showPreview && latestId !== null && (
+      {showPreview && (
         <div
-          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center"
           onClick={() => setShowPreview(false)}
         >
           <div
-            className="relative w-full max-w-lg max-h-[85vh] rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+            className="relative w-full sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 모달 헤더 */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-blue-500" />
                 <span className="text-sm font-bold text-gray-900">
-                  {lang === "ko" ? "지난 뉴스레터 샘플" : "Newsletter Sample"}
+                  {lang === "ko" ? "뉴스레터 미리보기" : "Newsletter Preview"}
                 </span>
+              </div>
+              {/* KR / EN 토글 */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-md p-0.5">
+                <button
+                  onClick={() => setPreviewLang("kr")}
+                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                    previewLang === "kr"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  KR
+                </button>
+                <button
+                  onClick={() => setPreviewLang("us")}
+                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                    previewLang === "us"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  EN
+                </button>
               </div>
               <button
                 onClick={() => setShowPreview(false)}
@@ -223,11 +253,13 @@ export function NewsletterCTA() {
                 <X className="h-4 w-4 text-gray-400" />
               </button>
             </div>
+            {/* 뉴스레터 HTML */}
             <div className="flex-1 overflow-auto bg-gray-50">
               <iframe
-                src={`${API}/newsletter/archive/${latestId}`}
+                key={previewLang}
+                src={previewUrl}
                 className="w-full border-0"
-                style={{ minHeight: "70vh" }}
+                style={{ minHeight: "75vh" }}
                 title="Newsletter Preview"
               />
             </div>
