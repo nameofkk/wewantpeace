@@ -30,6 +30,11 @@ async function apiFetch<T>(
   const authHeaders = await getAuthHeaders();
   const hasAuth = !!authHeaders.Authorization || !!authHeaders["X-Dev-UID"];
 
+  // 인증 없이 /me/* 호출 시 네트워크 요청 없이 즉시 에러 (브라우저 콘솔 401 방지)
+  if (!hasAuth && (path === "/me" || path.startsWith("/me/"))) {
+    throw Object.assign(new Error("Not authenticated"), { status: 401 });
+  }
+
   // 토스 WebView 등에서 fetch hang 방지: 20초 타임아웃
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
