@@ -4094,9 +4094,22 @@ async def send_newsletter_test(
     vol = body.data.get("vol_number", "?")
     # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
     import re as _re
+    from datetime import datetime as _dt, timedelta as _td
     _headline_raw = body.data.get("hero_headline_html", "")
-    _headline_text = _re.sub(r'<[^>]+>', '', _headline_raw).replace('\n', ' ').strip()
-    subject = f"[TEST] {_headline_text}" if _headline_text else f"[TEST] WeWantPeace Newsletter Vol.{vol}"
+    _headline_clean = _re.sub(r'<br\s*/?>', ' ', _headline_raw)
+    _headline_text = _re.sub(r'<[^>]+>', '', _headline_clean).replace('\n', ' ')
+    _headline_text = _re.sub(r'\s+', ' ', _headline_text).strip()
+    _date_range = ""
+    try:
+        _end = _dt.strptime(body.data.get("issue_date", ""), "%Y.%m.%d")
+        _start = _end - _td(days=6)
+        _date_range = f"{_start.month}.{_start.day}~{_end.month}.{_end.day}"
+    except Exception:
+        pass
+    _suffix = f" — WeWantPeace Vol.{vol}"
+    if _date_range:
+        _suffix += f" ({_date_range})"
+    subject = f"[TEST] {_headline_text}{_suffix}" if _headline_text else f"[TEST] WeWantPeace Newsletter Vol.{vol}"
 
     try:
         _send_email(admin.email, subject, html)
@@ -4169,9 +4182,22 @@ async def send_newsletter_all(
     vol = body.data.get("vol_number", body.vol)
     # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
     import re as _re
+    from datetime import datetime as _dt, timedelta as _td
     _headline_raw = body.data.get("hero_headline_html", "")
-    _headline_text = _re.sub(r'<[^>]+>', '', _headline_raw).replace('\n', ' ').strip()
-    subject_text = _headline_text if _headline_text else f"WeWantPeace Newsletter Vol.{vol}"
+    _headline_clean = _re.sub(r'<br\s*/?>', ' ', _headline_raw)
+    _headline_text = _re.sub(r'<[^>]+>', '', _headline_clean).replace('\n', ' ')
+    _headline_text = _re.sub(r'\s+', ' ', _headline_text).strip()
+    _date_range = ""
+    try:
+        _end = _dt.strptime(body.data.get("issue_date", ""), "%Y.%m.%d")
+        _start = _end - _td(days=6)
+        _date_range = f"{_start.month}.{_start.day}~{_end.month}.{_end.day}"
+    except Exception:
+        pass
+    _suffix = f" — WeWantPeace Vol.{vol}"
+    if _date_range:
+        _suffix += f" ({_date_range})"
+    subject_text = f"{_headline_text}{_suffix}" if _headline_text else f"WeWantPeace Newsletter Vol.{vol}"
 
     # 로그 생성
     log = MarketingEmailLog(
