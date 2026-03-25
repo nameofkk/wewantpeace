@@ -19,6 +19,7 @@ export function NewsletterCTA() {
   const [showPreview, setShowPreview] = useState(false);
   const [latestId, setLatestId] = useState<number | null>(null);
   const [subCount, setSubCount] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -49,7 +50,19 @@ export function NewsletterCTA() {
 
   const handleSubscribe = () => {
     if (!isLoggedIn) return;
-    patchProfile.mutate({ marketing_agreed_at: isSubscribed ? "" : "now" });
+    const turningOn = !isSubscribed;
+    patchProfile.mutate(
+      { marketing_agreed_at: turningOn ? "now" : "" },
+      {
+        onSuccess: () => {
+          const msg = turningOn
+            ? lang === "ko" ? "구독 완료! 매주 월요일 브리핑을 보내드릴게요" : "Subscribed! You'll get briefings every Monday"
+            : lang === "ko" ? "구독이 해지되었습니다" : "Unsubscribed";
+          setToast(msg);
+          setTimeout(() => setToast(null), 3000);
+        },
+      },
+    );
   };
 
   if (dismissed) return null;
@@ -176,6 +189,15 @@ export function NewsletterCTA() {
           </div>
         </div>
       </div>
+
+      {/* ── 토스트 ── */}
+      {toast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[110] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 shadow-lg shadow-emerald-500/20">
+            <span className="text-white text-[11px] font-medium">{toast}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── 미리보기 모달 ── */}
       {showPreview && latestId !== null && (
