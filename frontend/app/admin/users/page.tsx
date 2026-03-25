@@ -403,7 +403,7 @@ export default function AdminUsersPage() {
                       </div>
                       {u.plan !== "free" && subDateInfo(u, ko, locale) && (
                         <p className="text-[9px] text-muted-foreground mt-0.5 whitespace-nowrap">
-                          {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : ""}
+                          {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : u.sub_type === "promo" ? (ko ? "프로모 " : "Promo ") : ""}
                           {subDateInfo(u, ko, locale)}
                         </p>
                       )}
@@ -524,7 +524,7 @@ export default function AdminUsersPage() {
                 </div>
                 {u.plan !== "free" && subDateInfo(u, ko, locale) && (
                   <p className="text-[9px] text-muted-foreground mt-1 whitespace-nowrap">
-                    {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : u.sub_type === "trial" ? (ko ? "체험 " : "Trial ") : ""}
+                    {u.sub_type === "paid" ? (ko ? "결제일 " : "Paid ") : u.sub_type === "trial" ? (ko ? "체험 " : "Trial ") : u.sub_type === "promo" ? (ko ? "프로모 " : "Promo ") : ""}
                     {subDateInfo(u, ko, locale)}
                   </p>
                 )}
