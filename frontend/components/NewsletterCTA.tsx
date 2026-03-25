@@ -212,7 +212,7 @@ export function NewsletterCTA() {
           onClick={() => setShowPreview(false)}
         >
           <div
-            className="relative w-full sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 모달 헤더 */}
@@ -254,12 +254,12 @@ export function NewsletterCTA() {
               </button>
             </div>
             {/* 뉴스레터 HTML */}
-            <div className="flex-1 overflow-auto bg-gray-50">
+            <div className="flex-1 overflow-auto bg-gray-50 flex justify-center">
               <iframe
                 key={previewLang}
                 src={previewUrl}
-                className="w-full border-0"
-                style={{ minHeight: "75vh" }}
+                className="border-0"
+                style={{ width: 640, minHeight: "75vh" }}
                 title="Newsletter Preview"
               />
             </div>

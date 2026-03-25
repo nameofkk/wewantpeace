@@ -489,11 +489,9 @@ function PreviewPanel({
     requestAnimationFrame(() => setTimeout(measure, 200));
   }, []);
 
-  // 실효 스케일: 줌 > autofit > 1
+  // 실효 스케일: 줌 버튼 전용 (auto-fit 제거 — 컨테이너가 좁으면 스크롤)
   const rawW = mobileView ? 390 : CONTENT_WIDTH;
-  const effectiveScale = zoom !== 100
-    ? zoom / 100
-    : containerW < rawW ? Math.max(containerW / rawW, 0.3) : 1;
+  const effectiveScale = zoom / 100;
 
   return (
     <div className="flex flex-col h-full">
