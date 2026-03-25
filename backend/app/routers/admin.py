@@ -4027,6 +4027,19 @@ async def save_newsletter_draft(
     return {"status": "ok"}
 
 
+@router.delete("/newsletter/draft")
+async def delete_newsletter_draft(
+    vol: int = Query(1),
+    lang: str = Query("kr"),
+    admin: User = Depends(require_admin),
+):
+    """뉴스레터 초안 삭제 → 다음 로드 시 깨끗한 샘플 데이터 반환."""
+    redis = await get_redis()
+    draft_key = f"admin:newsletter:draft:vol{vol}-{lang}"
+    await redis.delete(draft_key)
+    return {"status": "ok", "message": f"Draft vol{vol}-{lang} deleted. Will load sample on next request."}
+
+
 @router.post("/newsletter/render")
 async def render_newsletter(
     body: NewsletterRenderBody,
@@ -4079,7 +4092,11 @@ async def send_newsletter_test(
     html = chevron.render(template, body.data)
 
     vol = body.data.get("vol_number", "?")
-    subject = f"[TEST] WeWantPeace Newsletter Vol.{vol}"
+    # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
+    import re as _re
+    _headline_raw = body.data.get("hero_headline_html", "")
+    _headline_text = _re.sub(r'<[^>]+>', '', _headline_raw).replace('\n', ' ').strip()
+    subject = f"[TEST] {_headline_text}" if _headline_text else f"[TEST] WeWantPeace Newsletter Vol.{vol}"
 
     try:
         _send_email(admin.email, subject, html)
@@ -4150,7 +4167,11 @@ async def send_newsletter_all(
         template = f.read()
 
     vol = body.data.get("vol_number", body.vol)
-    subject_text = f"WeWantPeace Newsletter Vol.{vol}"
+    # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
+    import re as _re
+    _headline_raw = body.data.get("hero_headline_html", "")
+    _headline_text = _re.sub(r'<[^>]+>', '', _headline_raw).replace('\n', ' ').strip()
+    subject_text = _headline_text if _headline_text else f"WeWantPeace Newsletter Vol.{vol}"
 
     # 로그 생성
     log = MarketingEmailLog(
