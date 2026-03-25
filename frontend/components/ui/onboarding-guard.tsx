@@ -25,6 +25,14 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const [splashVisible, setSplashVisible] = useState(true);
   const mountTime = useRef(Date.now());
 
+  // SSR 온보딩: 콘텐츠가 이미 HTML에 있으므로 React 스플래시 즉시 비활성화 (auth 대기 불필요)
+  useEffect(() => {
+    const p = window.location.pathname;
+    if (p === "/" || p === "/onboarding") {
+      setSplashVisible(false);
+    }
+  }, []);
+
   useEffect(() => {
     const done = localStorage.getItem("onboarding_done");
     const pathname = window.location.pathname;

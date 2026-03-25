@@ -35,6 +35,7 @@ export function SplashScreen({ visible }: SplashScreenProps) {
 
   return (
     <div
+      id="react-splash"
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden ${
         visible ? "" : "splash-fade-out"
       }`}
