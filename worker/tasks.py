@@ -30,6 +30,23 @@ def _get_sync_redis() -> _sync_redis.Redis:
     return _sync_redis_client
 
 
+def _smtp_connect(host: str, port: int, user: str, password: str, timeout: int = 15):
+    """Gmail SMTP 연결. SSL(465) 우선, 실패 시 STARTTLS(587) 폴백."""
+    import smtplib
+
+    try:
+        smtp = smtplib.SMTP_SSL(host, 465, timeout=timeout)
+        smtp.login(user, password)
+        return smtp
+    except Exception:
+        pass
+
+    smtp = smtplib.SMTP(host, port, timeout=timeout)
+    smtp.starttls()
+    smtp.login(user, password)
+    return smtp
+
+
 def _record_heartbeat(task_name: str) -> None:
     """태스크 시작 시 Redis에 마지막 실행 시각 기록."""
     try:
@@ -1847,9 +1864,7 @@ async def _send_trial_email(user_email: str, user_name: str, subject: str, templ
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(smtp_user, smtp_pass)
+        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
         smtp.sendmail(sender, user_email, msg.as_string())
         smtp.quit()
     except Exception as e:
@@ -2614,9 +2629,7 @@ async def _send_weekly_report_impl():
     batch_size = 50
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(smtp_user, smtp_pass)
+        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
     except Exception as e:
         logger.error("send_weekly_report: SMTP 연결 실패: %s", e)
         return {"status": "error", "reason": str(e)}
@@ -2809,9 +2822,7 @@ async def _send_kpi_alert_email(alerts: list[dict], week_start) -> None:
     </body></html>"""
 
     try:
-        smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
-        smtp.starttls()
-        smtp.login(smtp_user, smtp_pass)
+        smtp = _smtp_connect(smtp_host, smtp_port, smtp_user, smtp_pass)
 
         for admin in admins:
             try:
@@ -4416,9 +4427,7 @@ def send_newsletter_scheduled(self, tz_group: str):
             sent = 0
             failed = 0
             try:
-                smtp_conn = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15)
-                smtp_conn.starttls()
-                smtp_conn.login(settings.smtp_user, settings.smtp_password)
+                smtp_conn = _smtp_connect(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password)
 
                 for user, user_lang in users_to_send:
                     try:
