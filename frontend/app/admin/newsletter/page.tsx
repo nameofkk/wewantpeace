@@ -489,9 +489,20 @@ function PreviewPanel({
     requestAnimationFrame(() => setTimeout(measure, 200));
   }, []);
 
-  // 실효 스케일: 줌 버튼 전용 (auto-fit 제거 — 컨테이너가 좁으면 스크롤)
+  // 실효 스케일: 줌 버튼 전용
   const rawW = mobileView ? 390 : CONTENT_WIDTH;
   const effectiveScale = zoom / 100;
+
+  // 미리보기용 HTML: max-width 제거 + 배경 통일 → 컨테이너 폭에 맞게 늘어남
+  const previewSrcDoc = useMemo(() => {
+    if (!html) return "";
+    const inject = `<style>
+      body{background:#fff!important}
+      table[style*="max-width:600px"]{max-width:100%!important}
+      .ma{max-width:100%!important}
+    </style>`;
+    return html.replace("</head>", inject + "</head>");
+  }, [html]);
 
   return (
     <div className="flex flex-col h-full">
@@ -596,14 +607,14 @@ function PreviewPanel({
             {html}
           </pre>
         ) : (
-          <div className="flex justify-center p-1">
+          <div className="p-1">
               <iframe
                 ref={iframeRef}
-                srcDoc={html}
+                srcDoc={mobileView ? html : previewSrcDoc}
                 onLoad={handleIframeLoad}
                 className="border-0 bg-white rounded shadow-lg"
                 style={{
-                  width: rawW,
+                  width: mobileView ? rawW : "100%",
                   height: iframeH,
                   zoom: effectiveScale !== 1 ? effectiveScale : undefined,
                 }}

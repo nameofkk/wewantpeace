@@ -21,6 +21,7 @@ export function NewsletterCTA() {
   const [subCount, setSubCount] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewHtml, setPreviewHtml] = useState("");
 
   useEffect(() => {
     try {
@@ -36,6 +37,19 @@ export function NewsletterCTA() {
       .then((d) => setSubCount(d.subscriber_count))
       .catch(() => {});
   }, []);
+
+  // 미리보기 HTML fetch + CSS 주입 (max-width 제거 → 컨테이너 폭에 맞게)
+  useEffect(() => {
+    if (!showPreview) return;
+    setPreviewHtml("");
+    fetch(`${API}/newsletter/sample?lang=${previewLang}`)
+      .then((r) => r.text())
+      .then((raw) => {
+        const inject = `<style>body{background:#fff!important}table[style*="max-width:600px"]{max-width:100%!important}.ma{max-width:100%!important}</style>`;
+        setPreviewHtml(raw.replace("</head>", inject + "</head>"));
+      })
+      .catch(() => setPreviewHtml("<p style='padding:40px;text-align:center;color:#999'>로드 실패</p>"));
+  }, [showPreview, previewLang]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -75,9 +89,6 @@ export function NewsletterCTA() {
       ? `${subCount.toLocaleString("ko-KR")}명이 읽는 중`
       : `${subCount.toLocaleString("en-US")} readers`
     : null;
-
-  // 미리보기 URL: archive에 있으면 archive, 없으면 sample API
-  const previewUrl = `${API}/newsletter/sample?lang=${previewLang}`;
 
   return (
     <>
@@ -254,14 +265,21 @@ export function NewsletterCTA() {
               </button>
             </div>
             {/* 뉴스레터 HTML */}
-            <div className="flex-1 overflow-auto bg-gray-50 flex justify-center">
-              <iframe
-                key={previewLang}
-                src={previewUrl}
-                className="border-0"
-                style={{ width: 640, minHeight: "75vh" }}
-                title="Newsletter Preview"
-              />
+            <div className="flex-1 overflow-auto bg-white">
+              {previewHtml ? (
+                <iframe
+                  key={previewLang}
+                  srcDoc={previewHtml}
+                  className="w-full border-0"
+                  style={{ minHeight: "75vh" }}
+                  sandbox="allow-same-origin"
+                  title="Newsletter Preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+                  {lang === "ko" ? "로딩 중..." : "Loading..."}
+                </div>
+              )}
             </div>
           </div>
         </div>
