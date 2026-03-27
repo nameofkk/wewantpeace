@@ -66,10 +66,18 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 import os as _os
 _pool_size = 2 if _os.environ.get("CELERY_WORKER") else 5
 _max_overflow = 1 if _os.environ.get("CELERY_WORKER") else 5
+_connect_args = {}
+if not _is_sqlite and _os.environ.get("CELERY_WORKER"):
+    # Worker bulk INSERT 시 statement timeout 방지 (120초)
+    _connect_args = {"server_settings": {"statement_timeout": "120000"}}
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    **({} if _is_sqlite else {"pool_size": _pool_size, "max_overflow": _max_overflow, "pool_pre_ping": True, "pool_recycle": 1800}),
+    **({} if _is_sqlite else {
+        "pool_size": _pool_size, "max_overflow": _max_overflow,
+        "pool_pre_ping": True, "pool_recycle": 1800,
+        "connect_args": _connect_args,
+    }),
 )
 
 AsyncSessionLocal = async_sessionmaker(

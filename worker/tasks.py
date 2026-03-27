@@ -112,13 +112,21 @@ def collect_telegram(self):
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()   # ID 생성을 위해 flush 먼저
+                try:
+                    await db.flush()   # ID 생성을 위해 flush 먼저
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
@@ -153,14 +161,22 @@ def collect_rss(self):
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()   # ID 생성을 위해 flush 먼저
+                try:
+                    await db.flush()   # ID 생성을 위해 flush 먼저
+                except Exception:
+                    await db.rollback()
+                    raise
                 # 각 raw_event의 ID 수집 (flush 후 ID 할당됨)
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 # 처리 파이프라인 체이닝 (commit 후)
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
@@ -198,13 +214,21 @@ def collect_gdelt(self):
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()
+                try:
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("GDELT 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
@@ -238,13 +262,21 @@ def collect_acled(self):
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()
+                try:
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("ACLED 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
@@ -278,13 +310,21 @@ def collect_reliefweb(self):
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()
+                try:
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("ReliefWeb 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
@@ -317,13 +357,21 @@ def collect_usgs(self):
             results = await collector.collect_all(db)
             total = sum(r.collected for r in results)
             if total > 0:
-                await db.flush()
+                try:
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("USGS 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
@@ -374,13 +422,21 @@ def collect_travel_advisory(self):
 
             total = sum(r.collected for r in all_results)
             if total > 0:
-                await db.flush()
+                try:
+                    await db.flush()
+                except Exception:
+                    await db.rollback()
+                    raise
                 all_ids = []
                 for r in all_results:
                     for raw_ev in r.raw_event_ids:
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
-                await db.commit()
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 # 소스별 통계 로깅
