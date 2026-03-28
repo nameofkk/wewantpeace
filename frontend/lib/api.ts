@@ -1012,15 +1012,6 @@ export interface ClusterSignalMatch {
   metadata: Record<string, unknown> | null;
 }
 
-export interface HistoricalContext {
-  total_events: number;
-  period_start: string | null;
-  period_end: string | null;
-  top_actors: string[];
-  recent_fatalities: number;
-  yearly_trend: Record<string, unknown>[];
-}
-
 export function useClusterSignals(clusterId: string | null | undefined) {
   return useQuery({
     queryKey: ["issues", clusterId, "signals"],
@@ -1030,12 +1021,22 @@ export function useClusterSignals(clusterId: string | null | undefined) {
   });
 }
 
-export function useClusterContext(clusterId: string | null | undefined) {
+export interface CountryUcdpContext {
+  total_events: number;
+  period_start: string | null;
+  period_end: string | null;
+  top_actors: string[];
+  total_fatalities_best: number;
+  total_fatalities_low: number;
+  total_fatalities_high: number;
+}
+
+export function useCountryUcdpContext(countryCode: string | null | undefined) {
   return useQuery({
-    queryKey: ["issues", clusterId, "context"],
-    queryFn: () => apiFetch<HistoricalContext>(`/issues/${clusterId}/context`),
-    enabled: !!clusterId,
-    staleTime: 10 * 60 * 1000,
+    queryKey: ["issues", "country", countryCode, "context"],
+    queryFn: () => apiFetch<CountryUcdpContext>(`/issues/country/${countryCode}/context`),
+    enabled: !!countryCode,
+    staleTime: 30 * 60 * 1000,
   });
 }
 

@@ -1588,12 +1588,12 @@ export const translations = {
     cross_validation_boost: "교차검증으로 신뢰도 +{boost}% 상승",
     cross_validation_none: "아직 매칭된 시그널이 없습니다",
 
-    // 역사적 맥락
-    historical_context_title: "역사적 맥락",
-    historical_context_events: "이 지역의 분쟁 기록:",
-    historical_context_recorded: "{start}~{end}: {count}건의 기록된 분쟁 이벤트",
-    historical_context_actors: "주요 행위자: {actors}",
-    historical_context_fatalities: "최근 12개월 사망자: {count}명",
+    // UCDP 분쟁 기록 (국가 페이지)
+    ucdp_section_title: "분쟁 기록",
+    ucdp_period: "{start}~{end}: {count}건의 기록된 분쟁",
+    ucdp_actors: "주요 행위자: {actors}",
+    ucdp_fatalities: "누적 사망자: 약 {low}~{high}명",
+    ucdp_source: "UCDP GED · CC-BY 4.0",
 
     // 시그널 넛지 배너
     signal_nudge: "지금 이 지역에 위성 열점 {firms}건, GPS 교란 {gps}건이 감지되었습니다",
@@ -3274,12 +3274,12 @@ export const translations = {
     cross_validation_boost: "Confidence increased by +{boost}% via cross-validation",
     cross_validation_none: "No matched signals yet",
 
-    // Historical context
-    historical_context_title: "Historical Context",
-    historical_context_events: "Conflict records in this region:",
-    historical_context_recorded: "{start}-{end}: {count} recorded conflict events",
-    historical_context_actors: "Key actors: {actors}",
-    historical_context_fatalities: "Fatalities in last 12 months: {count}",
+    // UCDP conflict records (country page)
+    ucdp_section_title: "Conflict Records",
+    ucdp_period: "{start}-{end}: {count} recorded conflicts",
+    ucdp_actors: "Key actors: {actors}",
+    ucdp_fatalities: "Cumulative fatalities: ~{low}-{high}",
+    ucdp_source: "UCDP GED · CC-BY 4.0",
 
     // Signal nudge banner
     signal_nudge: "{firms} satellite hotspots and {gps} GPS jamming zones detected in this area",
