@@ -489,7 +489,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
   // ── Embedded mode: 탭 안에서 직접 표시 ──
   if (embedded) {
-    if (!inView || isLoading || (!effectiveClusterId && !is403 && !isError)) {
+    if (!inView || isLoading || (!useOverview && !effectiveClusterId && !is403 && !isError)) {
       return (
         <div ref={containerRef} className="flex items-center justify-center py-6">
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
