@@ -8,7 +8,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.li
 
 export const metadata: Metadata = {
   title: {
-    default: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    default: "WeWantPeace(위원트피스) — 실시간 글로벌 분쟁 모니터링",
     template: "%s | WeWantPeace",
   },
   description: "분쟁이 나에게 미치는 영향, 실시간으로 — 195개국 분쟁·안보 모니터링 & 개인화 영향 분석. KScore로 나에게 미치는 위험도를 확인하세요.",
@@ -38,13 +38,13 @@ export const metadata: Metadata = {
     alternateLocale: "en_US",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    title: "WeWantPeace(위원트피스) — 실시간 글로벌 분쟁 모니터링",
     description: "195개국 분쟁·안보 이슈를 실시간 모니터링. AI 기반 KScore로 나에게 미치는 영향을 분석합니다.",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace — 실시간 글로벌 분쟁 모니터링",
+    title: "WeWantPeace(위원트피스) — 실시간 글로벌 분쟁 모니터링",
     description: "195개국 분쟁·안보 이슈를 실시간 모니터링. AI 기반 KScore로 나에게 미치는 영향을 분석합니다.",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
