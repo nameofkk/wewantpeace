@@ -7,7 +7,7 @@ import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { LogoIcon } from "@/components/ui/logo-icon";
 import { isTossMiniApp } from "@/lib/platform";
-import { cn } from "@/lib/utils";
+import { cn, markOnboardingDone } from "@/lib/utils";
 
 /**
  * 공유 링크로 진입한 온보딩 미완료 유저에게 표시하는 하단 CTA 배너.
@@ -42,7 +42,7 @@ export function OnboardingBanner() {
   }
 
   function handleDismiss() {
-    localStorage.setItem("onboarding_done", "true");
+    markOnboardingDone();
     // wwp_welcome_seen은 세팅하지 않음 → 홈에서 WelcomeModal 표시
     sessionStorage.removeItem("wwp_share_entry");
     setVisible(false);

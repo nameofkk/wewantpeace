@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, getFirebaseAuth } from "@/lib/auth";
+import { markOnboardingDone } from "@/lib/utils";
 import { SplashScreen } from "./splash-screen";
 
 /** 공유 링크로 접근 가능한 경로들 */
@@ -42,7 +43,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
     // onboarding_done → 쿠키 동기화 (middleware SSR 최적화용)
     if (done) {
-      document.cookie = "onboarding_done=true; path=/; max-age=31536000; SameSite=Lax";
+      markOnboardingDone();
     }
 
     // 로그인 상태면 온보딩 자동 완료 처리 (이중 리다이렉트 방지)
@@ -50,8 +51,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     const isLoggedIn =
       !!localStorage.getItem("dev_uid") || !!auth?.currentUser;
     if (!done && isLoggedIn) {
-      localStorage.setItem("onboarding_done", "true");
-      document.cookie = "onboarding_done=true; path=/; max-age=31536000; SameSite=Lax";
+      markOnboardingDone();
       setChecked(true);
       return;
     }

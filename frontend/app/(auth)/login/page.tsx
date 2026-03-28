@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { Eye, EyeOff, CheckCircle2, Circle, Loader2, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, markOnboardingDone } from "@/lib/utils";
 import {
   signInWithGoogle,
   signInWithApple,
@@ -127,7 +127,7 @@ export default function LoginPage() {
             return;
           }
           trackEvent("auth_success", { provider: "google", source: "redirect" });
-          localStorage.setItem("onboarding_done", "true");
+          markOnboardingDone();
           localStorage.setItem("wwp_welcome_seen", String(Date.now()));
           clearTimeout(safetyTimeout);
           router.push(getReturnUrl());
@@ -267,7 +267,7 @@ export default function LoginPage() {
           }
         }
         trackEvent("auth_success", { provider: "toss", source: "login" });
-        localStorage.setItem("onboarding_done", "true");
+        markOnboardingDone();
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
       }
@@ -318,7 +318,7 @@ export default function LoginPage() {
           return;
         }
         trackEvent("auth_success", { provider: "google", source: "login" });
-        localStorage.setItem("onboarding_done", "true");
+        markOnboardingDone();
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
       } else {
@@ -383,7 +383,7 @@ export default function LoginPage() {
           return;
         }
         trackEvent("auth_success", { provider: "apple", source: "login" });
-        localStorage.setItem("onboarding_done", "true");
+        markOnboardingDone();
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
       } else {
@@ -485,8 +485,19 @@ export default function LoginPage() {
       trackEvent("auth_success", { provider: "google", source: "register" });
       // 등록 응답을 즉시 캐시에 반영 — RegistrationGuard가 stale 데이터로 리다이렉트하는 것 방지
       queryClient.setQueryData(["me"], registeredUser);
-      localStorage.setItem("onboarding_done", "true");
+      markOnboardingDone();
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));
+      // 온보딩에서 선택한 관심국가를 DB에 동기화
+      const myCountries = useAppStore.getState().myCountries;
+      if (myCountries.length > 0) {
+        for (const code of myCountries) {
+          fetch(`${API_BASE}/me/areas`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ country_code: code }),
+          }).catch(() => {}); // 비동기로 보내고 에러 무시 (navigating away)
+        }
+      }
       router.push(getReturnUrl());
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -556,7 +567,7 @@ export default function LoginPage() {
           return;
         }
         trackEvent("auth_success", { provider: "email", source: "login" });
-        localStorage.setItem("onboarding_done", "true");
+        markOnboardingDone();
         localStorage.setItem("wwp_welcome_seen", String(Date.now()));
         router.push(getReturnUrl());
       } else {
@@ -635,7 +646,7 @@ export default function LoginPage() {
       const registeredEmailUser = await res.json();
       trackEvent("auth_success", { provider: "email", source: "register" });
       queryClient.setQueryData(["me"], registeredEmailUser);
-      localStorage.setItem("onboarding_done", "true");
+      markOnboardingDone();
       localStorage.setItem("wwp_welcome_seen", String(Date.now()));
       router.push(getReturnUrl());
     } catch (e: unknown) {
