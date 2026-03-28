@@ -402,6 +402,12 @@ function ReportContent() {
                       {Math.round(animatedImpact)}
                     </span>
                     <span className="text-[10px] text-muted-foreground">/100</span>
+                    <InfoTooltip
+                      text={lang === "ko"
+                        ? "75+: 직접적 영향 · 50-74: 간접 영향 가능 · 25-49: 제한적 · 0-24: 미미"
+                        : "75+: Direct impact · 50-74: Indirect possible · 25-49: Limited · 0-24: Minimal"}
+                      direction="down"
+                    />
                     <span
                       className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
                       style={{ color, backgroundColor: `${color}12` }}
@@ -721,9 +727,16 @@ function ReportContent() {
                             </div>
                           ))}
                         </div>
-                        <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
-                          {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
-                        </p>
+                        <div className="flex items-center justify-center gap-1.5 mt-2">
+                          <p className="text-[8px] text-muted-foreground/50 text-center">
+                            {t(lang, "dash_market_disclaimer" as Parameters<typeof t>[1])}
+                          </p>
+                          {summary.market_snapshot.last_updated_at && (
+                            <span className="text-[8px] text-muted-foreground/40 shrink-0">
+                              · {lang === "ko" ? "기준일" : "As of"} {summary.market_snapshot.last_updated_at}
+                            </span>
+                          )}
+                        </div>
                       </>
                     ) : (
                       <p className="text-[11px] text-muted-foreground text-center py-4">

@@ -38,7 +38,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v15"
+_CACHE_VERSION = "v16"
 
 # 홈 국가 → 주가지수 심볼 매핑
 _HOME_INDEX_MAP: dict[str, str] = {
@@ -46,6 +46,8 @@ _HOME_INDEX_MAP: dict[str, str] = {
     "TW": "TWII", "TH": "SET", "SG": "STI", "IN": "SENSEX", "BR": "BOVESPA",
     "CA": "TSX", "FR": "CAC", "SA": "TASI", "IL": "TA35", "TR": "BIST",
     "AU": "ASX", "MX": "MXX",
+    "AE": "ADX", "VN": "VNINDEX", "RU": "MOEX", "ID": "JCI",
+    "PH": "PSEI", "PL": "WIG20", "EG": "EGX30",
 }
 
 # 국가 코드 → 국가명 (reason 표시용)
@@ -146,6 +148,8 @@ class ImpactSummaryTopIssue(BaseModel):
     so_what_line: str | None = None
     when_line: str | None = None
     relevant_commodities: list[str] | None = None
+    source_tier: str | None = None  # A/B/C/D
+    impact_reason: str | None = None  # 1-line reasoning
 
 
 class CommoditySnapshotOut(BaseModel):
@@ -173,6 +177,7 @@ class MarketSnapshotOut(BaseModel):
     commodities: list[CommoditySnapshotOut] = []
     indices: list[MarketIndexSnapshotOut] = []
     exchange_rates: list[ExchangeRateSnapshotOut] = []
+    last_updated_at: Optional[str] = None
 
 
 class TradePartnerOut(BaseModel):
@@ -440,6 +445,10 @@ async def _build_impact_summary(
         else:
             kscore_delta = round(-min(1.0, current_kscore * 0.1), 1) if current_kscore > 1 else 0
 
+        # Source Tier: 독립 소스 수 기반 등급 (A: 5+, B: 3-4, C: 2, D: 0-1)
+        _src_n = c.independent_sources or 0
+        _tier = "A" if _src_n >= 5 else ("B" if _src_n >= 3 else ("C" if _src_n >= 2 else "D"))
+
         top_issues.append(ImpactSummaryTopIssue(
             cluster_id=str(c.id),
             title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
@@ -452,7 +461,7 @@ async def _build_impact_summary(
             event_count=c.event_count or 0,
             severity=c.severity or 0,
             kscore=round(c.kscore or 0.0, 2),
-            independent_sources=c.independent_sources or 0,
+            independent_sources=_src_n,
             is_spike=c.is_spike or False,
             confidence=round(c.confidence or 0.0, 3),
             first_event_at=c.first_event_at.isoformat() if c.first_event_at else None,
@@ -463,6 +472,8 @@ async def _build_impact_summary(
             so_what_line=smart["so_what_line"],
             when_line=smart["when_line"],
             relevant_commodities=smart.get("relevant_commodities"),
+            source_tier=_tier,
+            impact_reason=reason,
         ))
 
     # 홈 국가 긴장도 조회
@@ -1514,7 +1525,7 @@ SECTOR_LABELS = {
 
 # 홈 국가 통화 매핑 (주요 환율 표시용)
 _HOME_CURRENCIES: dict[str, list[str]] = {
-    # DB에 수집되는 통화: AUD BRL CAD CNY EUR GBP ILS INR JPY KRW MXN SGD THB TRY
+    # DB에 수집되는 통화: AUD BRL CAD CNY EUR GBP IDR ILS INR JPY KRW MXN PHP PLN SGD THB TRY
     # 동아시아
     "KR": ["KRW", "JPY", "CNY", "EUR"],
     "JP": ["JPY", "KRW", "CNY", "EUR"],
@@ -1524,8 +1535,8 @@ _HOME_CURRENCIES: dict[str, list[str]] = {
     "TH": ["THB", "CNY", "JPY", "KRW"],
     "VN": ["CNY", "JPY", "KRW", "THB"],
     "SG": ["SGD", "CNY", "JPY", "EUR"],
-    "ID": ["CNY", "JPY", "SGD", "AUD"],
-    "PH": ["CNY", "JPY", "SGD", "KRW"],
+    "ID": ["IDR", "CNY", "JPY", "SGD"],
+    "PH": ["PHP", "CNY", "JPY", "SGD"],
     # 남아시아
     "IN": ["INR", "CNY", "JPY", "EUR"],
     # 북미
@@ -1536,7 +1547,7 @@ _HOME_CURRENCIES: dict[str, list[str]] = {
     "DE": ["EUR", "GBP", "JPY", "CNY"],
     "GB": ["GBP", "EUR", "JPY", "CNY"],
     "FR": ["EUR", "GBP", "JPY", "CNY"],
-    "PL": ["EUR", "GBP", "CNY", "TRY"],
+    "PL": ["PLN", "EUR", "GBP", "CNY"],
     "RU": ["CNY", "EUR", "INR", "TRY"],
     "TR": ["TRY", "EUR", "GBP", "CNY"],
     # 중동
@@ -2346,10 +2357,30 @@ async def _get_market_snapshot(
     if not commodities and not indices and not exchange_rates:
         return None
 
+    # last_updated_at: 원자재/지수 중 가장 최근 날짜
+    latest_dates: list[str] = []
+    _cp_date_q = await db.execute(
+        select(func.max(CommodityPrice.price_date))
+        .where(CommodityPrice.symbol.in_(_commodity_symbols))
+    )
+    cp_max = _cp_date_q.scalar()
+    if cp_max:
+        latest_dates.append(str(cp_max))
+    _mi_date_q = await db.execute(
+        select(func.max(MarketIndex.index_date))
+        .where(MarketIndex.symbol.in_(list(_HOME_INDEX_MAP.values())))
+    )
+    mi_max = _mi_date_q.scalar()
+    if mi_max:
+        latest_dates.append(str(mi_max))
+
+    last_updated = max(latest_dates) if latest_dates else None
+
     return {
         "commodities": commodities,
         "indices": indices,
         "exchange_rates": exchange_rates,
+        "last_updated_at": last_updated,
     }
 
 
