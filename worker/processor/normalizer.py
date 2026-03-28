@@ -1773,16 +1773,21 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
 # 테러 관련 외교/행정 맥락 — "테러 조직 지정" 같은 기사에서 terror STRONG 키워드 무효화
 # (실제 테러 사건이 아닌 외교·행정·사법 조치에 대한 기사)
 _TERROR_DIPLOMATIC_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
-    # 테러 조직 지정/분류/블랙리스트
-    r"(designat|classif|label|blacklist|delist|list|declar)\w{0,5}\s.{0,30}\b(terrorist|terror)\b",
-    r"\b(terrorist|terror)\b.{0,30}(designation|classification|label|listing|blacklist|delist|list\b)",
-    r"\b(terrorist|terror)\s+(organization|group|entity|network)\s+(list|designation|label)",
+    # 테러 조직 지정/분류/블랙리스트 — 범위 .{0,60}으로 확장
+    r"(designat|classif|label|blacklist|delist|list|declar)\w{0,5}\s.{0,60}\b(terrorist|terror)\b",
+    r"\b(terrorist|terror)\b.{0,60}(designation|classification|label|listing|blacklist|delist|list\b)",
+    r"\b(terrorist|terror)\s+(organization|group|entity|network)\b",
+    # 외교적 압박/촉구 맥락
+    r"(push|press|urg|call|pressure)\w{0,5}\s.{0,60}(blacklist|designat|classif|label).{0,30}(terrorist|terror)",
+    r"(push|press|urg|call|pressure)\w{0,5}\s.{0,60}(terrorist|terror)",
     # 테러 관련 사법/수사 논의 (실제 사건이 아닌 사후 논의)
-    r"(prob|investigat|charg|convict|sentenc|tri|acquit)\w{0,5}.{0,30}(terrorism|terror)\s*(link|ties|connection|charge|count)",
+    r"(prob|investigat|charg|convict|sentenc|tri|acquit)\w{0,5}.{0,40}(terrorism|terror)\s*(link|ties|connection|charge|count)",
     r"(terrorism|terror)\s*(charge|count|conviction|sentence|trial|probe|investigation)",
     # 테러 방지/대응 정책 논의
     r"(counter|anti).?terror",
     r"(terror|terrorist).{0,20}(policy|legislation|law|act|bill|statute|measure)",
+    # 정상회담/회의에서 테러 논의
+    r"(summit|conference|meeting|talks|diplomats?).{0,40}(terrorist|terror)",
 ]]
 
 
@@ -2044,6 +2049,9 @@ def _classify_topic(text: str) -> str:
 
         # 비군사 문맥이면 conflict/terror weak 키워드 무효화
         if non_military and topic in ("conflict", "terror"):
+            weak_hits = 0
+        # 테러 외교 맥락이면 terror weak 키워드도 무효화
+        if topic == "terror" and terror_diplomatic:
             weak_hits = 0
 
         # coup / cyber / maritime / disaster / health는 도메인이 좁아 1개도 충분
