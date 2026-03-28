@@ -38,7 +38,15 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v14"
+_CACHE_VERSION = "v15"
+
+# 홈 국가 → 주가지수 심볼 매핑
+_HOME_INDEX_MAP: dict[str, str] = {
+    "KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE",
+    "TW": "TWII", "TH": "SET", "SG": "STI", "IN": "SENSEX", "BR": "BOVESPA",
+    "CA": "TSX", "FR": "CAC", "SA": "TASI", "IL": "TA35", "TR": "BIST",
+    "AU": "ASX", "MX": "MXX",
+}
 
 # 국가 코드 → 국가명 (reason 표시용)
 _COUNTRY_DISPLAY = {
@@ -528,7 +536,7 @@ async def _build_impact_summary(
         gold_row = gold_q.first()
 
         # 홈 국가 주가지수 (1 쿼리)
-        home_idx_map = {"KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE"}
+        home_idx_map = _HOME_INDEX_MAP
         home_idx_sym = home_idx_map.get(home)
         idx_str = None
         if home_idx_sym:
@@ -613,29 +621,29 @@ async def _build_impact_summary(
             if energy_risk and oil_row:
                 price, chg = oil_row
                 if chg > 0:
-                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%) — 배럴당 $80+ 지속 시 정유·항공·물류 마진 압박 예상")
+                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%), 배럴당 $80+ 지속 시 정유·항공·물류 마진 압박 예상")
                 else:
-                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%) — 하락세지만 중동 리스크 프리미엄 상존")
+                    econ_parts.append(f"유가 ${price:,.0f}({chg:+.1f}%). 하락세지만 중동 리스크 프리미엄 상존")
             elif oil_str:
                 econ_parts.append(f"유가 {oil_str}")
             if gold_row and gold_row[1] > 1.0:
-                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 안전자산 선호 확대 — 리스크오프 심리 강화 신호")
+                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 안전자산 선호 확대, 리스크오프 심리 강화 신호")
             elif gold_row and gold_row[1] < -1.0:
-                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 하락 — 리스크 완화 또는 달러 강세 영향")
+                econ_parts.append(f"금 ${gold_row[0]:,.0f}({gold_row[1]:+.1f}%) 하락. 리스크 완화 또는 달러 강세 영향")
             if idx_str:
                 econ_parts.append(idx_str)
             if sector_details:
-                econ_parts.append(f"영향 섹터: {', '.join(sector_details[:3])} — 관련주 변동성 확대 구간")
+                econ_parts.append(f"영향 섹터: {', '.join(sector_details[:3])}. 관련주 변동성 확대 구간")
             # 경제 지표 추가 인사이트
             inflation_val = econ_extras.get("inflation")
             trade_open_val = econ_extras.get("trade_openness")
             ca_val = econ_extras.get("current_account")
             if inflation_val and inflation_val > 5:
-                econ_parts.append(f"인플레이션 {inflation_val:.1f}% — 원자재 상승 시 추가 물가 압력")
+                econ_parts.append(f"인플레이션 {inflation_val:.1f}%, 원자재 상승 시 추가 물가 압력")
             if trade_open_val and trade_open_val > 80:
-                econ_parts.append(f"교역/GDP {trade_open_val:.0f}% — 글로벌 공급망 교란에 높은 노출")
+                econ_parts.append(f"교역/GDP {trade_open_val:.0f}%, 글로벌 공급망 교란에 높은 노출")
             if ca_val and ca_val < 0:
-                econ_parts.append("경상수지 적자 — 외환 유출 리스크")
+                econ_parts.append("경상수지 적자, 외환 유출 리스크")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} 경제 직접 영향 제한적, 간접 파급 모니터링 중."
 
             # ── Trade: 의존도 비율 + 공급망 시사점 ──
@@ -643,14 +651,14 @@ async def _build_impact_summary(
             if trade_vols:
                 sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
                 top_tv = sorted_tv[0]
-                trade_parts.append(f"{display_home}↔{top_tv[0]} 교역 {_fmt_usd(top_tv[1])} — 분쟁국 중 최대 노출 지점")
+                trade_parts.append(f"{display_home}↔{top_tv[0]} 교역 {_fmt_usd(top_tv[1])}, 분쟁국 중 최대 노출 지점")
                 if len(sorted_tv) > 1:
                     for c, v in sorted_tv[1:3]:
                         trade_parts.append(f"{display_home}↔{c} {_fmt_usd(v)} 교역 분쟁 영향권 내")
                 if energy_risk and total_conflict_trade > 0:
-                    trade_parts.append(f"에너지 수입선 다변화 불가 시 공급 차질 리스크 — 대체 조달 소요 최소 2-4주")
+                    trade_parts.append(f"에너지 수입선 다변화 불가 시 공급 차질 리스크. 대체 조달 소요 최소 2-4주")
             elif energy_risk:
-                trade_parts.append("에너지 수입 의존국 불안정 — 유가·가스 가격 연동 리스크 확대")
+                trade_parts.append("에너지 수입 의존국 불안정, 유가·가스 가격 연동 리스크 확대")
             if not trade_parts:
                 trade_parts.append(f"{display_home} 직접 교역 리스크 제한적이나 글로벌 공급망 간접 파급 주시 필요")
             trade = ". ".join(trade_parts) + "."
@@ -664,8 +672,8 @@ async def _build_impact_summary(
                 )
                 lv4_in_issues = [r[0] for r in lv4_names_q.all()]
                 if lv4_in_issues:
-                    travel_parts.append(f"이슈 관련 {len(lv4_in_issues)}개국 여행금지(Lv.4): {', '.join(lv4_in_issues[:4])} — 인접국 경유편 취소·감편 가능성")
-                travel_parts.append(f"전 세계 {lv4_count}개국 여행금지 상태 — 분쟁 확산 시 인접국 경보 상향 가능")
+                    travel_parts.append(f"이슈 관련 {len(lv4_in_issues)}개국 여행금지(Lv.4): {', '.join(lv4_in_issues[:4])}. 인접국 경유편 취소·감편 가능성")
+                travel_parts.append(f"전 세계 {lv4_count}개국 여행금지 상태. 분쟁 확산 시 인접국 경보 상향 가능")
             if critical_count > 0:
                 travel_parts.append(f"고영향 이슈 {critical_count}건 관련 항공편 변동·보험료 할증 주의")
             if not travel_parts:
@@ -678,52 +686,52 @@ async def _build_impact_summary(
             if energy_risk and oil_row:
                 price, chg = oil_row
                 if chg > 0:
-                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%) — sustained above $80/bbl pressures refinery, airline & logistics margins")
+                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%); sustained above $80/bbl pressures refinery, airline & logistics margins")
                 else:
-                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%) — declining, but geopolitical risk premium persists")
+                    econ_parts.append(f"Oil ${price:,.0f} ({chg:+.1f}%). Declining, but geopolitical risk premium persists")
             elif oil_str:
                 econ_parts.append(f"Oil {oil_str}")
             if gold_row and gold_row[1] > 1.0:
-                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) rising — risk-off sentiment strengthening")
+                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) rising; risk-off sentiment strengthening")
             elif gold_row and gold_row[1] < -1.0:
-                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) falling — risk easing or dollar strength")
+                econ_parts.append(f"Gold ${gold_row[0]:,.0f} ({gold_row[1]:+.1f}%) falling. Risk easing or dollar strength")
             if idx_str:
                 econ_parts.append(idx_str)
             if sector_details:
-                econ_parts.append(f"Exposed sectors: {', '.join(sector_details[:3])} — elevated volatility expected")
+                econ_parts.append(f"Exposed sectors: {', '.join(sector_details[:3])}. Elevated volatility expected")
             # Economic indicator insights
             inflation_val = econ_extras.get("inflation")
             trade_open_val = econ_extras.get("trade_openness")
             ca_val = econ_extras.get("current_account")
             if inflation_val and inflation_val > 5:
-                econ_parts.append(f"Inflation {inflation_val:.1f}% — commodity spikes add further price pressure")
+                econ_parts.append(f"Inflation {inflation_val:.1f}%; commodity spikes add further price pressure")
             if trade_open_val and trade_open_val > 80:
-                econ_parts.append(f"Trade/GDP {trade_open_val:.0f}% — high exposure to global supply chain disruptions")
+                econ_parts.append(f"Trade/GDP {trade_open_val:.0f}%, high exposure to global supply chain disruptions")
             if ca_val and ca_val < 0:
-                econ_parts.append("Current account deficit — forex outflow risk")
+                econ_parts.append("Current account deficit, forex outflow risk")
             economy = ". ".join(econ_parts) + "." if econ_parts else f"{display_home} economy: limited direct impact, monitoring indirect spillover."
 
             trade_parts = []
             if trade_vols:
                 sorted_tv = sorted(trade_vols.items(), key=lambda x: -x[1])
                 top_tv = sorted_tv[0]
-                trade_parts.append(f"{display_home}↔{top_tv[0]} trade at {_fmt_usd(top_tv[1])} — primary conflict exposure")
+                trade_parts.append(f"{display_home}↔{top_tv[0]} trade at {_fmt_usd(top_tv[1])}, primary conflict exposure")
                 if len(sorted_tv) > 1:
                     for c, v in sorted_tv[1:3]:
                         trade_parts.append(f"{display_home}↔{c} {_fmt_usd(v)} within conflict zone")
                 if energy_risk and total_conflict_trade > 0:
                     trade_parts.append("Energy supply diversification lag 2-4 weeks if disrupted")
             elif energy_risk:
-                trade_parts.append("Energy import dependency at risk — oil & gas price pass-through likely")
+                trade_parts.append("Energy import dependency at risk; oil & gas price pass-through likely")
             if not trade_parts:
                 trade_parts.append(f"Direct trade exposure for {display_home} limited; global supply chain spillover possible")
             trade = ". ".join(trade_parts) + "."
 
             travel_parts = []
             if lv4_count > 0:
-                travel_parts.append(f"{lv4_count} countries at Do Not Travel (Lv.4) — adjacent transit routes may face cancellations")
+                travel_parts.append(f"{lv4_count} countries at Do Not Travel (Lv.4). Adjacent transit routes may face cancellations")
             if critical_count > 0:
-                travel_parts.append(f"{critical_count} high-impact issues — flight disruptions & insurance surcharges possible")
+                travel_parts.append(f"{critical_count} high-impact issues. Flight disruptions & insurance surcharges possible")
             if not travel_parts:
                 travel_parts.append("No major travel restrictions. Monitoring advisory escalation near conflict zones")
             travel = ". ".join(travel_parts) + "."
@@ -1127,7 +1135,7 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
         else:
             travel += "현지 안전 공지 확인 권장."
 
-        summary = f"{cluster_title[:50]} — {home_country} 영향도 {score}/100"
+        summary = f"{cluster_title[:50]}. {home_country} 영향도 {score}/100"
         if sectors_str:
             summary += f" ({sectors_str} 영향)"
 
@@ -1152,7 +1160,7 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
     if sectors_str:
         trade = f"{home_country}'s {sectors_str} sectors exposed. "
     if trade_vol_str:
-        trade += f"Trade volume {trade_vol_str} — monitor supply chain disruptions."
+        trade += f"Trade volume {trade_vol_str}. Monitor supply chain disruptions."
     else:
         trade += "Low direct trade exposure; watch for indirect spillover."
 
@@ -1162,7 +1170,7 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
     else:
         travel += "Check local advisories before traveling."
 
-    summary = f"{cluster_title[:50]} — Impact on {home_country}: {score}/100"
+    summary = f"{cluster_title[:50]}. Impact on {home_country}: {score}/100"
     if sectors_str:
         summary += f" ({sectors_str} exposed)"
 
@@ -1505,13 +1513,41 @@ SECTOR_LABELS = {
 # ── Phase 2 헬퍼 함수들 ─────────────────────────────────────────────────
 
 # 홈 국가 통화 매핑 (주요 환율 표시용)
-_HOME_CURRENCIES = {
+_HOME_CURRENCIES: dict[str, list[str]] = {
+    # DB에 수집되는 통화: AUD BRL CAD CNY EUR GBP ILS INR JPY KRW MXN SGD THB TRY
+    # 동아시아
     "KR": ["KRW", "JPY", "CNY", "EUR"],
-    "US": ["EUR", "JPY", "GBP", "CNY"],
     "JP": ["JPY", "KRW", "CNY", "EUR"],
     "CN": ["CNY", "JPY", "KRW", "EUR"],
+    "TW": ["CNY", "JPY", "KRW", "EUR"],
+    # 동남아
+    "TH": ["THB", "CNY", "JPY", "KRW"],
+    "VN": ["CNY", "JPY", "KRW", "THB"],
+    "SG": ["SGD", "CNY", "JPY", "EUR"],
+    "ID": ["CNY", "JPY", "SGD", "AUD"],
+    "PH": ["CNY", "JPY", "SGD", "KRW"],
+    # 남아시아
+    "IN": ["INR", "CNY", "JPY", "EUR"],
+    # 북미
+    "US": ["EUR", "JPY", "GBP", "CNY"],
+    "CA": ["CAD", "EUR", "JPY", "CNY"],
+    "MX": ["MXN", "EUR", "CAD", "CNY"],
+    # 유럽
     "DE": ["EUR", "GBP", "JPY", "CNY"],
     "GB": ["GBP", "EUR", "JPY", "CNY"],
+    "FR": ["EUR", "GBP", "JPY", "CNY"],
+    "PL": ["EUR", "GBP", "CNY", "TRY"],
+    "RU": ["CNY", "EUR", "INR", "TRY"],
+    "TR": ["TRY", "EUR", "GBP", "CNY"],
+    # 중동
+    "SA": ["EUR", "CNY", "INR", "GBP"],
+    "AE": ["EUR", "CNY", "INR", "GBP"],
+    "IL": ["ILS", "EUR", "GBP", "CNY"],
+    "EG": ["EUR", "CNY", "GBP", "INR"],
+    # 오세아니아
+    "AU": ["AUD", "CNY", "JPY", "EUR"],
+    # 남미
+    "BR": ["BRL", "EUR", "CNY", "MXN"],
 }
 
 # ── 국가→관련 원자재 매핑 (reason/summary 다양화용) ──
@@ -1769,29 +1805,29 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
             so_what_line = f"Trade with {c_name} {trade_str}, {top_sector} import prices may rise"
         elif affected_sectors:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%) — volatility expected"
+            so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%), volatility expected"
         else:
             so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row, commodity_prices)
 
     # when_line
     if lang == "ko":
         if severity >= 80 and topic in ("conflict", "terror"):
-            when_line = "즉각적 — 시장 이미 반영 중"
+            when_line = "즉각적. 시장 이미 반영 중"
         elif severity >= 60:
             when_line = "1-2주 내 공급망 영향"
         elif severity >= 40:
             when_line = "1-3개월 모니터링 필요"
         else:
-            when_line = "간접 영향 — 추이 관찰"
+            when_line = "간접 영향. 추이 관찰"
     else:
         if severity >= 80 and topic in ("conflict", "terror"):
-            when_line = "Immediate — markets pricing in"
+            when_line = "Immediate. Markets pricing in"
         elif severity >= 60:
             when_line = "Supply chain impact in 1-2 weeks"
         elif severity >= 40:
             when_line = "Monitor over 1-3 months"
         else:
-            when_line = "Indirect — monitoring trend"
+            when_line = "Indirect. Monitoring trend"
 
     # relevant_commodities: SmartSummaryCard 마켓칩용
     rel_syms = _get_relevant_symbols(cc, topic, commodity_prices)
@@ -1848,7 +1884,7 @@ async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_r
 
     # Finance: market index change
     try:
-        home_idx_map = {"KR": "KOSPI", "US": "SPX", "JP": "NKY", "CN": "SSE", "DE": "DAX", "GB": "FTSE"}
+        home_idx_map = _HOME_INDEX_MAP
         idx_sym = home_idx_map.get(home)
         finance_score = 30  # default
         if idx_sym:
@@ -2202,12 +2238,39 @@ async def _get_market_snapshot(
 
     # 1) 원자재: 국가별 관심 심볼 (DISTINCT ON)
     _COMMODITY_BY_HOME: dict[str, list[str]] = {
+        # 동아시아 — 에너지 수입 의존 + 해운
         "KR": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT", "BDRY"],
         "JP": ["WTI", "BRENT", "GOLD", "RICE", "NATGAS", "BDRY"],
-        "US": ["WTI", "BRENT", "GOLD", "NATGAS", "CORN", "SOYBEAN"],
         "CN": ["WTI", "BRENT", "GOLD", "SOYBEAN", "WHEAT", "NATGAS"],
+        "TW": ["WTI", "BRENT", "GOLD", "NATGAS", "BDRY"],
+        # 동남아 — 쌀 + 에너지
+        "TH": ["WTI", "GOLD", "RICE", "NATGAS", "BDRY"],
+        "VN": ["WTI", "GOLD", "RICE", "NATGAS", "BDRY"],
+        "SG": ["WTI", "BRENT", "GOLD", "NATGAS", "BDRY"],
+        "ID": ["WTI", "GOLD", "RICE", "NATGAS", "CORN"],
+        "PH": ["WTI", "GOLD", "RICE", "WHEAT", "BDRY"],
+        # 남아시아
+        "IN": ["WTI", "BRENT", "GOLD", "RICE", "WHEAT", "NATGAS"],
+        # 북미 — 곡물 수출국
+        "US": ["WTI", "BRENT", "GOLD", "NATGAS", "CORN", "SOYBEAN"],
+        "CA": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "MX": ["WTI", "BRENT", "GOLD", "CORN", "SILVER"],
+        # 유럽 — 가스 의존
         "DE": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
         "GB": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "FR": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "PL": ["WTI", "NATGAS", "GOLD", "WHEAT", "CORN"],
+        "RU": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "TR": ["WTI", "BRENT", "GOLD", "WHEAT", "NATGAS"],
+        # 중동 — 원유 생산국
+        "SA": ["WTI", "BRENT", "GOLD", "NATGAS", "SILVER"],
+        "AE": ["WTI", "BRENT", "GOLD", "NATGAS", "SILVER"],
+        "IL": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "EG": ["WTI", "BRENT", "GOLD", "WHEAT", "BDRY"],
+        # 오세아니아 — 자원 수출국
+        "AU": ["WTI", "GOLD", "WHEAT", "CORN", "NATGAS"],
+        # 남미 — 곡물·자원
+        "BR": ["WTI", "GOLD", "SOYBEAN", "CORN", "SILVER"],
     }
     _commodity_symbols = _COMMODITY_BY_HOME.get(home_country, ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"])
     commodity_q = await db.execute(
@@ -2228,7 +2291,7 @@ async def _get_market_snapshot(
     index_q = await db.execute(
         select(MarketIndex)
         .distinct(MarketIndex.symbol)
-        .where(MarketIndex.symbol.in_(["KOSPI", "SPX", "NKY", "DAX", "FTSE", "SSE"]))
+        .where(MarketIndex.symbol.in_(list(_HOME_INDEX_MAP.values())))
         .order_by(MarketIndex.symbol, MarketIndex.index_date.desc())
     )
     for row in index_q.scalars().all():
@@ -2501,97 +2564,97 @@ async def _get_real_trade_dependency(
 _SECTOR_NARRATIVES: dict[tuple[str, str], dict[str, dict[str, str]]] = {
     # conflict
     ("conflict", "energy"): {
-        "ko": {"critical": "원유·가스 공급 즉시 차질 — 유가 급등 압력, 정유·항공·물류 마진 급락",
-               "high": "주요 유전지역 불안정 — 유가 5-10% 변동성 확대, 난방·수송 비용 상승",
+        "ko": {"critical": "원유·가스 공급 즉시 차질. 유가 급등 압력, 정유·항공·물류 마진 급락",
+               "high": "주요 유전지역 불안정, 유가 5-10% 변동성 확대, 난방·수송 비용 상승",
                "medium": "공급 차질 제한적이나 유가 변동성 확대 모니터링 필요"},
-        "en": {"critical": "Oil/gas supply disruption imminent — fuel price spike, refinery & aviation margin collapse",
-               "high": "Instability in key oil regions — 5-10% price volatility, heating & transport cost rise",
+        "en": {"critical": "Oil/gas supply disruption imminent. Fuel price spike, refinery & aviation margin collapse",
+               "high": "Instability in key oil regions, 5-10% price volatility, heating & transport cost rise",
                "medium": "Limited supply impact but elevated price volatility warrants monitoring"},
     },
     ("conflict", "shipping"): {
-        "ko": {"critical": "주요 해운 경로 차단 위험 — 우회 비용 30-50% 증가, 납기 1-3주 지연",
-               "high": "해운 보험료 급등 + 항로 우회 — 물류 비용 15-25% 상승",
-               "medium": "해상 운송 리스크 상승 — 보험료 인상, 일부 선적 지연"},
-        "en": {"critical": "Major shipping route blockage risk — rerouting costs +30-50%, 1-3 week delays",
-               "high": "Shipping insurance surge + route diversion — logistics costs +15-25%",
-               "medium": "Elevated maritime risk — insurance hikes, selective shipment delays"},
+        "ko": {"critical": "주요 해운 경로 차단 위험, 우회 비용 30-50% 증가, 납기 1-3주 지연",
+               "high": "해운 보험료 급등 + 항로 우회, 물류 비용 15-25% 상승",
+               "medium": "해상 운송 리스크 상승, 보험료 인상, 일부 선적 지연"},
+        "en": {"critical": "Major shipping route blockage risk; rerouting costs +30-50%, 1-3 week delays",
+               "high": "Shipping insurance surge + route diversion, logistics costs +15-25%",
+               "medium": "Elevated maritime risk; insurance hikes, selective shipment delays"},
     },
     ("conflict", "semiconductor"): {
-        "ko": {"critical": "희토류·특수가스 공급 중단 — 칩 생산 차질, 납기 4-6주 지연",
-               "high": "반도체 원자재 공급 불안 — 납기 2-3주 지연, 재고 확보 경쟁 심화",
-               "medium": "간접 영향 — 글로벌 공급망 불확실성으로 선제 재고 확보 움직임"},
-        "en": {"critical": "Rare earth / specialty gas supply cut — chip production halt, 4-6 week delays",
-               "high": "Semiconductor raw material instability — 2-3 week delays, inventory competition",
-               "medium": "Indirect impact — precautionary stockpiling amid global uncertainty"},
+        "ko": {"critical": "희토류·특수가스 공급 중단, 칩 생산 차질, 납기 4-6주 지연",
+               "high": "반도체 원자재 공급 불안, 납기 2-3주 지연, 재고 확보 경쟁 심화",
+               "medium": "간접 영향. 글로벌 공급망 불확실성으로 선제 재고 확보 움직임"},
+        "en": {"critical": "Rare earth / specialty gas supply cut, chip production halt, 4-6 week delays",
+               "high": "Semiconductor raw material instability; 2-3 week delays, inventory competition",
+               "medium": "Indirect impact. Precautionary stockpiling amid global uncertainty"},
     },
     ("conflict", "agriculture"): {
-        "ko": {"critical": "곡물 수출국 분쟁 — 밀·옥수수 공급 차단, 식품 가격 급등",
-               "high": "식량 공급망 불안 — 곡물 가격 10-20% 상승 압력, 사료 비용 연동",
-               "medium": "식량 수급 모니터링 필요 — 가격 변동 확대"},
-        "en": {"critical": "Grain exporter conflict — wheat/corn supply blocked, food price surge",
-               "high": "Food supply chain stress — grain prices +10-20%, feed cost spillover",
-               "medium": "Food supply monitoring needed — price volatility widening"},
+        "ko": {"critical": "곡물 수출국 분쟁, 밀·옥수수 공급 차단, 식품 가격 급등",
+               "high": "식량 공급망 불안, 곡물 가격 10-20% 상승 압력, 사료 비용 연동",
+               "medium": "식량 수급 모니터링 필요, 가격 변동 확대"},
+        "en": {"critical": "Grain exporter conflict; wheat/corn supply blocked, food price surge",
+               "high": "Food supply chain stress; grain prices +10-20%, feed cost spillover",
+               "medium": "Food supply monitoring needed; price volatility widening"},
     },
     ("conflict", "defense"): {
-        "ko": {"critical": "방산 수요 폭증 — 군수품 납기 장기화, 방산주 급등",
-               "high": "군비 확장 압력 — 방산 부품 수급 긴장, 수출 기회 확대",
-               "medium": "지정학 리스크 반영 — 방위 예산 증액 논의 활발"},
-        "en": {"critical": "Defense demand surge — military supply backlogs, defense stocks spike",
-               "high": "Arms buildup pressure — defense parts supply tension, export opportunity",
-               "medium": "Geopolitical risk priced in — defense budget increase discussions active"},
+        "ko": {"critical": "방산 수요 폭증, 군수품 납기 장기화, 방산주 급등",
+               "high": "군비 확장 압력, 방산 부품 수급 긴장, 수출 기회 확대",
+               "medium": "지정학 리스크 반영, 방위 예산 증액 논의 활발"},
+        "en": {"critical": "Defense demand surge; military supply backlogs, defense stocks spike",
+               "high": "Arms buildup pressure; defense parts supply tension, export opportunity",
+               "medium": "Geopolitical risk priced in; defense budget increase discussions active"},
     },
     ("conflict", "tourism"): {
-        "ko": {"critical": "분쟁 지역 전면 여행 금지 — 항공편 취소, 인접국 관광 수요 급감",
-               "high": "여행 경보 상향 — 해당 지역 예약 취소 급증, 항공사 노선 조정",
-               "medium": "여행 심리 위축 — 인접 지역 관광 수요 소폭 감소"},
-        "en": {"critical": "Full travel ban to conflict zone — flight cancellations, adjacent tourism collapse",
-               "high": "Travel advisory upgrade — mass cancellations, airline route adjustments",
-               "medium": "Travel sentiment weakened — slight decline in adjacent tourism demand"},
+        "ko": {"critical": "분쟁 지역 전면 여행 금지. 항공편 취소, 인접국 관광 수요 급감",
+               "high": "여행 경보 상향. 해당 지역 예약 취소 급증, 항공사 노선 조정",
+               "medium": "여행 심리 위축. 인접 지역 관광 수요 소폭 감소"},
+        "en": {"critical": "Full travel ban to conflict zone. Flight cancellations, adjacent tourism collapse",
+               "high": "Travel advisory upgrade. Mass cancellations, airline route adjustments",
+               "medium": "Travel sentiment weakened. Slight decline in adjacent tourism demand"},
     },
     # sanctions
     ("sanctions", "energy"): {
-        "ko": {"critical": "에너지 수출 제재 — 대체 조달처 확보 시급, 유가 $20+ 프리미엄",
-               "high": "에너지 제재 확대 — 우회 수입 비용 증가, 장기 계약 재협상 필요"},
-        "en": {"critical": "Energy export sanctions — urgent alternative sourcing, $20+ oil premium",
-               "high": "Expanded energy sanctions — circumvention costs rise, contract renegotiation needed"},
+        "ko": {"critical": "에너지 수출 제재. 대체 조달처 확보 시급, 유가 $20+ 프리미엄",
+               "high": "에너지 제재 확대, 우회 수입 비용 증가, 장기 계약 재협상 필요"},
+        "en": {"critical": "Energy export sanctions. Urgent alternative sourcing, $20+ oil premium",
+               "high": "Expanded energy sanctions; circumvention costs rise, contract renegotiation needed"},
     },
     ("sanctions", "manufacturing"): {
-        "ko": {"critical": "제재 대상국 부품 즉시 수입 금지 — 생산 라인 2-4주 중단 위험",
-               "high": "제재 강화 시 부품 공급처 전환 필요 — 전환 비용 10-15% 증가"},
-        "en": {"critical": "Sanctioned parts import ban — production line shutdown risk for 2-4 weeks",
-               "high": "Sanctions escalation requires supplier switch — transition cost +10-15%"},
+        "ko": {"critical": "제재 대상국 부품 즉시 수입 금지, 생산 라인 2-4주 중단 위험",
+               "high": "제재 강화 시 부품 공급처 전환 필요, 전환 비용 10-15% 증가"},
+        "en": {"critical": "Sanctioned parts import ban; production line shutdown risk for 2-4 weeks",
+               "high": "Sanctions escalation requires supplier switch; transition cost +10-15%"},
     },
     ("sanctions", "semiconductor"): {
-        "ko": {"critical": "칩 수출 통제 — 고성능 반도체 공급 차단, 국내 제조 역량 의존 불가피",
-               "high": "기술 제재 확대 — EDA 도구·장비 접근 제한, 차세대 공정 개발 지연"},
-        "en": {"critical": "Chip export controls — high-end semiconductor supply cut, domestic reliance forced",
-               "high": "Tech sanctions widening — EDA tool/equipment access restricted, next-gen process delays"},
+        "ko": {"critical": "칩 수출 통제, 고성능 반도체 공급 차단, 국내 제조 역량 의존 불가피",
+               "high": "기술 제재 확대, EDA 도구·장비 접근 제한, 차세대 공정 개발 지연"},
+        "en": {"critical": "Chip export controls; high-end semiconductor supply cut, domestic reliance forced",
+               "high": "Tech sanctions widening; EDA tool/equipment access restricted, next-gen process delays"},
     },
     # cyber
     ("cyber", "technology"): {
-        "ko": {"critical": "대규모 사이버 공격 — 클라우드·금융 인프라 일시 마비, 기업 데이터 유출 위험",
-               "high": "사이버 위협 고조 — 보안 비용 급증, IT 서비스 일시 중단 가능"},
-        "en": {"critical": "Major cyberattack — cloud/financial infrastructure outage, corporate data breach risk",
-               "high": "Elevated cyber threat — security costs surge, IT service disruptions possible"},
+        "ko": {"critical": "대규모 사이버 공격, 클라우드·금융 인프라 일시 마비, 기업 데이터 유출 위험",
+               "high": "사이버 위협 고조, 보안 비용 급증, IT 서비스 일시 중단 가능"},
+        "en": {"critical": "Major cyberattack; cloud/financial infrastructure outage, corporate data breach risk",
+               "high": "Elevated cyber threat; security costs surge, IT service disruptions possible"},
     },
     ("cyber", "semiconductor"): {
-        "ko": {"critical": "반도체 설계 IP 탈취 위험 — 핵심 기술 유출, 수출 통제 강화 불가피",
-               "high": "사이버 스파이 활동 증가 — 설계 데이터 보호 강화 필요"},
-        "en": {"critical": "Chip design IP theft risk — core tech leakage, export controls inevitable",
-               "high": "Cyber espionage activity increase — design data protection reinforcement needed"},
+        "ko": {"critical": "반도체 설계 IP 탈취 위험, 핵심 기술 유출, 수출 통제 강화 불가피",
+               "high": "사이버 스파이 활동 증가, 설계 데이터 보호 강화 필요"},
+        "en": {"critical": "Chip design IP theft risk; core tech leakage, export controls inevitable",
+               "high": "Cyber espionage activity increase; design data protection reinforcement needed"},
     },
     # terror
     ("terror", "tourism"): {
-        "ko": {"critical": "테러 발생 — 해당국 여행 전면 금지, 글로벌 관광 심리 급랭",
-               "high": "테러 위협 고조 — 여행 보험료 인상, 예약 취소율 30% 이상"},
-        "en": {"critical": "Terror attack — full travel ban, global tourism sentiment collapses",
-               "high": "Elevated terror threat — travel insurance hikes, cancellation rate >30%"},
+        "ko": {"critical": "테러 발생. 해당국 여행 전면 금지, 글로벌 관광 심리 급랭",
+               "high": "테러 위협 고조, 여행 보험료 인상, 예약 취소율 30% 이상"},
+        "en": {"critical": "Terror attack. Full travel ban, global tourism sentiment collapses",
+               "high": "Elevated terror threat; travel insurance hikes, cancellation rate >30%"},
     },
     ("terror", "energy"): {
-        "ko": {"critical": "에너지 시설 테러 — 정유·파이프라인 가동 중단, 유가 즉시 급등",
-               "high": "에너지 인프라 위협 — 시설 보안 강화 비용 증가, 보험료 인상"},
-        "en": {"critical": "Energy facility attack — refinery/pipeline shutdown, immediate oil price spike",
-               "high": "Energy infrastructure threat — facility security costs rise, insurance hikes"},
+        "ko": {"critical": "에너지 시설 테러, 정유·파이프라인 가동 중단, 유가 즉시 급등",
+               "high": "에너지 인프라 위협, 시설 보안 강화 비용 증가, 보험료 인상"},
+        "en": {"critical": "Energy facility attack; refinery/pipeline shutdown, immediate oil price spike",
+               "high": "Energy infrastructure threat; facility security costs rise, insurance hikes"},
     },
 }
 
@@ -2611,14 +2674,14 @@ _COST_INCREASE: dict[str, str] = {
 
 _SCENARIO_TEMPLATES: dict[str, dict[str, dict[str, str]]] = {
     "ko": {
-        "worst": {"prefix": "악화 시: ", "suffix": " — 대체 조달 4주+, 생산 차질 불가피"},
-        "base": {"prefix": "현 수준 유지 시: ", "suffix": " — 비용 부담 증가하나 관리 가능"},
-        "best": {"prefix": "급속 완화 시: ", "suffix": " — 72시간 내 정상화, 일시적 변동만"},
+        "worst": {"prefix": "악화 시: ", "suffix": ". 대체 조달 4주+, 생산 차질 불가피"},
+        "base": {"prefix": "현 수준 유지 시: ", "suffix": ". 비용 부담 증가하나 관리 가능"},
+        "best": {"prefix": "급속 완화 시: ", "suffix": ". 72시간 내 정상화, 일시적 변동만"},
     },
     "en": {
-        "worst": {"prefix": "If worsened: ", "suffix": " — alternative sourcing 4+ weeks, production disruption inevitable"},
-        "base": {"prefix": "If status quo: ", "suffix": " — cost pressure up but manageable"},
-        "best": {"prefix": "If rapid resolution: ", "suffix": " — normalization within 72h, temporary volatility only"},
+        "worst": {"prefix": "If worsened: ", "suffix": ". Alternative sourcing 4+ weeks, production disruption inevitable"},
+        "base": {"prefix": "If status quo: ", "suffix": ". Cost pressure up but manageable"},
+        "best": {"prefix": "If rapid resolution: ", "suffix": ". Normalization within 72h, temporary volatility only"},
     },
 }
 

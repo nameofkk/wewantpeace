@@ -556,6 +556,19 @@ MARKET_INDEX_TICKERS = {
     "DAX": ("^GDAXI", "DAX", "EUR"),
     "FTSE": ("^FTSE", "FTSE 100", "GBP"),
     "SSE": ("000001.SS", "SSE Composite", "CNY"),
+    # 추가 지수 (25개국 커버)
+    "TWII": ("^TWII", "TAIEX", "TWD"),          # 대만
+    "SET": ("^SET.BK", "SET Index", "THB"),      # 태국
+    "STI": ("^STI", "STI", "SGD"),               # 싱가포르
+    "SENSEX": ("^BSESN", "SENSEX", "INR"),       # 인도
+    "BOVESPA": ("^BVSP", "Bovespa", "BRL"),      # 브라질
+    "TSX": ("^GSPTSE", "S&P/TSX", "CAD"),        # 캐나다
+    "CAC": ("^FCHI", "CAC 40", "EUR"),            # 프랑스
+    "TASI": ("^TASI.SR", "Tadawul", "SAR"),      # 사우디
+    "TA35": ("^TA125.TA", "TA-35", "ILS"),       # 이스라엘
+    "BIST": ("XU100.IS", "BIST 100", "TRY"),     # 튀르키예
+    "ASX": ("^AXJO", "ASX 200", "AUD"),          # 호주
+    "MXX": ("^MXX", "IPC Mexico", "MXN"),        # 멕시코
 }
 
 

@@ -43,17 +43,19 @@ function getRelevantMarketChips(cc: string, market: MarketSnapshot | null | unde
     const chips = market.commodities.filter((c) => recommended.includes(c.symbol));
     if (chips.length > 0) return chips;
   }
-  // 폴백: 기존 국가별 하드코딩
-  if (["IL", "IR", "IQ", "SA", "SY", "LB", "YE"].includes(cc))
+  // 폴백: 이벤트 국가별 관련 원자재/지수
+  const OIL = ["IL", "IR", "IQ", "SA", "SY", "LB", "YE", "KW", "LY", "AE"];
+  const GRAIN = ["UA", "RU", "BR", "AR", "AU"];
+  const RICE = ["IN", "TH", "VN", "MM", "PH", "ID"];
+  const SHIP = ["EG", "PA", "SO", "YE", "SG"];
+  if (OIL.includes(cc))
     return market.commodities.filter((c) => ["WTI", "BRENT"].includes(c.symbol));
-  if (["CN", "TW"].includes(cc))
-    return market.indices.filter((i) => ["SSE", "SHCOMP"].includes(i.symbol)).map(toChip);
-  if (["JP", "KP"].includes(cc))
-    return market.indices.filter((i) => ["NKY"].includes(i.symbol)).map(toChip);
-  if (["KR"].includes(cc))
-    return market.indices.filter((i) => ["KOSPI"].includes(i.symbol)).map(toChip);
-  if (["UA", "RU", "DE", "FR", "GB"].includes(cc))
-    return market.indices.filter((i) => ["DAX", "FTSE"].includes(i.symbol)).map(toChip);
+  if (GRAIN.includes(cc))
+    return market.commodities.filter((c) => ["WHEAT", "CORN", "SOYBEAN"].includes(c.symbol)).slice(0, 2);
+  if (RICE.includes(cc))
+    return market.commodities.filter((c) => ["RICE", "WHEAT"].includes(c.symbol)).slice(0, 2);
+  if (SHIP.includes(cc))
+    return market.commodities.filter((c) => ["BDRY", "WTI"].includes(c.symbol));
   return market.commodities.slice(0, 1);
 }
 
