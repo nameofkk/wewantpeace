@@ -1770,6 +1770,27 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
 }
 
 
+# 테러 관련 외교/행정 맥락 — "테러 조직 지정" 같은 기사에서 terror STRONG 키워드 무효화
+# (실제 테러 사건이 아닌 외교·행정·사법 조치에 대한 기사)
+_TERROR_DIPLOMATIC_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+    # 테러 조직 지정/분류/블랙리스트
+    r"(designat|classif|label|blacklist|delist|list|declar)\w{0,5}\s.{0,30}\b(terrorist|terror)\b",
+    r"\b(terrorist|terror)\b.{0,30}(designation|classification|label|listing|blacklist|delist|list\b)",
+    r"\b(terrorist|terror)\s+(organization|group|entity|network)\s+(list|designation|label)",
+    # 테러 관련 사법/수사 논의 (실제 사건이 아닌 사후 논의)
+    r"(prob|investigat|charg|convict|sentenc|tri|acquit)\w{0,5}.{0,30}(terrorism|terror)\s*(link|ties|connection|charge|count)",
+    r"(terrorism|terror)\s*(charge|count|conviction|sentence|trial|probe|investigation)",
+    # 테러 방지/대응 정책 논의
+    r"(counter|anti).?terror",
+    r"(terror|terrorist).{0,20}(policy|legislation|law|act|bill|statute|measure)",
+]]
+
+
+def _has_terror_diplomatic_context(text: str) -> bool:
+    """테러 관련 외교/행정/사법 맥락인지 판별. True면 terror STRONG 키워드 무효화."""
+    return any(p.search(text) for p in _TERROR_DIPLOMATIC_CONTEXT)
+
+
 # 비군사 문맥 패턴 — 이 패턴이 있으면 conflict/terror weak 키워드를 무효화
 _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     # 개인 사망 (자살, 병사, 사고사)
@@ -2006,10 +2027,15 @@ def _classify_topic(text: str) -> str:
     non_military = _has_non_military_context(text_lower)
     scores: dict[str, int] = {}
 
+    terror_diplomatic = _has_terror_diplomatic_context(text_lower)
+
     for topic, keywords in TOPIC_KEYWORDS.items():
         # 강력 키워드 체크
         strong = _STRONG_KEYWORDS.get(topic, set())
         strong_hits = sum(1 for kw in strong if _kw_in_text(kw, text_lower))
+        # 테러 외교 맥락이면 terror STRONG 무효화 (조직 지정/블랙리스트 기사)
+        if topic == "terror" and strong_hits and terror_diplomatic:
+            strong_hits = 0
         if strong_hits:
             scores[topic] = scores.get(topic, 0) + strong_hits * 3  # 가중치 3배
 
