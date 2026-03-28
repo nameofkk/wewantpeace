@@ -287,6 +287,100 @@ async def search_clusters(
     ]
 
 
+class CountryUcdpContextOut(BaseModel):
+    total_events: int = 0
+    period_start: str | None = None
+    period_end: str | None = None
+    top_actors: list[str] = []
+    total_fatalities_best: int = 0
+    total_fatalities_low: int = 0
+    total_fatalities_high: int = 0
+
+
+@router.get("/country/{country_code}/context", response_model=CountryUcdpContextOut)
+async def get_country_ucdp_context(
+    country_code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """국가별 UCDP 기반 분쟁 역사 정보."""
+    from sqlalchemy import func
+
+    cc = country_code.upper()
+
+    # UCDP 이벤트만 정확히 필터: source_type='api' AND external_id LIKE 'ucdp:%'
+    count_result = await db.execute(
+        select(func.count(NormalizedEvent.id))
+        .join(RawEvent, RawEvent.id == NormalizedEvent.raw_event_id)
+        .where(
+            NormalizedEvent.country_code == cc,
+            RawEvent.source_type == "api",
+            RawEvent.external_id.like("ucdp:%"),
+        )
+    )
+    total = count_result.scalar() or 0
+
+    if total == 0:
+        return CountryUcdpContextOut()
+
+    # 기간 범위
+    range_result = await db.execute(
+        select(
+            func.min(NormalizedEvent.event_time),
+            func.max(NormalizedEvent.event_time),
+        )
+        .join(RawEvent, RawEvent.id == NormalizedEvent.raw_event_id)
+        .where(
+            NormalizedEvent.country_code == cc,
+            RawEvent.source_type == "api",
+            RawEvent.external_id.like("ucdp:%"),
+        )
+    )
+    range_row = range_result.first()
+    period_start = range_row[0].isoformat() if range_row and range_row[0] else None
+    period_end = range_row[1].isoformat() if range_row and range_row[1] else None
+
+    # top_actors + fatalities: raw_metadata에서 추출
+    actors_result = await db.execute(
+        select(RawEvent.raw_metadata)
+        .join(NormalizedEvent, NormalizedEvent.raw_event_id == RawEvent.id)
+        .where(
+            NormalizedEvent.country_code == cc,
+            RawEvent.source_type == "api",
+            RawEvent.external_id.like("ucdp:%"),
+        )
+        .limit(500)
+    )
+    actor_counts: dict[str, int] = {}
+    total_fat_best = 0
+    total_fat_low = 0
+    total_fat_high = 0
+    for (meta,) in actors_result.all():
+        if not meta:
+            continue
+        for key in ("side_a", "side_b"):
+            actor = meta.get(key)
+            if actor and isinstance(actor, str) and actor.strip():
+                actor_counts[actor.strip()] = actor_counts.get(actor.strip(), 0) + 1
+        try:
+            total_fat_best += int(meta.get("fatalities_best", 0) or 0)
+            total_fat_low += int(meta.get("fatalities_low", 0) or 0)
+            total_fat_high += int(meta.get("fatalities_high", 0) or 0)
+        except (ValueError, TypeError):
+            pass
+
+    top_actors = sorted(actor_counts, key=actor_counts.get, reverse=True)[:3]  # type: ignore[arg-type]
+
+    return CountryUcdpContextOut(
+        total_events=total,
+        period_start=period_start,
+        period_end=period_end,
+        top_actors=top_actors,
+        total_fatalities_best=total_fat_best,
+        total_fatalities_low=total_fat_low,
+        total_fatalities_high=total_fat_high,
+    )
+
+
 @router.get("/{cluster_id}", response_model=ClusterDetailOut)
 @limiter.limit("60/minute")
 async def get_cluster(
@@ -395,71 +489,3 @@ async def get_cluster_signals(
         )
         for s in signals
     ]
-
-
-class HistoricalContextOut(BaseModel):
-    total_events: int = 0
-    period_start: str | None = None
-    period_end: str | None = None
-    top_actors: list[str] = []
-    recent_fatalities: int = 0
-    yearly_trend: list[dict] = []
-
-
-@router.get("/{cluster_id}/context", response_model=HistoricalContextOut)
-async def get_cluster_context(
-    cluster_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """UCDP 기반 역사적 맥락 정보."""
-    try:
-        uid = uuid.UUID(cluster_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid cluster_id")
-
-    # 클러스터의 국가 코드 확인
-    cluster_result = await db.execute(
-        select(IssueCluster.country_code).where(IssueCluster.id == uid)
-    )
-    row = cluster_result.first()
-    if not row or not row[0]:
-        return HistoricalContextOut()
-
-    cc = row[0]
-
-    # UCDP 이벤트 집계 (raw_events에서 external_id가 'ucdp:'로 시작하는 것)
-    from sqlalchemy import func, text
-
-    # 해당 국가의 UCDP 이벤트 수
-    count_result = await db.execute(
-        select(func.count(NormalizedEvent.id))
-        .where(
-            NormalizedEvent.country_code == cc,
-            NormalizedEvent.source_tier == "A",
-        )
-    )
-    total = count_result.scalar() or 0
-
-    if total == 0:
-        return HistoricalContextOut()
-
-    # 기간 범위
-    range_result = await db.execute(
-        select(
-            func.min(NormalizedEvent.event_time),
-            func.max(NormalizedEvent.event_time),
-        )
-        .where(
-            NormalizedEvent.country_code == cc,
-            NormalizedEvent.source_tier == "A",
-        )
-    )
-    range_row = range_result.first()
-    period_start = range_row[0].isoformat() if range_row and range_row[0] else None
-    period_end = range_row[1].isoformat() if range_row and range_row[1] else None
-
-    return HistoricalContextOut(
-        total_events=total,
-        period_start=period_start,
-        period_end=period_end,
-    )

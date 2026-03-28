@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
-import { useClusterDetail, useKScoreHistory, useTrackBehavior, useClusterSignals, useClusterContext, useMe, type KScoreHistoryPoint, type ClusterSignalMatch, type HistoricalContext } from "@/lib/api";
+import { useClusterDetail, useKScoreHistory, useTrackBehavior, useClusterSignals, useMe, type KScoreHistoryPoint, type ClusterSignalMatch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ImpactBriefCard } from "@/components/dashboard/ImpactBriefCard";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
@@ -317,50 +317,6 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
   );
 }
 
-// ── 역사적 맥락 섹션 ──
-function HistoricalContextSection({ clusterId, lang }: { clusterId: string; lang: Lang }) {
-  const { data: ctx, isPending } = useClusterContext(clusterId);
-
-  if (isPending || !ctx || ctx.total_events === 0) return null;
-
-  const locale = lang === "en" ? "en-US" : "ko-KR";
-  const startYear = ctx.period_start ? new Date(ctx.period_start).getFullYear() : "?";
-  const endYear = ctx.period_end ? new Date(ctx.period_end).getFullYear() : "?";
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 fade-in-up">
-      <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
-        <div className="w-1 h-4 rounded-full bg-emerald-500 shrink-0" />
-        <h3 className="text-xs font-bold text-foreground">{t(lang, "historical_context_title")}</h3>
-        <span className="text-[9px] text-muted-foreground/60 ml-auto font-medium">UCDP GED</span>
-      </div>
-      <div className="space-y-2.5">
-        <div className="flex items-start gap-2">
-          <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-          <div className="text-[11px]">
-            <span className="text-muted-foreground">{t(lang, "historical_context_events")} </span>
-            <span className="font-medium text-foreground">
-              {t(lang, "historical_context_recorded", { start: startYear, end: endYear, count: ctx.total_events })}
-            </span>
-          </div>
-        </div>
-        {ctx.top_actors.length > 0 && (
-          <div className="flex items-start gap-2">
-            <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-            <p className="text-[11px] text-muted-foreground">{t(lang, "historical_context_actors", { actors: ctx.top_actors.join(", ") })}</p>
-          </div>
-        )}
-        {ctx.recent_fatalities > 0 && (
-          <div className="flex items-start gap-2">
-            <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
-            <p className="text-[11px] text-muted-foreground">{t(lang, "historical_context_fatalities", { count: ctx.recent_fatalities })}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function IssueDetailClient({ initialData, id: propId }: Props) {
   const id = propId || initialData?.id || "";
   const router = useRouter();
@@ -527,9 +483,6 @@ export default function IssueDetailClient({ initialData, id: propId }: Props) {
 
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
-
-        {/* 역사적 맥락 */}
-        <HistoricalContextSection clusterId={id} lang={lang} />
 
         {/* 교차검증 증거 */}
         <CrossValidationSection clusterId={id} lang={lang} />

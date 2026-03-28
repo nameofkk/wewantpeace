@@ -2,13 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, AlertTriangle, Loader2, TrendingUp } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Loader2, TrendingUp, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { COUNTRY_MAP, getCountryName } from "@/lib/countries";
 import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, useCountryUcdpContext } from "@/lib/api";
 import { TensionHistoryChart } from "@/components/tension/TensionHistoryChart";
 import { ShareButton } from "@/components/issue/ShareButton";
 
@@ -92,6 +92,8 @@ export default function CountryIssuesPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: ucdpCtx } = useCountryUcdpContext(code);
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 헤더 */}
@@ -144,6 +146,57 @@ export default function CountryIssuesPage() {
             )}
           </div>
         )}
+
+        {/* UCDP 분쟁 기록 */}
+        {ucdpCtx && ucdpCtx.total_events > 0 && (() => {
+          const startYear = ucdpCtx.period_start ? new Date(ucdpCtx.period_start).getFullYear() : "?";
+          const endYear = ucdpCtx.period_end ? new Date(ucdpCtx.period_end).getFullYear() : "?";
+          return (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {t(lang, "ucdp_section_title")}
+                </h2>
+                <span className="text-[9px] text-muted-foreground/60 ml-auto font-medium">UCDP GED</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {t(lang, "ucdp_period", { start: startYear, end: endYear, count: ucdpCtx.total_events })}
+                    </span>
+                  </p>
+                </div>
+                {ucdpCtx.top_actors.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                    <p className="text-[11px] text-muted-foreground">
+                      {t(lang, "ucdp_actors", { actors: ucdpCtx.top_actors.join(", ") })}
+                    </p>
+                  </div>
+                )}
+                {(ucdpCtx.total_fatalities_low > 0 || ucdpCtx.total_fatalities_high > 0) && (
+                  <div className="flex items-start gap-2">
+                    <span className="mt-[3px] h-1.5 w-1.5 rounded-full bg-muted-foreground/30 shrink-0" />
+                    <p className="text-[11px] text-muted-foreground">
+                      {t(lang, "ucdp_fatalities", {
+                        low: ucdpCtx.total_fatalities_low.toLocaleString(),
+                        high: ucdpCtx.total_fatalities_high.toLocaleString(),
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 pt-2 border-t border-border text-[9px] text-muted-foreground/60">
+                <a href="https://ucdp.uu.se/downloads/" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                  {t(lang, "ucdp_source")}
+                </a>
+              </p>
+            </div>
+          );
+        })()}
 
         {isLoading && (
           <div className="flex justify-center py-16">
