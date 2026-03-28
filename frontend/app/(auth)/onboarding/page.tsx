@@ -23,6 +23,7 @@ import { signInWithGoogle, signInWithApple, signInWithToss, getIdToken } from "@
 import { isTossMiniApp } from "@/lib/platform";
 import { isGoogleOAuthBlocked, openInExternalBrowser } from "@/lib/browser-detect";
 import { trackEvent } from "@/lib/analytics";
+import { markOnboardingDone } from "@/lib/utils";
 
 type Step = 0 | 1 | 2;
 
@@ -284,7 +285,7 @@ export default function OnboardingPage() {
 
   function handleSkip() {
     trackSkip("later");
-    localStorage.setItem("onboarding_done", "true");
+    markOnboardingDone();
     localStorage.setItem("wwp_welcome_seen", String(Date.now()));
     const returnUrl = sessionStorage.getItem("wwp_return_url");
     sessionStorage.removeItem("wwp_return_url");
@@ -296,31 +297,34 @@ export default function OnboardingPage() {
     try {
       const token = await getIdToken();
       if (token) {
+        const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
         // 기준국가 동기화
         await fetch(`${API_BASE}/me/preferences`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: authHeaders,
           body: JSON.stringify({ home_country: homeCountryLocal }),
         });
         // 마케팅 수신 동의 시 PATCH /me
         if (marketingConsent) {
           await fetch(`${API_BASE}/me`, {
             method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+            headers: authHeaders,
             body: JSON.stringify({ marketing_agreed_at: new Date().toISOString() }),
           });
+        }
+        // 관심국가를 DB에 저장 (CountrySync가 덮어쓰기 전에)
+        for (const code of selectedCountries) {
+          await fetch(`${API_BASE}/me/areas`, {
+            method: "POST",
+            headers: authHeaders,
+            body: JSON.stringify({ country_code: code }),
+          }).catch(() => {}); // 중복 등 에러 무시
         }
       }
     } catch {
       // 실패해도 온보딩은 계속 진행
     }
-    localStorage.setItem("onboarding_done", "true");
+    markOnboardingDone();
     localStorage.setItem("wwp_welcome_seen", String(Date.now()));
     const returnUrl = sessionStorage.getItem("wwp_return_url");
     sessionStorage.removeItem("wwp_return_url");
@@ -397,7 +401,7 @@ export default function OnboardingPage() {
       } else {
         trackEvent("auth_success", { provider, source: "onboarding" });
         trackEvent("onboarding_login_need_register", { provider });
-        localStorage.setItem("onboarding_done", "true");
+        markOnboardingDone();
         router.push("/login?tab=google-register");
       }
     } catch (err: any) {
@@ -429,7 +433,7 @@ export default function OnboardingPage() {
       }
       trackEvent("auth_success", { provider: "toss", source: "onboarding" });
       trackEvent("onboarding_login_need_register", { provider: "toss" });
-      localStorage.setItem("onboarding_done", "true");
+      markOnboardingDone();
       router.push("/login?tab=google-register");
     } catch (err: any) {
       trackEvent("onboarding_login_error", { provider: "toss", error: String(err) });

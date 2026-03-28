@@ -116,6 +116,15 @@ export const TOPIC_LABELS: Record<string, string> = {
   unknown:   "기타",
 };
 
+/**
+ * 온보딩 완료 표시: localStorage + cookie 동시 설정.
+ * middleware.ts(SSR)는 cookie를, client 코드는 localStorage를 체크하므로 반드시 둘 다 설정해야 함.
+ */
+export function markOnboardingDone() {
+  localStorage.setItem("onboarding_done", "true");
+  document.cookie = "onboarding_done=true; path=/; max-age=31536000; SameSite=Lax";
+}
+
 export const TOPIC_LABELS_EN: Record<string, string> = {
   conflict:  "Conflict",
   terror:    "Terror",
