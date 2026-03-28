@@ -46,8 +46,7 @@ _HOME_INDEX_MAP: dict[str, str] = {
     "TW": "TWII", "TH": "SET", "SG": "STI", "IN": "SENSEX", "BR": "BOVESPA",
     "CA": "TSX", "FR": "CAC", "SA": "TASI", "IL": "TA35", "TR": "BIST",
     "AU": "ASX", "MX": "MXX",
-    "AE": "ADX", "VN": "VNINDEX", "RU": "MOEX", "ID": "JCI",
-    "PH": "PSEI", "PL": "WIG20", "EG": "EGX30",
+    "VN": "VNINDEX", "ID": "JCI", "PH": "PSEI", "PL": "WIG20", "EG": "EGX30",
 }
 
 # 국가 코드 → 국가명 (reason 표시용)
