@@ -708,6 +708,10 @@ def process_raw_event(self, raw_event_id: str):
                     ch = ch_res.scalar_one_or_none()
                     if ch:
                         tier = ch.tier
+                elif (raw_event.source_type == "api"
+                      and raw_event.raw_metadata
+                      and raw_event.raw_metadata.get("source_tier")):
+                    tier = raw_event.raw_metadata["source_tier"]
 
                 # 3. 정규화
                 # RSS 이벤트는 raw_metadata["title"]을 원본 제목으로 우선 사용
