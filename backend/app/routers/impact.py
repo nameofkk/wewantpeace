@@ -1218,6 +1218,7 @@ async def get_impact_brief(
         raise HTTPException(404, detail="Cluster not found")
 
     # 원자재 가격 조회 (AI 컨텍스트용)
+    from backend.app.models.economic_data import CommodityPrice
     _brief_cp_q = await db.execute(
         select(CommodityPrice)
         .distinct(CommodityPrice.symbol)
@@ -2839,6 +2840,7 @@ async def get_sector_analysis(
     affected = cluster.country_code or "Unknown"
 
     # 원자재 가격 조회 (섹터 설명 보강용)
+    from backend.app.models.economic_data import CommodityPrice
     _sector_cp_q = await db.execute(
         select(CommodityPrice)
         .distinct(CommodityPrice.symbol)
@@ -2944,6 +2946,7 @@ async def get_sector_overview(
     aggregated: dict[str, dict] = {}
 
     # 원자재 가격 조회 (섹터 설명 보강용)
+    from backend.app.models.economic_data import CommodityPrice
     _ov_cp_q = await db.execute(
         select(CommodityPrice)
         .distinct(CommodityPrice.symbol)
