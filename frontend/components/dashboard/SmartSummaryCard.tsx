@@ -111,18 +111,18 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
                 {topicLabel}
               </span>
               {item.is_spike && (
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-semibold shrink-0">
+                <span className="inline-flex items-center h-[18px] text-[8px] px-1.5 rounded bg-red-500/10 text-red-400 font-semibold shrink-0">
                   SPIKE
                 </span>
               )}
               {(item.confidence ?? 0) >= 0.7 && (
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">
+                <span className="inline-flex items-center h-[18px] text-[8px] px-1.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">
                   {t(lang, "dash_badge_verified" as TranslationKey)}
                 </span>
               )}
               {sourceTier && (
                 <span className={cn(
-                  "text-[8px] px-1.5 py-0.5 rounded font-semibold shrink-0",
+                  "inline-flex items-center h-[18px] text-[8px] px-1.5 rounded font-semibold shrink-0",
                   sourceTier === "A" ? "bg-blue-500/10 text-blue-400"
                     : sourceTier === "B" ? "bg-sky-500/10 text-sky-400"
                     : sourceTier === "C" ? "bg-amber-500/10 text-amber-400"
@@ -283,11 +283,11 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
 
       {/* Title + description */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] font-semibold truncate leading-tight">{displayTitle}</span>
+        <div className="flex items-center gap-1 leading-none">
+          <span className="text-[11px] font-semibold truncate">{displayTitle}</span>
           {sourceTier && (sourceTier === "A" || sourceTier === "B") && (
             <span className={cn(
-              "text-[7px] px-1 py-px rounded font-bold shrink-0",
+              "inline-flex items-center justify-center text-[7px] h-[14px] px-1 rounded font-bold shrink-0",
               sourceTier === "A" ? "bg-blue-500/10 text-blue-400" : "bg-sky-500/10 text-sky-400"
             )}>
               {sourceTier}
