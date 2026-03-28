@@ -327,6 +327,7 @@ def _iso3_to_iso2(alpha3: str) -> str | None:
 TARGET_CURRENCIES = [
     "KRW", "JPY", "CNY", "EUR", "GBP", "AUD", "INR", "BRL",
     "SAR", "AED", "ILS", "TRY", "THB", "VND", "SGD", "CAD", "MXN", "RUB",
+    "IDR", "PHP", "PLN",
 ]
 
 
@@ -569,6 +570,14 @@ MARKET_INDEX_TICKERS = {
     "BIST": ("XU100.IS", "BIST 100", "TRY"),     # 튀르키예
     "ASX": ("^AXJO", "ASX 200", "AUD"),          # 호주
     "MXX": ("^MXX", "IPC Mexico", "MXN"),        # 멕시코
+    # 추가 7개국 커버
+    "ADX": ("^ADI", "ADX General", "AED"),         # UAE
+    "VNINDEX": ("^VNINDEX", "VN-Index", "VND"),    # 베트남
+    "MOEX": ("IMOEX.ME", "MOEX Russia", "RUB"),    # 러시아
+    "JCI": ("^JKSE", "Jakarta Comp.", "IDR"),      # 인도네시아
+    "PSEI": ("PSEI.PS", "PSEi", "PHP"),            # 필리핀
+    "WIG20": ("WIG20.WA", "WIG20", "PLN"),         # 폴란드
+    "EGX30": ("^EGX30.CA", "EGX 30", "EGP"),       # 이집트
 }
 
 

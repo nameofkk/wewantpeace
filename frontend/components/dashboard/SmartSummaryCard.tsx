@@ -81,6 +81,8 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
   const soWhatLine = topIssueRaw?.so_what_line;
   const whenLine = topIssueRaw?.when_line;
   const bodySnippet = topIssueRaw?.body_snippet;
+  const sourceTier = topIssueRaw?.source_tier;
+  const impactReason = topIssueRaw?.impact_reason;
 
   return (
     <section
@@ -116,6 +118,17 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
               {(item.confidence ?? 0) >= 0.7 && (
                 <span className="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">
                   {t(lang, "dash_badge_verified" as TranslationKey)}
+                </span>
+              )}
+              {sourceTier && (
+                <span className={cn(
+                  "text-[8px] px-1.5 py-0.5 rounded font-semibold shrink-0",
+                  sourceTier === "A" ? "bg-blue-500/10 text-blue-400"
+                    : sourceTier === "B" ? "bg-sky-500/10 text-sky-400"
+                    : sourceTier === "C" ? "bg-amber-500/10 text-amber-400"
+                    : "bg-muted/30 text-muted-foreground"
+                )}>
+                  {lang === "ko" ? `신뢰 ${sourceTier}` : `Tier ${sourceTier}`}
                 </span>
               )}
             </div>
@@ -165,7 +178,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
         )}
       </div>
 
-      {/* ── Impact score bar ── */}
+      {/* ── Impact score bar + reason ── */}
       <div className="px-3.5 pb-2.5">
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-muted/30 rounded-full overflow-hidden">
@@ -176,6 +189,9 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
           </div>
           <span className={cn("text-[9px] font-bold tabular-nums", colors.text)}>{impactScore}/100</span>
         </div>
+        {impactReason && (
+          <p className="text-[9px] text-foreground/40 mt-1 leading-tight truncate">{impactReason}</p>
+        )}
       </div>
 
       {/* ── Market chips ── */}
@@ -246,6 +262,7 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
 
   const impactScore = topIssueRaw?.impact_score ?? 0;
   const soWhatLine = topIssueRaw?.so_what_line;
+  const sourceTier = topIssueRaw?.source_tier;
   const colors = impactScoreColor(impactScore);
 
   return (
@@ -266,7 +283,17 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
 
       {/* Title + description */}
       <div className="flex-1 min-w-0">
-        <span className="text-[11px] font-semibold truncate block leading-tight">{displayTitle}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-semibold truncate leading-tight">{displayTitle}</span>
+          {sourceTier && (sourceTier === "A" || sourceTier === "B") && (
+            <span className={cn(
+              "text-[7px] px-1 py-px rounded font-bold shrink-0",
+              sourceTier === "A" ? "bg-blue-500/10 text-blue-400" : "bg-sky-500/10 text-sky-400"
+            )}>
+              {sourceTier}
+            </span>
+          )}
+        </div>
         {soWhatLine && (
           <span className="text-[9px] text-foreground/50 truncate block mt-0.5 leading-tight">{soWhatLine}</span>
         )}

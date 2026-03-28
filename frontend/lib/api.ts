@@ -572,6 +572,8 @@ export interface ImpactSummaryTopIssue {
   so_what_line?: string | null;
   when_line?: string | null;
   relevant_commodities?: string[] | null;
+  source_tier?: string | null;  // A/B/C/D
+  impact_reason?: string | null;
 }
 
 export interface CommoditySnapshot {
@@ -599,6 +601,7 @@ export interface MarketSnapshot {
   commodities: CommoditySnapshot[];
   indices: MarketIndexSnapshot[];
   exchange_rates: ExchangeRateSnapshot[];
+  last_updated_at?: string | null;
 }
 
 export interface TradePartner {
