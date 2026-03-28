@@ -658,6 +658,7 @@ export interface RiskRadarOut {
 export interface ImpactFlowNode {
   id: string;
   label: string;
+  sub_label?: string | null;  // 2줄째: 실시간 가격 데이터
   color: string;
   category: string;
   cluster_id?: string;
