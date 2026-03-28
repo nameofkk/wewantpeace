@@ -72,7 +72,7 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeC
   };
 
   // 각 노드에 y위치 계산 (균등 분배)
-  const nodePositions = new Map<string, { x: number; y: number; h: number; color: string; label: string; category: string }>();
+  const nodePositions = new Map<string, { x: number; y: number; h: number; color: string; label: string; subLabel?: string | null; category: string }>();
 
   for (const cat of ["conflict", "commodity", "impact"] as const) {
     const nodes = cols[cat];
@@ -87,6 +87,7 @@ function computeLayout(data: ImpactFlowOut, width: number, height: number, sizeC
         h: nodeH,
         color: n.color || CATEGORY_COLORS[cat] || "#6b7280",
         label: n.label,
+        subLabel: n.sub_label,
         category: cat,
       });
       y += nodeH + cfg.nodePad;
@@ -479,6 +480,7 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
           {/* 라벨 */}
           {Array.from(nodePositions.entries()).map(([id, pos]) => {
             const isConflict = pos.category === "conflict";
+            const isImpact = pos.category === "impact";
             const idx = conflictIdxMap.get(id) ?? -1;
             const isNodeConnected = !isHovering || connectedNodes.has(id);
 
@@ -491,21 +493,47 @@ export function ImpactFlowSankey({ data, isPro, lang, conflictIssues }: Props) {
               : pos.x + nodeW + 4;
             const textAnchor = isConflict ? "end" : "start";
 
+            const baseFontSize = sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11;
+            const subFontSize = sizeClass === "lg" ? 11 : sizeClass === "md" ? 10 : effectiveWidth < 380 ? 8 : 9;
+            const hasSubLabel = isImpact && pos.subLabel;
+
             return (
-              <text
-                key={`label-${id}`}
-                x={textX}
-                y={pos.y + pos.h / 2}
-                dy="0.35em"
-                textAnchor={textAnchor}
-                fill={isConflict ? pos.color : isDark ? "rgba(156,163,175,0.9)" : "rgba(55,65,81,0.9)"}
-                fontSize={sizeClass === "lg" ? 13 : sizeClass === "md" ? 12 : effectiveWidth < 380 ? 9 : 11}
-                fontWeight={isHovering && isNodeConnected ? 700 : 600}
-                opacity={isHovering && !isNodeConnected ? 0.25 : 1}
-                style={{ transition: "opacity 0.25s ease, font-weight 0.25s ease" }}
-              >
-                {labelText}
-              </text>
+              <g key={`label-${id}`} opacity={isHovering && !isNodeConnected ? 0.25 : 1} style={{ transition: "opacity 0.25s ease" }}>
+                {/* 1줄: 카테고리명 (impact는 위로 올림) */}
+                <text
+                  x={textX}
+                  y={hasSubLabel ? pos.y + pos.h / 2 - (subFontSize * 0.55) : pos.y + pos.h / 2}
+                  dy="0.35em"
+                  textAnchor={textAnchor}
+                  fill={isConflict ? pos.color : isDark ? "rgba(156,163,175,0.9)" : "rgba(55,65,81,0.9)"}
+                  fontSize={hasSubLabel ? subFontSize : baseFontSize}
+                  fontWeight={isHovering && isNodeConnected ? 700 : 600}
+                  style={{ transition: "font-weight 0.25s ease" }}
+                >
+                  {labelText}
+                </text>
+                {/* 2줄: 실시간 가격 (impact 노드만) */}
+                {hasSubLabel && (
+                  <text
+                    x={textX}
+                    y={pos.y + pos.h / 2 + (subFontSize * 0.65)}
+                    dy="0.35em"
+                    textAnchor={textAnchor}
+                    fill={
+                      pos.subLabel!.includes("↑")
+                        ? isDark ? "#f87171" : "#dc2626"
+                        : pos.subLabel!.includes("↓")
+                          ? isDark ? "#34d399" : "#059669"
+                          : isDark ? "rgba(156,163,175,0.7)" : "rgba(55,65,81,0.7)"
+                    }
+                    fontSize={subFontSize}
+                    fontWeight={700}
+                    style={{ transition: "font-weight 0.25s ease" }}
+                  >
+                    {pos.subLabel}
+                  </text>
+                )}
+              </g>
             );
           })}
         </svg>

@@ -382,9 +382,20 @@ async def collect_exchange_rates(db: AsyncSession) -> int:
 # ── 4. yfinance 원자재 가격 수집 ─────────────────────────────────────────
 
 COMMODITY_TICKERS = {
+    # 에너지
     "WTI": ("CL=F", "WTI Crude Oil"),
     "BRENT": ("BZ=F", "Brent Crude Oil"),
+    "NATGAS": ("NG=F", "Natural Gas"),
+    # 곡물/식량
+    "WHEAT": ("ZW=F", "Wheat Futures"),
+    "CORN": ("ZC=F", "Corn Futures"),
+    "SOYBEAN": ("ZS=F", "Soybean Futures"),
+    "RICE": ("ZR=F", "Rough Rice Futures"),
+    # 금속/안전자산
     "GOLD": ("GC=F", "Gold"),
+    "SILVER": ("SI=F", "Silver"),
+    # 해운 (BDI proxy)
+    "BDRY": ("BDRY", "Breakwave Dry Bulk Shipping ETF"),
 }
 
 
@@ -455,6 +466,84 @@ async def collect_commodity_prices(db: AsyncSession) -> int:
 
     await db.flush()
     logger.info("commodity_prices_collected count=%d", saved)
+    return saved
+
+
+# ── 4b. FRED API 제트연료 수집 ─────────────────────────────────────────────
+
+FRED_API_KEY = None  # 환경변수에서 로드
+
+FRED_SERIES = {
+    "JET_FUEL": ("DJFUELUSGULF", "Jet Fuel (US Gulf Coast)"),
+}
+
+
+async def collect_fred_commodities(db: AsyncSession) -> int:
+    """FRED API로 제트연료 등 yfinance에 없는 원자재 가격 수집.
+
+    FRED_API_KEY 환경변수 필요 (https://fred.stlouisfed.org/docs/api/api_key.html).
+    Returns: 저장된 레코드 수
+    """
+    import os
+    from backend.app.models.economic_data import CommodityPrice
+
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        logger.warning("fred_skip: FRED_API_KEY not set")
+        return 0
+
+    saved = 0
+    async with aiohttp.ClientSession() as session:
+        for symbol, (series_id, name) in FRED_SERIES.items():
+            try:
+                url = (
+                    f"https://api.stlouisfed.org/fred/series/observations"
+                    f"?series_id={series_id}&api_key={api_key}&file_type=json"
+                    f"&sort_order=desc&limit=2"
+                )
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        logger.warning("fred_api_error series=%s status=%d", series_id, resp.status)
+                        continue
+                    data = await resp.json()
+
+                obs = [o for o in data.get("observations", []) if o.get("value", ".") != "."]
+                if not obs:
+                    continue
+
+                price = float(obs[0]["value"])
+                price_date = obs[0]["date"]
+                change_pct = 0.0
+                if len(obs) >= 2:
+                    prev = float(obs[1]["value"])
+                    if prev:
+                        change_pct = round(((price - prev) / prev) * 100, 2)
+
+                # 중복 확인
+                existing = await db.execute(
+                    select(CommodityPrice.id).where(
+                        and_(
+                            CommodityPrice.symbol == symbol,
+                            CommodityPrice.price_date == price_date,
+                        )
+                    ).limit(1)
+                )
+                if existing.scalar_one_or_none():
+                    continue
+
+                db.add(CommodityPrice(
+                    symbol=symbol,
+                    name=name,
+                    price_usd=round(price, 2),
+                    change_pct=change_pct,
+                    price_date=price_date,
+                ))
+                saved += 1
+            except Exception as e:
+                logger.warning("fred_commodity_error series=%s err=%s", series_id, str(e))
+
+    await db.flush()
+    logger.info("fred_commodities_collected count=%d", saved)
     return saved
 
 
@@ -704,6 +793,12 @@ async def collect_market_data(db: AsyncSession) -> dict:
     except Exception as e:
         logger.error("commodity_collection_failed: %s", str(e))
         results["commodities"] = -1
+
+    try:
+        results["fred_commodities"] = await collect_fred_commodities(db)
+    except Exception as e:
+        logger.error("fred_commodity_collection_failed: %s", str(e))
+        results["fred_commodities"] = -1
 
     try:
         results["indices"] = await collect_market_indices(db)

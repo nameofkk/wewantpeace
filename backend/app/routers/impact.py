@@ -201,6 +201,7 @@ class RiskRadarOut(BaseModel):
 class ImpactFlowNode(BaseModel):
     id: str
     label: str
+    sub_label: str | None = None  # 2줄째: 실시간 가격 데이터
     color: str
     category: str
     cluster_id: str | None = None
@@ -773,9 +774,22 @@ async def _build_impact_summary(
         risk_radar = risk_radar_obj.model_dump() if risk_radar_obj else None
 
     # ── Impact Flow (동기 함수 — gather 불필요) ──
+    # 상품 가격 배치 조회 (Impact Flow 2줄 라벨용)
+    _cp_symbols = ["WTI", "BRENT", "NATGAS", "WHEAT", "CORN", "BDRY", "JET_FUEL"]
+    _cp_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(_cp_symbols))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    commodity_prices: dict[str, tuple[float, float]] = {}  # symbol → (price, change_pct)
+    for cp in _cp_q.scalars():
+        if cp.symbol not in commodity_prices:
+            commodity_prices[cp.symbol] = (cp.price_usd, cp.change_pct or 0)
+
     impact_flow = None
     try:
-        impact_flow_obj = _compute_impact_flow(scored, home, sectors_data, trade_map, oil_row, lang)
+        impact_flow_obj = _compute_impact_flow(scored, home, sectors_data, trade_map, oil_row, lang, commodity_prices)
         impact_flow = impact_flow_obj.model_dump() if impact_flow_obj else None
     except Exception as e:
         logger.warning("impact_flow_error", error=str(e))
@@ -1706,7 +1720,7 @@ async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_r
     return RiskRadarOut(axes=axes, overall_trend=trend)
 
 
-def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map: dict, oil_row, lang: str) -> ImpactFlowOut | None:
+def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map: dict, oil_row, lang: str, commodity_prices: dict | None = None) -> ImpactFlowOut | None:
     """Impact Flow Sankey 3단 데이터"""
     if not scored:
         return None
@@ -1826,34 +1840,45 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     if not impact_sources:
         impact_sources["inflation"] = list(seen_commodities) if seen_commodities else ["energy"]
 
-    # impact 라벨 생성 함수
-    def _impact_label(imp_id: str, source_sectors: list[str]) -> str:
-        max_gdp = max((sectors_data.get(s, {}).get("gdp_pct", 0) for s in source_sectors), default=0)
-        _labels: dict[str, tuple[str, str]] = {
-            "energy_cost":     ("에너지 비용", "Energy"),
-            "food_cost":       ("식료품", "Food"),
-            "shipping_cost":   ("물류비", "Logistics"),
-            "electronics_cost":("전자제품", "Electronics"),
-            "auto_cost":       ("자동차", "Auto"),
-            "mfg_cost":        ("제조 원가", "Manufacturing"),
-            "travel_cost":     ("여행 경비", "Travel"),
-            "inflation":       ("물가 상승", "Inflation"),
-        }
-        base_ko, base_en = _labels.get(imp_id, ("영향", "Impact"))
+    # impact 라벨 생성 함수 — 2줄: label(카테고리) + sub_label(실시간 가격)
+    _cp = commodity_prices or {}
 
-        if imp_id == "energy_cost" and oil_change != 0:
-            return f"{base_ko} {oil_change:+.1f}%" if lang == "ko" else f"{base_en} {oil_change:+.1f}%"
-        if imp_id == "shipping_cost" and affected_trade > 0:
-            t_b = affected_trade / 1e9
-            return f"{base_ko} · ${t_b:.1f}B" if lang == "ko" else f"{base_en} · ${t_b:.1f}B"
-        if max_gdp > 0:
-            return f"{base_ko} GDP {max_gdp:.1f}%" if lang == "ko" else f"{base_en} GDP {max_gdp:.1f}%"
-        return f"{base_ko} 영향" if lang == "ko" else f"{base_en} affected"
+    # impact_id → (카테고리 라벨 ko/en, 대표 상품 symbol, 상품명 ko/en)
+    _IMPACT_META: dict[str, dict] = {
+        "energy_cost":      {"ko": "에너지", "en": "Energy", "symbols": ["NATGAS", "WTI"], "name_ko": ["천연가스", "유가"], "name_en": ["NatGas", "Oil"]},
+        "food_cost":        {"ko": "식료품", "en": "Food", "symbols": ["WHEAT", "CORN"], "name_ko": ["밀", "옥수수"], "name_en": ["Wheat", "Corn"]},
+        "shipping_cost":    {"ko": "물류비", "en": "Logistics", "symbols": ["BDRY", "WTI"], "name_ko": ["해운", "유가"], "name_en": ["Shipping", "Oil"]},
+        "electronics_cost": {"ko": "전자제품", "en": "Electronics", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
+        "auto_cost":        {"ko": "자동차", "en": "Auto", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
+        "mfg_cost":         {"ko": "제조 원가", "en": "Manufacturing", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
+        "travel_cost":      {"ko": "여행 경비", "en": "Travel", "symbols": ["JET_FUEL", "WTI"], "name_ko": ["항공유", "유가"], "name_en": ["JetFuel", "Oil"]},
+        "inflation":        {"ko": "물가 상승", "en": "Inflation", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
+    }
+
+    def _impact_label_2line(imp_id: str) -> tuple[str, str | None]:
+        """Returns (label, sub_label). sub_label에 실시간 가격 데이터."""
+        meta = _IMPACT_META.get(imp_id)
+        if not meta:
+            return ("영향" if lang == "ko" else "Impact", None)
+        label = meta["ko"] if lang == "ko" else meta["en"]
+
+        # 대표 상품에서 가격 데이터 찾기 (첫번째 매칭)
+        for i, sym in enumerate(meta["symbols"]):
+            if sym in _cp:
+                price, chg = _cp[sym]
+                name = meta["name_ko"][i] if lang == "ko" else meta["name_en"][i]
+                sign = "+" if chg > 0 else ""
+                arrow = "↑" if chg > 0 else "↓" if chg < 0 else ""
+                sub = f"{name} ${price:,.1f} {sign}{chg:.1f}%{arrow}" if price >= 10 else f"{name} ${price:.2f} {sign}{chg:.1f}%{arrow}"
+                return (label, sub)
+
+        # 가격 데이터 없으면 기존 방식 fallback
+        return (label, None)
 
     # impact 노드 + 링크 생성
     for imp_id, source_sectors in impact_sources.items():
-        lbl = _impact_label(imp_id, source_sectors)
-        nodes.append(ImpactFlowNode(id=imp_id, label=lbl, color="#3b82f6", category="impact"))
+        lbl, sub_lbl = _impact_label_2line(imp_id)
+        nodes.append(ImpactFlowNode(id=imp_id, label=lbl, sub_label=sub_lbl, color="#3b82f6", category="impact"))
         for sid in source_sectors:
             gdp = sectors_data.get(sid, {}).get("gdp_pct", 1)
             link_val = max(1, round(gdp * 2))
