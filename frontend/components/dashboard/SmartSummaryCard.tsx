@@ -33,11 +33,17 @@ interface SmartSummaryFullProps {
   isPro: boolean;
 }
 
-function getRelevantMarketChips(cc: string, market: MarketSnapshot | null | undefined) {
+function getRelevantMarketChips(cc: string, market: MarketSnapshot | null | undefined, recommended?: string[] | null) {
   if (!market) return [];
   const toChip = (i: { symbol: string; name: string; value: number; change_pct: number }) => ({
     symbol: i.symbol, name: i.name, price_usd: i.value, change_pct: i.change_pct,
   });
+  // 백엔드 추천 심볼이 있으면 우선 사용
+  if (recommended?.length) {
+    const chips = market.commodities.filter((c) => recommended.includes(c.symbol));
+    if (chips.length > 0) return chips;
+  }
+  // 폴백: 기존 국가별 하드코딩
   if (["IL", "IR", "IQ", "SA", "SY", "LB", "YE"].includes(cc))
     return market.commodities.filter((c) => ["WTI", "BRENT"].includes(c.symbol));
   if (["CN", "TW"].includes(cc))
@@ -66,7 +72,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
 
   const impactScore = topIssueRaw?.impact_score ?? 0;
   const cc = item.country_codes?.[0] ?? "";
-  const marketChips = getRelevantMarketChips(cc, market);
+  const marketChips = getRelevantMarketChips(cc, market, topIssueRaw?.relevant_commodities);
   const colors = impactScoreColor(impactScore);
 
   const whatLine = topIssueRaw?.what_line;

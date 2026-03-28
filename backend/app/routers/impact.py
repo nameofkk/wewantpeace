@@ -137,6 +137,7 @@ class ImpactSummaryTopIssue(BaseModel):
     what_line: str | None = None
     so_what_line: str | None = None
     when_line: str | None = None
+    relevant_commodities: list[str] | None = None
 
 
 class CommoditySnapshotOut(BaseModel):
@@ -406,10 +407,23 @@ async def _build_impact_summary(
                     text += "…"
                 body_snippets[cid] = text
 
+    # ── 원자재 가격 배치 조회 (reason/summary/impact_flow/risk_radar 공용) ──
+    _cp_symbols = ["WTI", "BRENT", "NATGAS", "WHEAT", "CORN", "SOYBEAN", "RICE", "BDRY", "JET_FUEL", "GOLD", "SILVER"]
+    _cp_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(_cp_symbols))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    commodity_prices: dict[str, tuple[float, float]] = {}  # symbol → (price, change_pct)
+    for cp in _cp_q.scalars():
+        if cp.symbol not in commodity_prices:
+            commodity_prices[cp.symbol] = (cp.price_usd, cp.change_pct or 0)
+
     top_issues = []
     for c, impact in top5_for_issues:
-        reason = _build_reason_sync(c, home, lang, sectors_data, trade_map, oil_row)
-        smart = _build_smart_summary(c, home, lang, sectors_data, trade_map, oil_row)
+        reason = _build_reason_sync(c, home, lang, sectors_data, trade_map, oil_row, commodity_prices)
+        smart = _build_smart_summary(c, home, lang, sectors_data, trade_map, oil_row, commodity_prices)
 
         recent_count = recent_counts.get(c.id, 0)
         current_kscore = c.kscore or 0
@@ -440,6 +454,7 @@ async def _build_impact_summary(
             what_line=smart["what_line"],
             so_what_line=smart["so_what_line"],
             when_line=smart["when_line"],
+            relevant_commodities=smart.get("relevant_commodities"),
         ))
 
     # 홈 국가 긴장도 조회
@@ -721,7 +736,7 @@ async def _build_impact_summary(
         _get_market_snapshot(home, db),
         _get_trade_exposure(trade_home, db),
         _get_travel_advisories(home, scored[:10], is_pro, db),
-        _compute_risk_radar(home, scored, sectors_data, oil_row, db),
+        _compute_risk_radar(home, scored, sectors_data, oil_row, db, commodity_prices),
         return_exceptions=True,
     )
 
@@ -773,20 +788,7 @@ async def _build_impact_summary(
         risk_radar_obj = gather_results[3]
         risk_radar = risk_radar_obj.model_dump() if risk_radar_obj else None
 
-    # ── Impact Flow (동기 함수 — gather 불필요) ──
-    # 상품 가격 배치 조회 (Impact Flow 2줄 라벨용)
-    _cp_symbols = ["WTI", "BRENT", "NATGAS", "WHEAT", "CORN", "BDRY", "JET_FUEL"]
-    _cp_q = await db.execute(
-        select(CommodityPrice)
-        .distinct(CommodityPrice.symbol)
-        .where(CommodityPrice.symbol.in_(_cp_symbols))
-        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
-    )
-    commodity_prices: dict[str, tuple[float, float]] = {}  # symbol → (price, change_pct)
-    for cp in _cp_q.scalars():
-        if cp.symbol not in commodity_prices:
-            commodity_prices[cp.symbol] = (cp.price_usd, cp.change_pct or 0)
-
+    # ── Impact Flow (동기 함수 — commodity_prices 재사용) ──
     impact_flow = None
     try:
         impact_flow_obj = _compute_impact_flow(scored, home, sectors_data, trade_map, oil_row, lang, commodity_prices)
@@ -886,6 +888,7 @@ async def _generate_impact_brief(
     home_country: str,
     lang: str,
     db: AsyncSession,
+    commodity_prices: dict | None = None,
 ) -> dict:
     """AI를 사용하여 클러스터의 경제/무역/여행 영향 분석을 생성합니다."""
 
@@ -995,6 +998,21 @@ CRITICAL RULES:
 - If trade dependency is high, score should reflect this proportionally
 - Respond in the requested language"""
 
+            # 원자재 컨텍스트 생성
+            _commodity_context = ""
+            _cp = commodity_prices or {}
+            _ref = _get_commodity_ref(country_code, _cp, "en")
+            if _ref:
+                _commodity_context = f"\nRelevant commodity: {_ref[0]} ${_ref[1]:,.2f} ({_ref[2]:+.1f}%)"
+            # 주요 원자재 시세 요약 (최대 5개)
+            _key_commodities = []
+            for _sym in ("WTI", "NATGAS", "WHEAT", "CORN", "GOLD"):
+                if _sym in _cp:
+                    _p, _c = _cp[_sym]
+                    _key_commodities.append(f"{_sym}: ${_p:,.2f} ({_c:+.1f}%)")
+            if _key_commodities:
+                _commodity_context += "\nKey commodity prices: " + ", ".join(_key_commodities)
+
             user_prompt = f"""Analyze impact on {home_country}:
 
 Crisis: {cluster_title}
@@ -1008,6 +1026,7 @@ Calculated impact score: {impact_score}/100
 
 Trade relationship ({home_country} sectors affected by {country_code}):
 {trade_context}
+{_commodity_context}
 
 Recent events:
 {events_text}
@@ -1069,11 +1088,30 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
         "guarded" if tension_score >= 20 else "stable"
     )
 
+    # 원자재 근거 문자열 (규칙 기반 fallback용)
+    _cp = commodity_prices or {}
+    _commodity_detail_ko = ""
+    _commodity_detail_en = ""
+    _cref = _get_commodity_ref(country_code, _cp, "ko")
+    if _cref:
+        _n, _pr, _ch, _s = _cref
+        _ps = f"${_pr:,.0f}" if _pr >= 10 else f"${_pr:.2f}"
+        _sign = "+" if _ch > 0 else ""
+        _commodity_detail_ko = f" {_n} {_ps}({_sign}{_ch:.1f}%)."
+    _cref_en = _get_commodity_ref(country_code, _cp, "en")
+    if _cref_en:
+        _n, _pr, _ch, _s = _cref_en
+        _ps = f"${_pr:,.0f}" if _pr >= 10 else f"${_pr:.2f}"
+        _sign = "+" if _ch > 0 else ""
+        _commodity_detail_en = f" {_n.title()} {_ps} ({_sign}{_ch:.1f}%)."
+
     if lang == "ko":
         economy = f"{country_code} 지역 긴장도 {tension_score:.0f}/100({tension_label}). "
         if trade_vol_str:
             economy += f"양자 교역 규모 {trade_vol_str}. "
         economy += f"에너지·원자재 가격 변동 및 환율 영향 가능성."
+        if _commodity_detail_ko:
+            economy += _commodity_detail_ko
 
         trade = ""
         if sectors_str:
@@ -1107,6 +1145,8 @@ Note: The score should be close to {impact_score} (pre-calculated based on trade
     if trade_vol_str:
         economy += f"Bilateral trade volume: {trade_vol_str}. "
     economy += "Potential impact on energy, commodities and FX."
+    if _commodity_detail_en:
+        economy += _commodity_detail_en
 
     trade = ""
     if sectors_str:
@@ -1177,8 +1217,20 @@ async def get_impact_brief(
     if not cluster:
         raise HTTPException(404, detail="Cluster not found")
 
+    # 원자재 가격 조회 (AI 컨텍스트용)
+    _brief_cp_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(["WTI", "BRENT", "NATGAS", "WHEAT", "CORN", "GOLD", "BDRY"]))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    _brief_cp: dict[str, tuple[float, float]] = {}
+    for _bcp in _brief_cp_q.scalars():
+        if _bcp.symbol not in _brief_cp:
+            _brief_cp[_bcp.symbol] = (_bcp.price_usd, _bcp.change_pct or 0)
+
     # AI 분석 생성
-    brief = await _generate_impact_brief(cluster, effective_home, lang, db)
+    brief = await _generate_impact_brief(cluster, effective_home, lang, db, _brief_cp)
 
     response_data = {
         "cluster_id": str(cluster.id),
@@ -1461,6 +1513,96 @@ _HOME_CURRENCIES = {
     "GB": ["GBP", "EUR", "JPY", "CNY"],
 }
 
+# ── 국가→관련 원자재 매핑 (reason/summary 다양화용) ──
+_COUNTRY_COMMODITY_MAP: dict[str, dict] = {
+    # 곡물 수출국
+    "UA": {"symbols": ["WHEAT"], "ko": "밀", "en": "wheat"},
+    "RU": {"symbols": ["WHEAT", "NATGAS"], "ko": "밀·가스", "en": "wheat & gas"},
+    "BR": {"symbols": ["SOYBEAN", "CORN"], "ko": "대두·옥수수", "en": "soybean & corn"},
+    "AR": {"symbols": ["SOYBEAN", "WHEAT"], "ko": "대두·밀", "en": "soybean & wheat"},
+    "IN": {"symbols": ["RICE"], "ko": "쌀", "en": "rice"},
+    "MM": {"symbols": ["RICE"], "ko": "쌀", "en": "rice"},
+    "TH": {"symbols": ["RICE"], "ko": "쌀", "en": "rice"},
+    "VN": {"symbols": ["RICE"], "ko": "쌀", "en": "rice"},
+    "AU": {"symbols": ["WHEAT", "CORN"], "ko": "밀·옥수수", "en": "wheat & corn"},
+    "CA": {"symbols": ["WHEAT", "WTI"], "ko": "밀·원유", "en": "wheat & oil"},
+    # 산유국 (기존 oil_row 보강)
+    "SA": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    "AE": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    "IQ": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    "KW": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    "IR": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    "LY": {"symbols": ["WTI", "BRENT"], "ko": "원유", "en": "crude oil"},
+    # 천연가스 핵심국
+    "QA": {"symbols": ["NATGAS"], "ko": "천연가스", "en": "natural gas"},
+    "NO": {"symbols": ["NATGAS"], "ko": "천연가스", "en": "natural gas"},
+    # 해운 허브
+    "EG": {"symbols": ["BDRY"], "ko": "해운", "en": "shipping"},
+    "PA": {"symbols": ["BDRY"], "ko": "해운", "en": "shipping"},
+    "YE": {"symbols": ["BDRY", "WTI"], "ko": "해운·유가", "en": "shipping & oil"},
+    "SO": {"symbols": ["BDRY"], "ko": "해운", "en": "shipping"},
+}
+
+
+def _get_commodity_ref(
+    cc: str, commodity_prices: dict | None, lang: str,
+) -> tuple[str, float, float, str] | None:
+    """국가 코드에 매핑된 원자재 가격 참조를 반환. (name, price, change_pct, symbol) or None"""
+    if not commodity_prices or cc not in _COUNTRY_COMMODITY_MAP:
+        return None
+    meta = _COUNTRY_COMMODITY_MAP[cc]
+    name = meta["ko"] if lang == "ko" else meta["en"]
+    for sym in meta["symbols"]:
+        if sym in commodity_prices:
+            price, change = commodity_prices[sym]
+            return (name, price, change, sym)
+    return None
+
+
+def _format_commodity_reason(name: str, price: float, change: float, sym: str, h_name: str, lang: str) -> str:
+    """원자재 참조를 reason 문장으로 변환."""
+    sign = "+" if change > 0 else ""
+    price_str = f"${price:,.0f}" if price >= 10 else f"${price:.2f}"
+    if lang == "ko":
+        if sym in ("WHEAT", "CORN", "SOYBEAN", "RICE"):
+            return f"{name} {price_str}({sign}{change:.1f}%), {h_name} 식료품 가격 상승 압력"
+        elif sym == "BDRY":
+            return f"해운지수 {price_str}({sign}{change:.1f}%), {h_name} 물류비 영향"
+        elif sym == "NATGAS":
+            return f"천연가스 {price_str}({sign}{change:.1f}%), {h_name} 에너지 비용 상승"
+        else:
+            return f"유가 {price_str}({sign}{change:.1f}%), {h_name} 에너지 비용 직접 상승 압력"
+    else:
+        if sym in ("WHEAT", "CORN", "SOYBEAN", "RICE"):
+            return f"{name.title()} {price_str} ({sign}{change:.1f}%), food cost pressure for {h_name}"
+        elif sym == "BDRY":
+            return f"Shipping index {price_str} ({sign}{change:.1f}%), logistics cost impact on {h_name}"
+        elif sym == "NATGAS":
+            return f"Natural gas {price_str} ({sign}{change:.1f}%), energy cost pressure for {h_name}"
+        else:
+            return f"Oil {price_str} ({sign}{change:.1f}%), rising energy costs for {h_name}"
+
+
+def _get_relevant_symbols(cc: str, topic: str, commodity_prices: dict | None = None) -> list[str]:
+    """SmartSummaryCard 마켓칩에 표시할 원자재 심볼 추천 (최대 3개)."""
+    symbols: list[str] = []
+    if cc in _COUNTRY_COMMODITY_MAP:
+        symbols.extend(_COUNTRY_COMMODITY_MAP[cc]["symbols"])
+    if topic in ("conflict", "terror") and "GOLD" not in symbols:
+        symbols.append("GOLD")
+    if topic in ("conflict", "terror", "military") and "WTI" not in symbols:
+        symbols.append("WTI")
+    if not symbols:
+        symbols = ["WTI"]
+    # 실제 가격 데이터가 있는 것만 필터
+    if commodity_prices:
+        symbols = [s for s in symbols if s in commodity_prices] or symbols
+    seen: list[str] = []
+    for s in symbols:
+        if s not in seen:
+            seen.append(s)
+    return seen[:3]
+
 
 def _build_reason_sync(
     cluster,
@@ -1469,6 +1611,7 @@ def _build_reason_sync(
     sectors_data: dict,
     trade_map: dict[str, float],
     oil_row,
+    commodity_prices: dict | None = None,
 ) -> str:
     """동기 함수: 배치 조회 결과로 reason 생성 (DB 호출 없음)."""
     cc = cluster.country_code or ""
@@ -1490,17 +1633,22 @@ def _build_reason_sync(
         elif trade_vol >= 1e6:
             trade_str = f"${trade_vol / 1e6:.0f}M"
 
+    # 원자재 참조: 국가별 매핑 (유가 + 곡물 + 해운 + 가스)
     oil_price = None
     if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
         if oil_row:
             oil_price = (oil_row[0], oil_row[1])
 
-    # 국가 코드 → 국가명 변환 (reason 가독성)
+    commodity_ref = _get_commodity_ref(cc, commodity_prices, lang)
+
     h_name = _country_name(home_country, lang)
     c_name = _country_name(cc, lang)
 
     if lang == "ko":
-        if affected_sectors and trade_str:
+        # 원자재 매핑이 있으면 우선 사용 (유가 외: 곡물/해운/가스)
+        if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
+            reason = _format_commodity_reason(*commodity_ref, h_name, lang)
+        elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
             reason = f"{h_name}↔{c_name} 교역 {trade_str}, {top_sector}(GDP {gdp}%) 공급망에 직접 영향"
             if oil_price:
@@ -1527,7 +1675,9 @@ def _build_reason_sync(
         else:
             reason = "국제 정세 변동에 따른 시장 불확실성 증가"
     else:
-        if affected_sectors and trade_str:
+        if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
+            reason = _format_commodity_reason(*commodity_ref, h_name, lang)
+        elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
             reason = f"{h_name}↔{c_name} trade {trade_str}, direct {top_sector} (GDP {gdp}%) supply chain exposure"
             if oil_price:
@@ -1554,7 +1704,7 @@ def _build_reason_sync(
     return reason
 
 
-def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: dict, trade_map: dict, oil_row) -> dict:
+def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: dict, trade_map: dict, oil_row, commodity_prices: dict | None = None) -> dict:
     """3줄 Smart Summary: what/so_what/when 생성"""
     cc = cluster.country_code or ""
     topic = cluster.topic or "unknown"
@@ -1587,14 +1737,18 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     else:
         what_line = (cluster.title or title)[:60]
 
-    # so_what_line
+    # so_what_line — 원자재 매핑 우선, 유가 폴백
     oil_price = None
     if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
         if oil_row:
             oil_price = (oil_row[0], oil_row[1])
 
+    commodity_ref = _get_commodity_ref(cc, commodity_prices, lang)
+
     if lang == "ko":
-        if oil_price:
+        if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
+            so_what_line = _format_commodity_reason(*commodity_ref, h_name, lang)
+        elif oil_price:
             so_what_line = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), 가스비·물류비 상승 압력"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
@@ -1603,9 +1757,11 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
             top_sector, gdp = affected_sectors[0]
             so_what_line = f"{c_name} 관련 {top_sector}(GDP {gdp}%) 변동성 확대"
         else:
-            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
+            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row, commodity_prices)
     else:
-        if oil_price:
+        if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
+            so_what_line = _format_commodity_reason(*commodity_ref, h_name, lang)
+        elif oil_price:
             so_what_line = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), gas & logistics cost pressure"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
@@ -1614,7 +1770,7 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
             top_sector, gdp = affected_sectors[0]
             so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%) — volatility expected"
         else:
-            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row)
+            so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row, commodity_prices)
 
     # when_line
     if lang == "ko":
@@ -1636,16 +1792,21 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
         else:
             when_line = "Indirect — monitoring trend"
 
-    return {"what_line": what_line, "so_what_line": so_what_line, "when_line": when_line}
+    # relevant_commodities: SmartSummaryCard 마켓칩용
+    rel_syms = _get_relevant_symbols(cc, topic, commodity_prices)
+
+    return {"what_line": what_line, "so_what_line": so_what_line, "when_line": when_line, "relevant_commodities": rel_syms}
 
 
-async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_row, db) -> RiskRadarOut | None:
-    """Risk Radar 5축 계산"""
+async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_row, db, commodity_prices: dict | None = None) -> RiskRadarOut | None:
+    """Risk Radar 5축 계산 — 원자재 가격 변동 반영"""
     if not scored:
         return None
 
     from backend.app.models.tension_index import TensionIndex
     from backend.app.models.economic_data import MarketIndex
+
+    _cp = commodity_prices or {}
 
     # Current values
     conflict_clusters = [(c, s) for c, s in scored if (c.topic or "") in ("conflict", "terror", "coup")]
@@ -1659,7 +1820,9 @@ async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_r
     oil_change = abs(oil_row[1]) if oil_row else 0
     energy_partners = set(energy_data.get("key_partners", []))
     energy_issues = sum(1 for c, _ in scored[:20] if (c.country_code or "") in energy_partners)
-    energy_score = min(100, energy_gdp * 3 + oil_change * 5 + energy_issues * 10)
+    # 천연가스 변동률도 에너지 스코어에 반영
+    gas_change = abs(_cp["NATGAS"][1]) if "NATGAS" in _cp else 0
+    energy_score = min(100, energy_gdp * 3 + oil_change * 5 + gas_change * 3 + energy_issues * 10)
 
     trade_issues = sum(1 for c, _ in scored[:20] if any(
         (c.country_code or "") in info.get("key_partners", [])
@@ -1671,7 +1834,16 @@ async def _compute_risk_radar(home: str, scored: list, sectors_data: dict, oil_r
     agri_gdp = agri_data.get("gdp_pct", 5.0)
     agri_partners = set(agri_data.get("key_partners", []))
     agri_issues = sum(1 for c, _ in scored[:20] if (c.country_code or "") in agri_partners)
-    food_score = min(100, agri_gdp * 2 + agri_issues * 15)
+    # 곡물 가격 변동률을 food_score에 반영
+    grain_volatility = 0.0
+    grain_count = 0
+    for _gs in ("WHEAT", "CORN", "SOYBEAN", "RICE"):
+        if _gs in _cp:
+            grain_volatility += abs(_cp[_gs][1])
+            grain_count += 1
+    if grain_count > 0:
+        grain_volatility /= grain_count
+    food_score = min(100, agri_gdp * 2 + agri_issues * 15 + grain_volatility * 3)
 
     # Finance: market index change
     try:
@@ -1816,15 +1988,15 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
 
     # sector → impact categories (1:다 — 현실적 교차 연결)
     _SECTOR_IMPACTS: dict[str, list[str]] = {
-        "energy":        ["energy_cost", "shipping_cost"],      # 유가 → 에너지비 + 물류비
+        "energy":        ["energy_cost", "gas_bill", "shipping_cost"],   # 에너지 → 에너지비 + 가스요금 + 물류비
         "agriculture":   ["food_cost"],
         "shipping":      ["shipping_cost", "food_cost"],        # 해운 → 물류비 + 식료품
         "semiconductor": ["electronics_cost"],
         "electronics":   ["electronics_cost"],
         "technology":    ["electronics_cost"],
         "manufacturing": ["mfg_cost", "electronics_cost"],      # 제조 → 제조원가 + 전자제품
-        "mining":        ["energy_cost", "mfg_cost"],           # 광업 → 에너지 + 제조원가
-        "finance":       ["energy_cost"],                       # 금융 → 에너지비 (간접)
+        "mining":        ["energy_cost", "mfg_cost", "safe_haven"],  # 광업 → 에너지 + 제조원가 + 안전자산
+        "finance":       ["safe_haven", "energy_cost"],         # 금융 → 안전자산 + 에너지비
         "construction":  ["mfg_cost"],                          # 건설 → 제조원가
         "automotive":    ["auto_cost"],
         "tourism":       ["travel_cost"],
@@ -1846,8 +2018,10 @@ def _compute_impact_flow(scored: list, home: str, sectors_data: dict, trade_map:
     # impact_id → (카테고리 라벨 ko/en, 대표 상품 symbol, 상품명 ko/en)
     _IMPACT_META: dict[str, dict] = {
         "energy_cost":      {"ko": "에너지", "en": "Energy", "symbols": ["NATGAS", "WTI"], "name_ko": ["천연가스", "유가"], "name_en": ["NatGas", "Oil"]},
+        "gas_bill":         {"ko": "가스요금", "en": "Gas Bill", "symbols": ["NATGAS"], "name_ko": ["천연가스"], "name_en": ["NatGas"]},
         "food_cost":        {"ko": "식료품", "en": "Food", "symbols": ["WHEAT", "CORN"], "name_ko": ["밀", "옥수수"], "name_en": ["Wheat", "Corn"]},
         "shipping_cost":    {"ko": "물류비", "en": "Logistics", "symbols": ["BDRY", "WTI"], "name_ko": ["해운", "유가"], "name_en": ["Shipping", "Oil"]},
+        "safe_haven":       {"ko": "안전자산", "en": "Safe Haven", "symbols": ["GOLD", "SILVER"], "name_ko": ["금", "은"], "name_en": ["Gold", "Silver"]},
         "electronics_cost": {"ko": "전자제품", "en": "Electronics", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
         "auto_cost":        {"ko": "자동차", "en": "Auto", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
         "mfg_cost":         {"ko": "제조 원가", "en": "Manufacturing", "symbols": ["WTI"], "name_ko": ["유가"], "name_en": ["Oil"]},
@@ -2025,11 +2199,20 @@ async def _get_market_snapshot(
     indices = []
     exchange_rates = []
 
-    # 1) 원자재: 1 배치 쿼리 (DISTINCT ON)
+    # 1) 원자재: 국가별 관심 심볼 (DISTINCT ON)
+    _COMMODITY_BY_HOME: dict[str, list[str]] = {
+        "KR": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT", "BDRY"],
+        "JP": ["WTI", "BRENT", "GOLD", "RICE", "NATGAS", "BDRY"],
+        "US": ["WTI", "BRENT", "GOLD", "NATGAS", "CORN", "SOYBEAN"],
+        "CN": ["WTI", "BRENT", "GOLD", "SOYBEAN", "WHEAT", "NATGAS"],
+        "DE": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+        "GB": ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"],
+    }
+    _commodity_symbols = _COMMODITY_BY_HOME.get(home_country, ["WTI", "BRENT", "GOLD", "NATGAS", "WHEAT"])
     commodity_q = await db.execute(
         select(CommodityPrice)
         .distinct(CommodityPrice.symbol)
-        .where(CommodityPrice.symbol.in_(["WTI", "BRENT", "GOLD"]))
+        .where(CommodityPrice.symbol.in_(_commodity_symbols))
         .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
     )
     for row in commodity_q.scalars().all():
@@ -2455,8 +2638,9 @@ async def _calc_sector_exposure(
     lang: str = "ko",
     db: AsyncSession | None = None,
     topic: str = "",
+    commodity_prices: dict | None = None,
 ) -> list[dict]:
-    """섹터 노출도 계산 v2 — 토픽별 설명 + 교역액 + 시나리오"""
+    """섹터 노출도 계산 v2 — 토픽별 설명 + 교역액 + 시나리오 + 원자재"""
     sectors_data = SECTOR_DATA.get(home_country, DEFAULT_SECTORS)
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     l = "ko" if lang == "ko" else "en"
@@ -2554,6 +2738,24 @@ async def _calc_sector_exposure(
                 else:
                     desc += "Low direct trade but potential indirect impact via global supply chains."
 
+        # ── 원자재 가격 보강 (섹터별 관련 원자재) ──
+        _SECTOR_COMMODITY_SYMS: dict[str, list[str]] = {
+            "energy": ["WTI", "NATGAS"], "agriculture": ["WHEAT", "CORN"],
+            "shipping": ["BDRY"], "mining": ["GOLD"], "tourism": ["JET_FUEL"],
+        }
+        _cp = commodity_prices or {}
+        _sc_syms = _SECTOR_COMMODITY_SYMS.get(sector, [])
+        for _sc_sym in _sc_syms:
+            if _sc_sym in _cp:
+                _sc_p, _sc_c = _cp[_sc_sym]
+                _sc_ps = f"${_sc_p:,.0f}" if _sc_p >= 10 else f"${_sc_p:.2f}"
+                _sc_sign = "+" if _sc_c > 0 else ""
+                if l == "ko":
+                    desc += f" {_sc_sym} {_sc_ps}({_sc_sign}{_sc_c:.1f}%)."
+                else:
+                    desc += f" {_sc_sym} {_sc_ps} ({_sc_sign}{_sc_c:.1f}%)."
+                break  # 첫 매칭만
+
         # ── 시나리오 + action (Pro+ 이슈 상세용) ──
         s_tpl = _SCENARIO_TEMPLATES.get(l, _SCENARIO_TEMPLATES["en"])
         scenario_worst = scenario_base = scenario_best = action_point = None
@@ -2636,7 +2838,18 @@ async def get_sector_analysis(
 
     affected = cluster.country_code or "Unknown"
 
-    sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db, topic=cluster.topic or "")
+    # 원자재 가격 조회 (섹터 설명 보강용)
+    _sector_cp_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(["WTI", "NATGAS", "WHEAT", "CORN", "GOLD", "BDRY", "JET_FUEL"]))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    _sector_cp: dict[str, tuple[float, float]] = {}
+    for _scp in _sector_cp_q.scalars():
+        if _scp.symbol not in _sector_cp:
+            _sector_cp[_scp.symbol] = (_scp.price_usd, _scp.change_pct or 0)
+    sectors = await _calc_sector_exposure(home, affected, cluster.severity or 0, lang, db, topic=cluster.topic or "", commodity_prices=_sector_cp)
     critical_count = sum(1 for s in sectors if s["risk_level"] == "critical")
     high_count = sum(1 for s in sectors if s["risk_level"] == "high")
 
@@ -2729,6 +2942,18 @@ async def get_sector_overview(
     sectors_data = SECTOR_DATA.get(home, DEFAULT_SECTORS)
     labels = SECTOR_LABELS.get(lang, SECTOR_LABELS["en"])
     aggregated: dict[str, dict] = {}
+
+    # 원자재 가격 조회 (섹터 설명 보강용)
+    _ov_cp_q = await db.execute(
+        select(CommodityPrice)
+        .distinct(CommodityPrice.symbol)
+        .where(CommodityPrice.symbol.in_(["WTI", "NATGAS", "WHEAT", "CORN", "GOLD", "BDRY", "JET_FUEL"]))
+        .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
+    )
+    _overview_cp: dict[str, tuple[float, float]] = {}
+    for _ovcp in _ov_cp_q.scalars():
+        if _ovcp.symbol not in _overview_cp:
+            _overview_cp[_ovcp.symbol] = (_ovcp.price_usd, _ovcp.change_pct or 0)
 
     # 섹터 GDP 비중 합계 (교역금액 비례배분용)
     total_gdp_pct = sum(info["gdp_pct"] for info in sectors_data.values()) or 1.0
@@ -2904,6 +3129,22 @@ async def get_sector_overview(
                     desc += "Indirect exposure through global supply chains."
                 else:
                     desc += "No direct trade exposure with conflict zones."
+
+        # ── 원자재 가격 인라인 (sector-overview) ──
+        _SECTOR_COMMODITY_SYMS_OV: dict[str, list[str]] = {
+            "energy": ["WTI", "NATGAS"], "agriculture": ["WHEAT", "CORN"],
+            "shipping": ["BDRY"], "mining": ["GOLD"], "tourism": ["JET_FUEL"],
+        }
+        for _ov_sym in _SECTOR_COMMODITY_SYMS_OV.get(sector, []):
+            if _ov_sym in _overview_cp:
+                _ov_p, _ov_c = _overview_cp[_ov_sym]
+                _ov_ps = f"${_ov_p:,.0f}" if _ov_p >= 10 else f"${_ov_p:.2f}"
+                _ov_sign = "+" if _ov_c > 0 else ""
+                if l == "ko":
+                    desc += f" {_ov_sym} {_ov_ps}({_ov_sign}{_ov_c:.1f}%)."
+                else:
+                    desc += f" {_ov_sym} {_ov_ps} ({_ov_sign}{_ov_c:.1f}%)."
+                break
 
         entry: dict = {
             "sector": sector_label,
