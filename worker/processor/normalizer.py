@@ -250,18 +250,20 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
     "terror": [
         "terror", "terrorist", "hostage", "isis", "al-qaeda", "extremist",
         "jihadist", "suicide bomb", "attack on civilians", "beheading",
-        "cartel", "drug lord", "drug trafficking", "organized crime", "gang",
-        "assassination", "murder", "shooting", "stabbing", "kidnapping",
+        "assassination", "shooting", "stabbing", "kidnapping",
         # 총기 · 폭탄
         "mass shooting", "school shooting", "active shooter", "gunman",
         "lone wolf", "vehicle attack", "ramming", "pipe bomb", "ied",
         "improvised explosive", "car bomb", "truck bomb",
-        # 조직범죄 · 암살
+        # 암살
         "assassination attempt", "political assassination", "targeted killing",
         "death squad", "execution", "extrajudicial",
         "hostage crisis", "hostage situation", "bomb threat",
         "domestic terrorism", "bioterrorism", "anthrax",
     ],
+    # REMOVED from terror (일반 범죄 → 오분류 원인):
+    # "murder" (일반 살인), "cartel" (마약조직), "drug lord",
+    # "drug trafficking", "organized crime", "gang"
     "coup": [
         "coup", "overthrow", "junta", "seized power", "military takeover",
         "martial law", "emergency decree", "suspended constitution",
@@ -1723,11 +1725,17 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "carpet bombing", "cluster bomb", "white phosphorus",
                   "scorched earth", "war crime", "crimes against humanity"},
     "terror":    {"terrorist", "suicide bomb", "isis", "al-qaeda", "jihadist",
-                  "beheading", "cartel", "drug lord", "hostage",
-                  "shooting", "assassination", "kidnapping", "murder",
+                  "beheading",
                   "mass shooting", "school shooting", "active shooter",
                   "car bomb", "truck bomb", "ied", "hostage crisis",
                   "assassination attempt", "bioterrorism", "anthrax"},
+                  # REMOVED from STRONG (일반 범죄와 혼동):
+                  # "shooting" → weak (일반 총기 사건)
+                  # "assassination" → weak (정치 사건)
+                  # "kidnapping" → weak (범죄)
+                  # "hostage" → weak ("hostage crisis"는 유지)
+                  # "murder" → 제거 (일반 살인 ≠ 테러)
+                  # "cartel", "drug lord" → 제거 (조직범죄 ≠ 테러)
     "protest":   {"protest", "protests", "riot", "riots", "uprising", "demonstration",
                   "revolution", "general strike", "civil disobedience"},
     "diplomacy": {"summit", "peace deal", "peace process", "treaty", "bilateral",

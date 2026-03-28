@@ -30,18 +30,18 @@ MAX_CLUSTER_AGE_HOURS = 120  # 클러스터 절대 수명 상한 — 72→120h, 
 MAX_EVENTS_UNKNOWN_GEO = 2
 
 # 클러스터당 최대 이벤트 수 — 초과 시 새 클러스터 생성
-MAX_EVENTS_PER_CLUSTER = 50
+MAX_EVENTS_PER_CLUSTER = 25  # 50→25, 단일 사건이 25개 이상 보도되는 경우 드뭄
 
 # 제목 유사도 임계값 (Filtered Jaccard 기준 — 노이즈 단어 제거 후)
-MIN_TITLE_OVERLAP = 0.12           # 0.15→0.12, 필터링 후 잔존 단어가 적어 더 낮은 임계값 필요
-MIN_TITLE_OVERLAP_HIGH_SEV = 0.08  # 0.13→0.08, 고심각도 이벤트는 더 적극적으로 병합
+MIN_TITLE_OVERLAP = 0.25           # 0.12→0.25, 최소 25% 콘텐츠 단어 겹침 필요
+MIN_TITLE_OVERLAP_HIGH_SEV = 0.18  # 0.08→0.18, 고심각도도 최소 18% 필요
 # AI 판정 경계 영역: 이 구간에서만 GPT-4o-mini로 "같은 사건?" 확인
-AI_MATCH_LOW = 0.06   # 0.10→0.06, 더 많은 경계 케이스를 AI에게 위임
-AI_MATCH_HIGH = 0.25  # 0.20→0.25, AI 판정 상한 확장
+AI_MATCH_LOW = 0.10   # 0.06→0.10, AI 판정 하한 상향
+AI_MATCH_HIGH = 0.40  # 0.25→0.40, AI 판정 상한 확장
 
 # Sub-topic soft signal 보정값
 SUBTOPIC_BONUS = 0.06    # 같은 sub_topic (둘 다 non-general) → sim +0.06
-SUBTOPIC_PENALTY = 0.08  # 다른 sub_topic (둘 다 non-general) → sim -0.08
+SUBTOPIC_PENALTY = 0.12  # 0.08→0.12, 다른 sub_topic은 더 강하게 분리
 
 # 활성 클러스터 후보 최대 조회 수
 MAX_CANDIDATE_CLUSTERS = 10
@@ -130,6 +130,12 @@ _TOPIC_FILTER_STEMS: frozenset[str] = frozenset({
     "health", "pandem", "epidem",
     # generic news words (클러스터 키와 무관하지만 모든 뉴스에 나타나서 가짜 유사도 생성)
     "govern", "offici", "report", "state", "minist", "presid",
+    # 공통 폭력/사건 단어 — 서로 다른 사건에서도 동일하게 나타나 가짜 유사도 생성
+    # (사건 구별에는 장소명·인물명·구체적 세부사항이 중요)
+    "attack", "bomb", "explos", "shoot", "kill", "dead", "death",
+    "wound", "injur", "victim", "suspect", "arrest", "polic",
+    "threat", "target", "blast", "detain", "strike", "troop",
+    "weapon", "forc", "secur", "crisis",
 })
 
 
@@ -788,8 +794,8 @@ async def merge_fragmented_clusters(
                 small.title, target.title,
                 ko_a=small.title_ko, ko_b=target.title_ko,
             )
-            # 병합용 완화된 임계값 (0.10) — AI 호출 제거 (DB 트랜잭션 내 외부 API 호출 금지)
-            if sim >= 0.10 and sim > best_sim:
+            # 병합용 임계값 (0.20) — AI 호출 제거 (DB 트랜잭션 내 외부 API 호출 금지)
+            if sim >= 0.20 and sim > best_sim:
                 best_sim = sim
                 best_target = target
 
