@@ -571,6 +571,7 @@ export interface ImpactSummaryTopIssue {
   what_line?: string | null;
   so_what_line?: string | null;
   when_line?: string | null;
+  relevant_commodities?: string[] | null;
 }
 
 export interface CommoditySnapshot {
