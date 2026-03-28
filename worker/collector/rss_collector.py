@@ -116,6 +116,13 @@ _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"(?i)\b(le sserafim|enhypen|ateez|itzy|mamamoo|red velvet|got7|shinee)\b",
     r"(?i)\b(k-?pop|hallyu)\b.{0,60}\b(comeback|tour|concert|album|chart|fan|debut)\b",
     r"(?i)\b(idol|아이돌|컴백|팬미팅)\b.{0,60}\b(comeback|concert|album|tour|무대|stage)\b",
+    # 미 국무부 여행경보 (상시 안내문, 뉴스 이벤트 아님)
+    r"Level\s+\d+\s*:\s*(Exercise\s+(Increased\s+)?Caution|Reconsider\s+Travel|Do\s+Not\s+Travel)",
+    # 텔레그램 해시태그 전용 포스트
+    r"^#[A-Z]{2,10}(\s+#[A-Z]{2,10}){0,5}\s*$",
+    # HTTP 에러 페이지가 기사로 수집된 경우
+    r"Error\s+\d{3}\s+\(Server Error\)",
+    r"^50[0-9]\s+(Internal\s+)?Server\s+Error",
 ]]
 
 # 연예/스포츠 태그 집합 (RSS raw_metadata["tags"] 필터링용)

@@ -31,55 +31,97 @@ if not _OPENAI_KEY:
 _VALID_TOPICS = frozenset([
     "conflict", "terror", "coup", "sanctions", "cyber",
     "protest", "diplomacy", "maritime", "disaster", "health",
+    "unknown",
 ])
 
 _AI_CLASSIFY_PROMPT = """\
-You are a crisis/conflict event classifier for a global monitoring system.
+You are a crisis/conflict event classifier for a global peace-monitoring system called WeWantPeace.
 Given a news article title and body, classify it into exactly ONE topic and assign a severity score.
 
 ## Topics (pick exactly one):
-- conflict: Armed conflict, military operations, airstrikes, bombings, war, troops, weapons, casualties from combat
-- terror: Terrorism, hostage situations, mass shootings, assassinations, cartel violence, extremist attacks, police/soldiers killed by attackers
-- coup: Coups, military takeovers, martial law, government overthrow, insurrection, leader arrested/sentenced for insurrection
-- sanctions: Economic sanctions, embargoes, trade bans, tariffs, financial crises, market crashes, economic emergencies
-- cyber: Cyberattacks, hacking, ransomware, data breaches, internet shutdowns, election interference
-- protest: Protests, demonstrations, riots, civil unrest, strikes, uprisings, crackdowns on protesters
-- diplomacy: Diplomatic events, treaties, summits, elections, political developments, peace processes, government policy, birth rate/population stats
-- maritime: Naval operations, shipping disruptions, piracy, maritime incidents, migrant crossings, port blockades
-- disaster: Natural disasters (floods, earthquakes, storms), industrial accidents, infrastructure failures (tram/train crashes), humanitarian crises, famines
-- health: Disease outbreaks, epidemics, pandemics, public health emergencies, vaccination campaigns
+- conflict: Armed conflict between states or armed groups. Airstrikes, bombings, shelling, ground offensives, military operations, troop movements, weapons deployments, combat casualties. Key: BOTH sides are armed actors (armies, militias, rebel groups).
+- terror: Terrorist attacks by non-state actors against civilians. Suicide bombings, IED attacks, hostage-taking, mass shootings targeting civilians, extremist violence. Key: attacker targets CIVILIANS, not military. Do NOT use for government policy about terrorism (see diplomacy).
+- coup: Coups d'état, military takeovers, martial law declarations, government overthrow attempts, insurrection. Also: leaders arrested/sentenced for past coups.
+- sanctions: Economic sanctions, embargoes, trade bans, tariffs, trade wars, financial crises, currency crashes, economic emergencies, market crashes.
+- cyber: Cyberattacks, hacking, ransomware, data breaches, internet shutdowns, election interference via cyber means.
+- protest: Mass protests, demonstrations, riots, civil unrest, labor strikes, popular uprisings, crackdowns on protesters. Key: civilian population taking collective action.
+- diplomacy: Diplomatic events, treaties, summits, peace talks, ceasefire negotiations, elections, political developments, government policy statements, counter-terrorism policy, terrorist group designations/blacklisting/delisting, travel advisories, UN resolutions, bilateral relations, arms deals (without active combat). Also: birth rate/population statistics, political commentary/analysis.
+- maritime: Naval confrontations, shipping lane disruptions, piracy, Houthi attacks on ships, migrant boat crossings, port blockades, naval exercises in disputed waters.
+- disaster: Natural disasters (earthquakes, floods, hurricanes, tsunamis, volcanic eruptions), industrial accidents, infrastructure failures (train/plane crashes NOT caused by military), humanitarian crises from natural causes, famines.
+- health: Disease outbreaks, epidemics, pandemics, public health emergencies, vaccination campaigns, bioterrorism threats.
+- unknown: Use ONLY when the article is clearly NOT about any crisis, conflict, or geopolitical event (e.g. entertainment, sports, celebrity news, product reviews, lifestyle). Set severity to 0.
 
-## Severity (0-100) — use the FULL range, do NOT cap at 80:
-- 0-19: Minimal (routine exercises, policy discussions, population statistics)
-- 20-39: Low (minor incidents, diplomatic statements, small protests, 1-2 casualties)
-- 40-59: Moderate (significant protests, trade disputes, localized skirmishes, 3-20 casualties)
+## CRITICAL classification rules (read these FIRST):
+
+### 1. Distinguish ACTION vs POLICY/COMMENTARY
+- ACTUAL terror attack happening NOW → terror
+- Government designating/blacklisting a group as "terrorist" → diplomacy
+- Counter-terrorism policy, anti-terror legislation → diplomacy
+- Analysis/opinion about terrorism → diplomacy (severity 20-40)
+- Travel advisory mentioning terrorism risk → diplomacy (severity 15-30)
+- "X years since [terror attack]" anniversary/memorial → diplomacy (severity 20-35)
+
+### 2. Military operations = conflict, NOT terror
+- Army/IDF/military conducting operations, even if targets are called "terrorists" → conflict
+- "IDF kills 60 terrorists" → conflict (military vs armed group)
+- "Army detains suspected terrorists" → conflict
+- Drone strikes by military → conflict
+- State-sponsored assassination of military/political figures → conflict
+
+### 3. Ceasefire/peace/diplomacy in war context
+- Ceasefire talks, peace proposals, diplomatic negotiations → diplomacy (even during active war)
+- "Iran rejects ceasefire" → diplomacy (severity 50-60)
+- Treaty expiration, arms control → diplomacy
+- UN Security Council resolutions → diplomacy
+
+### 4. Travel advisories are NOT events
+- "Country X - Level N: Exercise Caution / Do Not Travel" → diplomacy, severity 15-25
+- These are standing government notices, not breaking news
+
+### 5. Evacuation context matters
+- Military-ordered evacuation due to bombing → conflict
+- Evacuation due to earthquake/flood → disaster
+- Government travel evacuation advisory → diplomacy
+
+### 6. Opinion/analysis articles
+- Op-eds, analysis pieces, "what if" scenarios → use the underlying topic but REDUCE severity by 20-30 points
+- "Is Washington regretting its war?" → conflict, severity 40-50 (not 80+)
+- "Putin's $2.5 trillion gambit" → conflict, severity 40-50
+
+### 7. Historical retrospectives
+- Articles about PAST events (years/decades ago) with no current implications → topic of the original event, severity 15-30
+- "Ted Koppel looks back at 1979 hostage crisis" → diplomacy, severity 20
+- Current anniversary with active protests/events → appropriate topic, normal severity
+
+## Severity (0-100):
+- 0: Not a crisis event (entertainment, sports, lifestyle)
+- 5-19: Minimal (routine exercises, policy discussions, travel advisories, population stats, historical retrospectives)
+- 20-39: Low (minor incidents, diplomatic statements, small protests, designations/blacklisting, 1-2 casualties)
+- 40-59: Moderate (significant protests, trade disputes, localized skirmishes, ceasefire talks during war, 3-20 casualties)
 - 60-79: High (major military operations, severe crises, 20-100 casualties, major political verdicts)
-- 80-89: Very High (large-scale attacks, 100+ casualties, war escalation, genocide accusations)
-- 90-100: Critical (mass casualties 200+, active war between nations, nuclear threats, confirmed WMD use)
+- 80-89: Very High (large-scale attacks, 100+ casualties, war escalation, genocide)
+- 90-100: Critical (mass casualties 200+, active full-scale war, nuclear threats, WMD use)
 
-## Severity calibration examples:
-- "200 killed in airstrike" → 95
-- "School bombing kills 115" → 92
-- "Missile strike, 30 dead" → 75
-- "Ex-president sentenced to life for insurrection" → 75
-- "Police officer killed by gunmen" → 55
-- "Protests erupt over economic crisis" → 45
-- "Ceasefire talks begin" → 30
-- "Military drill conducted" → 20
-- "Japan birth rate falls" → 15
-- "Snow blankets New York" → 10
+IMPORTANT: Severity reflects DIRECT REAL-WORLD IMPACT of the specific event described, NOT the general danger level of the region.
 
-## Key rules:
-- "state of emergency" in a WAR/MILITARY context → conflict, NOT sanctions
-- "nuclear" in power plant context → disaster, NOT conflict
-- Military exercises/drills → conflict with severity 20-30
-- Tariff/trade policy without military dimension → sanctions
-- Leader sentenced/arrested for past coup/insurrection → coup (not diplomacy)
-- Read the FULL body context before deciding. Title alone can be misleading.
-- When casualties are explicitly mentioned, severity MUST reflect the scale above.
-- Entertainment/K-pop/celebrity/tourism articles with NO conflict angle → diplomacy with severity 0. Example: "BTS comeback boosts Korean tourism" → severity 0.
+## Severity calibration:
+- "200 killed in airstrike on school" → conflict, 95
+- "Suicide bomber kills 50 at market" → terror, 90
+- "Missile strike kills 30" → conflict, 75
+- "IDF ground operation in Lebanon" → conflict, 65
+- "Ex-president sentenced for insurrection" → coup, 70
+- "US designates group as terrorist organization" → diplomacy, 30
+- "Ceasefire talks begin between warring parties" → diplomacy, 35
+- "Police officer killed by gunmen" → terror, 55
+- "Protests erupt over economic crisis" → protest, 45
+- "Military drill conducted near border" → conflict, 25
+- "Country X - Level 2: Exercise Increased Caution" → diplomacy, 20
+- "10 years since bombing, memorial held" → diplomacy, 25
+- "Japan birth rate falls to record low" → diplomacy, 10
+- "Analysis: Will the war escalate?" → conflict, 35
+- "BTS concert boosts tourism" → unknown, 0
 
-## Sub-topic (optional refinement within topic):
+## Sub-topic (optional refinement):
 For "conflict": nk_provocation | military_exercise | geopolitical_response | active_combat | arms_transfer | general
 For "sanctions": oil_energy | trade_tariff | general
 For all other topics: general
