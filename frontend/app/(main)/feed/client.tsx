@@ -504,11 +504,11 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
       {tickerItems.length > 0 && (() => {
         const reps = tickerItems.length <= 4 ? 4 : 2;
         return (
-          <div className="border-t border-border/40 bg-secondary/20 overflow-hidden py-1.5 flex items-center">
-            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
+          <div className="border-t border-border/40 bg-secondary/20 overflow-hidden h-8 flex items-center">
+            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40 leading-none">
               {hasDelta ? (lang === "ko" ? "📈 KScore 변동" : "📈 KScore Δ") : "📊 KScore"}
             </span>
-            <div className="overflow-hidden flex-1">
+            <div className="overflow-hidden flex-1 h-full flex items-center">
               <div className="ticker-track-medium">
                 {Array.from({ length: reps }, (_, rep) => (
                   <span key={rep} className="inline-flex items-center gap-5 px-3">
@@ -521,21 +521,21 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
                       const delta = item.kscore_delta_24h;
                       const showDelta = hasDelta && delta != null && delta !== 0;
                       return (
-                        <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] whitespace-nowrap">
-                          <span>{flag}</span>
-                          <span className="font-medium text-foreground/80 whitespace-nowrap">{title}</span>
+                        <span key={`${rep}-${item.id}`} className="inline-flex items-center gap-1 text-[10px] whitespace-nowrap leading-none">
+                          <span className="leading-none">{flag}</span>
+                          <span className="font-medium text-foreground/80 whitespace-nowrap leading-none">{title}</span>
                           {showDelta ? (
                             <>
-                              <span className={cn("font-bold tabular-nums", delta > 0 ? "text-red-400" : "text-emerald-400")}>
+                              <span className={cn("font-bold tabular-nums leading-none", delta > 0 ? "text-red-400" : "text-emerald-400")}>
                                 {delta > 0 ? "+" : ""}{delta.toFixed(1)}
                               </span>
-                              <span className={cn("text-[9px]", delta > 0 ? "text-red-400" : "text-emerald-400")}>
+                              <span className={cn("text-[9px] leading-none", delta > 0 ? "text-red-400" : "text-emerald-400")}>
                                 {delta > 0 ? "▲" : "▼"}
                               </span>
                             </>
                           ) : (
                             <span className={cn(
-                              "font-bold tabular-nums",
+                              "font-bold tabular-nums leading-none",
                               item.kscore >= 7 ? "text-red-400" : item.kscore >= 4 ? "text-orange-400" : "text-muted-foreground"
                             )}>
                               K{item.kscore.toFixed(1)}

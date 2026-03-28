@@ -773,11 +773,11 @@ export default function TensionPage() {
         // 국가 수가 적을 때 무한 롤링을 위해 최소 4회 반복
         const reps = deltaItems.length <= 5 ? 6 : deltaItems.length <= 10 ? 4 : 2;
         return (
-          <div className="bg-secondary/30 border-y border-border/40 overflow-hidden py-1.5 flex items-center">
-            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40">
+          <div className="bg-secondary/30 border-y border-border/40 overflow-hidden h-8 flex items-center">
+            <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40 leading-none">
               {lang === "ko" ? "🌡️ 긴장도 변동" : "🌡️ Tension Δ"}
             </span>
-            <div className="overflow-hidden flex-1">
+            <div className="overflow-hidden flex-1 h-full flex items-center">
               <div className="ticker-track-medium">
                 {Array.from({ length: reps }, (_, rep) => (
                   <span key={rep} className="inline-flex items-center gap-4 px-3">
@@ -785,13 +785,13 @@ export default function TensionPage() {
                       const delta = item.delta_24h ?? 0;
                       const isUp = delta > 0;
                       return (
-                        <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap">
-                          <span>{getFlag(item.country_code)}</span>
-                          <span className="font-medium text-muted-foreground">{item.country_code}</span>
-                          <span className={cn("font-bold", isUp ? "text-red-400" : "text-emerald-400")}>
+                        <span key={`${rep}-${item.country_code}`} className="inline-flex items-center gap-1 text-[10px] tabular-nums whitespace-nowrap leading-none">
+                          <span className="leading-none">{getFlag(item.country_code)}</span>
+                          <span className="font-medium text-muted-foreground leading-none">{item.country_code}</span>
+                          <span className={cn("font-bold leading-none", isUp ? "text-red-400" : "text-emerald-400")}>
                             {isUp ? "+" : ""}{delta.toFixed(1)}
                           </span>
-                          <span className={cn("text-[9px]", isUp ? "text-red-400" : "text-emerald-400")}>
+                          <span className={cn("text-[9px] leading-none", isUp ? "text-red-400" : "text-emerald-400")}>
                             {isUp ? "▲" : "▼"}
                           </span>
                         </span>
