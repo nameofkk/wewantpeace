@@ -15,6 +15,7 @@ import {
   sendPasswordResetEmail,
   getFirebaseAuth,
   checkGoogleRedirectResult,
+  useAuth,
 } from "@/lib/auth";
 import { fetchSignInMethodsForEmail } from "firebase/auth";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -86,16 +87,23 @@ export default function LoginPage() {
   const platform = detectPlatform();
   const isIOS = platform === "ios-native" || platform === "ios-app";
 
-  // URL ?tab=google-register로 진입 시: Firebase 현재 유저 확인 후 바로 등록 폼 표시
+  // Firebase auth 상태 구독 (RegistrationGuard 리다이렉트 대응)
+  const { user: firebaseUser, loading: firebaseLoading } = useAuth();
+
+  // URL ?tab=google-register로 진입 시: Firebase auth 복원을 기다린 후 등록 폼 표시
+  // 기존 버그: useEffect([])로 마운트 시 1회만 체크 → Firebase 복원 전이면 놓침
+  // 수정: firebaseLoading/firebaseUser를 deps에 넣어 auth 상태 변화에 반응
   useEffect(() => {
     const urlTab = new URLSearchParams(window.location.search).get("tab");
     if (urlTab !== "google-register") return;
-    const auth = getFirebaseAuth();
-    if (!auth?.currentUser) return;
-    setGoogleUser(auth.currentUser);
-    setTab("google-register");
+    if (firebaseLoading) return; // Firebase 아직 복원 중 → 대기
+    if (firebaseUser) {
+      setGoogleUser(firebaseUser);
+      setTab("google-register");
+    }
+    // Firebase 복원 완료 후 유저가 없으면 → 일반 로그인 폼으로 폴백
     setCheckingRedirect(false);
-  }, []);
+  }, [firebaseLoading, firebaseUser]);
 
   // React Native WebView: Google 리다이렉트 로그인 결과 확인
   useEffect(() => {
