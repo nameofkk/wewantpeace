@@ -31,7 +31,8 @@ class TestTableCreation:
             # SQLite는 sqlite_master로 확인
             for table_name in expected_tables:
                 result = await conn.execute(
-                    text(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:tbl"),
+                    {"tbl": table_name},
                 )
                 row = result.fetchone()
                 assert row is not None, f"테이블 '{table_name}'이 존재하지 않음"

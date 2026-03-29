@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { adminFetch } from "@/lib/admin-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import { TabBar } from "@/components/admin/TabBar";
 import {
@@ -319,7 +320,7 @@ function FieldEditor({
           />
           {showPreview && isHtml && strVal.length > 0 && (
             <div className="mt-1 p-3 bg-white text-black text-xs rounded border border-border overflow-auto max-h-48">
-              <div dangerouslySetInnerHTML={{ __html: strVal }} />
+              <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(strVal) }} />
             </div>
           )}
         </>

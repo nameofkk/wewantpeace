@@ -37,7 +37,15 @@ const MAX_BIRTH_YEAR = CURRENT_YEAR - 14;
 function getReturnUrl(): string {
   if (typeof window === "undefined") return "/home";
   const params = new URLSearchParams(window.location.search);
-  return params.get("returnUrl") || sessionStorage.getItem("wwp_return_url") || "/home";
+  let url = params.get("returnUrl") || sessionStorage.getItem("wwp_return_url") || "/home";
+  // open redirect 방지: same-origin 상대 경로만 허용
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin !== window.location.origin) return "/home";
+  } catch {
+    return "/home";
+  }
+  return url;
 }
 
 export default function LoginPage() {
