@@ -39,6 +39,7 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   swcMinify: true,
+  poweredByHeader: false,
   experimental: {
     optimizeCss: true,
   },
@@ -77,6 +78,19 @@ const nextConfig = {
           { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
           { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' https://js.dodo.dev https://*.firebaseio.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data:",
+              "connect-src 'self' https://api.wewantpeace.live https://*.firebaseio.com https://*.googleapis.com https://basemaps.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com",
+              "frame-src https://checkout.dodopayments.com",
+              "frame-ancestors 'none'",
+            ].join("; "),
+          },
         ],
       },
       {
