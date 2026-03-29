@@ -480,54 +480,64 @@ function UpgradeContent() {
   }
 
   async function handleDodoCheckout(planId: string) {
-    if (isTossMiniApp()) {
-      // Toss WebView: application/json fetch는 CORS preflight가 필요 → 차단됨
-      // application/x-www-form-urlencoded은 "Simple Request"라 preflight 없음!
-      const token = await user!.getIdToken();
-      const params = new URLSearchParams();
-      params.set("plan", planId);
-      params.set("token", token);
-      params.set("billing_interval", billingCycle);
+    // 토스 WebView든 일반 웹이든 20초 안에 끝나지 않으면 강제 에러
+    const masterTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(lang === "ko" ? "결제 처리 시간 초과. 잠시 후 다시 시도해주세요." : "Payment timeout. Please try again.")), 20000),
+    );
 
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 15000);
+    const doCheckout = async () => {
+      if (isTossMiniApp()) {
+        // Toss WebView: application/json fetch는 CORS preflight가 필요 → 차단됨
+        // application/x-www-form-urlencoded은 "Simple Request"라 preflight 없음!
+        if (!user) throw new Error(lang === "ko" ? "로그인이 필요합니다." : "Login required.");
+        const token = await user.getIdToken();
+        const params = new URLSearchParams();
+        params.set("plan", planId);
+        params.set("token", token);
+        params.set("billing_interval", billingCycle);
 
-      let res: Response;
-      try {
-        res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
-          method: "POST",
-          body: params, // Content-Type: application/x-www-form-urlencoded 자동 설정
-          signal: ctrl.signal,
-        });
-      } catch (e) {
-        clearTimeout(tid);
-        if ((e as Error).name === "AbortError") {
-          throw new Error(lang === "ko" ? "결제 서버 응답 시간 초과 (15초). 잠시 후 다시 시도해주세요." : "Payment server timeout. Please try again.");
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 15000);
+
+        let res: Response;
+        try {
+          res = await fetch(`${API_BASE}/payments/dodo/create-checkout-simple`, {
+            method: "POST",
+            body: params, // Content-Type: application/x-www-form-urlencoded 자동 설정
+            signal: ctrl.signal,
+          });
+        } catch (e) {
+          clearTimeout(tid);
+          if ((e as Error).name === "AbortError") {
+            throw new Error(lang === "ko" ? "결제 서버 응답 시간 초과 (15초). 잠시 후 다시 시도해주세요." : "Payment server timeout. Please try again.");
+          }
+          throw new Error(lang === "ko" ? `결제 서버에 연결할 수 없습니다. (${(e as Error).message})` : `Cannot reach payment server. (${(e as Error).message})`);
         }
-        throw new Error(lang === "ko" ? "결제 서버에 연결할 수 없습니다." : "Cannot reach payment server.");
+        clearTimeout(tid);
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw Object.assign(
+            new Error(typeof data.detail === "string" ? data.detail : data.detail?.message || "결제 생성 실패"),
+            { status: res.status, body: data },
+          );
+        }
+
+        const { checkout_url } = await res.json();
+        if (!checkout_url) throw new Error(lang === "ko" ? "결제 URL을 생성하지 못했습니다." : "Failed to create checkout URL.");
+        // Toss WebView: window.open으로 인앱 브라우저에서 열기 (location.href는 WebView 자체를 이동시켜 행 걸림)
+        window.open(checkout_url, "_blank");
+        return;
       }
-      clearTimeout(tid);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw Object.assign(
-          new Error(typeof data.detail === "string" ? data.detail : data.detail?.message || "결제 생성 실패"),
-          { status: res.status, body: data },
-        );
-      }
+      // 일반 웹: fetch + DodoPayments overlay
+      const { checkout_url } = await createDodoCheckout(planId, billingCycle);
+      if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
+      const { DodoPayments } = await import("dodopayments-checkout");
+      await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
+    };
 
-      const { checkout_url } = await res.json();
-      if (!checkout_url) throw new Error(lang === "ko" ? "결제 URL을 생성하지 못했습니다." : "Failed to create checkout URL.");
-      // Toss WebView: window.open으로 인앱 브라우저에서 열기 (location.href는 WebView 자체를 이동시켜 행 걸림)
-      window.open(checkout_url, "_blank");
-      return;
-    }
-
-    // 일반 웹: fetch + DodoPayments overlay
-    const { checkout_url } = await createDodoCheckout(planId, billingCycle);
-    if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
-    const { DodoPayments } = await import("dodopayments-checkout");
-    await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
+    await Promise.race([doCheckout(), masterTimeout]);
   }
 
   const isWeb = platform === "web";  // 토스 WebView도 웹 결제(DodoPayments) 사용
