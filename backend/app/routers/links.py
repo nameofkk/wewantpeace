@@ -91,8 +91,15 @@ async def redirect_short_link(
         from fastapi import HTTPException
         raise HTTPException(status_code=410, detail="Link expired")
 
-    # Build final URL with UTM params
+    # Build final URL with UTM params (open redirect 방지: http/https + 허용 도메인만)
+    from urllib.parse import urlparse
     target = link.target_url
+    try:
+        parsed = urlparse(target)
+        if parsed.scheme not in ("http", "https"):
+            raise HTTPException(status_code=400, detail="Invalid redirect URL scheme")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid redirect URL")
     utm_params = []
     if link.utm_source:
         utm_params.append(f"utm_source={link.utm_source}")
