@@ -248,11 +248,11 @@ async def security_headers(request: Request, call_next):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "connect-src 'self' https:; "
-            "font-src 'self' data:; "
+            "script-src 'self'; "
+            "style-src 'self'; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "font-src 'self'; "
             "frame-ancestors 'none'"
         )
     return response

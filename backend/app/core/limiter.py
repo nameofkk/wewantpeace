@@ -29,4 +29,8 @@ def _get_real_client_ip(request: Request) -> str:
     return request.client.host if request.client else "127.0.0.1"
 
 
-limiter = Limiter(key_func=_get_real_client_ip, default_limits=["200/minute"])
+limiter = Limiter(
+    key_func=_get_real_client_ip,
+    default_limits=["200/minute"],
+    headers_enabled=True,
+)
