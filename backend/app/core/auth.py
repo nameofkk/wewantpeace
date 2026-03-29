@@ -85,7 +85,16 @@ async def _get_or_create_user(firebase_uid: str, db: AsyncSession, email: Option
         # DISABLE_AUTH 개발 환경에서 "dev-admin" UID는 자동으로 admin 역할 부여
         role = "admin" if (DISABLE_AUTH and firebase_uid == "dev-admin") else "user"
         nickname = "개발자어드민" if firebase_uid == "dev-admin" else None
-        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname, email=email)
+        # display_name 자동 설정: email 앞부분 또는 토스 사용자
+        if nickname:
+            default_display = nickname
+        elif email:
+            default_display = email.split("@")[0]
+        elif firebase_uid.startswith("toss:"):
+            default_display = "토스 사용자"
+        else:
+            default_display = None
+        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname, email=email, display_name=default_display)
         db.add(user)
         await db.flush()
 
