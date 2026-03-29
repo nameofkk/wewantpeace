@@ -87,7 +87,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
               "connect-src 'self' https://api.wewantpeace.live https://*.firebaseio.com https://*.googleapis.com https://basemaps.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com",
-              "frame-src https://checkout.dodopayments.com",
+              "frame-src https://checkout.dodopayments.com https://badge.disquiet.io",
               "frame-ancestors 'none'",
             ].join("; "),
           },
