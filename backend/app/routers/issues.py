@@ -303,31 +303,33 @@ async def get_country_ucdp_context(
     db: AsyncSession = Depends(get_db),
 ):
     """국가별 UCDP 기반 분쟁 역사 정보. raw_events에서 직접 조회 (normalize 불필요)."""
-    from sqlalchemy import func, cast, Integer, text
+    from sqlalchemy import func, text as sa_text
 
     cc = country_code.upper()
 
-    # UCDP raw_events에서 직접 조회 (structured_country는 raw_metadata에 저장됨)
-    base_filter = [
-        RawEvent.source_type == "api",
-        RawEvent.external_id.like("ucdp:%"),
-        RawEvent.raw_metadata["structured_country"].astext == cc,
-    ]
-
+    # JSON 타입이라 raw SQL로 JSONB 쿼리
     count_result = await db.execute(
-        select(func.count(RawEvent.id)).where(*base_filter)
+        sa_text("""
+            SELECT count(*) FROM raw_events
+            WHERE source_type='api' AND external_id LIKE 'ucdp:%%'
+              AND raw_metadata->>'structured_country' = :cc
+        """),
+        {"cc": cc},
     )
     total = count_result.scalar() or 0
 
     if total == 0:
         return CountryUcdpContextOut()
 
-    # 기간 범위 (raw_metadata->>'published')
+    # 기간 범위
     range_result = await db.execute(
-        select(
-            func.min(RawEvent.raw_metadata["published"].astext),
-            func.max(RawEvent.raw_metadata["published"].astext),
-        ).where(*base_filter)
+        sa_text("""
+            SELECT min(raw_metadata->>'published'), max(raw_metadata->>'published')
+            FROM raw_events
+            WHERE source_type='api' AND external_id LIKE 'ucdp:%%'
+              AND raw_metadata->>'structured_country' = :cc
+        """),
+        {"cc": cc},
     )
     range_row = range_result.first()
     period_start = range_row[0] if range_row and range_row[0] else None
@@ -335,14 +337,20 @@ async def get_country_ucdp_context(
 
     # top_actors + fatalities: raw_metadata에서 추출
     actors_result = await db.execute(
-        select(RawEvent.raw_metadata).where(*base_filter)
+        sa_text("""
+            SELECT raw_metadata FROM raw_events
+            WHERE source_type='api' AND external_id LIKE 'ucdp:%%'
+              AND raw_metadata->>'structured_country' = :cc
+        """),
+        {"cc": cc},
     )
     actor_counts: dict[str, int] = {}
     total_fat_best = 0
     total_fat_low = 0
     total_fat_high = 0
-    for (meta,) in actors_result.all():
-        if not meta:
+    for row in actors_result.all():
+        meta = row[0]
+        if not meta or not isinstance(meta, dict):
             continue
         for key in ("side_a", "side_b"):
             actor = meta.get(key)
