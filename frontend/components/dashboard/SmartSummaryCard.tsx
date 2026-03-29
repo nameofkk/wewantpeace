@@ -100,7 +100,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
                   {item.country_codes.slice(0, 3).map((code: string) => getFlag(code)).join("")}
                 </span>
               )}
-              <h3 className="text-[13px] font-bold text-foreground leading-snug line-clamp-2">{displayTitle}</h3>
+              <h3 className="text-[13px] font-bold text-foreground leading-snug">{displayTitle}</h3>
             </div>
             {/* Topic + badges row */}
             <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
@@ -284,7 +284,7 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
       {/* Title + description */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1 leading-none">
-          <span className="text-[11px] font-semibold truncate">{displayTitle}</span>
+          <span className="text-[11px] font-semibold line-clamp-2">{displayTitle}</span>
           {sourceTier && (sourceTier === "A" || sourceTier === "B") && (
             <span className={cn(
               "inline-flex items-center justify-center text-[7px] h-[14px] px-1 rounded font-bold shrink-0",
