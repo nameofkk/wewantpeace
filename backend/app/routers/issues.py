@@ -302,53 +302,40 @@ async def get_country_ucdp_context(
     country_code: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """국가별 UCDP 기반 분쟁 역사 정보."""
-    from sqlalchemy import func
+    """국가별 UCDP 기반 분쟁 역사 정보. raw_events에서 직접 조회 (normalize 불필요)."""
+    from sqlalchemy import func, cast, Integer, text
 
     cc = country_code.upper()
 
-    # UCDP 이벤트만 정확히 필터: source_type='api' AND external_id LIKE 'ucdp:%'
+    # UCDP raw_events에서 직접 조회 (structured_country는 raw_metadata에 저장됨)
+    base_filter = [
+        RawEvent.source_type == "api",
+        RawEvent.external_id.like("ucdp:%"),
+        RawEvent.raw_metadata["structured_country"].astext == cc,
+    ]
+
     count_result = await db.execute(
-        select(func.count(NormalizedEvent.id))
-        .join(RawEvent, RawEvent.id == NormalizedEvent.raw_event_id)
-        .where(
-            NormalizedEvent.country_code == cc,
-            RawEvent.source_type == "api",
-            RawEvent.external_id.like("ucdp:%"),
-        )
+        select(func.count(RawEvent.id)).where(*base_filter)
     )
     total = count_result.scalar() or 0
 
     if total == 0:
         return CountryUcdpContextOut()
 
-    # 기간 범위
+    # 기간 범위 (raw_metadata->>'published')
     range_result = await db.execute(
         select(
-            func.min(NormalizedEvent.event_time),
-            func.max(NormalizedEvent.event_time),
-        )
-        .join(RawEvent, RawEvent.id == NormalizedEvent.raw_event_id)
-        .where(
-            NormalizedEvent.country_code == cc,
-            RawEvent.source_type == "api",
-            RawEvent.external_id.like("ucdp:%"),
-        )
+            func.min(RawEvent.raw_metadata["published"].astext),
+            func.max(RawEvent.raw_metadata["published"].astext),
+        ).where(*base_filter)
     )
     range_row = range_result.first()
-    period_start = range_row[0].isoformat() if range_row and range_row[0] else None
-    period_end = range_row[1].isoformat() if range_row and range_row[1] else None
+    period_start = range_row[0] if range_row and range_row[0] else None
+    period_end = range_row[1] if range_row and range_row[1] else None
 
     # top_actors + fatalities: raw_metadata에서 추출
     actors_result = await db.execute(
-        select(RawEvent.raw_metadata)
-        .join(NormalizedEvent, NormalizedEvent.raw_event_id == RawEvent.id)
-        .where(
-            NormalizedEvent.country_code == cc,
-            RawEvent.source_type == "api",
-            RawEvent.external_id.like("ucdp:%"),
-        )
-        .limit(500)
+        select(RawEvent.raw_metadata).where(*base_filter)
     )
     actor_counts: dict[str, int] = {}
     total_fat_best = 0
