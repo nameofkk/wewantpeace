@@ -86,7 +86,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://api.wewantpeace.live https://*.firebaseio.com https://*.googleapis.com https://basemaps.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.gstatic.com https://accounts.google.com https://appleid.apple.com https://kauth.kakao.com",
+              "connect-src 'self' https://api.wewantpeace.live https://backend-production-3af7.up.railway.app https://*.firebaseio.com https://*.googleapis.com https://basemaps.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.gstatic.com https://accounts.google.com https://appleid.apple.com https://kauth.kakao.com",
               "frame-src https://checkout.dodopayments.com https://badge.disquiet.io https://accounts.google.com https://appleid.apple.com https://*.firebaseapp.com",
               "frame-ancestors 'none'",
             ].join("; "),
