@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, date, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -447,6 +447,7 @@ async def my_posts(
 @limiter.limit("10/minute")
 async def create_post(
     request: Request,
+    response: Response,
     body: PostCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -502,6 +503,7 @@ async def create_post(
 @limiter.limit("60/minute")
 async def get_post(
     request: Request,
+    response: Response,
     post_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),

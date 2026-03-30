@@ -409,6 +409,7 @@ def _make_mine_reason(cluster: IssueCluster, kscore: float) -> str:
 @limiter.limit("60/minute")
 async def peek_trending(
     request: Request,
+    response: Response,
     since: Optional[str] = Query(None, description="ISO timestamp — 이 시각 이후 신규 항목만 반환"),
     min_kscore: float = Query(3.0, ge=0.0, description="최소 KScore 임계값 (0-10 스케일)"),
     db: AsyncSession = Depends(get_db),

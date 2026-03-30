@@ -4359,8 +4359,8 @@ def cleanup_old_data(self):
                         break
                     results["noise_normalized"] += r.rowcount
 
-            # 3. 30일+ tension_index 배치 삭제 (히스토리 30일 보존)
-            cutoff_tension = datetime.now(timezone.utc) - timedelta(days=30)
+            # 3. 90일+ tension_index 배치 삭제 (Pro+ 플랜 90일 히스토리 지원)
+            cutoff_tension = datetime.now(timezone.utc) - timedelta(days=90)
             while True:
                 async with db.begin():
                     r = await db.execute(
