@@ -86,7 +86,7 @@ export const useAppStore = create<AppStore>()(
       userPlan: "free",
       trendingTab: "global",
       myCountries: [],
-      lang: "en",
+      lang: (typeof navigator !== "undefined" && navigator.language?.startsWith("ko")) ? "ko" : "en",
       theme: "dark",
       homeCountry: "",
       missedAlertCount: 0,
