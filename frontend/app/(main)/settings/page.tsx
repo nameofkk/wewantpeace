@@ -1399,7 +1399,7 @@ export default function SettingsPage() {
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
             </a>
             <a
-              href="https://x.com/wewantpeace_"
+              href="https://x.com/WeWantPeaceNews"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
@@ -1407,12 +1407,12 @@ export default function SettingsPage() {
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               <div className="flex-1">
                 <p>X (Twitter)</p>
-                <p className="text-[11px] text-muted-foreground">@wewantpeace_</p>
+                <p className="text-[11px] text-muted-foreground">@WeWantPeaceNews</p>
               </div>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
             </a>
             <a
-              href="https://www.threads.net/@wewantpeace.live"
+              href="https://www.threads.com/@wewantpeace_news?igshid=NTc4MTIwNjQ2YQ=="
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
@@ -1420,7 +1420,7 @@ export default function SettingsPage() {
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12.186 24h-.007c-3.581-.024-6.334-1.205-8.184-3.509C2.35 18.44 1.5 15.586 1.472 12.01v-.017c.03-3.579.879-6.43 2.525-8.482C5.845 1.205 8.6.024 12.18 0h.014c2.746.02 5.043.725 6.826 2.098 1.677 1.29 2.858 3.13 3.509 5.467l-2.04.569c-1.104-3.96-3.898-5.984-8.304-6.015-2.91.022-5.11.936-6.54 2.717C4.307 6.504 3.616 8.914 3.59 12c.025 3.086.718 5.496 2.057 7.164 1.432 1.784 3.631 2.698 6.54 2.717 2.623-.02 4.358-.631 5.8-2.045 1.647-1.613 1.618-3.593 1.09-4.798-.31-.71-.873-1.3-1.634-1.75-.192 1.352-.622 2.446-1.284 3.272-.886 1.102-2.14 1.704-3.73 1.79-1.202.065-2.361-.218-3.259-.801-1.063-.689-1.685-1.74-1.752-2.96-.065-1.178.408-2.265 1.328-3.059.88-.76 2.099-1.198 3.43-1.234 1.158-.03 2.203.143 3.126.519.014-.467-.003-.93-.055-1.384-.266-2.33-1.58-3.507-3.905-3.507-1.258 0-2.328.423-3.088 1.11l-1.373-1.607C8.39 3.778 9.932 3.15 11.93 3.15c1.736 0 3.16.482 4.112 1.392 1.007.963 1.567 2.376 1.663 4.2.028.053.042.108.05.164.293.146.567.312.82.494 1.14.82 1.99 1.86 2.456 3.015.766 1.9.366 4.572-1.66 6.577C17.605 20.675 15.41 21.5 12.186 24zm-.09-8.71c-.94.025-1.735.249-2.296.646-.538.381-.795.876-.766 1.472.026.533.318 1.013.822 1.34.585.378 1.382.563 2.243.52 1.07-.058 1.89-.455 2.44-1.18.453-.596.739-1.391.86-2.369-.695-.309-1.489-.464-2.358-.464-.317 0-.634.012-.945.035z"/></svg>
               <div className="flex-1">
                 <p>Threads</p>
-                <p className="text-[11px] text-muted-foreground">@wewantpeace.live</p>
+                <p className="text-[11px] text-muted-foreground">@wewantpeace_news</p>
               </div>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
             </a>
