@@ -418,15 +418,17 @@ async def collect_commodity_prices(db: AsyncSession) -> int:
             try:
                 t = yf.Ticker(ticker)
                 hist = t.history(period="5d")
-                if hist.empty or len(hist) < 1:
+                if hist.empty or len(hist) < 2:
                     continue
-                close_today = float(hist["Close"].iloc[-1])
-                if len(hist) >= 2:
-                    close_prev = float(hist["Close"].iloc[-2])
-                    change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
-                else:
-                    change_pct = 0
-                price_date = hist.index[-1].strftime("%Y-%m-%d")
+                # 주말/공휴일 제거: 마지막 거래일 기준으로만 사용
+                # yfinance가 주말 날짜를 반환하는 경우가 있어 weekday 필터링
+                trading_days = hist[hist.index.dayofweek < 5]  # Mon-Fri only
+                if len(trading_days) < 2:
+                    trading_days = hist  # 필터링 후 부족하면 원본 사용
+                close_today = float(trading_days["Close"].iloc[-1])
+                close_prev = float(trading_days["Close"].iloc[-2])
+                change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
+                price_date = trading_days.index[-1].strftime("%Y-%m-%d")
                 results[symbol] = {
                     "name": name,
                     "price_usd": round(close_today, 2),
@@ -444,26 +446,30 @@ async def collect_commodity_prices(db: AsyncSession) -> int:
         return 0
 
     for symbol, info in data.items():
-        # 중복 확인
+        # upsert: 같은 symbol+price_date가 있으면 업데이트
         existing = await db.execute(
-            select(CommodityPrice.id).where(
+            select(CommodityPrice).where(
                 and_(
                     CommodityPrice.symbol == symbol,
                     CommodityPrice.price_date == info["price_date"],
                 )
             ).limit(1)
         )
-        if existing.scalar_one_or_none():
-            continue
-
-        db.add(CommodityPrice(
-            symbol=symbol,
-            name=info["name"],
-            price_usd=info["price_usd"],
-            change_pct=info["change_pct"],
-            price_date=info["price_date"],
-        ))
-        saved += 1
+        row = existing.scalar_one_or_none()
+        if row:
+            row.price_usd = info["price_usd"]
+            row.change_pct = info["change_pct"]
+            row.name = info["name"]
+            saved += 1
+        else:
+            db.add(CommodityPrice(
+                symbol=symbol,
+                name=info["name"],
+                price_usd=info["price_usd"],
+                change_pct=info["change_pct"],
+                price_date=info["price_date"],
+            ))
+            saved += 1
 
     await db.flush()
     logger.info("commodity_prices_collected count=%d", saved)
@@ -595,15 +601,16 @@ async def collect_market_indices(db: AsyncSession) -> int:
             try:
                 t = yf.Ticker(ticker)
                 hist = t.history(period="5d")
-                if hist.empty or len(hist) < 1:
+                if hist.empty or len(hist) < 2:
                     continue
-                close_today = float(hist["Close"].iloc[-1])
-                if len(hist) >= 2:
-                    close_prev = float(hist["Close"].iloc[-2])
-                    change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
-                else:
-                    change_pct = 0
-                index_date = hist.index[-1].strftime("%Y-%m-%d")
+                # 주말/공휴일 필터링
+                trading_days = hist[hist.index.dayofweek < 5]
+                if len(trading_days) < 2:
+                    trading_days = hist
+                close_today = float(trading_days["Close"].iloc[-1])
+                close_prev = float(trading_days["Close"].iloc[-2])
+                change_pct = ((close_today - close_prev) / close_prev) * 100 if close_prev else 0
+                index_date = trading_days.index[-1].strftime("%Y-%m-%d")
                 results[symbol] = {
                     "name": name,
                     "value": round(close_today, 2),
@@ -623,25 +630,30 @@ async def collect_market_indices(db: AsyncSession) -> int:
 
     for symbol, info in data.items():
         existing = await db.execute(
-            select(MarketIndex.id).where(
+            select(MarketIndex).where(
                 and_(
                     MarketIndex.symbol == symbol,
                     MarketIndex.index_date == info["index_date"],
                 )
             ).limit(1)
         )
-        if existing.scalar_one_or_none():
-            continue
-
-        db.add(MarketIndex(
-            symbol=symbol,
-            name=info["name"],
-            value=info["value"],
-            change_pct=info["change_pct"],
-            index_date=info["index_date"],
-            currency=info["currency"],
-        ))
-        saved += 1
+        row = existing.scalar_one_or_none()
+        if row:
+            row.value = info["value"]
+            row.change_pct = info["change_pct"]
+            row.name = info["name"]
+            row.currency = info["currency"]
+            saved += 1
+        else:
+            db.add(MarketIndex(
+                symbol=symbol,
+                name=info["name"],
+                value=info["value"],
+                change_pct=info["change_pct"],
+                index_date=info["index_date"],
+                currency=info["currency"],
+            ))
+            saved += 1
 
     await db.flush()
     logger.info("market_indices_collected count=%d", saved)

@@ -39,7 +39,7 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v18"
+_CACHE_VERSION = "v19"
 
 # 홈 국가 → 주가지수 심볼 매핑
 _HOME_INDEX_MAP: dict[str, str] = {
