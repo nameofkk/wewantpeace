@@ -64,8 +64,8 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 # Supabase Transaction mode pooler (포트 6543) — PgBouncer 사용
 # prepared_statement_cache_size=0 필수 (PgBouncer는 prepared statements 미지원)
 import os as _os
-_pool_size = 1 if _os.environ.get("CELERY_WORKER") else 2
-_max_overflow = 0 if _os.environ.get("CELERY_WORKER") else 1
+_pool_size = 1 if _os.environ.get("CELERY_WORKER") else 5
+_max_overflow = 0 if _os.environ.get("CELERY_WORKER") else 3
 _connect_args = {"prepared_statement_cache_size": 0}
 if not _is_sqlite and _os.environ.get("CELERY_WORKER"):
     # Worker bulk INSERT 시 statement timeout 방지 (120초)
