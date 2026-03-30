@@ -4,9 +4,9 @@ import TensionClient from "./client";
 const SITE_URL = "https://www.wewantpeace.live";
 
 export const metadata: Metadata = {
-  title: "국가별 긴장도 지수",
+  title: "Country Tension Index",
   description:
-    "195개국의 실시간 긴장도 지수(0-100)를 확인하세요. 이벤트 심각도, 활동량, 인접국 파급효과 기반 종합 평가. Country-level Tension Index (0-100) updated every 5 minutes | combining event severity, activity volume, and spillover from neighboring countries.",
+    "Country-level Tension Index (0-100) updated every 5 minutes. Combining event severity, activity volume, and spillover from neighboring countries. | 195개국 실시간 긴장도 지수.",
   alternates: {
     canonical: `${SITE_URL}/tension`,
     languages: {

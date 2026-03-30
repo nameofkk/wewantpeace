@@ -79,7 +79,7 @@ function waitForResult(action: string, timeoutMs: number = 180000): Promise<Stor
     setTimeout(() => {
       if (_pendingResolvers.has(action)) {
         _pendingResolvers.delete(action);
-        reject(new Error("StoreKit 응답 타임아웃"));
+        reject(new Error("StoreKit response timeout"));
       }
     }, timeoutMs);
   });
@@ -93,14 +93,14 @@ export async function purchaseViaStoreKit(
   productId: string
 ): Promise<{ transactionId: string; productId: string } | null> {
   if (!postToStoreKit({ action: "purchase", productId })) {
-    throw new Error("StoreKit 브릿지를 사용할 수 없습니다.");
+    throw new Error("StoreKit bridge unavailable");
   }
 
   const result = await waitForResult("purchase");
 
   if (!result.success) {
     if (result.cancelled) return null;
-    throw new Error(result.error || "결제에 실패했습니다.");
+    throw new Error(result.error || "Payment failed");
   }
 
   return {
@@ -114,13 +114,13 @@ export async function purchaseViaStoreKit(
  */
 export async function restoreViaStoreKit(): Promise<StoreKitResult["transactions"]> {
   if (!postToStoreKit({ action: "restore" })) {
-    throw new Error("StoreKit 브릿지를 사용할 수 없습니다.");
+    throw new Error("StoreKit bridge unavailable");
   }
 
   const result = await waitForResult("restore");
 
   if (!result.success) {
-    throw new Error(result.error || "복원에 실패했습니다.");
+    throw new Error(result.error || "Restore failed");
   }
 
   return result.transactions || [];
@@ -131,13 +131,13 @@ export async function restoreViaStoreKit(): Promise<StoreKitResult["transactions
  */
 export async function getStoreKitProducts(): Promise<StoreKitResult["products"]> {
   if (!postToStoreKit({ action: "getProducts" })) {
-    throw new Error("StoreKit 브릿지를 사용할 수 없습니다.");
+    throw new Error("StoreKit bridge unavailable");
   }
 
   const result = await waitForResult("getProducts", 30000);
 
   if (!result.success) {
-    throw new Error(result.error || "상품 조회에 실패했습니다.");
+    throw new Error(result.error || "Product lookup failed");
   }
 
   return result.products || [];

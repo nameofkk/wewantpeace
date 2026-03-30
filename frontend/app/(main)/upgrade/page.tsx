@@ -5,9 +5,9 @@ import UpgradeClient from "./client";
 const SITE_URL = "https://www.wewantpeace.live";
 
 export const metadata: Metadata = {
-  title: "Pro 플랜 업그레이드",
+  title: "Upgrade to Pro",
   description:
-    "WeWantPeace Pro로 업그레이드하여 인터랙티브 이슈 지도, 5개 관심국가, KScore 필터, 30일 히스토리 등 프리미엄 기능을 이용하세요.",
+    "Upgrade to WeWantPeace Pro for interactive issue maps, 5 watchlist countries, KScore filters, 30-day history, and more premium features.",
   alternates: {
     canonical: `${SITE_URL}/upgrade`,
     languages: {
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Pro 플랜 업그레이드 | WeWantPeace",
-    description: "프리미엄 기능으로 글로벌 리스크를 더 깊이 분석하세요.",
+    title: "Upgrade to Pro | WeWantPeace",
+    description: "Go deeper with premium global risk analysis features.",
     type: "website",
     url: `${SITE_URL}/upgrade`,
     siteName: "WeWantPeace",

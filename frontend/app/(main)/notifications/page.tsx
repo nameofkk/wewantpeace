@@ -86,7 +86,7 @@ export default function NotificationsPage() {
       {/* 헤더 */}
       <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-md border-b border-border/50">
         <div className="flex items-center justify-between h-[52px] px-4">
-          <button onClick={() => router.back()} className="p-1">
+          <button onClick={() => router.back()} className="p-2" aria-label={lang === "ko" ? "뒤로 가기" : "Go back"}>
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
           <h1 className="text-[15px] font-semibold">{t(lang, "notif_page_title")}</h1>
@@ -175,28 +175,30 @@ export default function NotificationsPage() {
                         e.stopPropagation();
                         submitFeedback.mutate({ id: notif.id, feedback: "thumbs_up" });
                       }}
+                      aria-label={lang === "ko" ? "유용해요" : "Helpful"}
                       className={cn(
-                        "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                        "flex items-center gap-0.5 p-1.5 rounded text-[10px] transition-colors",
                         notif.feedback === "thumbs_up"
                           ? "bg-green-500/20 text-green-400"
                           : "text-muted-foreground hover:text-green-400"
                       )}
                     >
-                      <ThumbsUp className="w-3 h-3" />
+                      <ThumbsUp className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         submitFeedback.mutate({ id: notif.id, feedback: "thumbs_down" });
                       }}
+                      aria-label={lang === "ko" ? "별로예요" : "Not helpful"}
                       className={cn(
-                        "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                        "flex items-center gap-0.5 p-1.5 rounded text-[10px] transition-colors",
                         notif.feedback === "thumbs_down"
                           ? "bg-red-500/20 text-red-400"
                           : "text-muted-foreground hover:text-red-400"
                       )}
                     >
-                      <ThumbsDown className="w-3 h-3" />
+                      <ThumbsDown className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

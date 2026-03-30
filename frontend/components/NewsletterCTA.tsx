@@ -232,25 +232,25 @@ export function NewsletterCTA() {
           onClick={() => setShowPreview(false)}
         >
           <div
-            className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+            className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl bg-card shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-bold text-gray-900">
+                <span className="text-sm font-bold text-foreground">
                   {lang === "ko" ? "뉴스레터 미리보기" : "Newsletter Preview"}
                 </span>
               </div>
               {/* KR / EN 토글 */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-md p-0.5">
+              <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
                 <button
                   onClick={() => setPreviewLang("kr")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     previewLang === "kr"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   KR
@@ -259,8 +259,8 @@ export function NewsletterCTA() {
                   onClick={() => setPreviewLang("us")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     previewLang === "us"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   EN
@@ -268,13 +268,13 @@ export function NewsletterCTA() {
               </div>
               <button
                 onClick={() => setShowPreview(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                className="p-1.5 rounded-full hover:bg-muted transition-colors"
               >
-                <X className="h-4 w-4 text-gray-400" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
             {/* 뉴스레터 HTML */}
-            <div className="flex-1 overflow-auto bg-white">
+            <div className="flex-1 overflow-auto bg-white dark:bg-white">
               {previewHtml ? (
                 <iframe
                   key={previewLang}
@@ -285,7 +285,7 @@ export function NewsletterCTA() {
                   title="Newsletter Preview"
                 />
               ) : (
-                <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
+                <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
                   {lang === "ko" ? "로딩 중..." : "Loading..."}
                 </div>
               )}

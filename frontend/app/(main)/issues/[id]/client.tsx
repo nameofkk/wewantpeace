@@ -249,7 +249,7 @@ function CrossValidationSection({ clusterId, lang }: { clusterId: string; lang: 
                     {type === "cf_anomaly" && t(lang, "cross_validation_cf_match", { country: items[0]?.country_code ?? "?" })}
                     {type === "gps_jam" && t(lang, "cross_validation_gps_match", { region: items[0]?.country_code ?? "?" })}
                     {items.length > 1 && type !== "firms_hotspot" && (
-                      <span className="text-muted-foreground ml-1">({items.length}건)</span>
+                      <span className="text-muted-foreground ml-1">({items.length}{lang === "ko" ? "건" : ""})</span>
                     )}
                   </p>
                 </div>

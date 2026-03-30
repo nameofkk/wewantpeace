@@ -51,7 +51,7 @@ function PostViewInner() {
   });
 
   if (!id) {
-    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">게시글을 찾을 수 없습니다.</div>;
+    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">{lang === "ko" ? "게시글을 찾을 수 없습니다." : "Post not found."}</div>;
   }
 
   return (
