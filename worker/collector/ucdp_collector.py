@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 UCDP_ACCESS_TOKEN = os.environ.get("UCDP_ACCESS_TOKEN", "")
 UCDP_API_URL = "https://ucdpapi.pcr.uu.se/api/gedevents/25.1"
 
-# 2010년 이후 데이터만 수집 (적절한 역사적 범위 + API 부하 제한)
-START_DATE = "2010-01-01"
-MAX_PAGES = 300  # 안전 캡 (pagesize=1000 × 300 = 최대 300k)
+# 최근 6개월 데이터만 수집 (DB 부하 방지 — 2026-03-30 Disk IO 사고)
+START_DATE = "2025-10-01"
+MAX_PAGES = 5  # 안전 캡 (pagesize=1000 × 5 = 최대 5k)
 
 # UCDP type_of_violence → topic 매핑
 _VIOLENCE_TOPIC = {
@@ -255,10 +255,15 @@ class UCDPCollector:
                             result.skipped += 1
                             continue
 
-                    # 배치 insert
+                    # 배치 insert + 페이지 단위 커밋 (대량 수집 시 메모리/트랜잭션 안전)
                     if batch:
                         db.add_all(batch)
+                        await db.flush()
                         result.raw_event_ids.extend(batch)
+                        # 10 페이지(10,000건)마다 중간 커밋
+                        if page % 10 == 0:
+                            await db.commit()
+                            logger.info("UCDP 중간 커밋 완료 (누적 %d건)", result.collected)
 
                     logger.info(
                         "UCDP 페이지 %d/%d 처리: +%d건 (누적 %d)",

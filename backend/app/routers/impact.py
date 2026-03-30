@@ -1310,6 +1310,8 @@ SECTOR_DATA = {
         "agriculture": {"gdp_pct": 1.8, "key_partners": ["US", "AU", "BR", "UA", "RU"]},
         "shipping": {"gdp_pct": 2.1, "key_partners": ["CN", "JP", "US", "SG", "VN"]},
         "tourism": {"gdp_pct": 2.8, "key_partners": ["CN", "JP", "US", "TW", "TH"]},
+        "defense": {"gdp_pct": 2.8, "key_partners": ["US", "DE", "IL", "AU", "FR"]},
+        "technology": {"gdp_pct": 5.0, "key_partners": ["US", "CN", "JP", "TW", "IE"]},
     },
     "US": {
         "energy": {"gdp_pct": 5.8, "key_partners": ["CA", "SA", "MX", "RU", "IQ"]},

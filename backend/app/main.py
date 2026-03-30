@@ -177,18 +177,23 @@ async def lifespan(app: FastAPI):
         logger.warning("인덱스 생성 실패 (무시): %s", e)
 
     # 긴장도·트렌딩 계산을 백그라운드로 실행 (서버 즉시 시작, 완료 추적)
+    # Disk IO 부하 감소: 환경변수로 시작 시 무거운 계산 비활성화 가능
     app.state.tension_ready = False
 
-    async def _bg_tension():
-        try:
-            await asyncio.wait_for(_startup_tension_calculation(), timeout=120)
-        except asyncio.TimeoutError:
-            logger.warning("startup_tension_calculation 타임아웃(120초)")
-        finally:
-            app.state.tension_ready = True
-            logger.info("tension_ready = True")
+    if os.environ.get("SKIP_STARTUP_CALC"):
+        app.state.tension_ready = True
+        logger.info("SKIP_STARTUP_CALC 설정됨 — 시작 시 긴장도/트렌딩 계산 건너뜀")
+    else:
+        async def _bg_tension():
+            try:
+                await asyncio.wait_for(_startup_tension_calculation(), timeout=120)
+            except asyncio.TimeoutError:
+                logger.warning("startup_tension_calculation 타임아웃(120초)")
+            finally:
+                app.state.tension_ready = True
+                logger.info("tension_ready = True")
 
-    asyncio.create_task(_bg_tension())
+        asyncio.create_task(_bg_tension())
 
     yield
     await close_redis()
