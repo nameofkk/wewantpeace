@@ -751,6 +751,7 @@ function ReportContent() {
                 {activeTab === "trade" && (
                   <div>
                     {summary?.trade_exposure ? (
+                      <>
                       <ProDemoWrapper
                         isPro={isPro}
                         demoCount={1}
@@ -798,6 +799,12 @@ function ReportContent() {
                           </div>
                         ))}
                       </ProDemoWrapper>
+                      {summary?.generated_at && (
+                        <p className="text-[8px] text-muted-foreground/40 text-center mt-2">
+                          {lang === "ko" ? "기준일" : "As of"} {summary.generated_at.slice(0, 10)}
+                        </p>
+                      )}
+                      </>
                     ) : (
                       <p className="text-[11px] text-muted-foreground text-center py-4">
                         {!summary
@@ -855,6 +862,11 @@ function ReportContent() {
                         </div>
                         <p className="text-[8px] text-muted-foreground/50 mt-2 text-center">
                           {t(lang, "dash_travel_source" as Parameters<typeof t>[1])}
+                          {summary?.generated_at && (
+                            <span className="text-muted-foreground/40">
+                              {" · "}{lang === "ko" ? "기준일" : "As of"} {summary.generated_at.slice(0, 10)}
+                            </span>
+                          )}
                         </p>
                       </>
                     ) : (
@@ -951,7 +963,11 @@ function ReportContent() {
                         )}
                       </div>
                     </ProDemoWrapper>
-
+                    {summary?.generated_at && (
+                      <p className="text-[8px] text-muted-foreground/40 text-center mt-2">
+                        {lang === "ko" ? "기준일" : "As of"} {summary.generated_at.slice(0, 10)}
+                      </p>
+                    )}
                   </div>
                 )}
               </m.div>

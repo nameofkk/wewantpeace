@@ -110,8 +110,10 @@ function SectorChart({
   isDark: boolean;
 }) {
   if (chartData.length === 0) return null;
+  // 섹터 수에 따라 동적 높이 (최소 120px, 섹터당 28px)
+  const chartH = Math.max(120, chartData.length * 28);
   return (
-    <div className="h-[120px] sm:h-[160px] w-full">
+    <div style={{ height: chartH }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={chartData}
@@ -127,7 +129,7 @@ function SectorChart({
           <YAxis
             type="category"
             dataKey="name"
-            width={lang === "en" ? 85 : 50}
+            width={lang === "en" ? 85 : 58}
             tick={{ fontSize: 9, fill: isDark ? "#94a3b8" : "#475569" }}
           />
           <Tooltip
@@ -167,7 +169,7 @@ function SectorContent({
   lang,
   isDark,
 }: {
-  data: { sectors: SectorExposure[]; overall_risk: string };
+  data: { sectors: SectorExposure[]; overall_risk: string; generated_at?: string };
   chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
   lang: Lang;
   isDark: boolean;
@@ -263,6 +265,11 @@ function SectorContent({
           {lang === "ko"
             ? "출처: World Bank, UN Comtrade"
             : "Sources: World Bank, UN Comtrade"}
+          {data.generated_at && (
+            <span className="text-muted-foreground/60">
+              {" · "}{lang === "ko" ? "기준일" : "As of"} {String(data.generated_at).slice(0, 10)}
+            </span>
+          )}
         </p>
       </div>
     </div>
@@ -276,7 +283,7 @@ function SectorDetailContent({
   lang,
   isDark,
 }: {
-  data: { sectors: SectorExposure[]; overall_risk: string };
+  data: { sectors: SectorExposure[]; overall_risk: string; generated_at?: string };
   chartData: { name: string; fullName: string; dependency: number; gdp: number; risk: string }[];
   lang: Lang;
   isDark: boolean;
@@ -405,6 +412,11 @@ function SectorDetailContent({
           {lang === "ko"
             ? "출처: World Bank, UN Comtrade"
             : "Sources: World Bank, UN Comtrade"}
+          {data.generated_at && (
+            <span className="text-muted-foreground/60">
+              {" · "}{lang === "ko" ? "기준일" : "As of"} {String(data.generated_at).slice(0, 10)}
+            </span>
+          )}
         </p>
       </div>
     </div>
@@ -419,7 +431,7 @@ function buildDemoData(lang: Lang) {
     risk_level: s.risk_level,
     description: lang === "ko" ? s.description_ko : s.description_en,
   }));
-  const maxLabel = lang === "en" ? 12 : 5;
+  const maxLabel = lang === "en" ? 12 : 6;
   const chartData = sectors.map((s) => ({
     name: s.sector.length > maxLabel ? s.sector.slice(0, maxLabel) + ".." : s.sector,
     fullName: s.sector,
@@ -479,7 +491,7 @@ export function SectorImpactCard({ clusterId, embedded }: SectorImpactCardProps)
 
   const is403 = [401, 403].includes((error as any)?.status);
 
-  const maxLabel = lang === "en" ? 12 : 5;
+  const maxLabel = lang === "en" ? 12 : 6;
   const chartData = data?.sectors.map((s) => ({
     name: s.sector.length > maxLabel ? s.sector.slice(0, maxLabel) + ".." : s.sector,
     fullName: s.sector,

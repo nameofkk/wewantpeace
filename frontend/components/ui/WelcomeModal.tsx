@@ -75,7 +75,7 @@ export default function WelcomeModal() {
       {/* Modal */}
       <div
         className={cn(
-          "relative w-full max-w-md mx-4 sm:mx-auto rounded-3xl bg-card border border-border/60 overflow-hidden"
+          "relative w-full max-w-md mx-4 sm:mx-auto rounded-3xl bg-card border border-border/60 overflow-hidden max-h-[calc(100dvh-90px)] sm:max-h-[90vh] overflow-y-auto"
         )}
         style={{
           animation: closing

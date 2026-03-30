@@ -39,14 +39,14 @@ export function BottomNav() {
         "fixed z-50",
         toss
           ? "bottom-[calc(12px+env(safe-area-inset-bottom))] left-4 right-4 rounded-full bg-background/90 backdrop-blur-xl shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
-          : "tab-bar bottom-0 left-0 right-0 border-t border-border bg-background/95 backdrop-blur-sm"
+          : "tab-bar bottom-[calc(8px+env(safe-area-inset-bottom))] left-3 right-3 rounded-2xl bg-background/90 backdrop-blur-xl shadow-[0_2px_20px_rgba(0,0,0,0.12)] dark:shadow-[0_2px_20px_rgba(0,0,0,0.4)] border border-border/40"
       )}
       role="tablist"
       aria-label="Main navigation"
     >
       <div className={cn(
         "flex items-center justify-around",
-        toss ? "h-[56px] px-3" : "h-[60px] px-2"
+        toss ? "h-[56px] px-3" : "h-[56px] px-2"
       )}>
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           // /issues/*, /notifications/*, /upgrade/* 는 /feed의 하위 플로우로 간주

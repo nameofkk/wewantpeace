@@ -142,7 +142,7 @@ export function PaywallModal({ trigger, isOpen, onClose }: PaywallModalProps) {
       {/* 모달 */}
       <div
         className={cn(
-          "relative w-full max-w-md mx-4 sm:mx-auto rounded-t-3xl sm:rounded-3xl bg-card border border-border/60 overflow-hidden",
+          "relative w-full max-w-md mx-4 sm:mx-auto rounded-t-3xl sm:rounded-3xl bg-card border border-border/60 overflow-hidden mb-[72px] sm:mb-0 max-h-[calc(100dvh-90px)] sm:max-h-[90vh] overflow-y-auto",
           closing
             ? "animate-out slide-out-to-bottom"
             : "animate-in slide-in-from-bottom"

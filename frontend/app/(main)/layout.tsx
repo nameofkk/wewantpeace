@@ -92,7 +92,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <SessionTracker />
       <NewEventBanner />
       <WelcomeModal />
-      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[72px]"}>
+      <main className={isTossMiniApp() ? "pb-[84px]" : "pb-[80px]"}>
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
       <BottomNav />
