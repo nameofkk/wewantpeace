@@ -1863,7 +1863,7 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     title = cluster.title_ko if lang == "ko" and cluster.title_ko else cluster.title or ""
     title = title[:60]
 
-    # what_line — body 첫 문장 사용 (제목과 중복 시 빈 문자열 반환)
+    # what_line — body 첫 문장 사용 (제목과 중복 방지)
     _body_raw = (body_texts or {}).get("ko" if lang == "ko" else "en", "")
     _first_sent = ""
     if _body_raw:
@@ -1875,8 +1875,22 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     if _first_sent and len(_first_sent) > 15:
         what_line = _first_sent[:80]
     else:
-        # body가 없거나 제목과 동일하면 빈 문자열 → 프론트에서 "무슨 일?" 줄 숨김
-        what_line = ""
+        # body가 없으면 메타데이터 기반 상세 설명 생성
+        _topic_ko = {"conflict": "무장 충돌", "terror": "테러 위협", "coup": "쿠데타 시도",
+                     "sanctions": "국제 제재", "cyber": "사이버 공격", "protest": "대규모 시위",
+                     "diplomacy": "외교 갈등", "maritime": "해상 분쟁", "disaster": "재난 발생",
+                     "health": "보건 위기"}
+        _topic_en = {"conflict": "armed conflict", "terror": "terror threat", "coup": "coup attempt",
+                     "sanctions": "international sanctions", "cyber": "cyber attack", "protest": "mass protests",
+                     "diplomacy": "diplomatic tensions", "maritime": "maritime dispute", "disaster": "disaster",
+                     "health": "health crisis"}
+        _ev_count = cluster.event_count or 0
+        if lang == "ko":
+            _tl = _topic_ko.get(topic, "안보 위기")
+            what_line = f"{c_name} {_tl} 심각도 {severity}/100, {_ev_count}건 보도. 상황 지속 모니터링 중"
+        else:
+            _tl = _topic_en.get(topic, "security crisis")
+            what_line = f"{c_name} {_tl}, severity {severity}/100, {_ev_count} reports. Situation under monitoring"
 
     # so_what_line — 원자재 매핑 우선, 유가 폴백
     oil_price = None
