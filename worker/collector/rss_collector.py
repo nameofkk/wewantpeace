@@ -512,7 +512,7 @@ class RSSCollector:
                 continue
 
             # 3. 중복 확인 (no_autoflush: pending INSERT의 premature flush 방지)
-            async with db.no_autoflush:
+            with db.no_autoflush:
                 existing = await db.execute(
                     select(RawEvent).where(
                         RawEvent.source_type == "rss",
