@@ -93,11 +93,11 @@ async def _check_backlog(db: AsyncSession) -> CheckResult:
         text("SELECT COUNT(*) FROM raw_events WHERE processed = false")
     )
     count = result.scalar() or 0
-    ok = count <= 50
+    ok = count <= 300
     return CheckResult(
         "backlog",
         ok,
-        f"미처리: {count}건" if ok else f"백로그 과다: {count}건 (>50)",
+        f"미처리: {count}건" if ok else f"백로그 과다: {count}건 (>300)",
     )
 
 
