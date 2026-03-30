@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { MapPin, Plus, X, Search, ChevronUp, ChevronDown, Check, LogOut, LogIn, User, Loader2, Trash2, Sun, Moon, Mail, MessageCircleQuestion, Send, CheckCircle, BookOpen, Lock, Gift, Code } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, usePageTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT, PRO_COUNTRY_LIMIT, type Theme } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useMe, usePatchProfile, usePatchPreferences, useMyPreferences, useMyAreas, useAddArea, useDeleteArea, usePatchArea, useRegisterPushToken, useDeletePushToken, API_BASE } from "@/lib/api";
@@ -119,6 +119,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user: firebaseUser, loading: authLoading } = useAuth();
   const { myCountries, addMyCountry, removeMyCountry, userPlan, lang, setLang, setUserPlan, theme, homeCountry, setHomeCountry, reset } = useAppStore();
+  usePageTitle(lang, "tab_settings");
   const { data: me } = useMe();
 
   // 서버 plan → store 동기화 (Pro/Pro+ 관심국가 제한 반영)

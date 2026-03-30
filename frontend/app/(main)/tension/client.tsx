@@ -6,7 +6,7 @@ import TourHelpButton from "@/components/ui/TourHelpButton";
 import type { Step } from "react-joyride";
 import { Activity, Globe, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, Lock, Radio, Settings, MapPin, Pencil } from "lucide-react";
 import Link from "next/link";
-import { cn, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
+import { cn, usePageTitle, TENSION_LEVELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useTensionMine, useTensionHistory, useMe } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
@@ -555,6 +555,7 @@ function LoadingSkeleton() {
 
 export default function TensionPage() {
   const { myCountries, lang } = useAppStore();
+  usePageTitle(lang, "tab_tension");
   const [tourRun, setTourRun] = useState(false);
 
   const tensionTourSteps: Step[] = useMemo(() => [
