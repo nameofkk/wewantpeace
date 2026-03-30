@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { t, getTensionLevelLabel } from "@/lib/i18n";
+import { t, getTensionLevelLabel, type Lang } from "@/lib/i18n";
 import { getCountryName, getFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import { useAdminStore, adminFetch } from "@/lib/admin-utils";
@@ -91,7 +91,7 @@ function WowDelta({ current, previous }: { current: number; previous: number }) 
 
 /* ── Tab 1: Preview ── */
 function ReportPreview({ data }: { data: DraftData }) {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
 
   return (
     <div className="space-y-6">
@@ -172,7 +172,7 @@ function ReportPreview({ data }: { data: DraftData }) {
 
 /* ── Tab 2: Editor ── */
 function ReportEditor({ data, onSaved }: { data: DraftData; onSaved: () => void }) {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const { toast } = useAdminToast();
   const [noteKo, setNoteKo] = useState(data.editor_note_ko);
   const [noteEn, setNoteEn] = useState(data.editor_note_en);
@@ -311,7 +311,7 @@ function ReportEditor({ data, onSaved }: { data: DraftData; onSaved: () => void 
 
 /* ── Tab 3: History ── */
 function ReportHistory() {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
   const { data, isLoading } = useQuery<HistoryItem[]>({
@@ -376,7 +376,7 @@ function ReportHistory() {
 
 /* ── Send Panel ── */
 function SendPanel({ targetCount }: { targetCount: number }) {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const { toast } = useAdminToast();
   const queryClient = useQueryClient();
   const [confirmSend, setConfirmSend] = useState(false);
@@ -462,7 +462,7 @@ function SendPanel({ targetCount }: { targetCount: number }) {
 
 /* ── Main Page ── */
 export default function AdminWeeklyReportPage() {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const [activeTab, setActiveTab] = useState("preview");
   const queryClient = useQueryClient();
 
