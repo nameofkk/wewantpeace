@@ -2828,6 +2828,8 @@ def _fmt_usd(val: float | None) -> str:
     """USD millions → 읽기 좋은 형식"""
     if val is None:
         return "?"
+    if val >= 1_000_000:
+        return f"${val / 1_000_000:.1f}T"
     if val >= 1000:
         return f"${val / 1000:.1f}B"
     return f"${val:.0f}M"
@@ -3210,10 +3212,27 @@ async def get_sector_overview(
 
     l = "ko" if lang == "ko" else "en"
 
+    # 섹터별 민감도 배수 — 국가 전체 교역 의존도에 곱해서 섹터별 차별화
+    _SECTOR_SENSITIVITY: dict[str, float] = {
+        "energy": 5.0,       # 에너지: 분쟁 직결 (유가, 가스)
+        "shipping": 4.5,     # 해운: 해협 봉쇄 직결
+        "defense": 4.0,      # 방위: 군비 직결
+        "agriculture": 3.5,  # 농업: 식량 공급망
+        "mining": 3.0,       # 광업: 원자재
+        "semiconductor": 2.5,
+        "electronics": 2.0,
+        "manufacturing": 2.0,
+        "technology": 2.0,
+        "automotive": 1.8,
+        "tourism": 1.5,      # 관광: 간접 영향
+        "finance": 1.5,
+    }
+
     for sector, info in sectors_data.items():
         partners = info.get("key_partners", [])
         gdp_pct = info["gdp_pct"]
         sector_label = labels.get(sector, sector)
+        sensitivity = _SECTOR_SENSITIVITY.get(sector, 2.0)
 
         max_trade_dep = 0.0
         max_risk_score = 0.0
@@ -3232,7 +3251,7 @@ async def get_sector_overview(
             partner_rank = partners.index(cc) + 1 if is_partner else 0
 
             if real_dep is not None and real_dep > 0.001:
-                trade_dep = min(0.95, real_dep * 3)
+                trade_dep = min(0.95, real_dep * sensitivity)
                 affected_countries.append(cc)
                 if detail:
                     # 섹터 GDP 비중으로 비례배분 (국가 전체 교역액 × 섹터 비중)

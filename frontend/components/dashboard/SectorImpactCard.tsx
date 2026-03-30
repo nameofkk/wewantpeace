@@ -87,6 +87,7 @@ const DEMO_SECTOR = {
 /** USD 포맷 헬퍼 */
 function fmtUsd(val: number | null | undefined): string {
   if (!val) return "";
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}T`;
   if (val >= 1000) return `$${(val / 1000).toFixed(1)}B`;
   return `$${Math.round(val)}M`;
 }
