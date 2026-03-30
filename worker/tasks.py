@@ -158,26 +158,16 @@ def collect_rss(self):
         async with AsyncSessionLocal() as db:
             collector = RSSCollector()
             redis = get_redis()
+            # collect_all 내부에서 피드별 flush+commit 처리 완료
             results = await collector.collect_all(db, redis=redis)
             total = sum(r.collected for r in results)
-            if total > 0:
-                try:
-                    await db.flush()   # ID 생성을 위해 flush 먼저
-                except Exception:
-                    await db.rollback()
-                    raise
-                # 각 raw_event의 ID 수집 (flush 후 ID 할당됨)
-                all_ids = []
-                for r in results:
-                    for raw_ev in r.raw_event_ids:
-                        if raw_ev.id:
-                            all_ids.append(str(raw_ev.id))
-                try:
-                    await db.commit()
-                except Exception:
-                    await db.rollback()
-                    raise
-                # 처리 파이프라인 체이닝 (commit 후)
+            # 처리 파이프라인 체이닝 (이미 commit 완료된 이벤트만)
+            all_ids = []
+            for r in results:
+                for raw_ev in r.raw_event_ids:
+                    if raw_ev.id:
+                        all_ids.append(str(raw_ev.id))
+            if all_ids:
                 for raw_id in all_ids:
                     process_raw_event.delay(raw_id)
                 logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
