@@ -511,13 +511,14 @@ class RSSCollector:
                 result.skipped += 1
                 continue
 
-            # 3. 중복 확인
-            existing = await db.execute(
-                select(RawEvent).where(
-                    RawEvent.source_type == "rss",
-                    RawEvent.external_id == guid,
+            # 3. 중복 확인 (no_autoflush: pending INSERT의 premature flush 방지)
+            async with db.no_autoflush:
+                existing = await db.execute(
+                    select(RawEvent).where(
+                        RawEvent.source_type == "rss",
+                        RawEvent.external_id == guid,
+                    )
                 )
-            )
             if existing.scalar_one_or_none():
                 result.skipped += 1
                 continue
@@ -573,11 +574,26 @@ class RSSCollector:
         sem = asyncio.Semaphore(5)
 
         # 세션 공유 안전성을 위해 순차 실행 (asyncio.gather 대신)
+        # 피드별 flush+commit — 하나 실패해도 나머지는 저장됨
         results = []
         for ch in channels:
             async with sem:
                 try:
                     result = await self.collect_feed(ch, db, redis=redis)
+                    # Per-feed flush+commit — 피드별로 DB에 즉시 저장
+                    if result.collected > 0:
+                        try:
+                            await db.flush()
+                            await db.commit()
+                        except Exception as db_err:
+                            await db.rollback()
+                            logger.error(
+                                "RSS 피드 %s DB 저장 실패: %s",
+                                ch.display_name, db_err,
+                            )
+                            result.errors.append(f"DB 저장 실패: {db_err}")
+                            result.collected = 0
+                            result.raw_event_ids.clear()
                     logger.info(
                         "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
                         ch.display_name,
@@ -594,6 +610,11 @@ class RSSCollector:
                     )
                 except Exception as e:
                     logger.error("RSS 채널 %s 수집 오류: %s", ch.display_name, e)
+                    # 세션이 rollback 상태일 수 있으므로 복구
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
                     results.append(
                         RSSCollectResult(
                             feed_url=ch.feed_url or "",
