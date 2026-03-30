@@ -4320,3 +4320,17 @@ async def get_newsletter_schedule(
             "americas": "Monday 09:00 EST (14:00 UTC)",
         },
     }
+
+
+@router.post("/cache/clear")
+async def clear_cache(
+    admin: User = Depends(require_admin),
+    pattern: str = "impact:summary:*",
+):
+    """Redis 캐시 패턴 삭제. 기본값: impact summary 캐시."""
+    redis = await get_redis()
+    deleted = 0
+    async for key in redis.scan_iter(pattern):
+        await redis.delete(key)
+        deleted += 1
+    return {"deleted": deleted, "pattern": pattern}
