@@ -237,6 +237,9 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Railway Edge CDN 캐싱 방지 — CDN이 CORS 헤더 없이 캐시 응답을 반환하는 문제 해결
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Origin"
 
     # 뉴스레터 HTML(archive/sample)은 iframe 임베딩 허용
     path = request.url.path
