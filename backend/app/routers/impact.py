@@ -419,7 +419,12 @@ async def _build_impact_summary(
         .order_by(CommodityPrice.price_date.desc())
         .limit(1)
     )
-    oil_row = oil_q.first()
+    _oil_raw = oil_q.first()
+    oil_row = None
+    if _oil_raw:
+        _op = _oil_raw[0] if _oil_raw[0] and math.isfinite(_oil_raw[0]) else 0.0
+        _oc = _oil_raw[1] if _oil_raw[1] and math.isfinite(_oil_raw[1]) else 0.0
+        oil_row = (_op, _oc)
 
     # 배치 3: kscore_delta — 최근 24h 이벤트 수 배치
     day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
@@ -474,7 +479,9 @@ async def _build_impact_summary(
     commodity_prices: dict[str, tuple[float, float]] = {}  # symbol → (price, change_pct)
     for cp in _cp_q.scalars():
         if cp.symbol not in commodity_prices:
-            commodity_prices[cp.symbol] = (cp.price_usd, cp.change_pct or 0)
+            _cprice = cp.price_usd if cp.price_usd and math.isfinite(cp.price_usd) else 0.0
+            _cchg = cp.change_pct if cp.change_pct and math.isfinite(cp.change_pct) else 0.0
+            commodity_prices[cp.symbol] = (_cprice, _cchg)
 
     top_issues = []
     for c, impact in top5_for_issues:
@@ -587,7 +594,12 @@ async def _build_impact_summary(
             .where(CP2.symbol == "GOLD")
             .order_by(CP2.price_date.desc()).limit(1)
         )
-        gold_row = gold_q.first()
+        _gold_raw = gold_q.first()
+        gold_row = None
+        if _gold_raw:
+            _gp = _gold_raw[0] if _gold_raw[0] and math.isfinite(_gold_raw[0]) else 0.0
+            _gc = _gold_raw[1] if _gold_raw[1] and math.isfinite(_gold_raw[1]) else 0.0
+            gold_row = (_gp, _gc)
 
         # 홈 국가 주가지수 (1 쿼리)
         home_idx_map = _HOME_INDEX_MAP
@@ -600,7 +612,7 @@ async def _build_impact_summary(
                 .order_by(MI2.index_date.desc()).limit(1)
             )
             idx_row = idx_q.first()
-            if idx_row:
+            if idx_row and idx_row[1] is not None and math.isfinite(idx_row[1]):
                 idx_str = f"{idx_row[0]} {idx_row[1]:+.1f}%"
 
         # 주요 교역 파트너별 교역액 — 배치 조회 (1 쿼리)
@@ -2414,11 +2426,13 @@ async def _get_market_snapshot(
         .order_by(CommodityPrice.symbol, CommodityPrice.price_date.desc())
     )
     for row in commodity_q.scalars().all():
+        price = row.price_usd if row.price_usd and math.isfinite(row.price_usd) else 0.0
+        chg = row.change_pct if row.change_pct and math.isfinite(row.change_pct) else 0.0
         commodities.append({
             "symbol": row.symbol,
             "name": row.name,
-            "price_usd": row.price_usd,
-            "change_pct": row.change_pct,
+            "price_usd": price,
+            "change_pct": chg,
         })
 
     # 2) 주가지수: 1 배치 쿼리
@@ -2429,11 +2443,13 @@ async def _get_market_snapshot(
         .order_by(MarketIndex.symbol, MarketIndex.index_date.desc())
     )
     for row in index_q.scalars().all():
+        val = row.value if row.value and math.isfinite(row.value) else 0.0
+        chg = row.change_pct if row.change_pct and math.isfinite(row.change_pct) else 0.0
         indices.append({
             "symbol": row.symbol,
             "name": row.name,
-            "value": row.value,
-            "change_pct": row.change_pct,
+            "value": val,
+            "change_pct": chg,
             "currency": row.currency,
         })
 
@@ -2466,11 +2482,14 @@ async def _get_market_snapshot(
         if not rows:
             continue
         current_rate = rows[0][1]
+        if not current_rate or not math.isfinite(current_rate):
+            continue
         change_pct = None
         if len(rows) >= 2:
             prev_rate = rows[1][1]
-            if prev_rate and prev_rate > 0:
-                change_pct = round(((current_rate - prev_rate) / prev_rate) * 100, 2)
+            if prev_rate and prev_rate > 0 and math.isfinite(prev_rate):
+                cp = round(((current_rate - prev_rate) / prev_rate) * 100, 2)
+                change_pct = cp if math.isfinite(cp) else None
         exchange_rates.append({
             "target_currency": tc,
             "rate": current_rate,
