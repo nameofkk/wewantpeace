@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -331,6 +331,7 @@ async def toss_login(
 @limiter.limit("5/minute")
 async def register(
     request: Request,
+    response: Response,
     body: RegisterBody,
     db: AsyncSession = Depends(get_db),
 ):
@@ -473,7 +474,7 @@ async def check_nickname(nickname: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/find-email")
 @limiter.limit("5/minute")
-async def find_email(request: Request, nickname: str, birth_year: int, db: AsyncSession = Depends(get_db)):
+async def find_email(request: Request, response: Response, nickname: str, birth_year: int, db: AsyncSession = Depends(get_db)):
     """닉네임+생년도로 이메일 찾기."""
     import asyncio as _asyncio
     result = await db.execute(

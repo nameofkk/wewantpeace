@@ -233,6 +233,7 @@ async def list_clusters(
 @limiter.limit("60/minute")
 async def search_clusters(
     request: Request,
+    response: Response,
     q: str = Query(..., min_length=1, description="검색어 (title/title_ko ILIKE)"),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
@@ -380,6 +381,7 @@ async def get_country_ucdp_context(
 @limiter.limit("60/minute")
 async def get_cluster(
     request: Request,
+    response: Response,
     cluster_id: str,
     db: AsyncSession = Depends(get_db),
 ):
