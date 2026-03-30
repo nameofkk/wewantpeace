@@ -511,14 +511,13 @@ class RSSCollector:
                 result.skipped += 1
                 continue
 
-            # 3. 중복 확인 (no_autoflush: pending INSERT의 premature flush 방지)
-            with db.no_autoflush:
-                existing = await db.execute(
-                    select(RawEvent).where(
-                        RawEvent.source_type == "rss",
-                        RawEvent.external_id == guid,
-                    )
+            # 3. 중복 확인 (피드별 commit으로 pending INSERT 수 제한됨)
+            existing = await db.execute(
+                select(RawEvent).where(
+                    RawEvent.source_type == "rss",
+                    RawEvent.external_id == guid,
                 )
+            )
             if existing.scalar_one_or_none():
                 result.skipped += 1
                 continue
