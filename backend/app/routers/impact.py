@@ -11,6 +11,7 @@ import asyncio
 import os
 import json
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -417,25 +418,32 @@ async def _build_impact_summary(
 
     # 배치 4: body_ko snippet — 최근 이벤트에서 body_ko 가져오기
     body_snippets: dict[str, str] = {}
+    what_bodies: dict[str, dict[str, str]] = {}  # cluster_id → {"ko": ..., "en": ...}
     if top5_cluster_ids:
         from backend.app.models.issue_cluster import ClusterEvent as CE4
         body_q = await db.execute(
-            select(CE4.cluster_id, NormalizedEvent.body_ko)
+            select(CE4.cluster_id, NormalizedEvent.body_ko, NormalizedEvent.body)
             .join(NormalizedEvent, NormalizedEvent.id == CE4.event_id)
             .where(
                 CE4.cluster_id.in_(top5_cluster_ids),
-                NormalizedEvent.body_ko.isnot(None),
             )
             .order_by(NormalizedEvent.created_at.desc())
             .limit(20)
         )
         for row in body_q.fetchall():
             cid = row[0]
-            if cid not in body_snippets and row[1]:
-                text = row[1][:150].strip()
-                if len(row[1]) > 150:
+            bko, ben = row[1], row[2]
+            if cid not in body_snippets and bko:
+                text = bko[:150].strip()
+                if len(bko) > 150:
                     text += "…"
                 body_snippets[cid] = text
+            if cid not in what_bodies:
+                what_bodies[cid] = {}
+            if "ko" not in what_bodies[cid] and bko:
+                what_bodies[cid]["ko"] = bko
+            if "en" not in what_bodies[cid] and ben:
+                what_bodies[cid]["en"] = ben
 
     # ── 원자재 가격 배치 조회 (reason/summary/impact_flow/risk_radar 공용) ──
     _cp_symbols = ["WTI", "BRENT", "NATGAS", "WHEAT", "CORN", "SOYBEAN", "RICE", "BDRY", "JET_FUEL", "GOLD", "SILVER"]
@@ -453,7 +461,7 @@ async def _build_impact_summary(
     top_issues = []
     for c, impact in top5_for_issues:
         reason = _build_reason_sync(c, home, lang, sectors_data, trade_map, oil_row, commodity_prices)
-        smart = _build_smart_summary(c, home, lang, sectors_data, trade_map, oil_row, commodity_prices)
+        smart = _build_smart_summary(c, home, lang, sectors_data, trade_map, oil_row, commodity_prices, what_bodies.get(c.id))
 
         recent_count = recent_counts.get(c.id, 0)
         current_kscore = c.kscore or 0
@@ -1828,7 +1836,7 @@ def _build_reason_sync(
     return reason
 
 
-def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: dict, trade_map: dict, oil_row, commodity_prices: dict | None = None) -> dict:
+def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: dict, trade_map: dict, oil_row, commodity_prices: dict | None = None, body_texts: dict | None = None) -> dict:
     """3줄 Smart Summary: what/so_what/when 생성"""
     cc = cluster.country_code or ""
     topic = cluster.topic or "unknown"
@@ -1855,11 +1863,20 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     title = cluster.title_ko if lang == "ko" and cluster.title_ko else cluster.title or ""
     title = title[:60]
 
-    # what_line
-    if lang == "ko":
-        what_line = title
+    # what_line — body 첫 문장 사용 (제목과 중복 방지)
+    _body_raw = (body_texts or {}).get("ko" if lang == "ko" else "en", "")
+    # 첫 문장 추출 (마침표/느낌표/물음표 기준)
+    _first_sent = ""
+    if _body_raw:
+        _m = re.match(r"(.+?[.!?。！？])\s", _body_raw[:200])
+        _first_sent = _m.group(1).strip() if _m else _body_raw[:80].strip()
+        # 제목과 동일하면 버림
+        if _first_sent and _first_sent.rstrip(".!?。！？").strip() == title.rstrip(".!?。！？").strip():
+            _first_sent = ""
+    if _first_sent and len(_first_sent) > 15:
+        what_line = _first_sent[:80]
     else:
-        what_line = (cluster.title or title)[:60]
+        what_line = title
 
     # so_what_line — 원자재 매핑 우선, 유가 폴백
     oil_price = None
