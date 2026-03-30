@@ -47,6 +47,7 @@ _HOME_INDEX_MAP: dict[str, str] = {
     "CA": "TSX", "FR": "CAC", "SA": "TASI", "IL": "TA35", "TR": "BIST",
     "AU": "ASX", "MX": "MXX",
     "VN": "VNINDEX", "ID": "JCI", "PH": "PSEI", "PL": "WIG20", "EG": "EGX30",
+    "GLOBAL": "SPX",  # 글로벌 뷰는 S&P 500 기준
 }
 
 # 국가 코드 → 국가명 (reason 표시용)
@@ -59,8 +60,9 @@ _COUNTRY_DISPLAY = {
         "TR": "튀르키예", "TH": "태국", "VN": "베트남", "SG": "싱가포르", "MX": "멕시코",
         "KP": "북한", "LB": "레바논", "YE": "예멘", "LY": "리비아", "KW": "쿠웨이트",
         "PK": "파키스탄", "AF": "아프가니스탄", "SD": "수단", "MM": "미얀마",
+        "GLOBAL": "글로벌",
     },
-    "en": {},  # 영어는 코드 그대로 사용
+    "en": {"GLOBAL": "Global"},  # 영어는 코드 그대로 사용
 }
 
 
@@ -76,7 +78,7 @@ def calc_impact_factor(
     home_country: str = "",
 ) -> float:
     """서버사이드 impact factor 계산 (calibration.py 데이터 기반)"""
-    if not home_country:
+    if not home_country or home_country == "GLOBAL":
         return 1.0
     country_factors = IMPACT_FACTORS.get(home_country)
     if not country_factors:
@@ -346,34 +348,50 @@ async def _build_impact_summary(
     # 배치 1: TradeBilateral (Top5 국가 교역액)
     trade_map: dict[str, float] = {}
     if top5_countries and home:
-        trade_q = await db.execute(
-            select(TradeBilateral.partner_code, TradeBilateral.total_trade_usd)
-            .where(
-                TradeBilateral.reporter_code == home,
-                TradeBilateral.partner_code.in_(top5_countries),
-                TradeBilateral.period_type == "A",
-            )
-            .order_by(TradeBilateral.period.desc())
-        )
-        for row in trade_q.fetchall():
-            if row[0] not in trade_map:
-                trade_map[row[0]] = row[1]
-
-        # Fallback: 직접 보고 없으면 역방향 (mirror trade)
-        missing = [cc for cc in top5_countries if cc not in trade_map]
-        if missing:
-            mirror_q = await db.execute(
-                select(TradeBilateral.reporter_code, TradeBilateral.total_trade_usd)
+        if home == "GLOBAL":
+            # GLOBAL: 모든 reporter의 해당국 교역 합산
+            trade_q = await db.execute(
+                select(
+                    TradeBilateral.partner_code,
+                    func.sum(TradeBilateral.total_trade_usd),
+                )
                 .where(
-                    TradeBilateral.partner_code == home,
-                    TradeBilateral.reporter_code.in_(missing),
+                    TradeBilateral.partner_code.in_(top5_countries),
+                    TradeBilateral.period_type == "A",
+                )
+                .group_by(TradeBilateral.partner_code)
+            )
+            for row in trade_q.fetchall():
+                trade_map[row[0]] = row[1]
+        else:
+            trade_q = await db.execute(
+                select(TradeBilateral.partner_code, TradeBilateral.total_trade_usd)
+                .where(
+                    TradeBilateral.reporter_code == home,
+                    TradeBilateral.partner_code.in_(top5_countries),
                     TradeBilateral.period_type == "A",
                 )
                 .order_by(TradeBilateral.period.desc())
             )
-            for row in mirror_q.fetchall():
+            for row in trade_q.fetchall():
                 if row[0] not in trade_map:
                     trade_map[row[0]] = row[1]
+
+            # Fallback: 직접 보고 없으면 역방향 (mirror trade)
+            missing = [cc for cc in top5_countries if cc not in trade_map]
+            if missing:
+                mirror_q = await db.execute(
+                    select(TradeBilateral.reporter_code, TradeBilateral.total_trade_usd)
+                    .where(
+                        TradeBilateral.partner_code == home,
+                        TradeBilateral.reporter_code.in_(missing),
+                        TradeBilateral.period_type == "A",
+                    )
+                    .order_by(TradeBilateral.period.desc())
+                )
+                for row in mirror_q.fetchall():
+                    if row[0] not in trade_map:
+                        trade_map[row[0]] = row[1]
 
     # 배치 2: WTI 유가 (공유)
     oil_q = await db.execute(
@@ -1498,6 +1516,23 @@ SECTOR_DATA = {
     },
 }
 
+# GLOBAL 뷰: 세계 경제 전체 관점 — 주요 분쟁국이 글로벌 경제에 미치는 영향 분석
+# 각 섹터의 key_partners = 해당 섹터에서 세계적으로 가장 중요한 국가들
+SECTOR_DATA["GLOBAL"] = {
+    "energy": {"gdp_pct": 6.0, "key_partners": ["SA", "RU", "US", "AE", "IQ", "IR", "KW", "NG", "CA", "NO"]},
+    "semiconductor": {"gdp_pct": 3.5, "key_partners": ["TW", "KR", "US", "JP", "CN", "NL", "DE", "SG"]},
+    "manufacturing": {"gdp_pct": 16.0, "key_partners": ["CN", "US", "DE", "JP", "KR", "IN", "MX", "VN", "TW", "TH"]},
+    "technology": {"gdp_pct": 7.0, "key_partners": ["US", "CN", "JP", "KR", "TW", "DE", "GB", "IN", "IL", "IE"]},
+    "agriculture": {"gdp_pct": 4.0, "key_partners": ["US", "BR", "CN", "IN", "RU", "UA", "AU", "AR", "FR", "CA"]},
+    "shipping": {"gdp_pct": 3.5, "key_partners": ["CN", "US", "SG", "NL", "KR", "JP", "DE", "AE", "GB", "EG"]},
+    "automotive": {"gdp_pct": 3.0, "key_partners": ["CN", "US", "DE", "JP", "KR", "MX", "IN", "TH", "BR", "GB"]},
+    "tourism": {"gdp_pct": 3.5, "key_partners": ["FR", "ES", "US", "CN", "IT", "TR", "MX", "TH", "GB", "DE"]},
+    "defense": {"gdp_pct": 2.5, "key_partners": ["US", "CN", "RU", "IN", "SA", "GB", "DE", "FR", "JP", "KR"]},
+    "electronics": {"gdp_pct": 5.0, "key_partners": ["CN", "US", "KR", "TW", "JP", "VN", "DE", "MY", "SG", "TH"]},
+    "finance": {"gdp_pct": 8.0, "key_partners": ["US", "GB", "CN", "JP", "SG", "HK", "DE", "FR", "CH", "AU"]},
+    "mining": {"gdp_pct": 3.0, "key_partners": ["AU", "BR", "CN", "RU", "SA", "CA", "IN", "ID", "ZA", "CL"]},
+}
+
 # Default sectors for countries without specific data
 DEFAULT_SECTORS = {
     "energy": {"gdp_pct": 3.0, "key_partners": []},
@@ -1563,6 +1598,8 @@ _HOME_CURRENCIES: dict[str, list[str]] = {
     "AU": ["AUD", "CNY", "JPY", "EUR"],
     # 남미
     "BR": ["BRL", "EUR", "CNY", "MXN"],
+    # 글로벌
+    "GLOBAL": ["EUR", "JPY", "GBP", "CNY"],
 }
 
 # ── 국가→관련 원자재 매핑 (reason/summary 다양화용) ──
@@ -2548,6 +2585,37 @@ async def _get_real_trade_detail(
 ) -> _TradeDetail | None:
     """DB에서 실제 양자간 교역 상세 조회 (의존도 + 교역액)"""
     from backend.app.models.economic_data import TradeBilateral
+
+    # GLOBAL 뷰: 모든 reporter의 해당국 교역 합산 → 글로벌 교역 비중 계산
+    if home_country == "GLOBAL":
+        # 해당국과의 전체 교역 합산 (모든 reporter 기준)
+        pair_q = await db.execute(
+            select(
+                func.sum(TradeBilateral.total_trade_usd),
+                func.sum(TradeBilateral.export_value_usd),
+                func.sum(TradeBilateral.import_value_usd),
+            )
+            .where(
+                TradeBilateral.partner_code == affected_country,
+                TradeBilateral.period_type == "A",
+            )
+        )
+        pair_row = pair_q.first()
+        if pair_row is None or pair_row[0] is None:
+            return None
+        pair_trade, export_val, import_val = pair_row[0], pair_row[1], pair_row[2]
+
+        # 전체 글로벌 교역 합산
+        total_q = await db.execute(
+            select(func.sum(TradeBilateral.total_trade_usd))
+            .where(TradeBilateral.period_type == "A")
+        )
+        total_trade = total_q.scalar_one_or_none()
+        if not total_trade or total_trade <= 0:
+            return None
+
+        dep = min(1.0, pair_trade / total_trade)
+        return _TradeDetail(round(dep, 3), pair_trade, export_val, import_val)
 
     pair_q = await db.execute(
         select(
