@@ -8,6 +8,7 @@ Phase 5: Behavior Personalization — event tracking + recommendations
 """
 
 import asyncio
+import math
 import os
 import json
 import hashlib
@@ -35,6 +36,20 @@ from worker.processor.calibration import (
 import structlog
 
 logger = structlog.get_logger()
+
+
+def _sanitize_floats(obj):
+    """재귀적으로 inf/nan float를 None으로 치환 (JSON 직렬화 안전)."""
+    if isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_floats(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_floats(v) for v in obj]
+    return obj
+
 
 router = APIRouter(prefix="/impact", tags=["impact"])
 
@@ -861,6 +876,9 @@ async def _build_impact_summary(
         "risk_radar": risk_radar,
         "impact_flow": impact_flow,
     }
+
+    # inf/nan float 제거 (JSON 직렬화 안전)
+    response_data = _sanitize_floats(response_data)
 
     # 30분 캐시
     if redis:
