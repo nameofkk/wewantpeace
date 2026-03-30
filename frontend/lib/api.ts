@@ -685,7 +685,7 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     queryKey: ["impact", "summary", homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (homeCountry !== undefined) params.home_country = homeCountry;
+      params.home_country = homeCountry || "GLOBAL";
       if (lang) params.lang = lang;
       return apiFetch<ImpactSummary>("/impact/summary", params);
     },
@@ -745,7 +745,7 @@ export function useImpactBrief(clusterId?: string, homeCountry?: string, lang?: 
     queryKey: ["impact", "brief", clusterId, homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (homeCountry) params.home_country = homeCountry;
+      params.home_country = homeCountry || "GLOBAL";
       if (lang) params.lang = lang;
       return apiFetch<ImpactBrief>(`/impact/brief/${clusterId}`, params);
     },
@@ -789,7 +789,7 @@ export function useSectorAnalysis(clusterId?: string, homeCountry?: string, lang
     queryKey: ["impact", "sector", clusterId, homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (homeCountry) params.home_country = homeCountry;
+      params.home_country = homeCountry || "GLOBAL";
       if (lang) params.lang = lang;
       return apiFetch<SectorAnalysis>(`/impact/sector/${clusterId}`, params);
     },
@@ -804,7 +804,7 @@ export function useSectorOverview(homeCountry?: string, lang?: string, enabled =
     queryKey: ["impact", "sector-overview", homeCountry ?? "db", lang ?? "ko"],
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (homeCountry) params.home_country = homeCountry;
+      params.home_country = homeCountry || "GLOBAL";
       if (lang) params.lang = lang;
       return apiFetch<SectorAnalysis>("/impact/sector-overview", params);
     },

@@ -1214,8 +1214,11 @@ async def get_impact_brief(
         resolved_lang = pref_lang or "ko"
     lang = resolved_lang
 
-    # 기준 국가 결정 (쿼리 파라미터 > 사용자 설정 > 기본값)
-    effective_home = home_country or user.home_country or "KR"
+    # 기준 국가 결정: "GLOBAL" → 글로벌 뷰, 그 외 → 쿼리 > 사용자 설정 > KR
+    if home_country and home_country.upper() == "GLOBAL":
+        effective_home = "GLOBAL"
+    else:
+        effective_home = home_country or user.home_country or "KR"
 
     # 캐시 확인
     redis = get_redis()
@@ -2913,9 +2916,12 @@ async def get_sector_analysis(
         resolved_lang = pref_lang or "ko"
     lang = resolved_lang
 
-    # 기준 국가 결정 (쿼리 파라미터 > 사용자 설정 > 기본값)
+    # 기준 국가 결정: "GLOBAL" → 글로벌 뷰, 그 외 → 쿼리 > 사용자 설정 > KR
     redis = get_redis()
-    home = home_country or user.home_country or "KR"
+    if home_country and home_country.upper() == "GLOBAL":
+        home = "GLOBAL"
+    else:
+        home = home_country or user.home_country or "KR"
     cache_key = f"impact:sector:{_CACHE_VERSION}:{cluster_id}:{home}:{lang}"
 
     if redis:
@@ -2992,7 +2998,11 @@ async def get_sector_overview(
         resolved_lang = pref_lang or "ko"
     lang = resolved_lang
 
-    home = home_country or user.home_country or "KR"
+    # "GLOBAL" → 글로벌 뷰, 그 외 → 쿼리 > 사용자 설정 > KR
+    if home_country and home_country.upper() == "GLOBAL":
+        home = "GLOBAL"
+    else:
+        home = home_country or user.home_country or "KR"
 
     redis = get_redis()
     cache_key = f"impact:sector-overview:{_CACHE_VERSION}:{home}:{lang}"
