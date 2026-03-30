@@ -67,9 +67,11 @@ import os as _os
 _pool_size = 1 if _os.environ.get("CELERY_WORKER") else 5
 _max_overflow = 0 if _os.environ.get("CELERY_WORKER") else 3
 _connect_args = {}
-if not _is_sqlite and _os.environ.get("CELERY_WORKER"):
-    # Worker bulk INSERT 시 statement timeout 방지 (120초)
-    _connect_args["server_settings"] = {"statement_timeout": "120000"}
+if not _is_sqlite:
+    # Supabase Session mode pooler에서 statement timeout 설정 필수
+    # Worker: 120초 (bulk INSERT), Backend: 60초 (API 응답)
+    _timeout = "120000" if _os.environ.get("CELERY_WORKER") else "60000"
+    _connect_args["server_settings"] = {"statement_timeout": _timeout}
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
