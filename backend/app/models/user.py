@@ -26,7 +26,7 @@ class User(Base):
     bio: Mapped[str | None] = mapped_column(String(200), nullable=True)
     profile_image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     birth_year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
-    home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="KR")
+    home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="")
 
     # 계정 상태 및 권한
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
@@ -148,5 +148,5 @@ class UserPreference(Base):
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Seoul")
     min_kscore: Mapped[float] = mapped_column(nullable=False, default=4.0)
     intent: Mapped[str] = mapped_column(String(16), nullable=False, default="general")
-    home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="KR")
+    home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="")
     notify_engagement: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true", default=True)

@@ -73,7 +73,7 @@ def _country_name(code: str, lang: str) -> str:
 def calc_impact_factor(
     event_country: str,
     topic: str,
-    home_country: str = "KR",
+    home_country: str = "",
 ) -> float:
     """서버사이드 impact factor 계산 (calibration.py 데이터 기반)"""
     if not home_country:
@@ -1218,7 +1218,7 @@ async def get_impact_brief(
     if home_country and home_country.upper() == "GLOBAL":
         effective_home = "GLOBAL"
     else:
-        effective_home = home_country or user.home_country or "KR"
+        effective_home = home_country or user.home_country or "GLOBAL"
 
     # 캐시 확인
     redis = get_redis()
@@ -2921,7 +2921,7 @@ async def get_sector_analysis(
     if home_country and home_country.upper() == "GLOBAL":
         home = "GLOBAL"
     else:
-        home = home_country or user.home_country or "KR"
+        home = home_country or user.home_country or "GLOBAL"
     cache_key = f"impact:sector:{_CACHE_VERSION}:{cluster_id}:{home}:{lang}"
 
     if redis:
@@ -3002,7 +3002,7 @@ async def get_sector_overview(
     if home_country and home_country.upper() == "GLOBAL":
         home = "GLOBAL"
     else:
-        home = home_country or user.home_country or "KR"
+        home = home_country or user.home_country or "GLOBAL"
 
     redis = get_redis()
     cache_key = f"impact:sector-overview:{_CACHE_VERSION}:{home}:{lang}"
@@ -3327,7 +3327,7 @@ async def get_weekly_report(
     db: AsyncSession = Depends(get_db),
 ):
     """주간 영향 리포트 (Pro+ 이상)"""
-    home = user.home_country or "KR"
+    home = user.home_country or "GLOBAL"
     now = datetime.now(timezone.utc)
     week_start = now - timedelta(days=7)
 
@@ -3572,7 +3572,7 @@ async def get_trade_flow(
 
     DB에 실제 교역 데이터가 있으면 사용, 없으면 SECTOR_DATA 기반 추정.
     """
-    home = user.home_country or "KR"
+    home = user.home_country or "GLOBAL"
     redis = get_redis()
     cache_key = f"impact:trade-flow:{home}"
 
