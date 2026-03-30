@@ -1688,6 +1688,13 @@ export const translations = {
     newsletter_archive_empty: "아직 발송된 뉴스레터가 없습니다",
     newsletter_archive_cta: "이런 뉴스레터를 매주 받아보세요",
     newsletter_web_version: "웹 버전으로 보기",
+    // 브라우저 탭 제목
+    tab_home: "홈 | 나의 글로벌 리스크 대시보드",
+    tab_feed: "이슈 피드 | WeWantPeace",
+    tab_map: "분쟁 지도 | WeWantPeace",
+    tab_tension: "긴장도 지수 | WeWantPeace",
+    tab_settings: "설정 | WeWantPeace",
+    tab_community: "커뮤니티 | WeWantPeace",
   },
   en: {
     // bottom nav
@@ -3374,6 +3381,13 @@ export const translations = {
     newsletter_archive_empty: "No newsletters have been sent yet",
     newsletter_archive_cta: "Get newsletters like this every week",
     newsletter_web_version: "View web version",
+    // Browser tab titles
+    tab_home: "Home | My Global Risk Dashboard",
+    tab_feed: "Issue Feed | WeWantPeace",
+    tab_map: "Conflict Map | WeWantPeace",
+    tab_tension: "Tension Index | WeWantPeace",
+    tab_settings: "Settings | WeWantPeace",
+    tab_community: "Community | WeWantPeace",
   },
 } as const;
 

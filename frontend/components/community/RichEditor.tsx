@@ -4,6 +4,7 @@ import { useRef, useCallback, useEffect, useState } from "react";
 import { Bold, Italic, Link as LinkIcon, Quote, List, Minus } from "lucide-react";
 import DOMPurify from "dompurify";
 import { renderMarkdown } from "@/lib/markdown";
+import { useAppStore } from "@/lib/store";
 
 interface RichEditorProps {
   initialValue?: string;
@@ -175,6 +176,7 @@ export default function RichEditor({
     syncMarkdown();
     checkFormats();
   };
+  const lang = useAppStore((s) => s.lang);
   const handleLink = () => {
     const sel = window.getSelection();
     const selectedText = sel?.toString() || "";
@@ -183,8 +185,7 @@ export default function RichEditor({
     if (selectedText) {
       exec("createLink", url);
     } else {
-      // 선택 없으면 텍스트와 링크 모두 삽입
-      const linkText = window.prompt("링크 텍스트:", "") || url;
+      const linkText = window.prompt(lang === "ko" ? "링크 텍스트:" : "Link text:", "") || url;
       exec(
         "insertHTML",
         `<a href="${DOMPurify.sanitize(url)}" target="_blank" rel="noopener noreferrer">${DOMPurify.sanitize(linkText)}</a>`,

@@ -49,7 +49,7 @@ export function NewsletterCTA() {
         const inject = `<style>body{background:#fff!important}table[style*="max-width:600px"]{max-width:100%!important}.ma{max-width:100%!important}</style>`;
         setPreviewHtml(raw.replace("</head>", inject + "</head>"));
       })
-      .catch(() => setPreviewHtml("<p style='padding:40px;text-align:center;color:#999'>로드 실패</p>"));
+      .catch(() => setPreviewHtml(`<p style='padding:40px;text-align:center;color:#999'>${lang === "ko" ? "로드 실패" : "Failed to load"}</p>`));
   }, [showPreview, previewLang]);
 
   const showToast = useCallback((msg: string) => {

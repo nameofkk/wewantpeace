@@ -3,7 +3,7 @@
 import React, { Suspense, useMemo, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, usePageTitle } from "@/lib/utils";
 import { getFlag, getCountryName } from "@/lib/countries";
 import { useAppStore } from "@/lib/store";
 import {
@@ -154,6 +154,7 @@ function ReportContent() {
   const completedTours = useAppStore((s) => s.completedTours);
   const patchPrefs = usePatchPreferences();
 
+  usePageTitle(lang, "tab_home");
   const { data: me, isLoading: meLoading } = useMe();
   const meObj = me as { plan?: string; nickname?: string; display_name?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
