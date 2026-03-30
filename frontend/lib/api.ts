@@ -58,9 +58,9 @@ async function apiFetch<T>(
     clearTimeout(timeout);
     const err = e as Error;
     if (err.name === "AbortError") {
-      throw Object.assign(new Error("서버 응답 시간 초과"), { status: 0 });
+      throw Object.assign(new Error("Server response timeout"), { status: 0 });
     }
-    throw Object.assign(new Error(`네트워크 연결 오류 (${err.name}: ${err.message}) url=${url.pathname}`), { status: 0 });
+    throw Object.assign(new Error(`Network error (${err.name}: ${err.message}) url=${url.pathname}`), { status: 0 });
   } finally {
     clearTimeout(timeout);
   }
@@ -76,7 +76,7 @@ async function apiFetch<T>(
       return apiFetch<T>(path, params, options, true);
     }
     const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(`API 오류: ${res.status}`), { status: res.status, body });
+    throw Object.assign(new Error(`API error: ${res.status}`), { status: res.status, body });
   }
   if (res.status === 204) return undefined as T;
   return res.json();

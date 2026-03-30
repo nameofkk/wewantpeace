@@ -95,7 +95,7 @@ export async function purchaseSubscription(
           } else if (msg.payload.cancelled) {
             resolve(null);
           } else {
-            reject(new Error(msg.payload.error || "결제 실패"));
+            reject(new Error(msg.payload.error || "Payment failed"));
           }
         }
       };
@@ -105,7 +105,7 @@ export async function purchaseSubscription(
       setTimeout(() => {
         if (!settled) {
           window.removeEventListener("nativeMessage", handler);
-          reject(new Error("결제 응답 타임아웃"));
+          reject(new Error("Payment response timeout"));
         }
       }, 180_000);
 
@@ -124,7 +124,7 @@ export async function purchaseSubscription(
         window.ReactNativeWebView.postMessage(message);
       } else {
         window.removeEventListener("nativeMessage", handler);
-        reject(new Error("네이티브 브릿지를 사용할 수 없습니다."));
+        reject(new Error("Native bridge unavailable"));
       }
     });
   }
@@ -138,7 +138,7 @@ export async function purchaseSubscription(
   // 상품 정보 조회
   const details = await service.getDetails([productId]);
   if (!details || details.length === 0) {
-    throw new Error("상품 정보를 찾을 수 없습니다.");
+    throw new Error("Product not found");
   }
 
   // Payment Request API로 결제 UI 표시
@@ -167,7 +167,7 @@ export async function purchaseSubscription(
 
     if (!purchaseToken) {
       await response.complete("fail");
-      throw new Error("구매 토큰을 받지 못했습니다.");
+      throw new Error("Purchase token not received");
     }
 
     await response.complete("success");

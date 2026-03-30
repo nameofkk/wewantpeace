@@ -2,16 +2,18 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useAppStore } from "@/lib/store";
 import IssueDetailClient from "../[id]/client";
 
 function IssueViewInner() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id") || "";
+  const lang = useAppStore((s) => s.lang);
 
   if (!id) {
     return (
       <div className="flex items-center justify-center min-h-screen text-muted-foreground">
-        이슈를 찾을 수 없습니다.
+        {lang === "ko" ? "이슈를 찾을 수 없습니다." : "Issue not found."}
       </div>
     );
   }

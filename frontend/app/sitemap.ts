@@ -30,60 +30,32 @@ async function fetchIssues(): Promise<Issue[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: `${BASE_URL}/`,
-      lastModified: now,
-      changeFrequency: "always",
-      priority: 1.0,
-    },
-    {
-      url: `${BASE_URL}/home`,
-      lastModified: now,
-      changeFrequency: "always",
-      priority: 0.9,
-    },
-    {
-      url: `${BASE_URL}/feed`,
-      lastModified: now,
-      changeFrequency: "always",
-      priority: 0.9,
-    },
-    {
-      url: `${BASE_URL}/map`,
-      lastModified: now,
-      changeFrequency: "always",
-      priority: 0.9,
-    },
-    {
-      url: `${BASE_URL}/tension`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.8,
-    },
-    {
-      url: `${BASE_URL}/search`,
-      lastModified: now,
-      changeFrequency: "daily",
-      priority: 0.6,
-    },
-    {
-      url: `${BASE_URL}/upgrade`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.5,
-    },
-    {
-      url: `${BASE_URL}/terms`,
-      changeFrequency: "monthly",
-      priority: 0.3,
-    },
-    {
-      url: `${BASE_URL}/privacy`,
-      changeFrequency: "monthly",
-      priority: 0.3,
-    },
+  const corePaths = [
+    { path: "/", freq: "always" as const, pri: 1.0 },
+    { path: "/home", freq: "always" as const, pri: 0.9 },
+    { path: "/feed", freq: "always" as const, pri: 0.9 },
+    { path: "/map", freq: "always" as const, pri: 0.9 },
+    { path: "/tension", freq: "daily" as const, pri: 0.8 },
+    { path: "/search", freq: "daily" as const, pri: 0.6 },
+    { path: "/upgrade", freq: "weekly" as const, pri: 0.5 },
+    { path: "/terms", freq: "monthly" as const, pri: 0.3 },
+    { path: "/privacy", freq: "monthly" as const, pri: 0.3 },
   ];
+
+  const staticPages: MetadataRoute.Sitemap = corePaths.flatMap(({ path, freq, pri }) => [
+    {
+      url: `${BASE_URL}${path}`,
+      lastModified: now,
+      changeFrequency: freq,
+      priority: pri,
+    },
+    {
+      url: `${BASE_URL}${path}${path === "/" ? "?lang=en" : "?lang=en"}`,
+      lastModified: now,
+      changeFrequency: freq,
+      priority: pri * 0.9,
+    },
+  ]);
 
   const issues = await fetchIssues();
 

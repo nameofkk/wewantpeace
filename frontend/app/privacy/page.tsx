@@ -16,7 +16,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
-          <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground" aria-label={lang === "ko" ? "뒤로 가기" : "Go back"}>
             <ChevronLeft className="h-5 w-5" />
           </button>
           <h1 className="text-xl font-bold">{t(lang, "privacy_title")}</h1>

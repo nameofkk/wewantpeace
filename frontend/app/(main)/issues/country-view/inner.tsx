@@ -55,7 +55,7 @@ export default function CountryIssuesInner() {
   });
 
   if (!code) {
-    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">국가 코드가 없습니다.</div>;
+    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">{lang === "ko" ? "국가 코드가 없습니다." : "Country code not found."}</div>;
   }
 
   return (

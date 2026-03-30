@@ -105,7 +105,7 @@ export default function NewsletterArchivePage() {
         {/* Archive detail (iframe) */}
         {selectedId !== null && (
           <div className="mb-6">
-            <div className="rounded-xl border border-border overflow-hidden bg-white">
+            <div className="rounded-xl border border-border overflow-hidden bg-white dark:bg-white">
               <iframe
                 src={`${API_BASE}/newsletter/archive/${selectedId}`}
                 className="w-full border-0"

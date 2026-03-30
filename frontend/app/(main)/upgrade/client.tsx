@@ -518,7 +518,7 @@ function UpgradeContent() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw Object.assign(
-            new Error(typeof data.detail === "string" ? data.detail : data.detail?.message || "결제 생성 실패"),
+            new Error(typeof data.detail === "string" ? data.detail : data.detail?.message || (lang === "ko" ? "결제 생성 실패" : "Payment creation failed")),
             { status: res.status, body: data },
           );
         }
@@ -532,7 +532,7 @@ function UpgradeContent() {
 
       // 일반 웹: fetch + DodoPayments overlay
       const { checkout_url } = await createDodoCheckout(planId, billingCycle);
-      if (!checkout_url) throw new Error("결제 URL을 생성하지 못했습니다.");
+      if (!checkout_url) throw new Error(lang === "ko" ? "결제 URL을 생성하지 못했습니다." : "Failed to create checkout URL.");
       const { DodoPayments } = await import("dodopayments-checkout");
       await DodoPayments.Checkout.open({ checkoutUrl: checkout_url });
     };

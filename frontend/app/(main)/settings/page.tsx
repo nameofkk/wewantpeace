@@ -561,7 +561,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 {firebaseUser.photoURL ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={firebaseUser.photoURL} alt="프로필" className="h-10 w-10 rounded-full object-cover" />
+                  <img src={firebaseUser.photoURL} alt={lang === "ko" ? "프로필" : "Profile"} className="h-10 w-10 rounded-full object-cover" />
                 ) : (
                   <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
                     <User className="h-5 w-5 text-primary" />
@@ -1466,7 +1466,7 @@ export default function SettingsPage() {
               </button>
             ) : (
               <a
-                href={`mailto:${CONTACT_EMAIL}?subject=WeWantPeace%20의견`}
+                href={`mailto:${CONTACT_EMAIL}?subject=${lang === "ko" ? "WeWantPeace%20의견" : "WeWantPeace%20Feedback"}`}
                 className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-secondary/50"
               >
                 <MessageCircleQuestion className="h-4 w-4 text-muted-foreground shrink-0" />
