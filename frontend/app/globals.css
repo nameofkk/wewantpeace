@@ -133,9 +133,9 @@
   top: 2px;
 }
 
-/* 하단 탭바 */
+/* 하단 탭바 (플로팅 스타일 — safe area는 bottom position으로 처리) */
 .tab-bar {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  padding-bottom: 0;
 }
 
 /* ── 마커 애니메이션 ───────────────────────────────── */
