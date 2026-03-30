@@ -66,7 +66,7 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 import os as _os
 _pool_size = 1 if _os.environ.get("CELERY_WORKER") else 5
 _max_overflow = 0 if _os.environ.get("CELERY_WORKER") else 3
-_connect_args = {"prepared_statement_cache_size": 0}
+_connect_args = {}
 if not _is_sqlite and _os.environ.get("CELERY_WORKER"):
     # Worker bulk INSERT 시 statement timeout 방지 (120초)
     _connect_args["server_settings"] = {"statement_timeout": "120000"}
