@@ -157,7 +157,7 @@ def _pref_to_out(p: UserPreference) -> PreferencesOut:
         quiet_hours_start=p.quiet_hours_start.isoformat() if p.quiet_hours_start else None,
         quiet_hours_end=p.quiet_hours_end.isoformat() if p.quiet_hours_end else None,
         timezone=p.timezone,
-        home_country=getattr(p, "home_country", "KR"),
+        home_country=getattr(p, "home_country", ""),
         notify_engagement=getattr(p, "notify_engagement", True),
     )
 
