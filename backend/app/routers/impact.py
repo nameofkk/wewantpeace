@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,10 +40,10 @@ logger = structlog.get_logger()
 
 
 def _sanitize_floats(obj):
-    """재귀적으로 inf/nan float를 None으로 치환 (JSON 직렬화 안전)."""
+    """재귀적으로 inf/nan float를 0.0으로 치환 (JSON 직렬화 안전)."""
     if isinstance(obj, float):
         if math.isinf(obj) or math.isnan(obj):
-            return None
+            return 0.0
         return obj
     if isinstance(obj, dict):
         return {k: _sanitize_floats(v) for k, v in obj.items()}
@@ -271,7 +272,7 @@ class ImpactSummaryOut(BaseModel):
 
 async def _build_impact_summary(
     home: str, user_plan: str, lang: str, db: AsyncSession,
-) -> "ImpactSummaryOut":
+) -> dict:
     """캐시 워밍에서도 호출 가능한 impact summary 핵심 로직."""
     is_global = not home
 
@@ -286,7 +287,7 @@ async def _build_impact_summary(
                 # Phase 2 필드가 없는 구버전 캐시는 무시
                 if "market_snapshot" in data:
                     data["cached"] = True
-                    return ImpactSummaryOut(**data)
+                    return data
                 else:
                     await redis.delete(cache_key)
         except Exception:
@@ -899,10 +900,10 @@ async def _build_impact_summary(
         except Exception:
             pass  # Redis 장애 시 캐시 저장 스킵
 
-    return ImpactSummaryOut(**response_data)
+    return response_data
 
 
-@router.get("/summary", response_model=ImpactSummaryOut)
+@router.get("/summary")
 async def get_impact_summary(
     user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
@@ -932,7 +933,8 @@ async def get_impact_summary(
     elif not resolved_lang:
         resolved_lang = "en"
 
-    return await _build_impact_summary(home, user_plan, resolved_lang, db)
+    data = await _build_impact_summary(home, user_plan, resolved_lang, db)
+    return JSONResponse(content=_sanitize_floats(data))
 
 
 # ── Phase 2: Impact Brief (per-cluster, legacy) ─────────────────────────
