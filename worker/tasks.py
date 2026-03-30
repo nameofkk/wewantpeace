@@ -4245,7 +4245,7 @@ def beat_heartbeat():
 )
 def cleanup_old_data(self):
     """
-    30일+ raw_events 삭제, severity=0 normalized_events 삭제 (노이즈).
+    오래된 데이터 배치 삭제 (Disk IO 폭발 방지).
     매일 새벽 3시 30분 UTC 실행.
     """
     _record_heartbeat("cleanup_old_data")
@@ -4253,32 +4253,60 @@ def cleanup_old_data(self):
     async def _run():
         from sqlalchemy import text as sa_text
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+        BATCH_SIZE = 5000
+        results = {"raw_events": 0, "noise_normalized": 0, "tension_index": 0}
+
         async with AsyncSessionLocal() as db:
-            async with db.begin():
-                # 1. 30일+ raw_events 하드 삭제
-                raw_result = await db.execute(
-                    sa_text("DELETE FROM raw_events WHERE collected_at < :cutoff"),
-                    {"cutoff": cutoff},
-                )
-                deleted_raw = raw_result.rowcount
+            # 1. 7일+ processed raw_events 배치 삭제 (Disk IO 방지)
+            cutoff_raw = datetime.now(timezone.utc) - timedelta(days=7)
+            while True:
+                async with db.begin():
+                    r = await db.execute(
+                        sa_text(
+                            "DELETE FROM raw_events WHERE ctid IN "
+                            "(SELECT ctid FROM raw_events WHERE processed = true "
+                            "AND collected_at < :cutoff LIMIT :batch)"
+                        ),
+                        {"cutoff": cutoff_raw, "batch": BATCH_SIZE},
+                    )
+                    if r.rowcount == 0:
+                        break
+                    results["raw_events"] += r.rowcount
 
-                # 2. severity=0 normalized_events 하드 삭제 (노이즈)
-                norm_result = await db.execute(
-                    sa_text("DELETE FROM normalized_events WHERE severity = 0"),
-                )
-                deleted_norm = norm_result.rowcount
+            # 2. severity=0 normalized_events 배치 삭제
+            while True:
+                async with db.begin():
+                    r = await db.execute(
+                        sa_text(
+                            "DELETE FROM normalized_events WHERE ctid IN "
+                            "(SELECT ctid FROM normalized_events WHERE severity = 0 LIMIT :batch)"
+                        ),
+                        {"batch": BATCH_SIZE},
+                    )
+                    if r.rowcount == 0:
+                        break
+                    results["noise_normalized"] += r.rowcount
 
-                logger.info(
-                    "cleanup_old_data: raw_events %d개 삭제 (cutoff=%s), 노이즈 normalized_events %d개 삭제",
-                    deleted_raw, cutoff.isoformat(), deleted_norm,
-                )
-                return {
-                    "status": "ok",
-                    "deleted_raw_events": deleted_raw,
-                    "deleted_noise_normalized": deleted_norm,
-                    "cutoff": cutoff.isoformat(),
-                }
+            # 3. 30일+ tension_index 배치 삭제 (히스토리 30일 보존)
+            cutoff_tension = datetime.now(timezone.utc) - timedelta(days=30)
+            while True:
+                async with db.begin():
+                    r = await db.execute(
+                        sa_text(
+                            "DELETE FROM tension_index WHERE ctid IN "
+                            "(SELECT ctid FROM tension_index WHERE time < :cutoff LIMIT :batch)"
+                        ),
+                        {"cutoff": cutoff_tension, "batch": BATCH_SIZE},
+                    )
+                    if r.rowcount == 0:
+                        break
+                    results["tension_index"] += r.rowcount
+
+            logger.info(
+                "cleanup_old_data: raw_events=%d, noise_norm=%d, tension=%d 삭제",
+                results["raw_events"], results["noise_normalized"], results["tension_index"],
+            )
+            return {"status": "ok", **results}
 
     try:
         return run_async(_run())
