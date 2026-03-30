@@ -712,7 +712,7 @@ async def track_event(
 ):
     """Generic event tracking endpoint. Works for both authenticated and anonymous users."""
     user_id = current_user.id if current_user else None
-    logger.info("track_event", user_id=str(user_id) if user_id else "anon", event=body.name, props=body.props)
+    logger.info("track_event", user_id=str(user_id) if user_id else "anon", event_name=body.name, props=body.props)
 
     # Save to app_events (all events)
     ae = AppEvent(
