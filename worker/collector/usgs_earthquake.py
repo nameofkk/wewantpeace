@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # USGS M4.5+ 일간 피드 (GeoJSON)
 USGS_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson"
 
-# 저장 기준: M5.0 이상만
-MIN_MAGNITUDE = 5.0
+# 저장 기준: M4.5 이상 (5.0→4.5 완화, 데이터량 확보)
+MIN_MAGNITUDE = 4.5
 
 # 국가명 추출용 정규식: "123 km SSW of Someplace, Country" → "Country"
 _PLACE_COUNTRY_RE = re.compile(r",\s*([A-Za-z][A-Za-z\s\-'.]+)$")
