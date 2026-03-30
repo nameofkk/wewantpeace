@@ -1198,6 +1198,54 @@ def calculate_trending(self):
 
 
 @app.task(
+    name="worker.tasks.retry_unprocessed",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def retry_unprocessed(self):
+    """
+    미처리 raw_events를 Celery 큐에 재등록 (10분마다).
+    워커 재배포 시 큐에서 유실된 태스크를 복구.
+    """
+    _record_heartbeat("retry_unprocessed")
+
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.raw_event import RawEvent
+        from datetime import datetime, timezone, timedelta
+
+        async with AsyncSessionLocal() as db:
+            # 최근 6시간 이내 미처리 항목만 (너무 오래된 것은 무시)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            result = await db.execute(
+                select(RawEvent.id)
+                .where(
+                    RawEvent.processed == False,
+                    RawEvent.collected_at >= cutoff,
+                )
+                .order_by(RawEvent.collected_at.asc())
+                .limit(200)  # 한 번에 최대 200건
+            )
+            ids = [str(row[0]) for row in result.fetchall()]
+
+        if not ids:
+            logger.info("미처리 raw_events 없음 — skip")
+            return {"queued": 0}
+
+        for raw_id in ids:
+            process_raw_event.delay(raw_id)
+        logger.info("미처리 raw_events %d건 → process_raw_event 큐 등록", len(ids))
+        return {"queued": len(ids)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("retry_unprocessed 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.reprocess_orphans",
     queue="process",
     bind=True,
