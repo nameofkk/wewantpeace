@@ -1130,7 +1130,7 @@ export default function SettingsPage() {
                       className="flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm min-w-0"
                     />
                   </div>
-                  <span className="text-muted-foreground">—</span>
+                  <span className="text-muted-foreground">·</span>
                   <div className="flex-1 flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground">{t(lang, "notif_quiet_to")}</span>
                     <input
@@ -1259,7 +1259,7 @@ export default function SettingsPage() {
                   {lang === "ko" ? "연간 구독 시 $5.25/월 (25% 할인)" : "Annual: $5.25/mo (25% off)"}
                 </p>
                 <Link href="/upgrade" className="mt-1 block w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2 text-center text-xs font-bold text-white">
-                  {lang === "ko" ? "지금 Pro 구독하기 — $6.99/월" : "Subscribe Pro — $6.99/mo"}
+                  {lang === "ko" ? "지금 Pro 구독하기 · $6.99/월" : "Subscribe Pro · $6.99/mo"}
                 </Link>
               </div>
             )}

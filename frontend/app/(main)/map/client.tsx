@@ -306,7 +306,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
             className="w-full rounded-lg py-2.5 text-xs font-bold text-center"
             style={{ background: "var(--lock-btn-bg, rgba(255,255,255,0.05))", border: "1px solid var(--lock-btn-border, rgba(255,255,255,0.1))", color: "var(--lock-btn-text, rgba(255,255,255,0.3))", cursor: "default" }}
           >
-            {lang === "ko" ? "🔒 상세보기 — Pro 플랜 전용" : "🔒 Details — Pro plan only"}
+            {lang === "ko" ? "🔒 상세보기 · Pro 플랜 전용" : "🔒 Details · Pro plan only"}
           </div>
         ) : (
           <>
@@ -1811,7 +1811,7 @@ export default function MapPage() {
                   ) : (
                     <a href="/settings" className="flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] text-muted-foreground opacity-60 hover:opacity-80 whitespace-nowrap">
                       <span className="shrink-0">🚢</span>
-                      <span>{lang === "ko" ? "교역 흐름 — 기준국가 설정 →" : "Trade Flow — Set home country →"}</span>
+                      <span>{lang === "ko" ? "교역 흐름 · 기준국가 설정 →" : "Trade Flow · Set home country →"}</span>
                     </a>
                   )}
                 </div>

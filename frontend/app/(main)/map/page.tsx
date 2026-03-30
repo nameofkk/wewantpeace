@@ -6,7 +6,7 @@ const SITE_URL = "https://www.wewantpeace.live";
 export const metadata: Metadata = {
   title: "실시간 글로벌 이슈 지도",
   description:
-    "195개국 분쟁·안보 이슈를 실시간 인터랙티브 지도에서 확인하세요. 긴장도, 심각도, KScore 기반 필터링 지원. Interactive world conflict map — visualize active crises, wars, and security threats across 195 countries in real time.",
+    "195개국 분쟁·안보 이슈를 실시간 인터랙티브 지도에서 확인하세요. 긴장도, 심각도, KScore 기반 필터링 지원. Interactive world conflict map | visualize active crises, wars, and security threats across 195 countries in real time.",
   alternates: {
     canonical: `${SITE_URL}/map`,
     languages: {

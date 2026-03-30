@@ -393,7 +393,7 @@ function SendPanel({ targetCount }: { targetCount: number }) {
     mutationFn: () => adminFetch("/admin/weekly-report/send", { method: "POST" }),
     onSuccess: (d: unknown) => {
       const res = d as { sent: number; failed: number };
-      toast(`${t(lang, "admin_wr_send_success")} — ${res.sent} sent, ${res.failed} failed`, "success");
+      toast(`${t(lang, "admin_wr_send_success")} · ${res.sent} sent, ${res.failed} failed`, "success");
       setConfirmSend(false);
       queryClient.invalidateQueries({ queryKey: ["admin-weekly-report-history"] });
     },

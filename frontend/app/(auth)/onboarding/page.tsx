@@ -35,12 +35,12 @@ const DATA_SOURCES = [
 
 // 이벤트 팝업 데이터 (히어로 지도 위)
 const CONFLICT_EVENTS = [
-  { label: "Ukraine — 드론 공격 감지", labelEn: "Ukraine — Drone strike detected", color: "#ef4444", top: "15%", left: "53%" },
-  { label: "Gaza — 공습 보도 수집", labelEn: "Gaza — Airstrike reports collected", color: "#ef4444", top: "24%", left: "52%" },
-  { label: "Sudan — 교전 상황 업데이트", labelEn: "Sudan — Combat status update", color: "#f97316", top: "33%", left: "48%" },
-  { label: "Myanmar — 군부 충돌 보고", labelEn: "Myanmar — Military clash reported", color: "#f97316", top: "27%", left: "72%" },
-  { label: "Colombia — 무장단체 교전", labelEn: "Colombia — Armed group clash", color: "#eab308", top: "42%", left: "22%" },
-  { label: "Mexico — 카르텔 충돌", labelEn: "Mexico — Cartel conflict", color: "#eab308", top: "26%", left: "18%" },
+  { label: "Ukraine · 드론 공격 감지", labelEn: "Ukraine · Drone strike detected", color: "#ef4444", top: "15%", left: "53%" },
+  { label: "Gaza · 공습 보도 수집", labelEn: "Gaza · Airstrike reports collected", color: "#ef4444", top: "24%", left: "52%" },
+  { label: "Sudan · 교전 상황 업데이트", labelEn: "Sudan · Combat status update", color: "#f97316", top: "33%", left: "48%" },
+  { label: "Myanmar · 군부 충돌 보고", labelEn: "Myanmar · Military clash reported", color: "#f97316", top: "27%", left: "72%" },
+  { label: "Colombia · 무장단체 교전", labelEn: "Colombia · Armed group clash", color: "#eab308", top: "42%", left: "22%" },
+  { label: "Mexico · 카르텔 충돌", labelEn: "Mexico · Cartel conflict", color: "#eab308", top: "26%", left: "18%" },
 ];
 
 // 히어로 정적 핑 위치 (% 기반)

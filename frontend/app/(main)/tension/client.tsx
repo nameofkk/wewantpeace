@@ -269,7 +269,7 @@ function HistorySection({
             <span className="whitespace-nowrap">
               {userLevel < (PLAN_ORDER["pro"] ?? 1)
                 ? (lang === "ko" ? "Pro 30일 · Pro+ 90일 히스토리" : "Pro: 30d · Pro+: 90d history")
-                : (lang === "ko" ? "90일 히스토리는 Pro+ 전용" : "90d history — Pro+ only")}
+                : (lang === "ko" ? "90일 히스토리는 Pro+ 전용" : "90d history · Pro+ only")}
             </span>
           </div>
           <a

@@ -244,7 +244,7 @@ export const translations = {
     settings_login_prompt_sub: "로그인하면 더 많은 기능을 사용할 수 있어요",
     settings_add_country: "관심 국가 추가",
     settings_collapse_picker: "국가 선택 접기",
-    settings_upgrade_for_unlimited: "Pro 5개 · Pro+ 무제한 — 업그레이드하면 더 추가 가능",
+    settings_upgrade_for_unlimited: "Pro 5개 · Pro+ 무제한 · 업그레이드하면 더 추가 가능",
     plan_country_limit_hint: "📍 Pro 5개 · Pro+ 무제한",
     paywall_pro_feature_map: "교차검증 시그널 · AI 영향 분석",
     paywall_pro_feature_countries: "관심 국가 5개 · 신뢰 알림 · 토픽 필터",
@@ -366,8 +366,8 @@ export const translations = {
     home_no_trending_sub: "이벤트가 수집되면 표시됩니다.",
     home_change: "변경",
     home_view_detail: "이벤트 상세 보기",
-    home_global_count: "글로벌 {n}개 — 15분마다 갱신",
-    home_mine_count: "관심 국가 {n}개 — 실시간",
+    home_global_count: "글로벌 {n}개 · 15분마다 갱신",
+    home_mine_count: "관심 국가 {n}개 · 실시간",
     home_just_now: "방금 전",
     home_minutes_ago: "{n}분 전",
     home_hours_ago: "{n}시간 전",
@@ -394,7 +394,7 @@ export const translations = {
 
     // 긴장도 카드 내부
     tension_score_label: "긴장점수",
-    tension_gauge_tooltip: "게이지 색상은 절대 긴장점수 기준. 배지(안정/주의/경계/심각/극심)는 절대값과 30일 퍼센타일 중 높은 쪽 — 낮은 점수라도 역사적 급등이면 상위 단계가 될 수 있음.",
+    tension_gauge_tooltip: "게이지 색상은 절대 긴장점수 기준. 배지(안정/주의/경계/심각/극심)는 절대값과 30일 퍼센타일 중 높은 쪽 · 낮은 점수라도 역사적 급등이면 상위 단계가 될 수 있음.",
     tension_breakdown_title: "점수 구성",
     tension_breakdown_tooltip: "긴장도 = 이벤트(55%) + 가속도(35%) + 파급(10%). 각 항목은 0~100 범위이며 가중합산 후 30일 분포로 정규화.",
     tension_breakdown_event: "이벤트",
@@ -677,7 +677,7 @@ export const translations = {
     notif_verified_title: "확인된 이슈 알림",
     notif_verified_desc: "공식 확인된 이슈 발생 시 알림 수신",
     notif_fast_title: "Fast 알림 (속보)",
-    notif_fast_desc: "확인 전 속보 — 빠르지만 오탐 가능성 있음",
+    notif_fast_desc: "확인 전 속보 · 빠르지만 오탐 가능성 있음",
     notif_severity_title: "최소 심각도 기준",
     notif_severity_desc: "이 수치 이상 이슈만 알림 발송",
     notif_severity_free_hint: "Free 플랜은 50으로 고정됩니다",
@@ -707,7 +707,7 @@ export const translations = {
     settings_push_title: "푸시 알림",
     settings_push_desc_enabled: "이슈 발생 시 즉시 알림을 받습니다",
     settings_push_desc_unsupported: "iOS에서는 웹 푸시를 지원하지 않습니다. 앱을 설치하거나 PC에서 이용해주세요",
-    settings_push_desc_denied: "브라우저에서 알림이 차단됨 — 브라우저 설정에서 허용해주세요",
+    settings_push_desc_denied: "브라우저에서 알림이 차단됨 · 브라우저 설정에서 허용해주세요",
     settings_push_desc_default: "중요 이슈 발생 시 즉시 알림 수신",
     settings_push_off_hint: "푸시 알림을 켜면 설정할 수 있습니다",
     settings_push_enable: "알림 활성화",
@@ -1262,7 +1262,7 @@ export const translations = {
     // Phase 2: 공유
     share_button: "공유하기",
     share_copied: "링크가 복사되었습니다",
-    share_title: "WeWantPeace — {title}",
+    share_title: "WeWantPeace · {title}",
 
     // Phase 2: 레퍼럴
     referral_title: "친구 초대",
@@ -1717,7 +1717,7 @@ export const translations = {
 
     // dashboard
     dash_title: "Dashboard",
-    dash_subtitle: "How global conflicts affect you — in real time",
+    dash_subtitle: "How global conflicts affect you · in real time",
     dash_report_title: "{name}'s Live Impact Report",
     dash_report_subtitle: "Personalized analysis based on 197-country monitoring",
     dash_report_generated: "Last analyzed: {time}",
@@ -1930,7 +1930,7 @@ export const translations = {
     settings_login_prompt_sub: "Log in to access more features",
     settings_add_country: "Add Country",
     settings_collapse_picker: "Collapse",
-    settings_upgrade_for_unlimited: "Pro: 5 countries · Pro+: Unlimited — upgrade for more",
+    settings_upgrade_for_unlimited: "Pro: 5 countries · Pro+: Unlimited · upgrade for more",
     plan_country_limit_hint: "📍 Pro: 5 countries · Pro+: Unlimited",
     paywall_pro_feature_map: "Cross-verification · AI impact analysis",
     paywall_pro_feature_countries: "5 countries · Verified alerts · Topic filter",
@@ -2052,8 +2052,8 @@ export const translations = {
     home_no_trending_sub: "Issues will appear as events are collected.",
     home_change: "Edit",
     home_view_detail: "View Details",
-    home_global_count: "Global · {n} issues — refreshes every 15 min",
-    home_mine_count: "My Countries · {n} issues — live",
+    home_global_count: "Global · {n} issues · refreshes every 15 min",
+    home_mine_count: "My Countries · {n} issues · live",
     home_just_now: "just now",
     home_minutes_ago: "{n}m ago",
     home_hours_ago: "{n}h ago",
@@ -2094,7 +2094,7 @@ export const translations = {
 
     // tension card internals
     tension_score_label: "Tension Score",
-    tension_gauge_tooltip: "Gauge color reflects the absolute tension score. Badges (Stable/Caution/Alert/Severe/Extreme) use whichever is higher — the absolute score or the 30-day percentile. A low score can still be 'Extreme' if historically unprecedented.",
+    tension_gauge_tooltip: "Gauge color reflects the absolute tension score. Badges (Stable/Caution/Alert/Severe/Extreme) use whichever is higher · the absolute score or the 30-day percentile. A low score can still be 'Extreme' if historically unprecedented.",
     tension_breakdown_title: "Score Breakdown",
     tension_breakdown_tooltip: "Tension = Events (55%) + Acceleration (35%) + Spillover (10%). Each is 0–100, weighted and normalized against the 30-day distribution.",
     tension_breakdown_event: "Events",
@@ -2363,7 +2363,7 @@ export const translations = {
     notif_verified_title: "Verified Issue Alerts",
     notif_verified_desc: "Receive alerts for officially confirmed issues",
     notif_fast_title: "Fast Alerts (Breaking News)",
-    notif_fast_desc: "Pre-verification alerts — fast but may have false positives",
+    notif_fast_desc: "Pre-verification alerts · fast but may have false positives",
     notif_severity_title: "Minimum Severity",
     notif_severity_desc: "Only alert for issues at or above this severity",
     notif_severity_free_hint: "Fixed at 50 on the Free plan",
@@ -2393,7 +2393,7 @@ export const translations = {
     settings_push_title: "Push Notifications",
     settings_push_desc_enabled: "You'll get instant alerts for new issues",
     settings_push_desc_unsupported: "Web push is not supported on iOS. Install our app or use PC instead",
-    settings_push_desc_denied: "Blocked — allow in your browser settings",
+    settings_push_desc_denied: "Blocked · allow in your browser settings",
     settings_push_desc_default: "Get instant alerts for critical events",
     settings_push_off_hint: "Enable push to configure these settings",
     settings_push_enable: "Enable",
@@ -2948,7 +2948,7 @@ export const translations = {
     // Phase 2: Share
     share_button: "Share",
     share_copied: "Link copied",
-    share_title: "WeWantPeace — {title}",
+    share_title: "WeWantPeace · {title}",
 
     // Phase 2: Referral
     referral_title: "Invite Friends",
@@ -3122,7 +3122,7 @@ export const translations = {
     search_min_chars: "Enter at least 2 characters",
 
     tour_dash_page_role: "Your personalized dashboard. See how global conflicts affect you at a glance.",
-    tour_dash_risk: "Impact score and 5-axis risk radar. See which area — military, energy, trade, food, or finance — is most at risk.",
+    tour_dash_risk: "Impact score and 5-axis risk radar. See which area · military, energy, trade, food, or finance · is most at risk.",
     tour_dash_country_picker: "Change the base country to recalculate all analyses from that country's perspective. More countries available with Pro.",
     tour_dash_watchlist: "Quick view of tension levels for your watched countries. Tap a card for details.",
     tour_dash_flow: "Visualizes how conflicts flow through industries to affect your daily costs. Touch to highlight connected paths.",
@@ -3350,7 +3350,7 @@ export const translations = {
     settings_marketing_toggle: "Marketing opt-in",
     settings_marketing_desc: "Receive newsletters and marketing emails. You can opt out anytime.",
     // Newsletter marketing nudge
-    marketing_newsletter_benefit: "📬 Conflicts moving FX & oil — 3 min Monday briefing",
+    marketing_newsletter_benefit: "📬 Conflicts moving FX & oil · 3 min Monday briefing",
     marketing_newsletter_detail: "Global risk at a glance · Free · Cancel anytime",
     settings_engagement_title: "Daily briefing",
     settings_engagement_desc: "Get your watched regions' summary if inactive for 24h",
@@ -3360,7 +3360,7 @@ export const translations = {
 
     // Newsletter CTA
     newsletter_title: "Monday 3-Min Risk Briefing",
-    newsletter_desc: "How conflicts move FX, oil & supply chains — delivered every Monday",
+    newsletter_desc: "How conflicts move FX, oil & supply chains · delivered every Monday",
     newsletter_toggle_label: "Get via email",
     newsletter_toggle_sub: "Newsletter & marketing",
     newsletter_preview: "Preview",
