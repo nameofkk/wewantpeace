@@ -574,6 +574,8 @@ class RSSCollector:
 
         # 세션 공유 안전성을 위해 순차 실행 (asyncio.gather 대신)
         # 피드별 flush+commit — 하나 실패해도 나머지는 저장됨
+        # autoflush 비활성화: dedup SELECT가 pending INSERT를 premature flush하는 것 방지
+        db.autoflush = False
         results = []
         for ch in channels:
             async with sem:

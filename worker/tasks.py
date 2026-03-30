@@ -149,31 +149,42 @@ def collect_telegram(self):
     default_retry_delay=60,
 )
 def collect_rss(self):
-    """RSS 피드 수집 (10분마다)."""
+    """RSS 피드 수집 (5분마다). 이전 사이클이 실행 중이면 skip."""
     _record_heartbeat("collect_rss")
 
     async def _run():
         from worker.collector.rss_collector import RSSCollector
         from backend.app.core.redis import get_redis
-        async with AsyncSessionLocal() as db:
-            collector = RSSCollector()
-            redis = get_redis()
-            # collect_all 내부에서 피드별 flush+commit 처리 완료
-            results = await collector.collect_all(db, redis=redis)
-            total = sum(r.collected for r in results)
-            # 처리 파이프라인 체이닝 (이미 commit 완료된 이벤트만)
-            all_ids = []
-            for r in results:
-                for raw_ev in r.raw_event_ids:
-                    if raw_ev.id:
-                        all_ids.append(str(raw_ev.id))
-            if all_ids:
-                for raw_id in all_ids:
-                    process_raw_event.delay(raw_id)
-                logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
-            else:
-                logger.info("RSS 수집 완료: 총 %d개 새 이벤트", total)
-            return {"total_collected": total, "feeds": len(results)}
+        redis = get_redis()
+
+        # 중복 실행 방지 (이전 사이클이 아직 실행 중이면 skip)
+        lock_key = "lock:collect_rss"
+        acquired = await redis.set(lock_key, "1", ex=600, nx=True)  # 10분 TTL
+        if not acquired:
+            logger.info("RSS 수집 skip: 이전 사이클 실행 중")
+            return {"status": "skipped", "reason": "already_running"}
+
+        try:
+            async with AsyncSessionLocal() as db:
+                collector = RSSCollector()
+                # collect_all 내부에서 피드별 flush+commit 처리 완료
+                results = await collector.collect_all(db, redis=redis)
+                total = sum(r.collected for r in results)
+                # 처리 파이프라인 체이닝 (이미 commit 완료된 이벤트만)
+                all_ids = []
+                for r in results:
+                    for raw_ev in r.raw_event_ids:
+                        if raw_ev.id:
+                            all_ids.append(str(raw_ev.id))
+                if all_ids:
+                    for raw_id in all_ids:
+                        process_raw_event.delay(raw_id)
+                    logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
+                else:
+                    logger.info("RSS 수집 완료: 총 %d개 새 이벤트", total)
+                return {"total_collected": total, "feeds": len(results)}
+        finally:
+            await redis.delete(lock_key)
 
     try:
         return run_async(_run())
