@@ -1293,6 +1293,78 @@ def reprocess_orphans(self):
 
 
 @app.task(
+    name="worker.tasks.process_pending_raw_events",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def process_pending_raw_events(self):
+    """미처리 raw_events 일괄 처리 (워커 시작 시 또는 수동 호출).
+
+    DB에서 processed=false인 raw_events를 배치로 조회하여
+    process_raw_event 태스크를 디스패치합니다.
+    Disk IO 부하 방지를 위해 배치 사이 딜레이를 둡니다.
+    """
+    import time
+
+    async def _run():
+        from sqlalchemy import select, func
+        from backend.app.models.raw_event import RawEvent
+
+        BATCH_SIZE = 500
+        MAX_TOTAL = 50000  # 안전 캡
+        dispatched = 0
+
+        async with AsyncSessionLocal() as db:
+            # 전체 미처리 건수 확인
+            cnt_result = await db.execute(
+                select(func.count()).select_from(RawEvent).where(RawEvent.processed == False)
+            )
+            total_pending = cnt_result.scalar() or 0
+            logger.info("미처리 raw_events: %d건 (최대 %d건 처리)", total_pending, MAX_TOTAL)
+
+        offset = 0
+        while dispatched < MAX_TOTAL:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(RawEvent.id)
+                    .where(RawEvent.processed == False)
+                    .order_by(RawEvent.collected_at.asc())
+                    .offset(offset)
+                    .limit(BATCH_SIZE)
+                )
+                ids = [str(row[0]) for row in result.fetchall()]
+                if not ids:
+                    break
+
+            # 배치 디스패치
+            for raw_id in ids:
+                process_raw_event.delay(raw_id)
+                dispatched += 1
+
+            logger.info(
+                "process_pending: 배치 디스패치 %d건 (누적 %d/%d)",
+                len(ids), dispatched, total_pending,
+            )
+            offset += BATCH_SIZE
+
+            if len(ids) < BATCH_SIZE:
+                break
+
+            # 배치 간 잠시 쉬기 (DB/Redis 부하 분산)
+            time.sleep(1)
+
+        logger.info("process_pending 완료: 총 %d건 디스패치", dispatched)
+        return {"status": "ok", "dispatched": dispatched, "total_pending": total_pending}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("process_pending_raw_events 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.push_alert",
     queue="process",
     bind=True,
