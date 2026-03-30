@@ -17,11 +17,15 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def fix_db_url_scheme(cls, v: str) -> str:
-        """Railway는 postgres:// 또는 postgresql:// 형태로 제공 → asyncpg 드라이버로 변환."""
+        """Railway는 postgres:// 또는 postgresql:// 형태로 제공 → asyncpg 드라이버로 변환.
+        Transaction mode(6543) → Session mode(5432) 자동 전환 (prepared statement 호환)."""
         if v.startswith("postgres://"):
             v = v.replace("postgres://", "postgresql+asyncpg://", 1)
         elif v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # PgBouncer Transaction mode → Session mode 전환 (prepared statement 문제 방지)
+        if "pooler.supabase.com:6543" in v:
+            v = v.replace("pooler.supabase.com:6543", "pooler.supabase.com:5432")
         return v
 
     # Redis
