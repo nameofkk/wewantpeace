@@ -417,7 +417,7 @@ async def collect_commodity_prices(db: AsyncSession) -> int:
         for symbol, (ticker, name) in COMMODITY_TICKERS.items():
             try:
                 t = yf.Ticker(ticker)
-                hist = t.history(period="2d")
+                hist = t.history(period="5d")
                 if hist.empty or len(hist) < 1:
                     continue
                 close_today = float(hist["Close"].iloc[-1])
@@ -594,7 +594,7 @@ async def collect_market_indices(db: AsyncSession) -> int:
         for symbol, (ticker, name, currency) in MARKET_INDEX_TICKERS.items():
             try:
                 t = yf.Ticker(ticker)
-                hist = t.history(period="2d")
+                hist = t.history(period="5d")
                 if hist.empty or len(hist) < 1:
                     continue
                 close_today = float(hist["Close"].iloc[-1])
