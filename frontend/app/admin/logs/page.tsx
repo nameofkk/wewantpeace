@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { t } from "@/lib/i18n";
+import { t, type Lang } from "@/lib/i18n";
 import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useAuth } from "@/lib/auth";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -18,7 +18,7 @@ interface LogEntry {
 }
 
 export default function AdminLogsPage() {
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const { user } = useAuth();
   const [page, setPage] = useState(1);
 

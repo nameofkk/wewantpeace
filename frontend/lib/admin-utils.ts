@@ -1,13 +1,14 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
+import type { Lang } from "@/lib/i18n";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /** 어드민 페이지 전용 store hook — lang을 항상 "ko"로 고정 */
 export function useAdminStore() {
   const store = useAppStore();
-  return { ...store, lang: "ko" as const };
+  return { ...store, lang: "ko" as Lang };
 }
 
 export async function adminFetch<T>(

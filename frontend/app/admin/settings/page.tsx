@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Save, Loader2, Bell, Send } from "lucide-react";
-import { t } from "@/lib/i18n";
+import { t, type Lang } from "@/lib/i18n";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
 import { useAdminStore, API_BASE } from "@/lib/admin-utils";
@@ -38,7 +38,7 @@ function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boole
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
-  const lang = "ko" as const;
+  const lang = "ko" as Lang;
   const { toast } = useAdminToast();
   const [settings, setSettings] = useState<ServiceSettings>({
     maintenance_mode: false,
