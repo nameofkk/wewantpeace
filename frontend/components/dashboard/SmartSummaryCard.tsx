@@ -261,7 +261,9 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
   const impactScore = topIssueRaw?.impact_score ?? 0;
-  const soWhatLine = topIssueRaw?.so_what_line;
+  const _rawSoWhat = topIssueRaw?.so_what_line;
+  // 제목과 "무슨 일?"이 동일하면 중복 표시 방지
+  const soWhatLine = _rawSoWhat && _rawSoWhat !== displayTitle ? _rawSoWhat : undefined;
   const sourceTier = topIssueRaw?.source_tier;
   const colors = impactScoreColor(impactScore);
 

@@ -423,7 +423,7 @@ function ReportContent() {
                     />
                   </div>
 
-                  <p className="text-[11px] text-foreground/70 leading-relaxed line-clamp-3">
+                  <p className="text-[11px] text-foreground/70 leading-relaxed">
                     {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
                   </p>
                 </div>
