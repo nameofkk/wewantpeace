@@ -264,15 +264,18 @@ async def _build_impact_summary(
     redis = get_redis()
     cache_key = f"impact:summary:{_CACHE_VERSION}:{home or 'global'}:{user_plan}:{lang}"
     if redis:
-        cached = await redis.get(cache_key)
-        if cached:
-            data = json.loads(cached)
-            # Phase 2 필드가 없는 구버전 캐시는 무시
-            if "market_snapshot" in data:
-                data["cached"] = True
-                return ImpactSummaryOut(**data)
-            else:
-                await redis.delete(cache_key)
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                data = json.loads(cached)
+                # Phase 2 필드가 없는 구버전 캐시는 무시
+                if "market_snapshot" in data:
+                    data["cached"] = True
+                    return ImpactSummaryOut(**data)
+                else:
+                    await redis.delete(cache_key)
+        except Exception:
+            pass  # Redis 장애 시 DB에서 직접 조회
 
     # 최근 7일 활성 클러스터 가져오기
     since = datetime.now(timezone.utc) - timedelta(days=7)
@@ -772,31 +775,21 @@ async def _build_impact_summary(
                 travel_parts.append("No major travel restrictions. Monitoring advisory escalation near conflict zones")
             travel = ". ".join(travel_parts) + "."
 
-    # ── 병렬 조회: market_snapshot, trade_exposure, travel_advisories, risk_radar ──
-    # 서로 독립적인 비동기 쿼리들을 asyncio.gather로 병렬 실행
+    # ── 순차 조회: market_snapshot, trade_exposure, travel_advisories, risk_radar ──
+    # AsyncSession은 동시 접근에 안전하지 않으므로 순차 실행
     trade_home = home if home else "US"
-
-    gather_results = await asyncio.gather(
-        _get_market_snapshot(home, db),
-        _get_trade_exposure(trade_home, db),
-        _get_travel_advisories(home, scored[:10], is_pro, db),
-        _compute_risk_radar(home, scored, sectors_data, oil_row, db, commodity_prices),
-        return_exceptions=True,
-    )
 
     # market_snapshot
     market_snapshot = None
-    if isinstance(gather_results[0], Exception):
-        logger.warning("market_snapshot_error", error=str(gather_results[0]))
-    else:
-        market_snapshot = gather_results[0]
+    try:
+        market_snapshot = await _get_market_snapshot(home, db)
+    except Exception as e:
+        logger.warning("market_snapshot_error", error=str(e))
 
     # trade_exposure
     trade_exposure = None
-    if isinstance(gather_results[1], Exception):
-        logger.warning("trade_exposure_error", error=str(gather_results[1]))
-    else:
-        trade_exposure_data = gather_results[1]
+    try:
+        trade_exposure_data = await _get_trade_exposure(trade_home, db)
         if trade_exposure_data:
             if not is_pro:
                 # Free: top 3 partners, dependency_pct only
@@ -816,21 +809,23 @@ async def _build_impact_summary(
                 }
             else:
                 trade_exposure = trade_exposure_data
+    except Exception as e:
+        logger.warning("trade_exposure_error", error=str(e))
 
     # travel_advisories
     travel_advisories = []
-    if isinstance(gather_results[2], Exception):
-        logger.warning("travel_advisories_error", error=str(gather_results[2]))
-    else:
-        travel_advisories = gather_results[2] or []
+    try:
+        travel_advisories = await _get_travel_advisories(home, scored[:10], is_pro, db) or []
+    except Exception as e:
+        logger.warning("travel_advisories_error", error=str(e))
 
     # risk_radar
     risk_radar = None
-    if isinstance(gather_results[3], Exception):
-        logger.warning("risk_radar_error", error=str(gather_results[3]))
-    else:
-        risk_radar_obj = gather_results[3]
+    try:
+        risk_radar_obj = await _compute_risk_radar(home, scored, sectors_data, oil_row, db, commodity_prices)
         risk_radar = risk_radar_obj.model_dump() if risk_radar_obj else None
+    except Exception as e:
+        logger.warning("risk_radar_error", error=str(e))
 
     # ── Impact Flow (동기 함수 — commodity_prices 재사용) ──
     impact_flow = None
@@ -867,9 +862,12 @@ async def _build_impact_summary(
         "impact_flow": impact_flow,
     }
 
-    # 6시간 캐시
+    # 30분 캐시
     if redis:
-        await redis.set(cache_key, json.dumps(response_data), ex=30 * 60)
+        try:
+            await redis.set(cache_key, json.dumps(response_data), ex=30 * 60)
+        except Exception:
+            pass  # Redis 장애 시 캐시 저장 스킵
 
     return ImpactSummaryOut(**response_data)
 
