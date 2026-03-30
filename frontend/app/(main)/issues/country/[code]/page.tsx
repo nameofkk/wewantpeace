@@ -91,7 +91,7 @@ export default function Page({ params }: Props) {
     "@graph": [
       {
         "@type": "WebPage",
-        name: country ? `${country.ko} (${country.en}) — Tension Index` : `${code} Tension Index`,
+        name: country ? `${country.ko} (${country.en}) | Tension Index` : `${code} Tension Index`,
         url: countryUrl,
         description: country
           ? `Real-time tension index and conflict analysis for ${country.en} (${country.ko}). Live monitoring of security events, KScore impact scoring, and historical trend data.`

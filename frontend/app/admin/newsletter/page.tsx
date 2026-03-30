@@ -47,7 +47,7 @@ const SECTIONS: SectionDef[] = [
       { key: "issue_date_short", label: "Date Short", type: "input", placeholder: "2026.3.24", hint: "짧은 날짜" },
       { key: "issue_datetime", label: "Date Time", type: "input", placeholder: "2026-03-24T09:00:00+09:00", hint: "ISO 8601" },
       { key: "issue_label", label: "Issue Label", type: "input", placeholder: "Vol.1", hint: "짧은 라벨" },
-      { key: "issue_label_long", label: "Label Long", type: "input", placeholder: "Vol.1 — 2026.3.24", hint: "전체 라벨" },
+      { key: "issue_label_long", label: "Label Long", type: "input", placeholder: "Vol.1 · 2026.3.24", hint: "전체 라벨" },
     ],
   },
   {
@@ -843,7 +843,7 @@ export default function AdminNewsletterPage() {
       }),
     onSuccess: (res) => {
       const r = res as { sent: number; failed: number };
-      toast(lang === "ko" ? `발송 완료 — ${r.sent}명 성공, ${r.failed}명 실패` : `Sent — ${r.sent} ok, ${r.failed} failed`, "success");
+      toast(lang === "ko" ? `발송 완료 · ${r.sent}명 성공, ${r.failed}명 실패` : `Sent · ${r.sent} ok, ${r.failed} failed`, "success");
       setConfirmSend(false);
     },
     onError: () => {
@@ -879,7 +879,7 @@ export default function AdminNewsletterPage() {
           </h1>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-xs text-muted-foreground">
-              Vol.{vol} · {data.issue_date || "—"} · {filledFields}/{totalFields}
+              Vol.{vol} · {data.issue_date || "·"} · {filledFields}/{totalFields}
             </p>
             <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden">
               <div
@@ -1166,7 +1166,7 @@ export default function AdminNewsletterPage() {
                       <div className="flex items-center gap-3 text-muted-foreground">
                         <span>{h.sent}{lang === "ko" ? "명" : " sent"}</span>
                         {h.failed > 0 && <span className="text-red-400">{h.failed}{lang === "ko" ? " 실패" : " failed"}</span>}
-                        <span>{h.date ? new Date(h.date).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US") : "—"}</span>
+                        <span>{h.date ? new Date(h.date).toLocaleDateString(lang === "ko" ? "ko-KR" : "en-US") : "·"}</span>
                       </div>
                     </div>
                   ))}

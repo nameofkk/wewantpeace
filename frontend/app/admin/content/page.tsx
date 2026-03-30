@@ -563,7 +563,7 @@ export default function AdminContentPage() {
                       </div>
                       <p className="text-sm">
                         <span className="font-medium">{report.reporter_nickname || t(lang, "admin_report_anonymous")}</span>
-                        {" — "}
+                        {" · "}
                         <span className="text-muted-foreground">{report.reason}</span>
                       </p>
                       <div className="flex items-center gap-2 mt-1">

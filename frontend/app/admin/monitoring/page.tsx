@@ -132,7 +132,7 @@ function KScoreTab() {
     },
     onSuccess: (d) => {
       refetch();
-      toast(`${t(lang, "admin_recalc_done")} — ${(d as { keywords: number })?.keywords ?? 0} keywords`, "success");
+      toast(`${t(lang, "admin_recalc_done")} · ${(d as { keywords: number })?.keywords ?? 0} keywords`, "success");
     },
     onError: () => toast(t(lang, "admin_recalc_fail"), "error"),
   });
@@ -401,7 +401,7 @@ function TensionTab() {
     },
     onSuccess: (data) => {
       refetch();
-      toast(`${t(lang, "admin_recalc_done")} — ${(data as { countries: number })?.countries ?? 0} ${t(lang, "admin_count_countries")}`, "success");
+      toast(`${t(lang, "admin_recalc_done")} · ${(data as { countries: number })?.countries ?? 0} ${t(lang, "admin_count_countries")}`, "success");
     },
     onError: () => toast(t(lang, "admin_recalc_fail"), "error"),
   });
