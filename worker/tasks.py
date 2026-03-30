@@ -838,6 +838,19 @@ def process_raw_event(self, raw_event_id: str):
                     )
                     return {"status": "irrelevant", "topic": norm.topic}
 
+                # 3-2. 오래된 뉴스 필터: published_at이 7일 이상 과거면 severity 대폭 하향
+                # (워싱턴 항공기 충돌 등 회고 기사가 현재 이슈로 표시되는 문제 방지)
+                _event_time = norm.event_time or published_at or raw_event.collected_at
+                if _event_time:
+                    _age_hours = (datetime.now(timezone.utc) - _event_time).total_seconds() / 3600
+                    if _age_hours > 168:  # 7일 = 168시간
+                        _orig_sev = norm.severity
+                        norm.severity = min(norm.severity, 20)
+                        logger.info(
+                            "오래된 뉴스 감지 (%.0f시간 전): severity %d→%d, title=%s",
+                            _age_hours, _orig_sev, norm.severity, norm.title[:60],
+                        )
+
                 # 4. 중복 확인
                 is_dup = await check_duplicate(norm.dedup_key, db)
 
@@ -1225,7 +1238,7 @@ def retry_unprocessed(self):
                     RawEvent.collected_at >= cutoff,
                 )
                 .order_by(RawEvent.collected_at.asc())
-                .limit(200)  # 한 번에 최대 200건
+                .limit(500)  # 한 번에 최대 500건 (200→500 상향)
             )
             ids = [str(row[0]) for row in result.fetchall()]
 

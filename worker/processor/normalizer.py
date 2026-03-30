@@ -88,10 +88,14 @@ Given a news article title and body, classify it into exactly ONE topic and assi
 - "Is Washington regretting its war?" → conflict, severity 40-50 (not 80+)
 - "Putin's $2.5 trillion gambit" → conflict, severity 40-50
 
-### 7. Historical retrospectives
-- Articles about PAST events (years/decades ago) with no current implications → topic of the original event, severity 15-30
+### 7. Historical retrospectives & follow-up reports (IMPORTANT)
+- Articles about PAST events (weeks/months/years ago) with no NEW developments → severity 15-30 MAX
+- Look for temporal clues: "last January", "in 2025", "X months ago", "back in", "January 29th crash"
+- New video/footage/investigation of OLD events → still retrospective, severity 15-30
+- "Watch: Video reveals moment of American Airlines crash" (about Jan 2025 crash) → disaster, severity 20
 - "Ted Koppel looks back at 1979 hostage crisis" → diplomacy, severity 20
 - Current anniversary with active protests/events → appropriate topic, normal severity
+- If the article discusses a past event but mentions NEW policy changes as a result → severity 30-45
 
 ## Severity (0-100):
 - 0: Not a crisis event (entertainment, sports, lifestyle)

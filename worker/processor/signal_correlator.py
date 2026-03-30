@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-# 매칭 파라미터
-MAX_DISTANCE_KM = 100.0
-MAX_TIME_DELTA_H = 24.0
-MIN_MATCH_SCORE = 0.3
+# 매칭 파라미터 — 국가 중심좌표 vs 위성좌표 불일치 감안하여 완화
+MAX_DISTANCE_KM = 300.0   # 100→300, 대형 국가(UA/SD 등)에서 중심좌표 편차 커버
+MAX_TIME_DELTA_H = 48.0   # 24→48, 시그널-이벤트 시차 허용 확대
+MIN_MATCH_SCORE = 0.15    # 0.3→0.15, 매칭 기회 확대
 
 # 시그널 유형별 가중치
 SIGNAL_WEIGHTS: dict[str, float] = {
@@ -83,22 +83,35 @@ async def correlate_signals(db: AsyncSession) -> dict:
         best_dist = 0.0
         best_delta = 0.0
 
+        # 시그널의 country_code (있으면)
+        sig_cc = getattr(signal, "country_code", None) or ""
+
         for cluster in clusters:
-            if cluster.lat is None or cluster.lon is None:
+            # 좌표 기반 매칭
+            has_geo = cluster.lat is not None and cluster.lon is not None
+            same_country = sig_cc and sig_cc == (cluster.country_code or "")
+
+            if not has_geo and not same_country:
                 continue
 
-            # 거리 계산
-            dist = _haversine_km(signal.lat, signal.lon, cluster.lat, cluster.lon)
-            if dist > MAX_DISTANCE_KM:
-                continue
+            # 거리 계산 (좌표 있을 때만)
+            if has_geo:
+                dist = _haversine_km(signal.lat, signal.lon, cluster.lat, cluster.lon)
+                if dist > MAX_DISTANCE_KM and not same_country:
+                    continue
+            else:
+                dist = 0.0  # 좌표 없지만 같은 국가
 
             # 시간 차이
             time_delta = abs((signal.observed_at - cluster.last_event_at).total_seconds()) / 3600.0
             if time_delta > MAX_TIME_DELTA_H:
                 continue
 
-            # 복합 점수
-            score = (1.0 - dist / MAX_DISTANCE_KM) * 0.6 + (1.0 - time_delta / MAX_TIME_DELTA_H) * 0.4
+            # 복합 점수: 거리(0.5) + 시간(0.3) + 국가일치 보너스(0.2)
+            geo_score = max(0.0, 1.0 - dist / MAX_DISTANCE_KM) if has_geo else 0.0
+            time_score = max(0.0, 1.0 - time_delta / MAX_TIME_DELTA_H)
+            country_bonus = 0.2 if same_country else 0.0
+            score = geo_score * 0.5 + time_score * 0.3 + country_bonus
 
             if score > best_score:
                 best_score = score

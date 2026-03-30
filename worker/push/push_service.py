@@ -1125,6 +1125,10 @@ async def send_alert(
             country_code, notify_fast=False, kscore=kscore,
             cluster_topic=cluster_topic, db=db, alert_kind="verified",
         )
+        logger.info(
+            "FCM 대상 (verified): tokens=%d, suppressed=%d, cluster=%s, cc=%s, kscore=%.1f",
+            len(target_v.tokens), len(target_v.suppressed), cluster_id, country_code, kscore,
+        )
         target_v = await _apply_daily_limits(target_v, db, redis, severity=severity)
 
         # plan_locked: Free 유저가 Verified를 받으려 하는 경우
@@ -1176,6 +1180,10 @@ async def send_alert(
         target_f = await _get_target_tokens_by_platform(
             country_code, notify_fast=True, kscore=kscore,
             cluster_topic=cluster_topic, db=db, alert_kind="fast",
+        )
+        logger.info(
+            "FCM 대상 (fast): tokens=%d, suppressed=%d, cluster=%s, cc=%s, kscore=%.1f",
+            len(target_f.tokens), len(target_f.suppressed), cluster_id, country_code, kscore,
         )
 
         # combined 모드: verified 레인에서 이미 발송한 유저 제외 (중복 알림 방지)
