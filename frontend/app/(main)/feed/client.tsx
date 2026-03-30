@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Globe, MapPin, AlertTriangle, RefreshCw, Pencil, ChevronRight, ChevronDown, ChevronUp, Lock, Check, X, Loader2, Bell, BarChart3, ArrowUpDown, Search } from "lucide-react";
 import Link from "next/link";
 import { COUNTRY_MAP, getFlag, getCountryName } from "@/lib/countries";
-import { cn, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
+import { cn, usePageTitle, TOPIC_LABELS, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore, FREE_COUNTRY_LIMIT } from "@/lib/store";
 import { useGlobalTrending, useMineTrending, useMe, useKScoreHistory, usePatchCluster, useClusters, useMissedAlerts, useTensionAll, useMySubscription, usePatchPreferences } from "@/lib/api";
 import { TOPIC_COLORS, roundKScore, personalizedKScore, kscoreAccent, getKScoreBadge, isNew, isRising, isUpdated, formatFirstSeen, type TrendingItem } from "@/lib/kscore-utils";
@@ -592,6 +592,7 @@ function FeedPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { trendingTab, setTrendingTab, myCountries, lang, setUserPlan, userPlan: storePlan, homeCountry, setHomeCountry, completedTours } = useAppStore();
+  usePageTitle(lang, "tab_feed");
   const patchPrefs = usePatchPreferences();
   const [tourRun, setTourRun] = useState(false);
   const [showCountryPicker, setShowCountryPicker] = useState(false);

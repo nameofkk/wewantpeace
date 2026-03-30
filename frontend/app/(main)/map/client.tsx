@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Layers, AlertTriangle, RefreshCw, Radio, Lock, Map as MapIcon, Shield, ChevronDown, Info, X } from "lucide-react";
-import { cn, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
+import { cn, usePageTitle, stripTitlePrefix, isJunkTitle, buildSmartTitle } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { useClusters, useMe, useTensionAll, useFirmsSignals, useOutageSignals, useGpsJamSignals, useSignalSummary, useMatchedSignals, useTradeFlow } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -442,6 +442,7 @@ export default function MapPage() {
   const [markerVersion, setMarkerVersion] = useState(0); // 국가줌 경계 변경 시만 증가
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mapViewport, setMapViewport, lang, userPlan, homeCountry } = useAppStore();
+  usePageTitle(lang, "tab_map");
   const { data: me, isLoading: meLoading } = useMe();
   const { loading: authLoading } = useAuth();
   const plan = (me as { plan?: string })?.plan ?? userPlan ?? "free";
