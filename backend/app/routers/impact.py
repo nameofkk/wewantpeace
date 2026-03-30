@@ -1863,9 +1863,8 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     title = cluster.title_ko if lang == "ko" and cluster.title_ko else cluster.title or ""
     title = title[:60]
 
-    # what_line — body 첫 문장 사용 (제목과 중복 방지)
+    # what_line — body 첫 문장 사용 (제목과 중복 시 빈 문자열 반환)
     _body_raw = (body_texts or {}).get("ko" if lang == "ko" else "en", "")
-    # 첫 문장 추출 (마침표/느낌표/물음표 기준)
     _first_sent = ""
     if _body_raw:
         _m = re.match(r"(.+?[.!?。！？])\s", _body_raw[:200])
@@ -1876,7 +1875,8 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     if _first_sent and len(_first_sent) > 15:
         what_line = _first_sent[:80]
     else:
-        what_line = title
+        # body가 없거나 제목과 동일하면 빈 문자열 → 프론트에서 "무슨 일?" 줄 숨김
+        what_line = ""
 
     # so_what_line — 원자재 매핑 우선, 유가 폴백
     oil_price = None
