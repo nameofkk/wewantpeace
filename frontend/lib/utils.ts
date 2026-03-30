@@ -1,8 +1,17 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useEffect } from "react";
+import { t, type Lang, type TranslationKey } from "@/lib/i18n";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/** 브라우저 탭 제목을 언어별로 설정하는 훅 */
+export function usePageTitle(lang: Lang, key: TranslationKey) {
+  useEffect(() => {
+    document.title = t(lang, key);
+  }, [lang, key]);
 }
 
 export const TENSION_LEVELS = {

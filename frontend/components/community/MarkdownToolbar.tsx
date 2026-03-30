@@ -1,6 +1,7 @@
 "use client";
 
 import { Bold, Italic, Link, Quote, List } from "lucide-react";
+import { useAppStore } from "@/lib/store";
 
 interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement>;
@@ -75,6 +76,11 @@ export default function MarkdownToolbar({
   textareaRef,
   onContentChange,
 }: MarkdownToolbarProps) {
+  const lang = useAppStore((s) => s.lang);
+  const txt = lang === "ko" ? "텍스트" : "text";
+  const quote = lang === "ko" ? "인용문" : "quote";
+  const list = lang === "ko" ? "목록" : "list";
+
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border">
       <button
@@ -83,7 +89,7 @@ export default function MarkdownToolbar({
         title="Bold"
         onClick={() => {
           if (textareaRef.current)
-            insertAtCursor(textareaRef.current, "**", "**", "텍스트", onContentChange);
+            insertAtCursor(textareaRef.current, "**", "**", txt, onContentChange);
         }}
       >
         <Bold size={18} />
@@ -94,7 +100,7 @@ export default function MarkdownToolbar({
         title="Italic"
         onClick={() => {
           if (textareaRef.current)
-            insertAtCursor(textareaRef.current, "*", "*", "텍스트", onContentChange);
+            insertAtCursor(textareaRef.current, "*", "*", txt, onContentChange);
         }}
       >
         <Italic size={18} />
@@ -105,7 +111,7 @@ export default function MarkdownToolbar({
         title="Link"
         onClick={() => {
           if (textareaRef.current)
-            insertAtCursor(textareaRef.current, "[", "](url)", "텍스트", onContentChange);
+            insertAtCursor(textareaRef.current, "[", "](url)", txt, onContentChange);
         }}
       >
         <Link size={18} />
@@ -116,7 +122,7 @@ export default function MarkdownToolbar({
         title="Quote"
         onClick={() => {
           if (textareaRef.current)
-            insertAtLineStart(textareaRef.current, "> ", "인용문", onContentChange);
+            insertAtLineStart(textareaRef.current, "> ", quote, onContentChange);
         }}
       >
         <Quote size={18} />
@@ -127,7 +133,7 @@ export default function MarkdownToolbar({
         title="List"
         onClick={() => {
           if (textareaRef.current)
-            insertAtLineStart(textareaRef.current, "- ", "목록", onContentChange);
+            insertAtLineStart(textareaRef.current, "- ", list, onContentChange);
         }}
       >
         <List size={18} />

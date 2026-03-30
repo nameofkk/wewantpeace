@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function Error({
   error,
@@ -9,15 +9,18 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [isKo, setIsKo] = useState(true);
+
   useEffect(() => {
     console.error("Unhandled error:", error);
+    setIsKo(navigator.language?.startsWith("ko") ?? true);
   }, [error]);
 
   return (
     <div style={{ padding: "2rem", textAlign: "center" }}>
-      <h2>문제가 발생했습니다</h2>
+      <h2>{isKo ? "문제가 발생했습니다" : "Something went wrong"}</h2>
       <p style={{ color: "#666", margin: "1rem 0" }}>
-        잠시 후 다시 시도해주세요
+        {isKo ? "잠시 후 다시 시도해주세요" : "Please try again later"}
       </p>
       <button
         onClick={reset}
@@ -29,7 +32,7 @@ export default function Error({
           cursor: "pointer",
         }}
       >
-        다시 시도
+        {isKo ? "다시 시도" : "Try again"}
       </button>
     </div>
   );
