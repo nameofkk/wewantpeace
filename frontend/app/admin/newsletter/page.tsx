@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { adminFetch } from "@/lib/admin-utils";
+import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import { useAdminToast } from "@/components/ui/admin-toast";
@@ -631,7 +630,7 @@ function PreviewPanel({
 
 /* ── 메인 페이지 ── */
 export default function AdminNewsletterPage() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const [editLang, setEditLang] = useState<"kr" | "us">("kr");
   const [vol, setVol] = useState(1);

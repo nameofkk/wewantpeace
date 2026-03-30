@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import UserDetailDrawer from "@/components/admin/UserDetailDrawer";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 
 interface AdminUser {
   id: string;
@@ -125,7 +124,7 @@ function subDateInfo(u: AdminUser, ko: boolean, locale: string): string {
 
 export default function AdminUsersPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const queryClient = useQueryClient();
   const { toast } = useAdminToast();
   const [search, setSearch] = useState("");

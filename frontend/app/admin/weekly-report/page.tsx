@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { useAppStore } from "@/lib/store";
 import { t, getTensionLevelLabel } from "@/lib/i18n";
 import { getCountryName, getFlag } from "@/lib/countries";
 import { cn } from "@/lib/utils";
-import { adminFetch } from "@/lib/admin-utils";
+import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import { TabBar } from "@/components/admin/TabBar";
@@ -92,7 +91,7 @@ function WowDelta({ current, previous }: { current: number; previous: number }) 
 
 /* ── Tab 1: Preview ── */
 function ReportPreview({ data }: { data: DraftData }) {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
 
   return (
     <div className="space-y-6">
@@ -173,7 +172,7 @@ function ReportPreview({ data }: { data: DraftData }) {
 
 /* ── Tab 2: Editor ── */
 function ReportEditor({ data, onSaved }: { data: DraftData; onSaved: () => void }) {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const { toast } = useAdminToast();
   const [noteKo, setNoteKo] = useState(data.editor_note_ko);
   const [noteEn, setNoteEn] = useState(data.editor_note_en);
@@ -312,7 +311,7 @@ function ReportEditor({ data, onSaved }: { data: DraftData; onSaved: () => void 
 
 /* ── Tab 3: History ── */
 function ReportHistory() {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const locale = lang === "en" ? "en-US" : "ko-KR";
 
   const { data, isLoading } = useQuery<HistoryItem[]>({
@@ -377,7 +376,7 @@ function ReportHistory() {
 
 /* ── Send Panel ── */
 function SendPanel({ targetCount }: { targetCount: number }) {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const { toast } = useAdminToast();
   const queryClient = useQueryClient();
   const [confirmSend, setConfirmSend] = useState(false);
@@ -463,7 +462,7 @@ function SendPanel({ targetCount }: { targetCount: number }) {
 
 /* ── Main Page ── */
 export default function AdminWeeklyReportPage() {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const [activeTab, setActiveTab] = useState("preview");
   const queryClient = useQueryClient();
 

@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, CreditCard, HelpCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
 
 interface SubscriptionItem {
@@ -80,7 +79,7 @@ function InlineGuide({ lang }: { lang: "ko" | "en" }) {
 
 export default function AdminSubscriptionsPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);

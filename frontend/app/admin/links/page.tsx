@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import {
   Link2, Copy, Plus, ChevronLeft, ChevronRight, ChevronDown,
   HelpCircle, X, Check, ExternalLink, BarChart3,
@@ -300,7 +299,7 @@ function ClickStats({ linkId, lang, user }: { linkId: number; lang: "ko" | "en";
 /* ------------------------------------------------------------------ */
 export default function AdminLinksPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const qc = useQueryClient();
 
   const [page, setPage] = useState(1);

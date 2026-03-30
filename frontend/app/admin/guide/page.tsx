@@ -1,7 +1,8 @@
 "use client";
 
+import { useAdminStore } from "@/lib/admin-utils";
+
 import { useState } from "react";
-import { useAppStore } from "@/lib/store";
 import { BookOpen, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -191,7 +192,7 @@ function CollapsibleSection({
 }
 
 export default function AdminGuidePage() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
