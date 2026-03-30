@@ -240,6 +240,7 @@ DEFAULT_COUNTRIES = [
 @limiter.limit("60/minute")
 async def peek_tension(
     request: Request,
+    response: Response,
     since: Optional[str] = Query(None, description="ISO timestamp — 이 시각 이후 알림만 반환"),
 ):
     """
