@@ -83,6 +83,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="2,7,12,17,22,27,32,37,42,47,52,57"),  # 5분마다 (+2분 오프셋)
         "options": {"queue": "process"},
     },
+    "retry-unprocessed": {
+        "task": "worker.tasks.retry_unprocessed",
+        "schedule": crontab(minute="*/10"),  # 10분마다 — 미처리 raw_events 복구
+        "options": {"queue": "process"},
+    },
     "reprocess-orphans": {
         "task": "worker.tasks.reprocess_orphans",
         "schedule": crontab(minute=0, hour="*/1"),  # 1시간마다
