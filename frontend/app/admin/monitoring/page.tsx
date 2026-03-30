@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -11,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getCountryName, getFlag } from "@/lib/countries";
 import { useAdminToast } from "@/components/ui/admin-toast";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "@/components/admin/TabBar";
 import { StatCard } from "@/components/admin/StatCard";
@@ -97,7 +96,7 @@ const ROW_BG = ["", "", "bg-orange-500/[0.03]", "bg-red-500/[0.04]", "bg-red-900
 /* ── KScore Tab ── */
 function KScoreTab() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const kscoreLabels = lang === "ko" ? KSCORE_LABELS_KO : KSCORE_LABELS_EN;
 
@@ -368,7 +367,7 @@ function KScoreTab() {
 /* ── Tension Tab ── */
 function TensionTab() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const levelLabels = lang === "ko" ? LEVEL_LABELS_KO : LEVEL_LABELS_EN;
   const [countrySearch, setCountrySearch] = useState("");
@@ -585,7 +584,7 @@ function TensionTab() {
 
 /* ── Main Page ── */
 export default function AdminMonitoringPage() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();

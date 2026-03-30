@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Layers, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCountryName, getFlag } from "@/lib/countries";
 import { useAdminToast } from "@/components/ui/admin-toast";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "@/components/admin/TabBar";
 import { StatCard } from "@/components/admin/StatCard";
@@ -58,7 +57,7 @@ const TIER_LABELS: Record<string, { label: string; color: string }> = {
 /* ── Clusters Tab ── */
 function ClustersTab() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -314,7 +313,7 @@ function ClustersTab() {
 /* ── Events Tab ── */
 function EventsTab() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const [page, setPage] = useState(1);
   const [sourceFilter, setSourceFilter] = useState("");
   const [countryFilter, setCountryFilter] = useState("");
@@ -506,7 +505,7 @@ function EventsTab() {
 
 /* ── Main Page ── */
 export default function AdminIssuesPage() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const searchParams = useSearchParams();
   const router = useRouter();
   const activeTab = searchParams.get("tab") || "clusters";

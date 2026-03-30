@@ -1,6 +1,5 @@
 "use client";
 
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getCountryName } from "@/lib/countries";
 import Link from "next/link";
-import { adminFetch } from "@/lib/admin-utils";
+import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 
 interface WeekComparisonItem {
   this: number;
@@ -77,7 +76,7 @@ const STAGE_LABELS_KO = ["수집", "정규화", "중복제거", "클러스터", 
 const STAGE_LABELS_EN = ["Collect", "Normalize", "Dedup", "Cluster", "KScore Alert", "KScore", "Tension", "Trending", "Push", "Orphan"];
 
 export default function AdminDashboard() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
 
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["admin-stats"],

@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import {
   Handshake, Search, Plus, Trash2, ChevronLeft, ChevronRight,
   HelpCircle, ChevronDown, X, ExternalLink, CalendarCheck,
@@ -267,7 +266,7 @@ function CreatePartnerModal({
 /* ------------------------------------------------------------------ */
 export default function AdminPartnersPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const qc = useQueryClient();
 
   const [page, setPage] = useState(1);

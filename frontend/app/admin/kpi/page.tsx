@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { adminFetch } from "@/lib/admin-utils";
-import { useAppStore } from "@/lib/store";
+import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 import { t, type Lang } from "@/lib/i18n";
 import { HelpCircle, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -121,7 +120,7 @@ const RAW_METRIC_LABELS_KO: Record<string, string> = {
 };
 
 export default function KpiPage() {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);

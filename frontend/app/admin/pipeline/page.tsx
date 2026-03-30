@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,7 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
-import { adminFetch } from "@/lib/admin-utils";
+import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 import Link from "next/link";
 
 /* ─── types ─── */
@@ -237,7 +236,7 @@ function ActionBtn({
 /* ═══ MAIN PAGE ═══ */
 export default function AdminPipelinePage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const queryClient = useQueryClient();
   const { toast } = useAdminToast();
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);

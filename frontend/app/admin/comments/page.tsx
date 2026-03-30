@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useAuth } from "@/lib/auth";
 import { Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,7 @@ interface AdminComment {
 }
 
 export default function AdminCommentsPage() {
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const { user } = useAuth();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);

@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 
 interface CollectStatus {
   status: "ok" | "error";
@@ -109,7 +108,7 @@ function getInactiveReason(ch: SourceItem, lang: Lang): string {
 
 export default function AdminSourcesPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const queryClient = useQueryClient();
   const { toast } = useAdminToast();
   const [page, setPage] = useState(1);

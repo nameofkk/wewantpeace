@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MessageCircleQuestion, Loader2 } from "lucide-react";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 
 interface FeedbackItem {
   id: number;
@@ -15,7 +14,7 @@ interface FeedbackItem {
 }
 
 export default function AdminFeedbacksPage() {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [total, setTotal] = useState(0);

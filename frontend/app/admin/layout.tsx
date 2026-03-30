@@ -12,10 +12,9 @@ import {
 } from "lucide-react";
 import { AdminToastProvider } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/lib/store";
 import { t, type Lang } from "@/lib/i18n";
 import { useAuth, signOut } from "@/lib/auth";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 
 interface NavItem {
   href: string;
@@ -181,7 +180,7 @@ function Sidebar({
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const router = useRouter();
   const { user, loading } = useAuth();
   const pathname = usePathname();

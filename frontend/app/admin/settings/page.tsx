@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Save, Loader2, Bell, Send } from "lucide-react";
-import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { useAdminToast } from "@/components/ui/admin-toast";
 import { cn } from "@/lib/utils";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 
 interface ServiceSettings {
   maintenance_mode: boolean;
@@ -39,7 +38,7 @@ function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boole
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
-  const lang = useAppStore((s) => s.lang);
+  const lang = "ko" as const;
   const { toast } = useAdminToast();
   const [settings, setSettings] = useState<ServiceSettings>({
     maintenance_mode: false,

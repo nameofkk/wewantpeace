@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import { useAppStore } from "@/lib/store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API_BASE } from "@/lib/admin-utils";
+import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import {
   Share2, Search, ChevronLeft, ChevronRight, HelpCircle,
   ChevronDown, X, CheckCircle, XCircle, RefreshCw, Eye,
@@ -663,7 +662,7 @@ function AutoApproveSection({
 /* ------------------------------------------------------------------ */
 export default function AdminSocialPage() {
   const { user } = useAuth();
-  const { lang } = useAppStore();
+  const { lang } = useAdminStore();
   const qc = useQueryClient();
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
