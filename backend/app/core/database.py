@@ -62,10 +62,10 @@ class UUIDArray(TypeDecorator):
 
 _is_sqlite = settings.database_url.startswith("sqlite")
 # Supabase Session mode pooler 연결 수 제한 대응:
-# Worker(6 프로세스 × pool_size) + Backend 합계가 Supabase 한도(~20) 이내여야 함
+# Backend pool_size=3 + Worker pool_size=1 → 총 ~8 연결 (Supabase Free ~20 한도)
 import os as _os
-_pool_size = 2 if _os.environ.get("CELERY_WORKER") else 5
-_max_overflow = 1 if _os.environ.get("CELERY_WORKER") else 5
+_pool_size = 1 if _os.environ.get("CELERY_WORKER") else 2
+_max_overflow = 0 if _os.environ.get("CELERY_WORKER") else 1
 _connect_args = {}
 if not _is_sqlite and _os.environ.get("CELERY_WORKER"):
     # Worker bulk INSERT 시 statement timeout 방지 (120초)
