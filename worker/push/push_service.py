@@ -401,7 +401,7 @@ async def _apply_daily_limits(
 
     for t in target.tokens:
         plan = user_plans.get(t.user_id, "free")
-        # v7: Critical 바이패스 — Pro/Pro+ 사용자는 sev>=80 시 상한 무시
+        # v7: Critical 바이패스 · Pro/Pro+ 사용자는 sev>=80 시 상한 무시
         if severity >= CRITICAL_SEVERITY_MIN and plan in ("pro", "pro_plus"):
             allowed_tokens.append(t)
             continue
@@ -485,37 +485,37 @@ _HOME_COUNTRY_NAMES_EN: dict[str, str] = {
 # 50자 이내를 목표로 함
 _RELATION_TEMPLATES_KO: dict[str, list[tuple[float, str]]] = {
     "geo": [
-        (0.9, "직접 안보 위협 — 최고 경계"),
-        (0.7, "인접국 긴장 — 주시 필요"),
-        (0.4, "주변국 동향 — 영향 가능"),
+        (0.9, "직접 안보 위협 · 최고 경계"),
+        (0.7, "인접국 긴장 · 주시 필요"),
+        (0.4, "주변국 동향 · 영향 가능"),
     ],
     "sec": [
-        (0.9, "핵심 안보 이해관계 — 경계"),
-        (0.7, "안보 동맹/관련국 — 주시 필요"),
-        (0.4, "안보 연관 — 동향 주시"),
+        (0.9, "핵심 안보 이해관계 · 경계"),
+        (0.7, "안보 동맹/관련국 · 주시 필요"),
+        (0.4, "안보 연관 · 동향 주시"),
     ],
     "eco": [
-        (0.9, "핵심 경제 파트너 — 직접 영향"),
-        (0.7, "주요 교역국 — 경제 영향 가능"),
-        (0.4, "경제 연관 — 간접 영향 가능"),
+        (0.9, "핵심 경제 파트너 · 직접 영향"),
+        (0.7, "주요 교역국 · 경제 영향 가능"),
+        (0.4, "경제 연관 · 간접 영향 가능"),
     ],
 }
 
 _RELATION_TEMPLATES_EN: dict[str, list[tuple[float, str]]] = {
     "geo": [
-        (0.9, "Direct threat — highest alert"),
-        (0.7, "Neighboring tension — monitor"),
-        (0.4, "Regional development — watch"),
+        (0.9, "Direct threat · highest alert"),
+        (0.7, "Neighboring tension · monitor"),
+        (0.4, "Regional development · watch"),
     ],
     "sec": [
-        (0.9, "Core security interest — alert"),
-        (0.7, "Security ally/partner — monitor"),
-        (0.4, "Security link — watch"),
+        (0.9, "Core security interest · alert"),
+        (0.7, "Security ally/partner · monitor"),
+        (0.4, "Security link · watch"),
     ],
     "eco": [
-        (0.9, "Key economic partner — direct impact"),
-        (0.7, "Major trade partner — potential impact"),
-        (0.4, "Economic link — indirect impact"),
+        (0.9, "Key economic partner · direct impact"),
+        (0.7, "Major trade partner · potential impact"),
+        (0.4, "Economic link · indirect impact"),
     ],
 }
 
@@ -531,22 +531,22 @@ def generate_alert_context(
     IMPACT_FACTORS와 TOPIC_IMPACT_WEIGHTS를 기반으로 가장 두드러진 요인을 선택.
     50자 이내 목표.
 
-    Returns: "한국: 직접 안보 위협 — 최고 경계" 형태의 문자열
+    Returns: "한국: 직접 안보 위협 · 최고 경계" 형태의 문자열
     """
     from worker.processor.calibration import IMPACT_FACTORS, TOPIC_IMPACT_WEIGHTS
 
     # BASIC(빈 문자열) 기준국가 → 글로벌 알림
     if not home_country:
         if lang == "ko":
-            return "📍 글로벌 긴장도 상승 — 주시 필요"
-        return "📍 Global tension rising — monitor"
+            return "📍 글로벌 긴장도 상승 · 주시 필요"
+        return "📍 Global tension rising · monitor"
 
     factors = IMPACT_FACTORS.get(home_country, {}).get(event_country)
     if not factors:
         # 등록되지 않은 국가쌍: 글로벌 폴백
         if lang == "ko":
-            return "📍 글로벌 긴장도 상승 — 주시 필요"
-        return "📍 Global tension rising — monitor"
+            return "📍 글로벌 긴장도 상승 · 주시 필요"
+        return "📍 Global tension rising · monitor"
 
     # TOPIC_IMPACT_WEIGHTS로 가중 점수 계산, 가장 높은 요인 선택
     weights = TOPIC_IMPACT_WEIGHTS.get(topic, TOPIC_IMPACT_WEIGHTS["unknown"])
@@ -573,9 +573,9 @@ def generate_alert_context(
     if not desc:
         # 모든 요인이 낮은 경우 (< 0.4)
         if lang == "ko":
-            desc = "글로벌 동향 — 참고"
+            desc = "글로벌 동향 · 참고"
         else:
-            desc = "Global development — FYI"
+            desc = "Global development · FYI"
 
     return f"📍 {home_label} 관점: {desc}"
 
@@ -828,7 +828,7 @@ def _split_and_send_with_context(
         if event_country:
             context = generate_alert_context(home_country, event_country, topic or "unknown", lang)
         else:
-            context = "글로벌 긴장도 상승 — 주시 필요" if lang == "ko" else "Global tension rising — monitor"
+            context = "글로벌 긴장도 상승 · 주시 필요" if lang == "ko" else "Global tension rising · monitor"
 
         # body에 컨텍스트 추가 (줄바꿈 구분)
         personalized_body = f"{group_body}\n{context}"
