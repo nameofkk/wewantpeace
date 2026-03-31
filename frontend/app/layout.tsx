@@ -8,10 +8,10 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.li
 
 export const metadata: Metadata = {
   title: {
-    default: "WeWantPeace — 실시간 전쟁·분쟁 모니터링 | Real-time War & Conflict Tracker",
+    default: "WeWantPeace — Real-time War & Conflict Tracker | 실시간 전쟁·분쟁 모니터링",
     template: "%s | WeWantPeace",
   },
-  description: "전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적. 긴장도 지수·맞춤 알림·글로벌 지도. Track how war impacts your life in real time across 195 countries with KScore.",
+  description: "Track how war impacts your life in real time. Tension Index, personalized alerts & global conflict map across 195 countries. | 전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적.",
   keywords: [
     "분쟁 모니터링", "국제 안보", "긴장도 지수", "실시간 뉴스", "위기 분석",
     "전쟁 뉴스", "글로벌 리스크", "지정학", "안보 위협", "KScore",
@@ -38,14 +38,14 @@ export const metadata: Metadata = {
     alternateLocale: "en_US",
     url: SITE_URL,
     siteName: "WeWantPeace",
-    title: "WeWantPeace — 실시간 전쟁·분쟁 모니터링 | War & Conflict Tracker",
-    description: "전쟁이 내 삶에 미치는 영향을 실시간 추적. 195개국 긴장도 지수·맞춤 알림·글로벌 분쟁 지도. Track how war impacts you with KScore.",
+    title: "WeWantPeace — Real-time War & Conflict Tracker",
+    description: "Track how war impacts your life in real time. Tension Index, personalized alerts & global conflict map across 195 countries.",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "WeWantPeace — 실시간 전쟁·분쟁 모니터링 | War & Conflict Tracker",
-    description: "전쟁이 내 삶에 미치는 영향을 실시간 추적. 195개국 긴장도 지수·맞춤 알림·글로벌 분쟁 지도. Track how war impacts you with KScore.",
+    title: "WeWantPeace — Real-time War & Conflict Tracker",
+    description: "Track how war impacts your life in real time. Tension Index, personalized alerts & global conflict map across 195 countries.",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
   appleWebApp: {
