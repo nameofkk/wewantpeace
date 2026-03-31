@@ -21,11 +21,11 @@ const SITE = "https://www.wewantpeace.live";
 
 const META_KO = {
   lang: "ko",
-  title: "WeWantPeace: 실시간 전쟁·분쟁 트래커",
-  desc: "전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적. 긴장도 지수, 맞춤 알림, 195개국 분쟁 지도",
-  ogTitle: "WeWantPeace: 실시간 전쟁·분쟁 트래커",
-  ogDesc: "전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적. 긴장도 지수, 맞춤 알림, 195개국 분쟁 지도",
-  h1: "WeWantPeace: 실시간 전쟁·분쟁 트래커",
+  title: "실시간 전쟁 지도 · 분쟁 뉴스 트래커 | WeWantPeace",
+  desc: "전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적. 195개국 긴장도 지수, AI 분석, 분쟁 지도",
+  ogTitle: "실시간 전쟁 지도 · 분쟁 뉴스 트래커 | WeWantPeace",
+  ogDesc: "전쟁·분쟁이 내 삶에 미치는 영향을 실시간 추적. 195개국 긴장도 지수, AI 분석, 분쟁 지도",
+  h1: "실시간 전쟁 지도 · 분쟁 뉴스 트래커",
   body: `<p>전 세계 전쟁·분쟁이 내 삶에 미치는 영향을 실시간으로 추적하세요.</p>
 <ul>
 <li>긴장도 지수: 195개국 실시간 점수(0~100), 15분마다 갱신</li>
@@ -40,11 +40,11 @@ const META_KO = {
 
 const META_EN = {
   lang: "en",
-  title: "WeWantPeace: Real-time Conflict Tracker",
-  desc: "Track how war affects you in real time. Tension Index &amp; alerts for 195 countries",
-  ogTitle: "WeWantPeace: Real-time Conflict Tracker",
-  ogDesc: "Track how war affects you in real time. Tension Index &amp; alerts for 195 countries",
-  h1: "WeWantPeace: Real-time Conflict Tracker",
+  title: "Live War Map &amp; Conflict Tracker | WeWantPeace",
+  desc: "Track wars &amp; conflicts in real time across 195 countries. Live map, Tension Index, AI analysis &amp; alerts",
+  ogTitle: "Live War Map &amp; Conflict Tracker | WeWantPeace",
+  ogDesc: "Track wars &amp; conflicts in real time across 195 countries. Live map, Tension Index, AI analysis &amp; alerts",
+  h1: "Live War Map &amp; Conflict Tracker",
   body: `<p>Track how war and conflict impact your daily life in real time.</p>
 <ul>
 <li>Tension Index: Real-time country-level scores (0-100), updated every 15 minutes</li>
