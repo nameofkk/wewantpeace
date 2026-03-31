@@ -21,7 +21,7 @@ function botHtml() {
 <head>
 <meta charset="utf-8">
 <title>WeWantPeace: Real-time Conflict Tracker</title>
-<meta name="description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries.">
+<meta name="description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries">
 <meta name="robots" content="index, follow">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="canonical" href="${SITE}">
@@ -30,7 +30,7 @@ function botHtml() {
 <link rel="alternate" hreflang="x-default" href="${SITE}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="WeWantPeace: Real-time Conflict Tracker">
-<meta property="og:description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries.">
+<meta property="og:description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries">
 <meta property="og:image" content="${SITE}/og-image.png?v=4">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -40,7 +40,7 @@ function botHtml() {
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="WeWantPeace: Real-time Conflict Tracker">
-<meta name="twitter:description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries.">
+<meta name="twitter:description" content="Track how war affects you in real time. Tension Index &amp; alerts for 195 countries">
 <meta name="twitter:image" content="${SITE}/og-image-twitter.png?v=4">
 <meta name="google-site-verification" content="LJQ8sx_1VitFQTLo9e3oNys3rRVZdpIWAHuSYZtzrOo">
 <meta name="naver-site-verification" content="ce8b1e250ea44cedcdd2e4383a4d35d1f9252031">

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     default: "WeWantPeace: Real-time Conflict Tracker",
     template: "%s | WeWantPeace",
   },
-  description: "Track how war affects you in real time. Tension Index & alerts for 195 countries.",
+  description: "Track how war affects you in real time. Tension Index & alerts for 195 countries",
   keywords: [
     "분쟁 모니터링", "국제 안보", "긴장도 지수", "실시간 뉴스", "위기 분석",
     "전쟁 뉴스", "글로벌 리스크", "지정학", "안보 위협", "KScore",
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: "WeWantPeace",
     title: "WeWantPeace: Real-time Conflict Tracker",
-    description: "Track how war affects you in real time. Tension Index & alerts for 195 countries.",
+    description: "Track how war affects you in real time. Tension Index & alerts for 195 countries",
     images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "WeWantPeace: Real-time Conflict Tracker",
-    description: "Track how war affects you in real time. Tension Index & alerts for 195 countries.",
+    description: "Track how war affects you in real time. Tension Index & alerts for 195 countries",
     images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
   },
   appleWebApp: {
