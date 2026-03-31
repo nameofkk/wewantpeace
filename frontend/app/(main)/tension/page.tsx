@@ -4,9 +4,9 @@ import TensionClient from "./client";
 const SITE_URL = "https://www.wewantpeace.live";
 
 export const metadata: Metadata = {
-  title: "Country Tension Index",
+  title: "Country Tension Index (0–100)",
   description:
-    "Country-level Tension Index (0-100) updated every 5 minutes. Combining event severity, activity volume, and spillover from neighboring countries. | 195개국 실시간 긴장도 지수.",
+    "Real-time Tension Index across 195 countries. Updated every 15 minutes — combining event severity, activity volume, and spillover analysis.",
   alternates: {
     canonical: `${SITE_URL}/tension`,
     languages: {
@@ -16,8 +16,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Country Tension Index (0-100) | WeWantPeace",
-    description: "Real-time tension scores for 195 countries | updated every 5 minutes based on conflict events, activity, and spillover.",
+    title: "Country Tension Index (0–100) | WeWantPeace",
+    description: "Real-time tension scores for 195 countries. Updated every 15 minutes based on conflict events, activity, and spillover.",
     type: "website",
     url: `${SITE_URL}/tension`,
     siteName: "WeWantPeace",
