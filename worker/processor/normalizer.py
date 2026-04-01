@@ -130,7 +130,16 @@ For "conflict": nk_provocation | military_exercise | geopolitical_response | act
 For "sanctions": oil_energy | trade_tariff | general
 For all other topics: general
 
-Respond ONLY with JSON: {"topic": "...", "sub_topic": "...", "severity": N}"""
+## Country code (ISO 3166-1 alpha-2):
+- Identify the PRIMARY country where the event PHYSICALLY occurs
+- Use the event LOCATION, not the news source's country
+- "Baghdad kidnapping" → IQ (not IL even if from Israeli media)
+- "Pakistan pipeline bombing" → PK
+- "London stabbing" → GB
+- Multi-country: pick where the main action happens
+- If unclear or global (e.g. UN resolution, general policy): null
+
+Respond ONLY with JSON: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null}"""
 
 
 _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
@@ -139,12 +148,12 @@ _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
 }
 
 
-def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int]]:
+def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str]]]:
     """
-    GPT-4o-mini로 토픽 + sub_topic + severity 분류.
+    GPT-4o-mini로 토픽 + sub_topic + severity + country_code 분류.
 
     Returns:
-        (topic, sub_topic, severity) 또는 실패 시 None
+        (topic, sub_topic, severity, country_code) 또는 실패 시 None
     """
     if not _OPENAI_KEY:
         return None
@@ -166,7 +175,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int]]:
                 {"role": "user", "content": user_text},
             ],
             temperature=0,
-            max_tokens=80,
+            max_tokens=100,
             response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content
@@ -193,7 +202,16 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int]]:
         valid_subs = _VALID_SUB_TOPICS.get(topic)
         sub_topic = raw_sub if (valid_subs and raw_sub in valid_subs) else "general"
 
-        return topic, sub_topic, severity
+        # country_code 추출 (AI가 반환한 ISO 3166-1 alpha-2)
+        ai_country = data.get("country_code")
+        if ai_country and isinstance(ai_country, str):
+            ai_country = ai_country.strip().upper()
+            if len(ai_country) != 2 or not ai_country.isalpha():
+                ai_country = None
+        else:
+            ai_country = None
+
+        return topic, sub_topic, severity, ai_country
 
     except Exception:
         logger.exception("AI 분류 실패 (제목: %s)", title[:80])
@@ -2139,6 +2157,27 @@ def _calculate_severity(text: str, topic: str, title: str | None = None) -> int:
     return max(0, min(100, base + modifier))
 
 
+# ── AI country_code → 좌표 역조회 ────────────────────────────────────────────
+
+_COUNTRY_CODE_TO_COORDS: dict[str, tuple[float, float]] = {}
+
+
+def _build_country_code_coords() -> None:
+    """COUNTRY_MAP에서 국가코드 → 대표 좌표 역색인 생성 (모듈 로드 시 1회)."""
+    for _kw, (_code, _lat, _lon) in COUNTRY_MAP.items():
+        if _code not in _COUNTRY_CODE_TO_COORDS:
+            _COUNTRY_CODE_TO_COORDS[_code] = (_lat, _lon)
+
+
+_build_country_code_coords()
+
+
+def _get_country_coords(code: str) -> tuple[Optional[float], Optional[float]]:
+    """국가코드 → 대표 좌표 반환. 없으면 (None, None)."""
+    coords = _COUNTRY_CODE_TO_COORDS.get(code)
+    return coords if coords else (None, None)
+
+
 def _extract_geo(
     text: str,
     title: Optional[str] = None,
@@ -2146,12 +2185,14 @@ def _extract_geo(
     """
     국가 코드, 위도, 경도 반환.
 
-    빈도 기반 + 제목 3배 가중치:
-    - title에서 발견된 키워드는 weight × 3 (제목은 기사의 핵심 주제를 반영)
+    빈도 기반 + 제목 5배 가중치:
+    - title에서 발견된 키워드는 weight × 5 (제목은 기사의 핵심 주제를 반영)
     - body에서 여러 국가가 언급되어도 title 국가가 우선됨
+    - 제목-본문 불일치 시 제목에 명확한 도시/국가명이 있으면 제목 국가 확정
     """
     from collections import defaultdict
     country_hits: dict[str, list[tuple[int, float, float]]] = defaultdict(list)
+    title_hits: dict[str, int] = defaultdict(int)  # 제목 전용 가중치 추적
 
     sorted_kws = sorted(COUNTRY_MAP.keys(), key=len, reverse=True)
 
@@ -2163,7 +2204,7 @@ def _extract_geo(
                 is_response = True
                 break
 
-    title_multiplier = 1 if is_response else 3
+    title_multiplier = 1 if is_response else 5
 
     # title 매칭 (조건부 가중치)
     if title:
@@ -2174,6 +2215,7 @@ def _extract_geo(
                 count = title_lower.count(kw)
                 weight = count * len(kw) * title_multiplier
                 country_hits[code].append((weight, lat, lon))
+                title_hits[code] += weight
 
     # body(전체 텍스트) 매칭
     text_lower = text.lower()
@@ -2187,8 +2229,23 @@ def _extract_geo(
     if not country_hits:
         return None, None, None
 
-    # 국가별 총 가중치 계산 후 최대 선택
-    best_code = max(country_hits, key=lambda c: sum(w for w, _, _ in country_hits[c]))
+    # 국가별 총 가중치 계산
+    total_weights = {c: sum(w for w, _, _ in country_hits[c]) for c in country_hits}
+    best_code = max(total_weights, key=total_weights.get)  # type: ignore[arg-type]
+
+    # 제목-본문 불일치 감지: 제목 1위 국가 ≠ 전체 1위일 때, 제목 국가 우선
+    if title_hits:
+        title_best = max(title_hits, key=title_hits.get)  # type: ignore[arg-type]
+        if title_best != best_code and title_hits[title_best] > 0:
+            # 제목에 명확한 국가/도시가 있으면 제목 국가 확정
+            best_code = title_best
+            logger.debug(
+                "제목-본문 불일치: 제목 국가 %s 우선 (제목w=%d, 전체1위=%s w=%d)",
+                title_best, title_hits[title_best],
+                max(total_weights, key=total_weights.get),  # type: ignore[arg-type]
+                max(total_weights.values()),
+            )
+
     # 해당 국가의 가장 긴 키워드(대표 좌표) 사용
     best_entry = max(country_hits[best_code], key=lambda x: x[0])
     return best_code, best_entry[1], best_entry[2]
@@ -2277,9 +2334,10 @@ def normalize(
     ai_result = _classify_with_ai(_title_for_ai, text_for_analysis)
 
     if ai_result is not None:
-        topic, sub_topic, severity = ai_result
-        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, _title_for_ai[:60])
+        topic, sub_topic, severity, ai_country_code = ai_result
+        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, _title_for_ai[:60])
     else:
+        ai_country_code = None
         # 폴백: 기존 키워드 기반 분류
         topic = _classify_topic(text_for_analysis)
         if topic == "unknown" and lang not in ("en", "unknown"):
@@ -2298,9 +2356,14 @@ def normalize(
         sub_topic = "general"
         severity = 0
 
-    # 제목 결정 (geo 추출에 활용하기 위해 먼저 계산)
+    # 국가코드: AI 우선, 키워드 폴백
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
-    country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
+    if ai_country_code:
+        country_code = ai_country_code
+        lat, lon = _get_country_coords(ai_country_code)
+        logger.debug("AI 국가코드 사용: %s (제목: %s)", ai_country_code, _title_for_ai[:60])
+    else:
+        country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
     geohash5 = _make_geohash(lat, lon)
 
     # 정보 접근성 보정: 언론 자유도 낮은 국가의 severity 상향
