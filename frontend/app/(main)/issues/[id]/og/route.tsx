@@ -254,28 +254,19 @@ export async function GET(
   // Satori는 외부 URL을 직접 fetch할 수 없으므로 Base64로 변환
   // Satori가 지원하는 포맷: JPEG, PNG, GIF (WebP 미지원 → 크래시)
   // Edge Runtime 메모리 한계로 대용량 이미지도 스킵
-  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
   const MAX_IMAGE_BYTES = 800_000; // 800KB
   let bgImageSrc: string | null = null;
   if (issue.image_url) {
     try {
-      // WebP → JPEG 변환: wsrv.nl 프록시 사용 (Satori WebP 미지원)
-      const isWebP = /\.webp(\?|$)/i.test(issue.image_url);
-      const fetchUrl = isWebP
-        ? `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=80&w=1200`
-        : issue.image_url;
+      // 모든 이미지를 wsrv.nl 프록시로 JPEG 변환 + 리사이즈
+      // → WebP 미지원 해결 + 대용량 이미지 압축 (800KB 초과 방지)
+      const fetchUrl = `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=75&w=1200&h=630&fit=cover`;
 
-      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
+      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
       if (imgRes.ok) {
-        const ct = imgRes.headers.get("content-type") || "";
-        const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
-        const isAllowed = isWebP || ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t));
-        if (isAllowed && (cl === 0 || cl <= MAX_IMAGE_BYTES)) {
-          const buf = await imgRes.arrayBuffer();
-          if (buf.byteLength <= MAX_IMAGE_BYTES) {
-            const mimeType = isWebP ? "image/jpeg" : ct;
-            bgImageSrc = `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`;
-          }
+        const buf = await imgRes.arrayBuffer();
+        if (buf.byteLength <= MAX_IMAGE_BYTES) {
+          bgImageSrc = `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
         }
       }
     } catch {}
