@@ -163,10 +163,8 @@ export async function GET(
   }
 
   // 상위 이슈 이미지를 배경으로 (Satori는 외부 URL 불가 → Base64 변환)
-  // Satori 지원 포맷: JPEG, PNG, GIF (WebP 미지원 → 크래시)
-  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif"];
+  // 모든 이미지를 wsrv.nl 프록시로 JPEG 변환 + 리사이즈
   const MAX_IMAGE_BYTES = 800_000;
-  // 여러 이미지를 순차 시도 (첫 번째 성공한 것 사용)
   const candidateUrls = (tension.top5_clusters ?? [])
     .map((c) => c.image_url)
     .filter((u): u is string => !!u);
@@ -174,22 +172,12 @@ export async function GET(
   for (const imgUrl of candidateUrls) {
     if (bgImageSrc) break;
     try {
-      // WebP → JPEG 변환: wsrv.nl 프록시 사용 (Satori WebP 미지원)
-      const isWebP = /\.webp(\?|$)/i.test(imgUrl);
-      const fetchUrl = isWebP
-        ? `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&output=jpg&q=80&w=1200`
-        : imgUrl;
-      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(3000) });
+      const fetchUrl = `https://wsrv.nl/?url=${encodeURIComponent(imgUrl)}&output=jpg&q=75&w=1200&h=630&fit=cover`;
+      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
       if (!imgRes.ok) continue;
-      const ct = imgRes.headers.get("content-type") || "";
-      const cl = parseInt(imgRes.headers.get("content-length") || "0", 10);
-      const isAllowed = isWebP || ALLOWED_IMAGE_TYPES.some((t) => ct.startsWith(t));
-      if (!isAllowed) continue;
-      if (cl > 0 && cl > MAX_IMAGE_BYTES) continue;
       const buf = await imgRes.arrayBuffer();
       if (buf.byteLength <= MAX_IMAGE_BYTES) {
-        const mimeType = isWebP ? "image/jpeg" : ct;
-        bgImageSrc = `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`;
+        bgImageSrc = `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
       }
     } catch {}
   }
