@@ -36,7 +36,7 @@ MAX_EVENTS_PER_CLUSTER = 50  # 25→50 복원, 대형 사건은 50건 이상 보
 MIN_TITLE_OVERLAP = 0.15           # 0.25→0.15 복원, 15% 콘텐츠 단어 겹침
 MIN_TITLE_OVERLAP_HIGH_SEV = 0.10  # 0.18→0.10 복원, 고심각도 완화
 # AI 판정 경계 영역: 이 구간에서만 GPT-4o-mini로 "같은 사건?" 확인
-AI_MATCH_LOW = 0.06   # 0.10→0.06 복원, AI 판정 기회 확대
+AI_MATCH_LOW = 0.03   # 0.06→0.03 확대, 더 넓은 범위에서 AI 판정
 AI_MATCH_HIGH = 0.25  # 0.40→0.25 복원, 0.25 이상은 자동 병합
 
 # Sub-topic soft signal 보정값
@@ -221,10 +221,14 @@ def _ai_same_event(
     title_b: str,
     topic: str,
     country_code: str | None,
+    body_hint_a: str | None = None,
+    body_hint_b: str | None = None,
 ) -> bool | None:
     """
     GPT-4o-mini로 두 제목이 같은 사건인지 판정 (경계 영역에서만 호출).
     LRU 캐시로 동일 쌍 중복 호출 방지.
+
+    body_hint_a/b: 본문 앞 100자 (추가 맥락 제공)
 
     Returns: True(같은 사건), False(다른 사건), None(API 실패)
     """
@@ -233,6 +237,10 @@ def _ai_same_event(
         return None
 
     user_msg = f"Country: {country_code or 'Unknown'}\nTopic: {topic}\n\nHeadline A: {title_a[:200]}\nHeadline B: {title_b[:200]}"
+    if body_hint_a:
+        user_msg += f"\nBody A (excerpt): {body_hint_a[:100]}"
+    if body_hint_b:
+        user_msg += f"\nBody B (excerpt): {body_hint_b[:100]}"
 
     try:
         from openai import OpenAI
@@ -552,6 +560,8 @@ async def assign_cluster(
             ai_result = _ai_same_event(
                 event.title, cand.title,
                 event.topic, event.country_code,
+                body_hint_a=(event.body or "")[:100] or None,
+                body_hint_b=None,  # 클러스터에는 body 없음
             )
             if ai_result is True:
                 cluster = cand
