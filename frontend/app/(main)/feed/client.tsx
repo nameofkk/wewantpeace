@@ -141,7 +141,7 @@ function KScoreHistorySection({
     <div className="mt-4 pt-4 border-t border-border" data-tour="feed-kscore-history">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-muted-foreground">
-          KScore {lang === "ko" ? "히스토리" : "History"}
+          {lang === "ko" ? "위험지수 히스토리" : "Risk Level History"}
         </p>
         <div className="flex gap-1">
           {rangeOptions.map(({ value, labelKo, labelEn, requiredPlan }) => {
@@ -214,7 +214,15 @@ function KScoreHistorySection({
   );
 }
 
-// ── 트렌딩 카드 ──────────────────────────────────────────────────────────
+// ── Trust Level 뱃지 ─────────────────────────────────────────────────────
+const TRUST_BADGE: Record<string, { bg: string; text: string; icon: string; labelKo: string; labelEn: string }> = {
+  confirmed:   { bg: "bg-emerald-600/15", text: "text-emerald-600", icon: "✓✓✓", labelKo: "검증 완료", labelEn: "Confirmed" },
+  verified:    { bg: "bg-emerald-500/10", text: "text-emerald-500", icon: "✓✓", labelKo: "검증됨", labelEn: "Verified" },
+  reported:    { bg: "bg-blue-500/10", text: "text-blue-500", icon: "✓", labelKo: "보도됨", labelEn: "Reported" },
+  unconfirmed: { bg: "bg-amber-500/10", text: "text-amber-500", icon: "⚠️", labelKo: "미확인", labelEn: "Unconfirmed" },
+};
+
+// ── 트렌딩 카드 (v2.0 정보위계 5단계) ───────────────────────────────────
 const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, userPlan = "free", isAdmin = false }: { item: TrendingItem; rank: number; delay?: number; userPlan?: string; isAdmin?: boolean }) {
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
@@ -231,14 +239,13 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
   const isAlert = k >= 4;
   const badge = getKScoreBadge(pKScore, lang);
   const clusterId = item.cluster_ids?.[0];
-  // 영어 모드: 원문 영어 키워드 / 한국어 모드: 번역된 한국어 우선
   const rawTitle = lang === "en" ? item.keyword : (item.keyword_ko ?? item.keyword);
   const topicKey = `topic_${topic}` as Parameters<typeof t>[1];
   const topicLabel = t(lang, topicKey) || topic;
-  // 쓰레기 제목(해시태그만): 국가명+토픽 조합 / 정상 제목: 접두어 제거
   const displayTitle = isJunkTitle(rawTitle)
     ? buildSmartTitle(item.keyword, topic, lang, getCountryName, item.country_codes[0])
     : (stripTitlePrefix(rawTitle) || topicLabel);
+  const trust = TRUST_BADGE[item.trust_level ?? ""] ?? null;
 
   const handleEditStart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -277,7 +284,7 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
       style={{ animationDelay: `${delay}ms` }}
       onClick={clusterId && !editing ? () => router.push(issueDetailPath(clusterId)) : undefined}
     >
-      {/* 배경 글로우 (경계 이상) */}
+      {/* 배경 글로우 */}
       {isAlert && (
         <div
           className="absolute inset-0 rounded-xl pointer-events-none"
@@ -291,119 +298,107 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
         />
       )}
 
-      <div className="flex items-start gap-3 relative">
-        {/* 순위 — 1위는 특별 강조 */}
-        <div className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
-          rank === 1 ? "bg-primary text-primary-foreground" : "bg-secondary"
-        )}>
-          {rank}
+      <div className="relative">
+        {/* ① 심각도 배지 + 시간 + 토픽 */}
+        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide">
+          <span className={cn(
+            "inline-flex items-center h-5 rounded-full px-2 text-[10px] font-bold leading-none shrink-0",
+            badge.bg, badge.text,
+            k >= 8 && "animate-pulse",
+          )}>
+            {badge.label}
+          </span>
+          {isNew(item.first_event_at) && (
+            <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-blue-500/20 px-1.5 text-[9px] font-bold text-blue-400 leading-none shrink-0">
+              NEW
+            </span>
+          )}
+          {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
+            <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none shrink-0">
+              RISING
+            </span>
+          )}
+          {isUpdated(item.first_event_at, item.calculated_at) && !isNew(item.first_event_at) && !isRising(item.first_event_at, item.kscore) && (
+            <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-amber-500/20 px-1.5 text-[9px] font-bold text-amber-400 leading-none shrink-0">
+              UPDATED
+            </span>
+          )}
+          <span className={cn("inline-flex items-center h-5 rounded-full px-2 text-[10px] font-medium leading-none shrink-0", TOPIC_COLORS[topic])}>
+            {topicLabel}
+          </span>
+          {item.country_codes.length > 0 && (
+            <span className="text-[11px] text-muted-foreground shrink-0">
+              {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
+            </span>
+          )}
+          {formatFirstSeen(item.first_event_at, lang) && (
+            <span className="text-[9px] text-muted-foreground/60 shrink-0 ml-auto">
+              {formatFirstSeen(item.first_event_at, lang)}
+            </span>
+          )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* KScore 상태 뱃지 */}
-            <span className={cn(
-              "inline-flex items-center h-5 rounded-full px-2 text-[10px] font-bold leading-none",
-              badge.bg, badge.text,
-              k >= 8 && "animate-pulse",
-            )}>
-              {badge.label}
-            </span>
-            {isNew(item.first_event_at) && (
-              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-blue-500/20 px-1.5 text-[9px] font-bold text-blue-400 leading-none">
-                NEW
-                <InfoTooltip direction="down" text={t(lang, "signal_new_tooltip")} />
-              </span>
-            )}
-            {isRising(item.first_event_at, item.kscore) && !isNew(item.first_event_at) && (
-              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[9px] font-bold text-emerald-500 leading-none">
-                RISING
-                <InfoTooltip direction="down" text={t(lang, "signal_rising_tooltip")} />
-              </span>
-            )}
-            {isUpdated(item.first_event_at, item.calculated_at) && !isNew(item.first_event_at) && !isRising(item.first_event_at, item.kscore) && (
-              <span className="inline-flex items-center h-5 gap-0.5 rounded-full bg-amber-500/20 px-1.5 text-[9px] font-bold text-amber-400 leading-none">
-                UPDATED
-                <InfoTooltip direction="down" text={t(lang, "signal_updated_tooltip")} />
-              </span>
-            )}
-            <span className={cn("inline-flex items-center h-5 gap-0.5 rounded-full px-2 text-[10px] font-medium leading-none", TOPIC_COLORS[topic])}>
-              {topicLabel}
-              <InfoTooltip direction="down" text={t(lang, (`topic_${topic}_tooltip`) as Parameters<typeof t>[1]) || topicLabel} />
-            </span>
-            {item.country_codes.length > 0 && (
-              <span className="text-[11px] text-muted-foreground">
-                {item.country_codes.map((code: string) => getFlag(code)).join(" ")}
-              </span>
+        {/* ② 헤드라인 (가장 큰 폰트) */}
+        {editing ? (
+          <div className="mt-2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <input
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleEditSave(e);
+                if (e.key === "Escape") handleEditCancel(e);
+              }}
+              className="flex-1 min-w-0 rounded-md border border-border bg-background px-2 py-1 text-sm font-semibold leading-snug outline-none focus:border-primary"
+              placeholder={lang === "ko" ? "한국어 제목 입력" : "Enter Korean title"}
+            />
+            <button onClick={handleEditSave} disabled={patchCluster.isPending} className="shrink-0 rounded-md p-1 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50">
+              <Check className="h-4 w-4" />
+            </button>
+            <button onClick={handleEditCancel} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2 flex items-center gap-1">
+            <h3 className="text-sm font-bold leading-snug line-clamp-2">{item.what_consumer || displayTitle}</h3>
+            {isAdmin && clusterId && (
+              <button onClick={handleEditStart} className="shrink-0 rounded p-0.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors" title={t(lang, "admin_edit_title")}>
+                <Pencil className="h-3 w-3" />
+              </button>
             )}
           </div>
+        )}
 
-          {editing ? (
-            <div className="mt-1.5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-              <input
-                autoFocus
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleEditSave(e);
-                  if (e.key === "Escape") handleEditCancel(e);
-                }}
-                className="flex-1 min-w-0 rounded-md border border-border bg-background px-2 py-1 text-sm font-semibold leading-snug outline-none focus:border-primary"
-                placeholder={lang === "ko" ? "한국어 제목 입력" : "Enter Korean title"}
-              />
-              <button
-                onClick={handleEditSave}
-                disabled={patchCluster.isPending}
-                className="shrink-0 rounded-md p-1 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
-              >
-                <Check className="h-4 w-4" />
-              </button>
-              <button
-                onClick={handleEditCancel}
-                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-secondary"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="mt-1.5 flex items-center gap-1">
-              <h3 className="text-sm font-semibold leading-snug line-clamp-2">{displayTitle}</h3>
-              {isAdmin && clusterId && (
-                <button
-                  onClick={handleEditStart}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
-                  title={t(lang, "admin_edit_title")}
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-              )}
-            </div>
+        {/* ③ "Why it matters to you" — so_what_consumer */}
+        {item.so_what_consumer && (
+          <p className="mt-1.5 text-[11px] text-foreground/70 leading-relaxed">{item.so_what_consumer}</p>
+        )}
+
+        {/* ④ 신뢰도 + 센서 */}
+        <div className="flex items-center gap-1.5 mt-2">
+          {trust && (
+            <span className={cn("inline-flex items-center h-4 rounded-full px-1.5 text-[9px] font-medium leading-none gap-0.5", trust.bg, trust.text)}>
+              {trust.icon} {lang === "ko" ? trust.labelKo : trust.labelEn}
+            </span>
           )}
-
-          {formatFirstSeen(item.first_event_at, lang) && (
-            <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-              {formatFirstSeen(item.first_event_at, lang)}
-            </p>
+          {item.sensor_context && (
+            <span className="text-[9px] text-muted-foreground">🛰️</span>
           )}
-
-          {/* 트렌딩 이유 — 항상 표시 */}
-          <TrendingSignals item={item} delay={delay} />
+          {(item.independent_sources ?? 0) > 0 && (
+            <span className="text-[9px] text-muted-foreground">
+              {t(lang, "term_sources")}: {item.independent_sources}
+            </span>
+          )}
         </div>
 
-        {/* KScore 뱃지 */}
-        <div className="shrink-0 flex flex-col items-end gap-0.5">
-          <span className={cn(
-            "text-lg font-bold tabular-nums",
-            badge.text,
-          )}>
-            {k.toFixed(1)}
+        {/* ⑤ 지갑 영향 칩 */}
+        {item.wallet_line && (
+          <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-amber-600 dark:text-amber-400">
+            <span>💰</span>
+            <span>{item.wallet_line}</span>
           </span>
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-            KScore
-            <InfoTooltip direction="down" text={t(lang, "signal_kscore_tooltip")} />
-          </span>
-        </div>
+        )}
       </div>
 
       {clusterId && (
@@ -425,8 +420,8 @@ const TrendingCard = React.memo(function TrendingCard({ item, rank, delay = 0, u
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
           >
             {showHistory
-              ? <><ChevronUp className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 접기" : "Hide KScore history"}</>
-              : <><ChevronDown className="h-3 w-3" />{lang === "ko" ? "KScore 히스토리 보기" : "Show KScore history"}</>
+              ? <><ChevronUp className="h-3 w-3" />{lang === "ko" ? "위험지수 히스토리 접기" : "Hide risk history"}</>
+              : <><ChevronDown className="h-3 w-3" />{lang === "ko" ? "위험지수 히스토리 보기" : "Show risk history"}</>
             }
           </button>
         </div>
@@ -506,7 +501,7 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
         return (
           <div className="border-t border-border/40 bg-secondary/20 overflow-hidden h-8 flex items-center">
             <span className="shrink-0 px-2.5 text-[9px] font-bold text-muted-foreground whitespace-nowrap border-r border-border/40 leading-none">
-              {hasDelta ? (lang === "ko" ? "📈 KScore 변동" : "📈 KScore Δ") : "📊 KScore"}
+              {hasDelta ? (lang === "ko" ? "📈 위험지수 변동" : "📈 Risk Δ") : (lang === "ko" ? "📊 위험지수" : "📊 Risk")}
             </span>
             <div className="overflow-hidden flex-1 h-full flex items-center">
               <div className="ticker-track-medium">
@@ -718,6 +713,13 @@ function FeedPageContent() {
         calculated_at: c.last_event_at,
         first_event_at: c.first_event_at,
         independent_sources: c.independent_sources ?? 1,
+        // v2.0 consumer fields
+        so_what_consumer: c.so_what_consumer ?? null,
+        wallet_line: c.wallet_line ?? null,
+        trust_level: c.trust_level ?? null,
+        trust_detail: c.trust_detail ?? null,
+        sensor_context: c.sensor_context ?? null,
+        what_consumer: c.what_consumer ?? null,
       }))
       .sort((a, b) => {
         const kDiff = personalizedKScore(b, homeCountry) - personalizedKScore(a, homeCountry);

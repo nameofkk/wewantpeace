@@ -22,6 +22,7 @@ from backend.app.models.normalized_event import NormalizedEvent
 from backend.app.models.raw_event import RawEvent
 from backend.app.models.source_channel import SourceChannel
 from backend.app.models.cluster_change_log import ClusterChangeLog
+from backend.app.utils.consumer import build_consumer_fields
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -99,6 +100,17 @@ class ChangeLogOut(BaseModel):
 class ClusterDetailOut(ClusterOut):
     events: list[EventOut]
     change_logs: list[ChangeLogOut] = []
+    # Consumer fields (v2.0)
+    so_what_consumer: Optional[str] = None
+    wallet_line: Optional[str] = None
+    trust_level: Optional[str] = None
+    trust_detail: Optional[str] = None
+    sensor_context: Optional[str] = None
+    what_consumer: Optional[str] = None
+    when_consumer: Optional[str] = None
+    verification_label: Optional[str] = None
+    signal_corroboration_count: Optional[int] = None
+    signal_types: Optional[list[str]] = None
 
 
 
@@ -383,6 +395,7 @@ async def get_cluster(
     request: Request,
     response: Response,
     cluster_id: str,
+    lang: str = Query("en", description="Language for consumer fields (en/ko)"),
     db: AsyncSession = Depends(get_db),
 ):
     """이슈 클러스터 상세 + 연결된 이벤트 타임라인."""
@@ -419,6 +432,9 @@ async def get_cluster(
     )
     logs = log_result.scalars().all()
 
+    # Consumer fields 생성
+    consumer = build_consumer_fields(cluster, lang)
+
     detail = ClusterDetailOut(
         **_cluster_to_out(cluster).model_dump(),
         events=[_event_to_out(ne, raw, sc) for ne, raw, sc in rows],
@@ -433,6 +449,16 @@ async def get_cluster(
             )
             for log in logs
         ],
+        so_what_consumer=consumer.get("so_what_consumer"),
+        wallet_line=consumer.get("wallet_line"),
+        trust_level=consumer.get("trust_level"),
+        trust_detail=consumer.get("trust_detail"),
+        sensor_context=consumer.get("sensor_context"),
+        what_consumer=consumer.get("what_consumer"),
+        when_consumer=consumer.get("when_consumer"),
+        verification_label=consumer.get("verification_label"),
+        signal_corroboration_count=consumer.get("signal_corroboration_count"),
+        signal_types=consumer.get("signal_types"),
     )
     return detail
 

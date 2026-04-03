@@ -24,8 +24,8 @@ const TRIGGER_TITLES: Record<string, { ko: string; en: string }> = {
     en: "Verified Alerts",
   },
   kscore_threshold_locked: {
-    ko: "KScore 필터 조정",
-    en: "KScore Filter",
+    ko: "위험지수 필터 조정",
+    en: "Risk Level Filter",
   },
   watch_country_limit_locked: {
     ko: "더 많은 관심 국가",
@@ -43,8 +43,8 @@ const TRIGGER_DESCRIPTIONS: Record<string, { ko: string; en: string }> = {
     en: "Get alerts for issues verified by trusted sources",
   },
   kscore_threshold_locked: {
-    ko: "KScore 임계치를 조절하여 맞춤 알림을 받으세요",
-    en: "Customize your KScore threshold for tailored alerts",
+    ko: "위험지수 임계치를 조절하여 맞춤 알림을 받으세요",
+    en: "Customize your risk level threshold for tailored alerts",
   },
   watch_country_limit_locked: {
     ko: "Pro에서 5개 국가까지, Pro+에서 무제한으로 추적하세요",

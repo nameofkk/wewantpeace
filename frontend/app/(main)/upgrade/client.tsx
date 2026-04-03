@@ -56,7 +56,7 @@ const FEATURES: Feature[] = [
     free: { ko: "글로벌", en: "Global" }, pro: { ko: "개인화", en: "Custom" }, proplus: { ko: "개인화", en: "Custom" },
   },
   {
-    labelKo: "KScore 필터",            labelEn: "KScore filter",
+    labelKo: "위험지수 필터",            labelEn: "Risk level filter",
     free: { ko: "4.0 고정", en: "4.0 fixed" }, pro: { ko: "3.0~10.0", en: "3.0~10.0" }, proplus: { ko: "1.5~10.0", en: "1.5~10.0" },
   },
   {
@@ -64,7 +64,7 @@ const FEATURES: Feature[] = [
     free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
   {
-    labelKo: "KScore 히스토리",        labelEn: "KScore history",
+    labelKo: "위험지수 히스토리",        labelEn: "Risk trend history",
     free: { ko: "7일", en: "7d" },     pro: { ko: "30일", en: "30d" },   proplus: { ko: "90일", en: "90d" },
   },
   {
@@ -845,7 +845,7 @@ function UpgradeContent() {
                   lang === "ko" ? "관심 국가 5개 · 신뢰 알림 · 토픽 필터" : "5 countries · Verified alerts · Topic filter",
                   lang === "ko" ? "AI 영향 분석 · 산업별 리스크 개요" : "AI impact analysis · Sector risk overview",
                   lang === "ko" ? "Intel 레이어 (위성·GPS·교역)" : "Intel layers (FIRMS·GPS·Trade)",
-                  lang === "ko" ? "KScore 3.0~ · 30일 히스토리" : "KScore 3.0+ · 30-day history",
+                  lang === "ko" ? "위험지수 3.0~ · 30일 히스토리" : "Risk level 3.0+ · 30-day history",
                 ].map((text, i) => (
                   <div key={i} className="flex items-center gap-2.5">
                     <div className="h-5 w-5 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0">
@@ -1063,7 +1063,7 @@ function UpgradeContent() {
               <div className="mt-4 space-y-2.5">
                 {[
                   lang === "ko" ? "Pro 모든 기능 포함" : "Everything in Pro",
-                  lang === "ko" ? "무제한 국가 · 일일 100건 · KScore 1.5~" : "Unlimited countries · 100/day · KScore 1.5+",
+                  lang === "ko" ? "무제한 국가 · 일일 100건 · 위험지수 1.5~" : "Unlimited countries · 100/day · Risk level 1.5+",
                   lang === "ko" ? "이슈별 산업 리스크 · 주간 리포트" : "Per-issue sector risk · Weekly report",
                   lang === "ko" ? "90일 히스토리" : "90-day history",
                 ].map((text, i) => (

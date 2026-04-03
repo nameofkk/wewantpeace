@@ -36,6 +36,12 @@ from backend.app.models.user import User, UserArea, UserPreference, UserPushToke
 from backend.app.models.notification import Notification
 from backend.app.models.alert_delivery_log import AlertDeliveryLog
 from backend.app.core.config import settings
+from backend.app.utils.consumer import (
+    quick_consumer_line,
+    push_weather_emoji,
+    push_severity_label,
+    compute_trust_level,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1141,24 +1147,34 @@ async def send_alert(
             target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
         )
 
-        _title_en = f"⚠️ {cluster_title}"
-        _title_ko = f"⚠️ {cluster_title_ko or cluster_title}"
-        # combined 모드: 속보 + 신뢰 동시 충족 표시
-        if alert_kind == "combined":
-            _vbody_ko = f"심각도 {severity} · KScore {kscore:.1f} · 속보 + 신뢰 알림"
-            _vbody_en = f"Severity {severity} · KScore {kscore:.1f} · Fast + Verified"
+        _emoji = push_weather_emoji(severity)
+        _title_en = f"{_emoji} {cluster_title}"
+        _title_ko = f"{_emoji} {cluster_title_ko or cluster_title}"
+        # consumer body: 5단계 라벨 + so_what_consumer
+        _slabel_ko = push_severity_label(severity, "ko")
+        _slabel_en = push_severity_label(severity, "en")
+        _consumer_ko = quick_consumer_line(country_code, cluster_topic, "ko")
+        _consumer_en = quick_consumer_line(country_code, cluster_topic, "en")
+        _trust_lvl, _ = compute_trust_level(signal_corroboration_count, [], 0)
+        _trust_ko = "✓ 검증됨" if _trust_lvl in ("confirmed", "verified") else ""
+        _trust_en = "✓ Verified" if _trust_lvl in ("confirmed", "verified") else ""
+        if _consumer_ko:
+            _vbody_ko = f"{_slabel_ko} · {_consumer_ko}"
         else:
-            _vbody_ko = f"심각도 {severity} · KScore {kscore:.1f} · 신뢰 알림"
-            _vbody_en = f"Severity {severity} · KScore {kscore:.1f} · Verified Alert"
-        # 시그널 교차검증 정보 추가
-        if signal_corroboration_count > 0:
-            _vbody_ko += f"\n🛡️ 신뢰 확인 + 시그널 {signal_corroboration_count}건 교차검증"
-            _vbody_en += f"\n🛡️ Verified + {signal_corroboration_count} signal(s) corroborated"
+            _vbody_ko = f"{_slabel_ko} · 검증된 이슈"
+        if _consumer_en:
+            _vbody_en = f"{_slabel_en} · {_consumer_en}"
+        else:
+            _vbody_en = f"{_slabel_en} · Verified issue"
+        if _trust_ko:
+            _vbody_ko += f"\n{_trust_ko}"
+        if _trust_en:
+            _vbody_en += f"\n{_trust_en}"
         sent_verified, invalid_v, failures_v = _split_and_send_with_context(
             token_infos=target_v.tokens,
             title=_title_en,
             base_body=_vbody_en,
-            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore), "weather_emoji": _emoji, "what_consumer": cluster_title, "so_what_consumer": _consumer_en or ""},
             event_country=country_code,
             topic=cluster_topic,
             severity=severity,
@@ -1203,20 +1219,30 @@ async def send_alert(
             target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
         )
 
-        _title_en_f = f"🚨 {cluster_title}"
-        _title_ko_f = f"🚨 {cluster_title_ko or cluster_title}"
-        if alert_kind == "fast" and not is_verified:
-            _body_ko_f = f"심각도 {severity} · 속보 알림\n⏳ 추후 신뢰 인증 가능"
-            _body_en_f = f"Severity {severity} · Fast Alert\n⏳ May be verified later"
+        _emoji_f = push_weather_emoji(severity)
+        _title_en_f = f"{_emoji_f} {cluster_title}"
+        _title_ko_f = f"{_emoji_f} {cluster_title_ko or cluster_title}"
+        _slabel_ko_f = push_severity_label(severity, "ko")
+        _slabel_en_f = push_severity_label(severity, "en")
+        _consumer_ko_f = quick_consumer_line(country_code, cluster_topic, "ko")
+        _consumer_en_f = quick_consumer_line(country_code, cluster_topic, "en")
+        if _consumer_ko_f:
+            _body_ko_f = f"{_slabel_ko_f} · {_consumer_ko_f}"
         else:
-            _body_ko_f = f"심각도 {severity} · 속보 알림"
-            _body_en_f = f"Severity {severity} · Fast Alert"
+            _body_ko_f = f"{_slabel_ko_f} · 속보"
+        if _consumer_en_f:
+            _body_en_f = f"{_slabel_en_f} · {_consumer_en_f}"
+        else:
+            _body_en_f = f"{_slabel_en_f} · Breaking"
+        if alert_kind == "fast" and not is_verified:
+            _body_ko_f += "\n⏳ 추후 검증될 수 있어요"
+            _body_en_f += "\n⏳ May be verified later"
 
         sent_fast, invalid_f, failures_f = _split_and_send_with_context(
             token_infos=target_f.tokens,
             title=_title_en_f,
             base_body=_body_en_f,
-            data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
+            data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity), "weather_emoji": _emoji_f, "what_consumer": cluster_title, "so_what_consumer": _consumer_en_f or ""},
             event_country=country_code,
             topic=cluster_topic,
             severity=severity,
@@ -1312,6 +1338,7 @@ async def save_in_app_notifications(
     notif_type: str,
     db: AsyncSession,
     cluster_topic: Optional[str] = None,
+    severity: int = 0,
 ) -> int:
     """
     해당 국가 관심지역 사용자에게 인앱 Notification 레코드 배치 INSERT.
@@ -1344,16 +1371,12 @@ async def save_in_app_notifications(
             UserArea.is_active == True,
             UserArea.notify_verified == True,
         )
-        title = f"⚠️ {cluster_title}"
-        base_body = "공식 확인된 이슈입니다 / Verified issue"
     else:
         # v7: Fast alert → 모든 관심국가 구독자 (notify_fast 무관)
         area_filter = (
             UserArea.country_code == country_code,
             UserArea.is_active == True,
         )
-        title = f"🚨 {cluster_title}"
-        base_body = "속보 알림 / Breaking alert"
 
     # 대상 사용자 user_id + home_country + language 수집 (중복 제거)
     result = await db.execute(
@@ -1373,21 +1396,32 @@ async def save_in_app_notifications(
 
     notifications = []
     for uid, home_country, language in rows:
+        lang = language or "ko"
+        _emoji = push_weather_emoji(severity)
+        # consumer 스타일 title/body
+        _title = f"{_emoji} {cluster_title}"
+        _consumer = quick_consumer_line(country_code, cluster_topic, lang)
         # 유저별 개인화된 컨텍스트 생성
         context = generate_alert_context(
             home_country=home_country or "KR",
             event_country=country_code,
             topic=cluster_topic or "unknown",
-            lang=language or "ko",
+            lang=lang,
         )
-        body = f"{base_body}\n{context}"
+        if _consumer:
+            body = f"{_consumer}\n{context}"
+        else:
+            _base = "검증된 이슈" if lang == "ko" else "Verified issue"
+            if notif_type == "fast":
+                _base = "속보" if lang == "ko" else "Breaking"
+            body = f"{_base}\n{context}"
 
         notifications.append(
             Notification(
                 user_id=uid,
                 type=notif_type,
                 cluster_id=cluster_uuid,
-                title=title,
+                title=_title,
                 body=body,
             )
         )

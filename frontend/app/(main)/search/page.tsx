@@ -26,6 +26,22 @@ function getSeverityBg(severity: number): string {
   return "bg-green-500/20 text-green-400";
 }
 
+function getSeverityLabel(severity: number, lang: "ko" | "en"): string {
+  if (severity >= 80) return lang === "ko" ? "위험" : "Critical";
+  if (severity >= 60) return lang === "ko" ? "주의" : "Elevated";
+  if (severity >= 40) return lang === "ko" ? "관심" : "Watch";
+  if (severity >= 20) return lang === "ko" ? "양호" : "Fair";
+  return lang === "ko" ? "안정" : "Clear";
+}
+
+function getWeatherEmoji(severity: number): string {
+  if (severity >= 80) return "🌪️";
+  if (severity >= 60) return "⛈️";
+  if (severity >= 40) return "🌥️";
+  if (severity >= 20) return "⛅";
+  return "☀️";
+}
+
 const TOPIC_EMOJI: Record<string, string> = {
   conflict: "\u2694\uFE0F",
   terror: "\uD83D\uDCA3",
@@ -151,18 +167,16 @@ function SearchResultCard({ item, lang }: { item: SearchResult; lang: "ko" | "en
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-sm">{emoji}</span>
+            <span className="text-sm">{getWeatherEmoji(item.severity)}</span>
             {flag && <span className="text-sm">{flag}</span>}
             <span className={cn("px-1.5 py-0.5 text-[10px] font-medium rounded-md", sevBg)}>
-              {item.severity}
+              {getSeverityLabel(item.severity, lang)}
             </span>
           </div>
           <p className="text-sm font-medium leading-snug line-clamp-2">{title}</p>
           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-            <span>K {item.kscore.toFixed(1)}</span>
-            <span className="w-px h-3 bg-border" />
             <span>
-              {item.event_count}{lang === "ko" ? "건" : " events"}
+              {item.event_count}{lang === "ko" ? "건 보도" : " reports"}
             </span>
             <span className="w-px h-3 bg-border" />
             <span>{timeAgo}</span>

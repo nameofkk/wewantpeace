@@ -319,3 +319,68 @@ def build_commodity_snapshot(
         snap["gold"] = {"price": round(p, 2), "change_pct": round(c, 1), "symbol": "GC=F"}
 
     return snap if snap else None
+
+
+# ── Push 알림용 경량 Consumer 함수 ──────────────────────────────────
+
+def quick_consumer_line(
+    country_code: str | None,
+    topic: str | None,
+    lang: str = "ko",
+) -> str | None:
+    """Push body에 추가할 so_what_consumer 1줄 (경량). DB 접근 없음."""
+    cc = country_code or ""
+    topic = topic or "unknown"
+
+    # 국가→원자재 매핑에서 찾기
+    country_map = COUNTRY_COMMODITY_MAP.get(cc)
+    if country_map:
+        for sym in country_map["symbols"]:
+            if sym in COMMODITY_CONSUMER_MAP:
+                return COMMODITY_CONSUMER_MAP[sym][lang]
+
+    # 원유 관련 분쟁국 폴백
+    if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY", "YE"):
+        return COMMODITY_CONSUMER_MAP["WTI"][lang]
+    # 해상 분쟁 폴백
+    if topic == "maritime" or cc in ("EG", "PA", "SO", "YE"):
+        return COMMODITY_CONSUMER_MAP["BDRY"][lang]
+
+    return None
+
+
+def push_weather_emoji(severity: int) -> str:
+    """Push title prefix용 weather 이모지."""
+    if severity >= 80:
+        return "🌪️"
+    if severity >= 60:
+        return "⛈️"
+    if severity >= 40:
+        return "🌥️"
+    if severity >= 20:
+        return "⛅"
+    return "☀️"
+
+
+def push_severity_label(severity: int, lang: str = "ko") -> str:
+    """Push body용 5단계 severity 라벨."""
+    if lang == "ko":
+        if severity >= 80:
+            return "위험"
+        if severity >= 60:
+            return "주의"
+        if severity >= 40:
+            return "관심"
+        if severity >= 20:
+            return "양호"
+        return "안정"
+    else:
+        if severity >= 80:
+            return "Critical"
+        if severity >= 60:
+            return "Elevated"
+        if severity >= 40:
+            return "Watch"
+        if severity >= 20:
+            return "Fair"
+        return "Clear"

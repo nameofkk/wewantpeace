@@ -933,7 +933,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* 1.5. 기준 국가 (KScore 개인화) */}
+            {/* 1.5. 기준 국가 (위험지수 개인화) */}
             <div className="p-4 border-b border-border" data-tour="settings-home-country">
               <div className="flex items-center justify-between">
                 <div>
@@ -958,12 +958,12 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* 2. KScore 슬라이더 */}
+            {/* 2. 위험지수 슬라이더 */}
             <div className={cn("p-4", !hasFCMToken && "opacity-50 pointer-events-none")} data-tour="settings-kscore-slider">
               <div className="flex items-center justify-between mb-1">
                 <div>
-                  <p className="text-sm font-medium">{t(lang, "notif_kscore_title")}</p>
-                  <p className="text-[10px] text-muted-foreground">{t(lang, "notif_kscore_desc")}</p>
+                  <p className="text-sm font-medium">{lang === "ko" ? "최소 위험지수" : "Min. risk level"}</p>
+                  <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "이 수준 이상의 이슈만 알림" : "Only alert for issues above this level"}</p>
                 </div>
                 <span className="text-sm font-mono font-bold tabular-nums ml-3">
                   {kscoreValue.toFixed(1)}
@@ -1002,8 +1002,8 @@ export default function SettingsPage() {
                     className="w-full accent-primary"
                   />
                   <div className="flex justify-between text-[9px] text-muted-foreground">
-                    <span>{plan === "pro_plus" ? "1.5" : plan === "pro" ? "3.0" : "4.0"} · {t(lang, "notif_kscore_low")}</span>
-                    <span>10.0 · {t(lang, "notif_kscore_high")}</span>
+                    <span>{plan === "pro_plus" ? "1.5" : plan === "pro" ? "3.0" : "4.0"} · {lang === "ko" ? "낮음" : "Low"}</span>
+                    <span>10.0 · {lang === "ko" ? "극심" : "Extreme"}</span>
                   </div>
                 </div>
               )}
@@ -1305,7 +1305,7 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { icon: "✅", ko: "신뢰 알림", en: "Verified alerts" },
-                    { icon: "📊", ko: "KScore 조정", en: "KScore adjust" },
+                    { icon: "📊", ko: "위험지수 조정", en: "Risk level adjust" },
                     { icon: "🔕", ko: "방해금지 시간", en: "Quiet hours" },
                     { icon: "📍", ko: `관심 국가 ${PRO_COUNTRY_LIMIT}개`, en: `${PRO_COUNTRY_LIMIT} countries` },
                     { icon: "🛰️", ko: "인텔리전스 레이어", en: "Intel layers" },

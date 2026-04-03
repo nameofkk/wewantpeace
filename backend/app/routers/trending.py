@@ -18,6 +18,7 @@ from backend.app.core.limiter import limiter
 from backend.app.models.user import User, UserPreference
 from backend.app.models.trending_keyword import TrendingKeyword
 from backend.app.models.issue_cluster import IssueCluster
+from backend.app.utils.consumer import build_consumer_fields
 
 router = APIRouter(prefix="/trending", tags=["trending"])
 
@@ -85,6 +86,13 @@ class TrendingItem(BaseModel):
     reason: str = ""
     independent_sources: int = 1
     kscore_delta_24h: Optional[float] = None
+    # v2.0 Consumer Translation
+    so_what_consumer: str | None = None
+    wallet_line: str | None = None
+    trust_level: str | None = None
+    trust_detail: str | None = None
+    sensor_context: str | None = None
+    what_consumer: str | None = None
 
 
 # ── Pydantic 스키마 (추가) ─────────────────────────────────────────────────────
@@ -272,6 +280,7 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
         cid = str(c.id)
         prev_ks = fb_prev_map.get(cid)
         delta = round(ks - prev_ks, 2) if prev_ks is not None else None
+        _cf = build_consumer_fields(c, "en")
         scored.append(TrendingItem(
             id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,
@@ -289,6 +298,12 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
             reason=_make_global_reason(c, ks),
             independent_sources=c.independent_sources,
             kscore_delta_24h=delta,
+            so_what_consumer=_cf["so_what_consumer"],
+            wallet_line=_cf["wallet_line"],
+            trust_level=_cf["trust_level"],
+            trust_detail=_cf["trust_detail"],
+            sensor_context=_cf["sensor_context"],
+            what_consumer=_cf["what_consumer"],
         ))
 
     scored.sort(key=lambda x: x.kscore, reverse=True)
@@ -368,6 +383,7 @@ async def mine_trending(
         cid = str(c.id)
         prev_ks = prev_kscore_map.get(cid)
         delta = round(ks - prev_ks, 2) if prev_ks is not None else None
+        _cf = build_consumer_fields(c, "en")
         items.append(TrendingItem(
             id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,
@@ -385,6 +401,12 @@ async def mine_trending(
             reason=_make_mine_reason(c, ks),
             independent_sources=c.independent_sources,
             kscore_delta_24h=delta,
+            so_what_consumer=_cf["so_what_consumer"],
+            wallet_line=_cf["wallet_line"],
+            trust_level=_cf["trust_level"],
+            trust_detail=_cf["trust_detail"],
+            sensor_context=_cf["sensor_context"],
+            what_consumer=_cf["what_consumer"],
         ))
 
     items.sort(key=lambda x: x.kscore, reverse=True)
@@ -456,12 +478,17 @@ async def peek_trending(
     rows = result.mappings().all()
     sorted_rows = sorted(rows, key=lambda r: float(r["kscore"]), reverse=True)[:5]
 
-    return [
-        TrendingItem(
+    items = []
+    for r in sorted_rows:
+        _sev = r["severity"] or 0
+        _ks = round(float(r["kscore"]), 2)
+        # peek는 raw SQL이므로 제한적 consumer 필드 생성
+        _trust = "verified" if (r["event_count"] or 0) >= 3 else "reported" if (r["event_count"] or 0) >= 1 else "unconfirmed"
+        items.append(TrendingItem(
             id=r["id"],
             keyword=r["keyword"],
             keyword_ko=r["keyword_ko"],
-            kscore=round(float(r["kscore"]), 2),
+            kscore=_ks,
             topic=r["topic"],
             country_codes=r["country_codes"] or [],
             cluster_ids=[str(u) for u in (r["cluster_ids"] or [])],
@@ -472,13 +499,14 @@ async def peek_trending(
                 else str(r["calculated_at"])
             ),
             event_count=r["event_count"] or 0,
-            severity=r["severity"] or 0,
+            severity=_sev,
             is_spike=bool(r["is_spike"]),
-            reason=f"KScore {float(r['kscore']):.1f}",
+            reason=f"KScore {_ks:.1f}",
             independent_sources=1,
-        )
-        for r in sorted_rows
-    ]
+            trust_level=_trust,
+            what_consumer=r["keyword_ko"] or r["keyword"],
+        ))
+    return items
 
 
 @router.get("/kscore-history/{cluster_id}", response_model=list[KScoreHistoryPoint])

@@ -63,7 +63,7 @@ function CustomTooltip({
     <div className="rounded-lg border border-border bg-card/95 backdrop-blur-sm px-3 py-2 text-xs shadow-lg">
       <p className="text-muted-foreground mb-1">{new Date(d.time).toLocaleString(locale)}</p>
       <p className="font-bold" style={{ color }}>
-        KScore <span className="font-normal text-foreground">{d.kscore.toFixed(1)}</span>
+        {lang === "ko" ? "위험지수" : "Risk"} <span className="font-normal text-foreground">{d.kscore.toFixed(1)}</span>
       </p>
     </div>
   );

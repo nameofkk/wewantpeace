@@ -26,6 +26,11 @@ interface ClusterSummary {
   topic: string;
   kscore: number;
   country_code?: string | null;
+  // v2.0 Consumer fields
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  what_consumer?: string | null;
 }
 
 interface TensionData {
@@ -498,12 +503,16 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
                   style={{ animationDelay: `${500 + i * 70}ms` }}
                 >
                   <span className="text-[10px] text-muted-foreground w-4">{i + 1}.</span>
-                  <span className="flex-1 text-[11px] truncate">{clusterTitle}</span>
-                  <span className="text-[10px] text-muted-foreground">{t(lang, topicKey)}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] truncate block">{c.what_consumer || clusterTitle}</span>
+                    {c.so_what_consumer && (
+                      <span className="text-[9px] text-muted-foreground block truncate">{c.so_what_consumer}</span>
+                    )}
+                  </div>
                   <span className={cn(
-                    "text-[10px] font-bold tabular-nums",
+                    "text-[10px] font-bold tabular-nums shrink-0",
                     (c.kscore ?? 0) >= 8 ? "text-red-700 dark:text-red-300" : (c.kscore ?? 0) >= 6 ? "text-red-600 dark:text-red-400" : (c.kscore ?? 0) >= 4 ? "text-orange-600 dark:text-orange-300" : (c.kscore ?? 0) >= 2 ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground"
-                  )}>K{(c.kscore ?? 0).toFixed(1)}</span>
+                  )}>{(c.kscore ?? 0).toFixed(1)}</span>
                 </Link>
               );
             })}

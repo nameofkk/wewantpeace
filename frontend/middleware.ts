@@ -29,11 +29,11 @@ const META_KO = {
   body: `<p>전 세계 전쟁·분쟁이 내 삶에 미치는 영향을 실시간으로 추적하세요.</p>
 <ul>
 <li>긴장도 지수: 195개국 실시간 점수(0~100), 15분마다 갱신</li>
-<li>KScore: AI 기반 맞춤형 영향 분석</li>
+<li>위험지수: AI 기반 맞춤형 영향 분석</li>
 <li>리스크 레이더: 군사·에너지·무역·식량·금융 5축 위험 평가</li>
 <li>시장 스냅샷: 원유·금·가스 가격 및 환율과 분쟁 연계 분석</li>
 <li>글로벌 분쟁 지도: 히트맵 + 실시간 마커, 195개국</li>
-<li>스마트 알림: 관심 국가 기반 KScore 푸시 알림</li>
+<li>스마트 알림: 관심 국가 기반 위험지수 푸시 알림</li>
 </ul>`,
   nav: `<a href="${SITE}/home">대시보드</a> <a href="${SITE}/tension">긴장도 지수</a> <a href="${SITE}/feed">분쟁 피드</a> <a href="${SITE}/map">글로벌 지도</a>`,
 };
@@ -48,11 +48,11 @@ const META_EN = {
   body: `<p>Track how war and conflict impact your daily life in real time.</p>
 <ul>
 <li>Tension Index: Real-time country-level scores (0-100), updated every 15 minutes</li>
-<li>KScore: AI-powered impact analysis personalized to your country</li>
+<li>Risk Level: AI-powered impact analysis personalized to your country</li>
 <li>Risk Radar: Military, Energy, Trade, Food, Finance - 5-axis risk assessment</li>
 <li>Market Snapshot: Oil, gold, gas prices and exchange rates linked to conflicts</li>
 <li>Global Conflict Map: Heatmap + real-time markers across 195 countries</li>
-<li>Smart Alerts: KScore-based push notifications for your countries of interest</li>
+<li>Smart Alerts: Risk-level-based push notifications for your countries of interest</li>
 </ul>`,
   nav: `<a href="${SITE}/home">Dashboard</a> <a href="${SITE}/tension">Tension Index</a> <a href="${SITE}/feed">Conflict Feed</a> <a href="${SITE}/map">Global Map</a>`,
 };
