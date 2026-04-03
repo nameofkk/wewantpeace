@@ -1695,6 +1695,18 @@ export const translations = {
     tab_tension: "긴장도 지수 | WeWantPeace",
     tab_settings: "설정 | WeWantPeace",
     tab_community: "커뮤니티 | WeWantPeace",
+    // v2.0 Consumer Translation
+    issue_your_connection: "나와의 연결",
+    term_risk_level: "위험지수",
+    term_reports: "관련 보도",
+    term_sources: "확인된 출처",
+    settings_morning_briefing: "아침 브리핑",
+    settings_evening_digest: "저녁 요약",
+    invite_title: "친구 초대",
+    invite_desc: "분쟁이 내 지갑에 미치는 영향, 매일 30초로 확인해요",
+    invite_button: "초대 링크 공유",
+    upgrade_missed_title: "놓친 알림이 있어요",
+    upgrade_missed_body: "지난 7일간 {count}건의 알림을 놓쳤어요",
   },
   en: {
     // bottom nav
@@ -3388,13 +3400,25 @@ export const translations = {
     tab_tension: "Tension Index | WeWantPeace",
     tab_settings: "Settings | WeWantPeace",
     tab_community: "Community | WeWantPeace",
+    // v2.0 Consumer Translation
+    issue_your_connection: "Your Connection",
+    term_risk_level: "Risk Level",
+    term_reports: "Related reports",
+    term_sources: "Verified sources",
+    settings_morning_briefing: "Morning Briefing",
+    settings_evening_digest: "Evening Digest",
+    invite_title: "Invite Friends",
+    invite_desc: "See how conflicts affect your wallet, in 30 seconds daily",
+    invite_button: "Share invite link",
+    upgrade_missed_title: "You missed some alerts",
+    upgrade_missed_body: "You missed {count} alerts in the past 7 days",
   },
 } as const;
 
 export type TranslationKey = keyof typeof translations.ko;
 
 export function t(lang: Lang, key: TranslationKey, vars?: Record<string, string | number>): string {
-  let str: string = (translations[lang] as Record<string, string>)[key] ?? (translations.ko as Record<string, string>)[key] ?? key;
+  let str: string = (translations[lang] as Record<string, string>)[key] ?? (translations.en as Record<string, string>)[key] ?? key;
   if (vars) {
     Object.entries(vars).forEach(([k, v]) => {
       str = str.replace(`{${k}}`, String(v));
