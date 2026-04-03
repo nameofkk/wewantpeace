@@ -145,6 +145,8 @@ def build_consumer_fields(
     cluster,
     lang: str,
     commodity_prices: dict[str, tuple[float, float]] | None = None,
+    relevant_commodities: list[str] | None = None,
+    so_what_fallback: str | None = None,
 ) -> dict:
     """Consumer 필드 생성. impact.py의 _build_smart_summary() 뒤에 호출."""
     cc = cluster.country_code or ""
@@ -176,6 +178,31 @@ def build_consumer_fields(
         elif topic == "maritime" or cc in ("EG", "PA", "SO", "YE"):
             so_what_consumer = COMMODITY_CONSUMER_MAP["BDRY"][lang]
 
+    # relevant_commodities 폴백 (smart summary에서 추출된 원자재)
+    # 생활밀접 원자재 우선 (WTI>WHEAT>NATGAS>...), GOLD/SILVER는 최후순위
+    if not so_what_consumer and relevant_commodities:
+        _LIFE_PRIORITY = ("WTI", "BRENT", "WHEAT", "CORN", "RICE", "SOYBEAN", "NATGAS", "BDRY", "JET_FUEL")
+        for sym in _LIFE_PRIORITY:
+            if sym in relevant_commodities and sym in COMMODITY_CONSUMER_MAP:
+                so_what_consumer = COMMODITY_CONSUMER_MAP[sym][lang]
+                break
+        if not so_what_consumer:
+            for sym in relevant_commodities:
+                if sym in COMMODITY_CONSUMER_MAP:
+                    so_what_consumer = COMMODITY_CONSUMER_MAP[sym][lang]
+                    break
+
+    # 최종 폴백: 기존 so_what_line
+    if not so_what_consumer and so_what_fallback:
+        so_what_consumer = so_what_fallback
+
+    # severity 기반 일반 폴백 (어떤 매핑에도 안 걸린 경우)
+    if not so_what_consumer:
+        if severity >= 60:
+            so_what_consumer = "글로벌 공급망·시장에 영향을 줄 수 있어요" if lang == "ko" else "May affect global supply chains & markets"
+        elif severity >= 40:
+            so_what_consumer = "국제 정세 변동에 따른 시장 불확실성 증가" if lang == "ko" else "Market uncertainty rising with geopolitical shifts"
+
     # ── when_consumer: 구어체 시간 ──
     if severity >= 80:
         when_consumer = "바로 영향이 올 수 있어요" if lang == "ko" else "Impact could be immediate"
@@ -193,12 +220,24 @@ def build_consumer_fields(
             if sym in WALLET_LINE_MAP:
                 wallet_line = WALLET_LINE_MAP[sym][lang]
                 break
-    if not wallet_line and so_what_consumer:
-        # so_what_consumer가 있으면 첫 번째 관련 원자재 wallet_line
+    if not wallet_line:
+        # 원유/해상 분쟁 폴백
         if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY", "YE"):
             wallet_line = WALLET_LINE_MAP.get("WTI", {}).get(lang)
         elif topic == "maritime" or cc in ("EG", "PA", "SO", "YE"):
             wallet_line = WALLET_LINE_MAP.get("BDRY", {}).get(lang)
+    # relevant_commodities 폴백 (생활밀접 우선)
+    if not wallet_line and relevant_commodities:
+        _LIFE_PRIORITY = ("WTI", "BRENT", "WHEAT", "CORN", "RICE", "SOYBEAN", "NATGAS", "BDRY", "JET_FUEL")
+        for sym in _LIFE_PRIORITY:
+            if sym in relevant_commodities and sym in WALLET_LINE_MAP:
+                wallet_line = WALLET_LINE_MAP[sym][lang]
+                break
+        if not wallet_line:
+            for sym in relevant_commodities:
+                if sym in WALLET_LINE_MAP:
+                    wallet_line = WALLET_LINE_MAP[sym][lang]
+                    break
 
     # ── trust_level + sensor_context ──
     sig_count = getattr(cluster, "signal_corroboration_count", 0) or 0
