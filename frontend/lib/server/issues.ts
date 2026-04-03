@@ -21,6 +21,13 @@ export interface IssueServer {
   kscore: number;
   first_event_at: string;
   last_event_at: string;
+  // Consumer fields (v2.0)
+  what_consumer?: string | null;
+  so_what_consumer?: string | null;
+  so_what_line?: string | null;
+  when_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
   events: Array<{
     id: string;
     title: string;

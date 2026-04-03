@@ -83,6 +83,13 @@ interface ClusterDetail {
   last_event_at: string;
   events: EventOut[];
   change_logs?: ChangeLog[];
+  // v2.0 Consumer fields
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  trust_detail?: string | null;
+  sensor_context?: string | null;
+  what_consumer?: string | null;
 }
 
 interface Props {
@@ -117,7 +124,7 @@ function KScoreTooltip({ active, payload, lang }: { active?: boolean; payload?: 
         {new Date(d.time).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
       </p>
       <p className="font-bold" style={{ color: scoreColor }}>
-        KScore <span className="font-normal text-foreground">{d.kscore.toFixed(1)}</span>
+        {lang === "ko" ? "위험지수" : "Risk"} <span className="font-normal text-foreground">{d.kscore.toFixed(1)}</span>
       </p>
     </div>
   );
@@ -414,16 +421,24 @@ export default function IssueDetailClient({ initialData, id: propId }: Props) {
 
           <div className="grid grid-cols-3 text-center mb-4" style={{ gap: "var(--gap-card)" }}>
             <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
-              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{issue.severity}</p>
-              <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_severity")}</p>
+              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>
+                {issue.severity >= 80 ? "🌪️" : issue.severity >= 60 ? "⛈️" : issue.severity >= 40 ? "🌥️" : issue.severity >= 20 ? "⛅" : "☀️"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {issue.severity >= 80 ? (lang === "ko" ? "위험" : "Critical") : issue.severity >= 60 ? (lang === "ko" ? "주의" : "Elevated") : issue.severity >= 40 ? (lang === "ko" ? "관심" : "Watch") : issue.severity >= 20 ? (lang === "ko" ? "양호" : "Fair") : (lang === "ko" ? "안정" : "Clear")}
+              </p>
             </div>
             <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
-              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{Math.round(issue.confidence * 100)}%</p>
-              <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_confidence")}</p>
+              <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>
+                {issue.trust_level === "confirmed" ? "✓✓✓" : issue.trust_level === "verified" ? "✓✓" : issue.trust_level === "reported" ? "✓" : issue.independent_sources ? `${issue.independent_sources}` : `${Math.round(issue.confidence * 100)}%`}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {issue.trust_level ? (lang === "ko" ? (issue.trust_level === "confirmed" ? "검증 완료" : issue.trust_level === "verified" ? "검증됨" : issue.trust_level === "reported" ? "보도됨" : "미확인") : (issue.trust_level === "confirmed" ? "Confirmed" : issue.trust_level === "verified" ? "Verified" : issue.trust_level === "reported" ? "Reported" : "Unconfirmed")) : t(lang, "issue_stat_confidence")}
+              </p>
             </div>
             <div className="rounded-lg bg-secondary p-1.5 sm:p-2">
               <p className="font-bold" style={{ fontSize: "var(--text-score-md)" }}>{issue.event_count}</p>
-              <p className="text-[10px] text-muted-foreground">{t(lang, "issue_stat_events")}</p>
+              <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "관련 보도" : "Reports"}</p>
             </div>
           </div>
 
@@ -483,6 +498,45 @@ export default function IssueDetailClient({ initialData, id: propId }: Props) {
 
           {showHistory && <KScoreHistorySection clusterId={issue.id} lang={lang} />}
         </div>
+
+        {/* v2.0: Your Connection 섹션 */}
+        {(issue.so_what_consumer || issue.wallet_line) && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 pb-2.5 mb-3 border-b border-border">
+              <div className="w-1 h-4 rounded-full bg-amber-500 shrink-0" />
+              <h3 className="text-xs font-bold text-foreground">{t(lang, "issue_your_connection")}</h3>
+              {issue.trust_level && (() => {
+                const TRUST: Record<string, { bg: string; text: string; icon: string; ko: string; en: string }> = {
+                  confirmed: { bg: "bg-emerald-600/15", text: "text-emerald-600", icon: "✓✓✓", ko: "검증 완료", en: "Confirmed" },
+                  verified: { bg: "bg-emerald-500/10", text: "text-emerald-500", icon: "✓✓", ko: "검증됨", en: "Verified" },
+                  reported: { bg: "bg-blue-500/10", text: "text-blue-500", icon: "✓", ko: "보도됨", en: "Reported" },
+                  unconfirmed: { bg: "bg-amber-500/10", text: "text-amber-500", icon: "⚠️", ko: "미확인", en: "Unconfirmed" },
+                };
+                const tr = TRUST[issue.trust_level] ?? TRUST.unconfirmed;
+                return (
+                  <span className={cn("text-[9px] font-medium px-1.5 py-0.5 rounded-full ml-auto", tr.bg, tr.text)}>
+                    {tr.icon} {lang === "ko" ? tr.ko : tr.en}
+                  </span>
+                );
+              })()}
+            </div>
+            {issue.so_what_consumer && (
+              <p className="text-[11px] text-foreground/80 leading-relaxed">{issue.so_what_consumer}</p>
+            )}
+            {issue.wallet_line && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-xs">💰</span>
+                <span className="text-[11px] text-amber-600 dark:text-amber-400">{issue.wallet_line}</span>
+              </div>
+            )}
+            {issue.sensor_context && (
+              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+                <span className="text-[9px]">🛰️</span>
+                <span className="text-[9px] text-muted-foreground">{issue.sensor_context}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 교차검증 증거 */}
         <CrossValidationSection clusterId={id} lang={lang} />

@@ -124,6 +124,20 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>(0);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [homeCountryLocal, setHomeCountryLocal] = useState("KR");
+  const [geoDetected, setGeoDetected] = useState(false);
+
+  // GeoIP 자동감지 — Zero-Question 개인화
+  useEffect(() => {
+    fetch("https://ipapi.co/json/")
+      .then(r => r.json())
+      .then(data => {
+        if (data.country_code && typeof data.country_code === "string") {
+          setHomeCountryLocal(data.country_code);
+          setGeoDetected(true);
+        }
+      })
+      .catch(() => {}); // 실패 시 KR 폴백 유지
+  }, []);
   const [pushStatus, setPushStatus] = useState<"default" | "granted" | "denied">("default");
   const [search, setSearch] = useState("");
   const [proBannerHighlight, setProBannerHighlight] = useState(false);

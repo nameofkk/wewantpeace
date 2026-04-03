@@ -20,6 +20,13 @@ export interface TrendingItem {
   kscore_delta_24h?: number | null;
   is_spike?: boolean;
   confidence?: number;
+  // v2.0 Consumer fields
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  trust_detail?: string | null;
+  sensor_context?: string | null;
+  what_consumer?: string | null;
 }
 
 // ── 토픽 컬러 ─────────────────────────────────────────────────────────────

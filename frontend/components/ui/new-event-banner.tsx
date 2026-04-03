@@ -307,7 +307,7 @@ export function NewEventBanner() {
               <span className="text-[10px] text-muted-foreground/60">·</span>
               <span className="text-[10px] text-muted-foreground">{topicLabel}</span>
               <span className="text-[10px] text-muted-foreground/50 font-mono ml-auto">
-                KScore {item?.kscore.toFixed(1)}
+                {lang === "ko" ? "위험" : "Risk"} {item?.kscore.toFixed(1)}
               </span>
             </div>
             <p className="text-sm font-medium text-foreground truncate">

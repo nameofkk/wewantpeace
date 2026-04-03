@@ -18,8 +18,10 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
-  const title = data.title || payload.notification?.title || "WeWantPeace 알림";
-  const body = data.body || payload.notification?.body || "";
+  const emoji = data.weather_emoji || "🌍";
+  const rawTitle = data.what_consumer || data.title || payload.notification?.title || "WeWantPeace";
+  const title = `${emoji} ${rawTitle}`;
+  const body = data.so_what_consumer || data.body || payload.notification?.body || "";
 
   self.registration.showNotification(title, {
     body,

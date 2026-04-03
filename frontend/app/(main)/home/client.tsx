@@ -475,15 +475,35 @@ function ReportContent() {
                 )}
               </div>
 
-              {/* Streak */}
-              {streakDays > 0 && (
-                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
-                  <span className="text-xs">🔥</span>
-                  <span className="text-[10px] font-medium">
-                    {streakDays}{lang === "ko" ? "일 연속 확인" : "-day streak"}
-                  </span>
-                </div>
-              )}
+              {/* Streak + Share */}
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50">
+                {streakDays > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs">🔥</span>
+                    <span className="text-[10px] font-medium">
+                      {streakDays}{lang === "ko" ? "일 연속 확인" : "-day streak"}
+                    </span>
+                  </div>
+                )}
+                <button
+                  className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={async () => {
+                    const emoji = summary?.weather_emoji ?? "☀️";
+                    const label = lang === "ko" ? summary?.weather_label_ko ?? "안정" : summary?.weather_label_en ?? "Clear";
+                    const score = Math.round(impactScore);
+                    const text = lang === "ko"
+                      ? `🌍 오늘의 분쟁 날씨: ${emoji} ${label} (${score}/100)\n\n${summary?.summary ?? ""}\n\n👉 나도 확인하기: https://www.wewantpeace.live`
+                      : `🌍 Today's conflict weather: ${emoji} ${label} (${score}/100)\n\n${summary?.summary ?? ""}\n\n👉 Check yours: https://www.wewantpeace.live`;
+                    if (navigator.share) {
+                      try { await navigator.share({ text }); } catch {}
+                    } else {
+                      await navigator.clipboard.writeText(text);
+                    }
+                  }}
+                >
+                  {lang === "ko" ? "공유" : "Share"}
+                </button>
+              </div>
             </div>
 
             {/* Watchlist chips */}

@@ -55,9 +55,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const pageUrl = `${SITE_URL}/issues/${issue.id}${langSuffix}`;
   const severity = issue.severity ?? 0;
   const eventCount = issue.event_count ?? 0;
+  const weatherEmoji = severity >= 80 ? "🌪️" : severity >= 60 ? "⛈️" : severity >= 40 ? "🌥️" : severity >= 20 ? "⛅" : "☀️";
+  const soWhat = isEn
+    ? (issue.so_what_consumer || issue.so_what_line || `${eventCount} reports`)
+    : (issue.so_what_consumer || issue.so_what_line || `${eventCount}건 보도`);
+  const walletPart = issue.wallet_line ? ` · 💰 ${issue.wallet_line}` : "";
   const desc = isEn
-    ? `Severity ${severity} · ${eventCount} reports · Real-time global conflict monitoring`
-    : `위기지수 ${severity} · ${eventCount}건 보도 · 실시간 세계 분쟁 모니터링`;
+    ? `${weatherEmoji} ${soWhat}${walletPart} — WeWantPeace`
+    : `${weatherEmoji} ${soWhat}${walletPart} — WeWantPeace`;
 
   const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
 

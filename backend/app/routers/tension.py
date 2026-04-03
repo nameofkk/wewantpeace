@@ -6,6 +6,7 @@ GET /tension/peek              — 긴장도 레벨 변화 인앱 알림용 폴�
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+from types import SimpleNamespace
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -18,6 +19,7 @@ from backend.app.core.limiter import limiter
 from backend.app.models.user import User
 from backend.app.models.tension_index import TensionIndex
 from backend.app.models.issue_cluster import IssueCluster
+from backend.app.utils.consumer import build_consumer_fields, get_weather
 
 router = APIRouter(prefix="/tension", tags=["tension"])
 
@@ -37,6 +39,13 @@ class ClusterSummary(BaseModel):
     event_count: int = 0
     image_url: Optional[str] = None
     country_code: Optional[str] = None
+    # consumer fields
+    so_what_consumer: Optional[str] = None
+    wallet_line: Optional[str] = None
+    trust_level: Optional[str] = None
+    trust_detail: Optional[str] = None
+    sensor_context: Optional[str] = None
+    what_consumer: Optional[str] = None
 
 
 class TensionOut(BaseModel):
@@ -53,6 +62,10 @@ class TensionOut(BaseModel):
     delta_24h: Optional[float] = None
     updated_at: str
     top5_clusters: list[ClusterSummary]
+    # weather fields
+    weather_emoji: str = "\u2600\ufe0f"
+    weather_label_ko: str = "\uc548\uc815"
+    weather_label_en: str = "Clear"
 
 
 class TensionHistoryPoint(BaseModel):
@@ -97,8 +110,10 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
         .limit(5)
     )
     clusters = result.scalars().all()
-    return [
-        ClusterSummary(
+    summaries: list[ClusterSummary] = []
+    for c in clusters:
+        _cf = build_consumer_fields(c, "en")
+        summaries.append(ClusterSummary(
             id=str(c.id),
             title=c.title,
             title_ko=c.title_ko,
@@ -109,9 +124,14 @@ async def _get_top5(country_code: str, db: AsyncSession, min_severity: int = 0) 
             event_count=c.event_count,
             image_url=c.image_url,
             country_code=c.country_code,
-        )
-        for c in clusters
-    ]
+            so_what_consumer=_cf.get("so_what_consumer"),
+            wallet_line=_cf.get("wallet_line"),
+            trust_level=_cf.get("trust_level"),
+            trust_detail=_cf.get("trust_detail"),
+            sensor_context=_cf.get("sensor_context"),
+            what_consumer=_cf.get("what_consumer"),
+        ))
+    return summaries
 
 
 async def _get_top5_batch(
@@ -140,6 +160,9 @@ async def _get_top5_batch(
             IssueCluster.kscore,
             IssueCluster.event_count,
             IssueCluster.image_url,
+            IssueCluster.signal_corroboration_count,
+            IssueCluster.signal_types,
+            IssueCluster.independent_sources,
             rn_col,
         )
         .where(
@@ -160,6 +183,18 @@ async def _get_top5_batch(
 
     top5_map: dict[str, list[ClusterSummary]] = {}
     for row in rows:
+        # build_consumer_fields expects an object with attributes
+        _proxy = SimpleNamespace(
+            country_code=row.country_code,
+            topic=row.topic,
+            severity=row.severity,
+            title=row.title,
+            title_ko=row.title_ko,
+            signal_corroboration_count=row.signal_corroboration_count,
+            signal_types=row.signal_types,
+            independent_sources=row.independent_sources,
+        )
+        _cf = build_consumer_fields(_proxy, "en")
         cs = ClusterSummary(
             id=str(row.id),
             title=row.title,
@@ -171,6 +206,12 @@ async def _get_top5_batch(
             event_count=row.event_count,
             image_url=row.image_url,
             country_code=row.country_code,
+            so_what_consumer=_cf.get("so_what_consumer"),
+            wallet_line=_cf.get("wallet_line"),
+            trust_level=_cf.get("trust_level"),
+            trust_detail=_cf.get("trust_detail"),
+            sensor_context=_cf.get("sensor_context"),
+            what_consumer=_cf.get("what_consumer"),
         )
         top5_map.setdefault(row.country_code, []).append(cs)
     return top5_map
@@ -179,6 +220,7 @@ async def _get_top5_batch(
 def _tension_to_out(
     t: TensionIndex, top5: list[ClusterSummary], delta_24h: Optional[float] = None,
 ) -> TensionOut:
+    w = get_weather(t.raw_score)
     return TensionOut(
         country_code=t.country_code,
         raw_score=round(t.raw_score, 1),
@@ -193,6 +235,9 @@ def _tension_to_out(
         delta_24h=delta_24h,
         updated_at=t.time.isoformat(),
         top5_clusters=top5,
+        weather_emoji=w["emoji"],
+        weather_label_ko=w["label_ko"],
+        weather_label_en=w["label_en"],
     )
 
 

@@ -258,7 +258,7 @@ export default function CountryIssuesPage() {
                   <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                     <span>{t(lang, "country_stat_severity")} <span className="font-medium" style={{ color }}>{cluster.severity}</span></span>
                     <span>{t(lang, "country_stat_events")} {cluster.event_count}</span>
-                    <span>KScore {cluster.kscore.toFixed(1)}</span>
+                    <span>{lang === "ko" ? "위험" : "Risk"} {cluster.kscore.toFixed(1)}</span>
                     <span className="ml-auto">{formatTime(cluster.last_event_at)}</span>
                   </div>
                 </div>

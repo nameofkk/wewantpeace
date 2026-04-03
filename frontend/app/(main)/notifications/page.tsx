@@ -15,10 +15,10 @@ import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
 import type { Step } from "react-joyride";
 
 const NOTIF_TYPE_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
-  verified: { bg: "bg-green-500/20", text: "text-green-400", labelKo: "확인", labelEn: "Verified" },
-  fast: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "긴급", labelEn: "Fast" },
-  daily_summary: { bg: "bg-blue-500/20", text: "text-blue-400", labelKo: "일일 요약", labelEn: "Daily" },
-  weekly_report: { bg: "bg-purple-500/20", text: "text-purple-400", labelKo: "주간", labelEn: "Weekly" },
+  verified: { bg: "bg-emerald-500/15", text: "text-emerald-500", labelKo: "검증됨", labelEn: "Confirmed" },
+  fast: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "⛈️ 주의", labelEn: "⛈️ Alert" },
+  daily_summary: { bg: "bg-blue-500/20", text: "text-blue-400", labelKo: "오늘의 브리핑", labelEn: "Briefing" },
+  weekly_report: { bg: "bg-purple-500/20", text: "text-purple-400", labelKo: "주간 요약", labelEn: "Weekly" },
 };
 
 const NOTIF_TYPE_FALLBACK = NOTIF_TYPE_STYLES.fast;
@@ -162,10 +162,10 @@ export default function NotificationsPage() {
                       {timeAgo(notif.created_at, lang)}
                     </span>
                   </div>
-                  <p className="text-sm font-medium text-foreground truncate">
+                  <p className="text-sm font-medium text-foreground line-clamp-2">
                     {notif.title}
                   </p>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
                     {notif.body}
                   </p>
                   {/* 피드백 버튼 */}

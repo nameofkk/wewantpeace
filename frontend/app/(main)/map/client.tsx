@@ -268,7 +268,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
         <div className="rounded-lg p-2" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
           <p className="text-lg font-bold" style={{ color }}>{roundKScore(cluster.kscore).toFixed(1)}</p>
           <p className="flex items-center justify-center gap-0.5 text-[10px] text-muted-foreground">
-            KScore
+            {lang === "ko" ? "위험지수" : "Risk"}
             <InfoTooltip direction="up" text={t(lang, "map_popup_kscore_tooltip")} />
           </p>
         </div>
@@ -282,7 +282,7 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
         <div className="rounded-lg bg-secondary p-2">
           <p className="text-lg font-bold">{cluster.event_count}</p>
           <p className="text-[10px] text-muted-foreground">
-            {t(lang, "map_popup_events")}
+            {lang === "ko" ? "관련 보도" : "Reports"}
             {(cluster.grouped_total_events ?? 0) > cluster.event_count && (
               <span className="text-primary/70"> /{cluster.grouped_total_events}</span>
             )}
@@ -1823,8 +1823,8 @@ export default function MapPage() {
           {showHeatmap && (
             <div className="mt-1 rounded-lg bg-background/80 px-2.5 py-1 text-[10px] text-muted-foreground backdrop-blur-sm text-center">
               {lang === "ko"
-                ? "히트맵: 국가별 긴장도 | 마커: 개별 이슈 KScore"
-                : "Heatmap: Country tension | Markers: Issue KScore"}
+                ? "히트맵: 국가별 긴장도 | 마커: 개별 이슈 위험지수"
+                : "Heatmap: Country tension | Markers: Issue risk level"}
             </div>
           )}
         </div>

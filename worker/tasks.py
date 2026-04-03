@@ -1477,6 +1477,7 @@ def push_alert(self, cluster_id: str, alert_kind: str = "fast"):
                     notif_type=notif_type,
                     db=db,
                     cluster_topic=cluster.topic,
+                    severity=cluster.severity or 0,
                 )
 
                 logger.info("push_alert 완료: kind=%s result=%s", alert_kind, result)
@@ -2137,18 +2138,18 @@ def send_trial_nudges(self):
 
                     if lang == "en":
                         if missed_count > 0:
-                            title = f"Pro Trial · Day 3"
-                            body = f"{missed_count} alerts detected in the last 72 hours"
+                            title = "⛈️ Pro Trial · Day 3"
+                            body = f"You missed {missed_count} conflict alerts in 72 hours. Stay informed."
                         else:
-                            title = "Pro Trial · Day 3"
-                            body = "Check the tension level in your monitored regions"
+                            title = "⛈️ Pro Trial · Day 3"
+                            body = "Check how conflicts are affecting your daily life"
                     else:
                         if missed_count > 0:
-                            title = f"Pro 체험 중 · 3일 경과"
-                            body = f"지난 72시간 알림 {missed_count}건이 감지되었습니다"
+                            title = "⛈️ Pro 체험 중 · 3일 경과"
+                            body = f"72시간 동안 분쟁 알림 {missed_count}건을 놓쳤어요"
                         else:
-                            title = "Pro 체험 중 · 3일 경과"
-                            body = "현재 관심 지역의 긴장도를 확인하세요"
+                            title = "⛈️ Pro 체험 중 · 3일 경과"
+                            body = "분쟁이 내 생활에 미치는 영향을 확인하세요"
 
                     notif = Notification(
                         user_id=sub.user_id,
@@ -2200,12 +2201,12 @@ def send_trial_nudges(self):
                     missed_count = missed_result.scalar() or 0
 
                     if lang == "en":
-                        title = "Trial ends tomorrow"
-                        body = "Subscribe now to keep all Pro features without interruption."
+                        title = "🌪️ Trial ends tomorrow"
+                        body = "Don't lose access to conflict-to-wallet insights. Subscribe now."
                         email_subject = "Your WeWantPeace Pro trial ends tomorrow"
                     else:
-                        title = "체험 종료 D-1"
-                        body = "내일이면 Pro 기능이 비활성화됩니다. 지금 구독하면 끊김 없이 계속 사용할 수 있어요."
+                        title = "🌪️ 체험 종료 D-1"
+                        body = "분쟁이 내 지갑에 미치는 영향, 계속 받아보세요. 지금 구독하면 끊김 없이 이용 가능해요."
                         email_subject = "WeWantPeace Pro 체험이 내일 종료됩니다"
 
                     notif = Notification(
@@ -2274,6 +2275,7 @@ def send_daily_engagement(self):
             _HOME_COUNTRY_NAMES_KO, _HOME_COUNTRY_NAMES_EN,
             _is_in_quiet_hours,
         )
+        from backend.app.utils.consumer import push_weather_emoji, push_severity_label
 
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(hours=24)
@@ -2371,35 +2373,37 @@ def send_daily_engagement(self):
                         if top:
                             cc = top.country_code
                             score = int(top.raw_score)
+                            _emoji = push_weather_emoji(score)
+                            _slabel = push_severity_label(score, lang)
                             names_ko = _HOME_COUNTRY_NAMES_KO
                             names_en = _HOME_COUNTRY_NAMES_EN
                             name = names_ko.get(cc, cc) if lang == "ko" else names_en.get(cc, cc)
 
                             if lang == "ko":
-                                title = "오늘의 관심 국가 브리핑"
+                                title = f"{_emoji} 오늘의 분쟁 날씨"
                                 if new_issues > 0:
-                                    body = f"{name} 긴장도 {score}점 · 어제 새 이슈 {new_issues}건 감지"
+                                    body = f"{name} {_slabel} · 새 이슈 {new_issues}건"
                                 else:
-                                    body = f"{name} 긴장도 {score}점 · 최신 상황을 확인하세요"
+                                    body = f"{name} {_slabel} · 최신 상황을 확인하세요"
                             else:
-                                title = "Your daily briefing"
+                                title = f"{_emoji} Today's conflict weather"
                                 if new_issues > 0:
-                                    body = f"{name} tension {score}/100 · {new_issues} new issue(s) detected"
+                                    body = f"{name} {_slabel} · {new_issues} new issue(s)"
                                 else:
-                                    body = f"{name} tension {score}/100 · Check the latest updates"
+                                    body = f"{name} {_slabel} · Check the latest updates"
                         else:
                             if lang == "ko":
-                                title = "오늘의 글로벌 분쟁 상황"
+                                title = "☀️ 오늘의 분쟁 날씨"
                                 body = "관심 국가의 최신 상황을 확인해보세요"
                             else:
-                                title = "Today's global conflicts"
+                                title = "☀️ Today's conflict weather"
                                 body = "Check the latest updates in your watched regions"
                     else:
                         if lang == "ko":
-                            title = "오늘의 글로벌 분쟁 상황"
+                            title = "🌍 오늘의 분쟁 날씨"
                             body = "전 세계 분쟁 상황을 확인해보세요"
                         else:
-                            title = "Today's global conflicts"
+                            title = "🌍 Today's conflict weather"
                             body = "Check today's worldwide conflict updates"
 
                     try:
@@ -2505,12 +2509,12 @@ def send_expired_trial_offers(self):
                     missed_count = missed_result.scalar() or 0
 
                     if lang == "en":
-                        title = "30% off your first month · Get Pro back"
-                        body = "Subscribe now and get back real-time alerts and all Pro features."
+                        title = "🌍 30% off · Get conflict-to-wallet insights back"
+                        body = "Don't miss how conflicts affect your daily costs. Subscribe now."
                         email_subject = "Special offer from WeWantPeace"
                     else:
-                        title = "첫 달 30% 할인 · Pro를 다시 만나보세요"
-                        body = "지금 구독하면 실시간 알림과 모든 Pro 기능을 다시 사용할 수 있어요."
+                        title = "🌍 첫 달 30% 할인 · 분쟁 날씨를 다시 받아보세요"
+                        body = "분쟁이 내 지갑에 미치는 영향, 놓치지 마세요. 지금 구독하세요."
                         email_subject = "WeWantPeace에서 특별 혜택을 드립니다"
 
                     # 인앱 알림
@@ -2591,9 +2595,9 @@ def send_expired_trial_offers(self):
                     missed_count = missed_result.scalar() or 0
 
                     if lang == "en":
-                        email_subject = f"You've missed {missed_count} crisis alerts since your trial ended"
+                        email_subject = f"You missed {missed_count} conflict alerts that may affect your wallet"
                     else:
-                        email_subject = f"체험 이후 {missed_count}건의 위기 알림을 놓치셨습니다"
+                        email_subject = f"체험 이후 내 지갑에 영향을 줄 수 있는 알림 {missed_count}건을 놓치셨어요"
 
                     await _send_trial_email(
                         user_email=user.email,
