@@ -138,7 +138,7 @@ async def _get_kscore_delta_24h(
 
 @router.get("/global", response_model=list[TrendingItem])
 @limiter.limit("60/minute")
-async def global_trending(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+async def global_trending(request: Request, response: Response, db: AsyncSession = Depends(get_db), lang: str = "en"):
     response.headers["Cache-Control"] = "public, max-age=300"
     """
     글로벌 트렌딩 상위 20개 반환.
@@ -146,10 +146,11 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
     """
     import json
 
-    # 1. Redis 캐시 확인
+    # 1. Redis 캐시 확인 (lang별 캐시)
+    _cache_key = f"{_TRENDING_CACHE_KEY}:{lang}"
     try:
         redis = get_redis()
-        cached_json = await redis.get(_TRENDING_CACHE_KEY)
+        cached_json = await redis.get(_cache_key)
         if cached_json:
             return json.loads(cached_json)
     except Exception:
@@ -192,14 +193,16 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
             if cids:
                 all_cids.append(cids[0])
         cid_to_first: dict = {}
+        cid_to_cluster: dict = {}
         if all_cids:
             cr = await db.execute(
-                select(IssueCluster.id, IssueCluster.first_event_at).where(
+                select(IssueCluster).where(
                     IssueCluster.id.in_(all_cids)
                 )
             )
-            for row in cr.fetchall():
-                cid_to_first[str(row[0])] = row[1].isoformat() if row[1] else None
+            for c_obj in cr.scalars().all():
+                cid_to_first[str(c_obj.id)] = c_obj.first_event_at.isoformat() if c_obj.first_event_at else None
+                cid_to_cluster[str(c_obj.id)] = c_obj
 
         # 24h 전 KScore delta 배치 조회
         delta_cids = [str(r["cluster_ids"][0]) for r in sorted_rows if r["cluster_ids"]]
@@ -213,6 +216,22 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
             cur_ks = round(float(r["kscore"]), 2)
             prev_ks = prev_kscore_map.get(cid) if cid else None
             delta = round(cur_ks - prev_ks, 2) if prev_ks is not None else None
+            # Consumer fields from cluster object (or proxy from raw row)
+            if cid and cid in cid_to_cluster:
+                _cf = build_consumer_fields(cid_to_cluster[cid], lang)
+            else:
+                from types import SimpleNamespace
+                _proxy = SimpleNamespace(
+                    country_code=(r["country_codes"] or [None])[0],
+                    topic=r["topic"],
+                    severity=r["severity"] or 0,
+                    title=r["keyword"],
+                    title_ko=r["keyword_ko"],
+                    signal_corroboration_count=0,
+                    signal_types=[],
+                    independent_sources=int(r["independent_sources"] or 0),
+                )
+                _cf = build_consumer_fields(_proxy, lang)
             out.append(TrendingItem(
                 id=r["id"],
                 keyword=r["keyword"],
@@ -231,13 +250,19 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
                 reason=f"KScore {float(r['kscore']):.1f}",
                 independent_sources=int(r["independent_sources"] or 1),
                 kscore_delta_24h=delta,
+                so_what_consumer=_cf.get("so_what_consumer"),
+                wallet_line=_cf.get("wallet_line"),
+                trust_level=_cf.get("trust_level"),
+                trust_detail=_cf.get("trust_detail"),
+                sensor_context=_cf.get("sensor_context"),
+                what_consumer=_cf.get("what_consumer"),
             ))
 
         # Redis 캐시 갱신
         try:
             redis = get_redis()
             await redis.setex(
-                _TRENDING_CACHE_KEY,
+                _cache_key,
                 _TRENDING_CACHE_TTL,
                 json.dumps([item.dict() for item in out]),
             )
@@ -280,7 +305,7 @@ async def global_trending(request: Request, response: Response, db: AsyncSession
         cid = str(c.id)
         prev_ks = fb_prev_map.get(cid)
         delta = round(ks - prev_ks, 2) if prev_ks is not None else None
-        _cf = build_consumer_fields(c, "en")
+        _cf = build_consumer_fields(c, lang)
         scored.append(TrendingItem(
             id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,
@@ -317,6 +342,7 @@ _MINE_COUNTRIES = ["UA", "PS", "IL", "IR", "KP", "KR", "TW", "SY", "MM"]
 async def mine_trending(
     response: Response,
     countries: Optional[str] = Query(None, description="쉼표 구분 국가 코드 (예: UA,PS,IL)"),
+    lang: str = "en",
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -383,7 +409,7 @@ async def mine_trending(
         cid = str(c.id)
         prev_ks = prev_kscore_map.get(cid)
         delta = round(ks - prev_ks, 2) if prev_ks is not None else None
-        _cf = build_consumer_fields(c, "en")
+        _cf = build_consumer_fields(c, lang)
         items.append(TrendingItem(
             id=abs(hash(cid)) % (2 ** 31),
             keyword=c.title,

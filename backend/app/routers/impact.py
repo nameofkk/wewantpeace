@@ -62,7 +62,7 @@ def _sanitize_floats(obj):
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v20"
+_CACHE_VERSION = "v22"
 
 # 홈 국가 → 주가지수 심볼 매핑
 _HOME_INDEX_MAP: dict[str, str] = {
@@ -528,7 +528,11 @@ async def _build_impact_summary(
         _tier = "A" if _src_n >= 5 else ("B" if _src_n >= 3 else ("C" if _src_n >= 2 else "D"))
 
         # v2.0 Consumer Translation Layer
-        _consumer = build_consumer_fields(c, lang, commodity_prices)
+        _consumer = build_consumer_fields(
+            c, lang, commodity_prices,
+            relevant_commodities=smart.get("relevant_commodities"),
+            so_what_fallback=smart.get("so_what_line"),
+        )
 
         top_issues.append(ImpactSummaryTopIssue(
             cluster_id=str(c.id),
