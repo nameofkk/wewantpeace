@@ -28,7 +28,8 @@ import { Disclaimer } from "@/components/ui/Disclaimer";
 import { NewsletterCTA } from "@/components/NewsletterCTA";
 import { SmartSummaryCardFull, SmartSummaryCompact } from "@/components/dashboard/SmartSummaryCard";
 import { RiskRadar } from "@/components/dashboard/RiskRadar";
-import { ImpactFlowSankey } from "@/components/dashboard/ImpactFlowSankey";
+import { WalletGauge } from "@/components/dashboard/WalletGauge";
+import { ImpactChainCard } from "@/components/dashboard/ImpactChainCard";
 import { ProDemoWrapper } from "@/components/dashboard/ProDemoWrapper";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
@@ -69,11 +70,24 @@ export default function HomePage() {
 
 /* ───────────────────────── 색상/레벨 유틸 ───────────────────────── */
 
+function weatherColor(score: number) {
+  if (score >= 80) return "#991B1B";
+  if (score >= 60) return "#EF4444";
+  if (score >= 40) return "#F97316";
+  if (score >= 20) return "#EAB308";
+  return "#22C55E";
+}
+
+function greetingByTime(lang: "ko" | "en"): string {
+  const h = new Date().getHours();
+  if (h < 12) return lang === "ko" ? "좋은 아침이에요." : "Good morning.";
+  if (h < 18) return lang === "ko" ? "좋은 오후예요." : "Good afternoon.";
+  return lang === "ko" ? "좋은 저녁이에요." : "Good evening.";
+}
+
+// backward compat alias
 function impactColor(score: number) {
-  if (score >= 75) return "#dc2626";
-  if (score >= 50) return "#f97316";
-  if (score >= 25) return "#f59e0b";
-  return "#10b981";
+  return weatherColor(score);
 }
 
 function tensionColor(score: number) {
@@ -168,7 +182,27 @@ function ReportContent() {
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel" | "detail">("market");
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [tourRun, setTourRun] = useState(false);
+  const [dataExpanded, setDataExpanded] = useState(false);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
+
+  // v2.0 Streak 계산 (localStorage)
+  const [streakDays, setStreakDays] = useState(0);
+  useEffect(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastVisit = localStorage.getItem("wwp_last_visit");
+      const streak = parseInt(localStorage.getItem("wwp_streak") || "0", 10);
+      if (lastVisit === today) {
+        setStreakDays(streak);
+      } else {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const newStreak = lastVisit === yesterday ? streak + 1 : 1;
+        localStorage.setItem("wwp_last_visit", today);
+        localStorage.setItem("wwp_streak", String(newStreak));
+        setStreakDays(newStreak);
+      }
+    } catch {}
+  }, []);
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작 (데이터 로딩 완료 후)
   // searchParams를 deps에서 제거: replaceState로 URL 변경 시 re-render가 timer를 취소하는 레이스 컨디션 방지
@@ -192,8 +226,8 @@ function ReportContent() {
       disableBeacon: true,
     },
     {
-      target: "[data-tour='dash-risk']",
-      content: t(lang, "tour_dash_risk"),
+      target: "[data-tour='dash-weather']",
+      content: lang === "ko" ? "오늘의 분쟁 날씨예요. 숫자가 높을수록 생활에 영향이 커요." : "Today's conflict weather. Higher numbers mean more impact on your daily life.",
       disableBeacon: true,
     },
     {
@@ -207,8 +241,8 @@ function ReportContent() {
       disableBeacon: true,
     },
     {
-      target: "[data-tour='dash-flow']",
-      content: t(lang, "tour_dash_flow"),
+      target: "[data-tour='dash-wallet']",
+      content: lang === "ko" ? "분쟁이 지갑에 미치는 영향을 4가지 카테고리로 보여드려요." : "See how conflicts affect your wallet across 4 categories.",
       disableBeacon: true,
     },
     {
@@ -219,11 +253,6 @@ function ReportContent() {
     {
       target: "[data-tour='dash-top-issues']",
       content: t(lang, "tour_dash_top_issues"),
-      disableBeacon: true,
-    },
-    {
-      target: "[data-tour='dash-sector-risk']",
-      content: t(lang, "tour_dash_sector_risk"),
       disableBeacon: true,
     },
   ], [lang]);
@@ -378,116 +407,65 @@ function ReportContent() {
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-4 space-y-5">
 
-          {/* ═══════════════ SECTION A: Unified Hero (Impact + Radar + Watchlist) ═══════════════ */}
+          {/* ═══════════════ SECTION A: Weather Header + Watchlist ═══════════════ */}
           <m.section
             custom={0}
             initial="hidden"
             animate="visible"
             variants={sectionVariants}
-            className="rounded-xl border border-border bg-card"
-            data-tour="dash-risk"
+            data-tour="dash-weather"
           >
-            {/* ── 영향도 점수 + 레이더 ── */}
-            <div className="p-4 pb-3">
-              <div className="flex items-center gap-1.5 mb-3">
-                <h2 className="text-xs font-bold text-foreground">{t(lang, "dash_section_hero_title" as any)}</h2>
-                <InfoTooltip text={t(lang, "dash_section_hero_tooltip" as any)} direction="down" />
-                {updatedTime && <span className="text-[9px] text-muted-foreground/50 ml-auto">{updatedTime}</span>}
-              </div>
-
-              <div className="flex items-start gap-4">
-                {/* Left: Impact Score */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-1.5">
-                    <span className="text-3xl font-extrabold tabular-nums leading-none score-reveal" style={{ color }}>
-                      {Math.round(animatedImpact)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">/100</span>
-                    <InfoTooltip
-                      text={lang === "ko"
-                        ? "75+: 직접적 영향 · 50-74: 간접 영향 가능 · 25-49: 제한적 · 0-24: 미미"
-                        : "75+: Direct impact · 50-74: Indirect possible · 25-49: Limited · 0-24: Minimal"}
-                      direction="down"
-                    />
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                      style={{ color, backgroundColor: `${color}12` }}
-                    >
-                      {t(lang, levelKey)}
-                    </span>
-                  </div>
-
-                  <div className="h-1 rounded-full bg-muted overflow-hidden mb-3">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000 ease-out"
-                      style={{ width: `${Math.min(impactScore, 100)}%`, backgroundColor: color }}
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-foreground/70 leading-relaxed">
-                    {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
-                  </p>
-                </div>
-
-                {/* Right: Risk Radar */}
-                {summary?.risk_radar && (
-                  <div className="shrink-0">
-                    <RiskRadar data={summary.risk_radar} lang={lang} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── 기준국가 긴장도 ── */}
-            <div className="px-4 py-3 border-t border-border">
-              <div className="flex items-center gap-2">
-                <span className="text-base">{homeCountry ? getFlag(homeCountry) : "🌐"}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 whitespace-nowrap">
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {homeCountry
-                        ? (lang === "ko" ? "기준국가 긴장도" : "Home Tension")
-                        : (lang === "ko" ? "글로벌 평균 긴장도" : "Global Avg. Tension")}
-                    </span>
-                    <span className={cn("text-xs font-bold tabular-nums shrink-0", tensionColor(homeScore).text)}>
-                      {Math.round(animatedHomeScore)}
-                    </span>
-                    <span className={cn("text-[9px] font-medium px-1.5 py-0.5 rounded shrink-0", tensionColor(homeScore).text)}>
-                      {tensionLabelShort(homeScore, lang)}
-                    </span>
-                  </div>
-                  <div className="h-1 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-1000 ease-out", tensionColor(homeScore).bar)}
-                      style={{ width: `${Math.min(homeScore, 100)}%` }}
-                    />
+            {/* ── Weather Header ── */}
+            <div
+              className="rounded-xl border bg-card p-4"
+              style={{ borderLeftColor: weatherColor(impactScore), borderLeftWidth: 3 }}
+            >
+              <p className="text-[10px] text-muted-foreground mb-2">{greetingByTime(lang)}</p>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{summary?.weather_emoji ?? "☀️"}</span>
+                  <div>
+                    <h2 className="text-sm font-bold">
+                      {lang === "ko" ? summary?.weather_label_ko ?? "안정" : summary?.weather_label_en ?? "Clear"}
+                    </h2>
+                    {updatedTime && <p className="text-[9px] text-muted-foreground">{updatedTime}</p>}
                   </div>
                 </div>
+                <div className="text-right">
+                  <span
+                    className="text-3xl font-extrabold tabular-nums score-reveal"
+                    style={{ color: weatherColor(impactScore) }}
+                  >
+                    {Math.round(animatedImpact)}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground block">/100</span>
+                </div>
               </div>
-            </div>
+              <p className="text-[11px] text-foreground/70 leading-relaxed">
+                {summary?.summary || (lang === "ko" ? "분석 중..." : "Loading...")}
+              </p>
 
-            {/* ── 전 세계 현황 요약 ── */}
-            <div className="px-4 py-3 border-t border-border">
-              <div className="flex items-center gap-3 text-[10px] whitespace-nowrap overflow-x-auto scrollbar-hide">
+              {/* Global summary chips */}
+              <div className="flex items-center gap-3 text-[10px] whitespace-nowrap overflow-x-auto scrollbar-hide mt-3 pt-2 border-t border-border/50">
                 <span className="text-muted-foreground font-medium shrink-0">
                   {lang === "ko" ? "전 세계" : "Global"}
                 </span>
                 {extremeCount > 0 && (
                   <span className="flex items-center gap-1 text-red-700 dark:text-red-300 shrink-0">
-                    <span className="h-2 w-2 rounded-full bg-red-600 dark:bg-red-500 animate-pulse shrink-0" />
-                    <span className="font-medium">{lang === "ko" ? "극심" : "Extreme"} {extremeCount}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-600 dark:bg-red-500 animate-pulse shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "위험" : "Critical"} {extremeCount}</span>
                   </span>
                 )}
                 {severeCount > 0 && (
                   <span className="flex items-center gap-1 text-red-600 dark:text-red-400 shrink-0">
-                    <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
-                    <span className="font-medium">{lang === "ko" ? "심각" : "Severe"} {severeCount}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "주의" : "Elevated"} {severeCount}</span>
                   </span>
                 )}
                 {alertCount > 0 && (
                   <span className="flex items-center gap-1 text-orange-600 dark:text-orange-300 shrink-0">
-                    <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
-                    <span className="font-medium">{lang === "ko" ? "경계" : "Alert"} {alertCount}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-orange-500 shrink-0" />
+                    <span className="font-medium">{lang === "ko" ? "관심" : "Watch"} {alertCount}</span>
                   </span>
                 )}
                 {extremeCount === 0 && severeCount === 0 && alertCount === 0 && (
@@ -496,15 +474,24 @@ function ReportContent() {
                   </span>
                 )}
               </div>
+
+              {/* Streak */}
+              {streakDays > 0 && (
+                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+                  <span className="text-xs">🔥</span>
+                  <span className="text-[10px] font-medium">
+                    {streakDays}{lang === "ko" ? "일 연속 확인" : "-day streak"}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Watchlist chips */}
-            <div className="px-4 pt-3 pb-4 border-t border-border">
-            <div data-tour="dash-watchlist">
+            <div className="mt-3" data-tour="dash-watchlist">
             {myCountries.length > 0 ? (
               <div className="space-y-1">
               <span className="text-[9px] text-muted-foreground/60 font-medium">
-                {lang === "ko" ? "관심 국가 긴장도" : "Watchlist Tension"}
+                {lang === "ko" ? "관심 국가" : "Watchlist"}
               </span>
               <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
                 {myCountries.map((code) => {
@@ -512,8 +499,6 @@ function ReportContent() {
                   const allData = allTensionMap.get(code);
                   const score = data?.raw_score ?? allData?.raw_score ?? 0;
                   const tc = tensionColor(score);
-                  const isAnomaly = (allData?.anomaly_z ?? 0) >= 2.0;
-                  const isConverging = (allData?.convergence_bonus ?? 0) >= 5.0;
                   return (
                     <div
                       key={code}
@@ -522,8 +507,6 @@ function ReportContent() {
                     >
                       <span className="text-xs">{getFlag(code)}</span>
                       <span className={cn("text-[10px] font-bold tabular-nums", tc.text)}>{score}</span>
-                      {isAnomaly && <span className="text-[7px] px-1 rounded bg-red-500/20 text-red-600 dark:text-red-400 font-bold">{t(lang, "dash_badge_anomaly" as any)}</span>}
-                      {isConverging && <span className="text-[7px] px-1 rounded bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold">{t(lang, "dash_badge_convergence" as any)}</span>}
                     </div>
                   );
                 })}
@@ -549,34 +532,45 @@ function ReportContent() {
               </div>
             )}
             </div>
-            </div>
           </m.section>
 
-          {/* ═══════════════ SECTION B: Impact Stories (Sankey + Smart Cards) ═══════════════ */}
+          {/* ═══════════════ SECTION B: Wallet Gauge + Impact Chain + Smart Cards ═══════════════ */}
           <m.section custom={1} initial="hidden" animate="visible" variants={sectionVariants}>
-            {/* Impact Flow Sankey */}
-            {summary?.impact_flow && (
-              <div className="rounded-xl border border-border bg-card mb-5" data-tour="dash-flow">
-                <div className="px-4 pt-3 pb-1">
-                  <SectionHeader
-                    icon={Activity}
-                    title={t(lang, "dash_flow_title" as any)}
-                    desc={t(lang, "dash_flow_desc" as any)}
-                    tooltip={t(lang, "dash_section_flow_tooltip" as any)}
-                  />
-                </div>
-                <div>
-                  <ImpactFlowSankey
-                    data={summary.impact_flow}
-                    isPro={isPro}
-                    lang={lang}
-                    conflictIssues={summary.top_issues?.slice(0, 3).map((ti: any) => ({
-                      clusterId: ti.cluster_id,
-                      title: lang === "en" && ti.title_en ? ti.title_en : ti.title,
-                      countryCodes: ti.country_codes ?? [],
-                    }))}
-                  />
-                </div>
+            {/* Wallet Gauge */}
+            <div data-tour="dash-wallet">
+              <WalletGauge
+                energy={summary?.wallet_energy ?? 0}
+                food={summary?.wallet_food ?? 0}
+                finance={summary?.wallet_finance ?? 0}
+                travel={summary?.wallet_travel ?? 0}
+                lang={lang}
+                commoditySnapshot={summary?.commodity_snapshot}
+              />
+            </div>
+
+            {/* Impact Chain — Top Issue */}
+            {summary?.top_issues?.[0] && (
+              <div className="mt-4">
+                <ImpactChainCard
+                  event={summary.top_issues[0].what_consumer || summary.top_issues[0].what_line || summary.top_issues[0].title}
+                  marketImpact={(() => {
+                    const rc = summary.top_issues[0].relevant_commodities;
+                    if (!rc?.length) return null;
+                    const snap = summary.commodity_snapshot;
+                    const parts = rc.slice(0, 2).map((sym: string) => {
+                      const key = sym === "WTI" || sym === "BRENT" ? "oil" : sym === "WHEAT" ? "wheat" : sym === "BDRY" ? "shipping" : sym === "NATGAS" ? "natgas" : sym === "GOLD" ? "gold" : null;
+                      const d = key && snap?.[key];
+                      return d ? `${sym} $${d.price.toLocaleString(undefined, { maximumFractionDigits: 0 })} (${d.change_pct > 0 ? "+" : ""}${d.change_pct.toFixed(1)}%)` : sym;
+                    });
+                    return parts.join(" · ");
+                  })()}
+                  dailyLife={summary.top_issues[0].so_what_consumer || summary.top_issues[0].so_what_line}
+                  timeline={summary.top_issues[0].when_consumer || summary.top_issues[0].when_line}
+                  trustLevel={summary.top_issues[0].trust_level}
+                  trustDetail={summary.top_issues[0].trust_detail}
+                  sensorContext={summary.top_issues[0].sensor_context}
+                  lang={lang}
+                />
               </div>
             )}
 
@@ -636,7 +630,22 @@ function ReportContent() {
             )}
           </m.section>
 
-          {/* ═══════════════ SECTION C: Data Dashboard (4탭 통합) ═══════════════ */}
+          {/* ═══════════════ Data Deep Dive Toggle ═══════════════ */}
+          <button
+            onClick={() => setDataExpanded(!dataExpanded)}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors rounded-xl border border-border/50 bg-card/50"
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            <span className="font-medium">
+              {dataExpanded
+                ? (lang === "ko" ? "데이터 접기" : "Hide data")
+                : (lang === "ko" ? "데이터 더 보기" : "Data deep dive")}
+            </span>
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", dataExpanded && "rotate-180")} />
+          </button>
+
+          {/* ═══════════════ SECTION C+D: Data Dashboard — 접기 가능 ═══════════════ */}
+          {dataExpanded && (<>
           <m.section
             custom={2}
             initial="hidden"
@@ -977,7 +986,6 @@ function ReportContent() {
           {/* ═══════════════ SECTION D: 산업별 리스크 분석 ═══════════════ */}
           <m.section custom={3} initial="hidden" animate="visible" variants={sectionVariants}
             className="rounded-xl border border-border bg-card p-4"
-            data-tour="dash-sector-risk"
           >
             <SectionHeader
               icon={Sparkles}
@@ -989,6 +997,7 @@ function ReportContent() {
             />
             <SectorImpactCard embedded />
           </m.section>
+          </>)}{/* end dataExpanded */}
 
           {/* ═══════════════ Newsletter CTA ═══════════════ */}
           <NewsletterCTA />

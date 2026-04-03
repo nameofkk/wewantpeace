@@ -77,9 +77,14 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
   const marketChips = getRelevantMarketChips(cc, market, topIssueRaw?.relevant_commodities);
   const colors = impactScoreColor(impactScore);
 
-  const whatLine = topIssueRaw?.what_line;
-  const soWhatLine = topIssueRaw?.so_what_line;
-  const whenLine = topIssueRaw?.when_line;
+  // v2.0: prefer consumer fields, fallback to technical
+  const whatLine = topIssueRaw?.what_consumer ?? topIssueRaw?.what_line;
+  const soWhatLine = topIssueRaw?.so_what_consumer ?? topIssueRaw?.so_what_line;
+  const whenLine = topIssueRaw?.when_consumer ?? topIssueRaw?.when_line;
+  const walletLine = topIssueRaw?.wallet_line;
+  const trustLevel = topIssueRaw?.trust_level;
+  const trustDetail = topIssueRaw?.trust_detail;
+  const sensorContext = topIssueRaw?.sensor_context;
   const bodySnippet = topIssueRaw?.body_snippet;
   const sourceTier = topIssueRaw?.source_tier;
   const impactReason = topIssueRaw?.impact_reason;
@@ -115,20 +120,25 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
                   SPIKE
                 </span>
               )}
-              {(item.confidence ?? 0) >= 0.7 && (
-                <span className="inline-flex items-center h-[18px] text-[8px] px-1.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold shrink-0">
-                  {t(lang, "dash_badge_verified" as TranslationKey)}
-                </span>
-              )}
-              {sourceTier && (
+              {/* v2.0 Trust Level badge */}
+              {trustLevel && (
                 <span className={cn(
                   "inline-flex items-center h-[18px] text-[8px] px-1.5 rounded font-semibold shrink-0",
-                  sourceTier === "A" ? "bg-blue-500/10 text-blue-400"
-                    : sourceTier === "B" ? "bg-sky-500/10 text-sky-400"
-                    : sourceTier === "C" ? "bg-amber-500/10 text-amber-400"
-                    : "bg-muted/30 text-muted-foreground"
+                  trustLevel === "confirmed" ? "bg-emerald-600/15 text-emerald-600"
+                    : trustLevel === "verified" ? "bg-emerald-500/10 text-emerald-500"
+                    : trustLevel === "reported" ? "bg-blue-500/10 text-blue-500"
+                    : "bg-amber-500/10 text-amber-500"
                 )}>
-                  {lang === "ko" ? `신뢰 ${sourceTier}` : `Tier ${sourceTier}`}
+                  {trustLevel === "confirmed" ? "✓✓✓"
+                    : trustLevel === "verified" ? "✓✓"
+                    : trustLevel === "reported" ? "✓"
+                    : "⚠️"}
+                  {" "}{trustDetail ? `${(topIssueRaw?.signal_corroboration_count || topIssueRaw?.independent_sources || 0)} ${lang === "ko" ? "출처" : "sources"}` : ""}
+                </span>
+              )}
+              {sensorContext && (
+                <span className="inline-flex items-center h-[18px] text-[8px] px-1.5 rounded bg-purple-500/10 text-purple-500 font-semibold shrink-0">
+                  🛰️
                 </span>
               )}
             </div>
@@ -173,6 +183,15 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
                 {t(lang, "dash_smart_when" as TranslationKey)}
               </span>
               <span className="text-[11px] text-foreground/70 leading-snug block">{whenLine}</span>
+            </div>
+          </div>
+        )}
+        {walletLine && (
+          <div className="flex gap-2.5">
+            <div className="shrink-0 w-[3px] rounded-full bg-amber-400 self-stretch" />
+            <div className="min-w-0">
+              <span className="text-[9px] font-bold text-amber-400 block mb-0.5">💰</span>
+              <span className="text-[11px] text-foreground/80 leading-snug font-medium block">{walletLine}</span>
             </div>
           </div>
         )}
@@ -261,10 +280,10 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
     : (stripTitlePrefix(rawTitle) || topicLabel);
 
   const impactScore = topIssueRaw?.impact_score ?? 0;
-  const _rawSoWhat = topIssueRaw?.so_what_line;
-  // 제목과 "무슨 일?"이 동일하면 중복 표시 방지
+  // v2.0: prefer consumer fields
+  const _rawSoWhat = topIssueRaw?.so_what_consumer ?? topIssueRaw?.so_what_line;
   const soWhatLine = _rawSoWhat && _rawSoWhat !== displayTitle ? _rawSoWhat : undefined;
-  const sourceTier = topIssueRaw?.source_tier;
+  const trustLevel = topIssueRaw?.trust_level;
   const colors = impactScoreColor(impactScore);
 
   return (
@@ -287,12 +306,12 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1 leading-none">
           <span className="text-[11px] font-semibold line-clamp-2">{displayTitle}</span>
-          {sourceTier && (sourceTier === "A" || sourceTier === "B") && (
+          {trustLevel && (trustLevel === "confirmed" || trustLevel === "verified") && (
             <span className={cn(
               "inline-flex items-center justify-center text-[7px] h-[14px] px-1 rounded font-bold shrink-0",
-              sourceTier === "A" ? "bg-blue-500/10 text-blue-400" : "bg-sky-500/10 text-sky-400"
+              trustLevel === "confirmed" ? "bg-emerald-600/15 text-emerald-600" : "bg-emerald-500/10 text-emerald-500"
             )}>
-              {sourceTier}
+              {trustLevel === "confirmed" ? "✓✓✓" : "✓✓"}
             </span>
           )}
         </div>

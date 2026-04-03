@@ -34,6 +34,13 @@ from worker.processor.calibration import (
     DEFAULT_IMPACT_FACTOR,
 )
 
+from backend.app.utils.consumer import (
+    build_consumer_fields,
+    compute_wallet_gauges,
+    build_commodity_snapshot,
+    get_weather,
+)
+
 import structlog
 
 logger = structlog.get_logger()
@@ -55,7 +62,7 @@ def _sanitize_floats(obj):
 router = APIRouter(prefix="/impact", tags=["impact"])
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-_CACHE_VERSION = "v19"
+_CACHE_VERSION = "v20"
 
 # 홈 국가 → 주가지수 심볼 매핑
 _HOME_INDEX_MAP: dict[str, str] = {
@@ -168,6 +175,17 @@ class ImpactSummaryTopIssue(BaseModel):
     relevant_commodities: list[str] | None = None
     source_tier: str | None = None  # A/B/C/D
     impact_reason: str | None = None  # 1-line reasoning
+    # v2.0 Consumer Translation Layer
+    what_consumer: str | None = None
+    so_what_consumer: str | None = None
+    when_consumer: str | None = None
+    wallet_line: str | None = None
+    trust_level: str | None = None
+    trust_detail: str | None = None
+    sensor_context: str | None = None
+    verification_label: str | None = None
+    signal_corroboration_count: int = 0
+    signal_types: list[str] = []
 
 
 class CommoditySnapshotOut(BaseModel):
@@ -268,6 +286,15 @@ class ImpactSummaryOut(BaseModel):
     travel_advisories: list[TravelAlertOut] = []
     risk_radar: RiskRadarOut | None = None
     impact_flow: ImpactFlowOut | None = None
+    # v2.0 Weather + Wallet Gauge
+    wallet_energy: int = 0
+    wallet_food: int = 0
+    wallet_finance: int = 0
+    wallet_travel: int = 0
+    weather_emoji: str = "☀️"
+    weather_label_ko: str = "안정"
+    weather_label_en: str = "Clear"
+    commodity_snapshot: dict | None = None
 
 
 async def _build_impact_summary(
@@ -500,6 +527,9 @@ async def _build_impact_summary(
         _src_n = c.independent_sources or 0
         _tier = "A" if _src_n >= 5 else ("B" if _src_n >= 3 else ("C" if _src_n >= 2 else "D"))
 
+        # v2.0 Consumer Translation Layer
+        _consumer = build_consumer_fields(c, lang, commodity_prices)
+
         top_issues.append(ImpactSummaryTopIssue(
             cluster_id=str(c.id),
             title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
@@ -525,6 +555,17 @@ async def _build_impact_summary(
             relevant_commodities=smart.get("relevant_commodities"),
             source_tier=_tier,
             impact_reason=reason,
+            # v2.0 consumer fields
+            what_consumer=_consumer["what_consumer"],
+            so_what_consumer=_consumer["so_what_consumer"],
+            when_consumer=_consumer["when_consumer"],
+            wallet_line=_consumer["wallet_line"],
+            trust_level=_consumer["trust_level"],
+            trust_detail=_consumer["trust_detail"],
+            sensor_context=_consumer["sensor_context"],
+            verification_label=_consumer["verification_label"],
+            signal_corroboration_count=_consumer["signal_corroboration_count"],
+            signal_types=_consumer["signal_types"],
         ))
 
     # 홈 국가 긴장도 조회
@@ -869,6 +910,12 @@ async def _build_impact_summary(
     if travel_advisories:
         data_sources.append("US State Dept")
 
+    # v2.0 Wallet Gauge + Weather + Commodity Snapshot
+    _adv_high = sum(1 for a in (travel_advisories or []) if isinstance(a, dict) and a.get("level", 0) >= 3)
+    _wallet = compute_wallet_gauges(top_issues, commodity_prices, _adv_high)
+    _weather = get_weather(overall_score)
+    _commodity_snap = build_commodity_snapshot(commodity_prices)
+
     response_data = {
         "score": overall_score,
         "level": level,
@@ -888,6 +935,15 @@ async def _build_impact_summary(
         "travel_advisories": travel_advisories,
         "risk_radar": risk_radar,
         "impact_flow": impact_flow,
+        # v2.0
+        "wallet_energy": _wallet["wallet_energy"],
+        "wallet_food": _wallet["wallet_food"],
+        "wallet_finance": _wallet["wallet_finance"],
+        "wallet_travel": _wallet["wallet_travel"],
+        "weather_emoji": _weather["emoji"],
+        "weather_label_ko": _weather["label_ko"],
+        "weather_label_en": _weather["label_en"],
+        "commodity_snapshot": _commodity_snap,
     }
 
     # inf/nan float 제거 (JSON 직렬화 안전)
@@ -1905,7 +1961,7 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
     if _first_sent and len(_first_sent) > 15:
         what_line = _first_sent[:80]
     else:
-        # body가 없으면 메타데이터 기반 상세 설명 생성
+        # body가 없으면 구어체 메타데이터 기반 설명 생성
         _topic_ko = {"conflict": "무장 충돌", "terror": "테러 위협", "coup": "쿠데타 시도",
                      "sanctions": "국제 제재", "cyber": "사이버 공격", "protest": "대규모 시위",
                      "diplomacy": "외교 갈등", "maritime": "해상 분쟁", "disaster": "재난 발생",
@@ -1917,12 +1973,12 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
         _ev_count = cluster.event_count or 0
         if lang == "ko":
             _tl = _topic_ko.get(topic, "안보 위기")
-            what_line = f"{c_name} {_tl} 심각도 {severity}/100, {_ev_count}건 보도. 상황 지속 모니터링 중"
+            what_line = f"{c_name}에서 {_tl} 발생, {_ev_count}건 보도되고 있어요"
         else:
             _tl = _topic_en.get(topic, "security crisis")
-            what_line = f"{c_name} {_tl}, severity {severity}/100, {_ev_count} reports. Situation under monitoring"
+            what_line = f"{_tl.capitalize()} in {c_name}, {_ev_count} reports so far"
 
-    # so_what_line — 원자재 매핑 우선, 유가 폴백
+    # so_what_line — 원자재 매핑 우선, 유가 폴백 (v2.0: 구어체)
     oil_price = None
     if topic in ("conflict", "terror") and cc in ("SA", "AE", "IQ", "KW", "IR", "RU", "LY"):
         if oil_row:
@@ -1934,48 +1990,48 @@ def _build_smart_summary(cluster, home_country: str, lang: str, sectors_data: di
         if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
             so_what_line = _format_commodity_reason(*commodity_ref, h_name, lang)
         elif oil_price:
-            so_what_line = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%), 가스비·물류비 상승 압력"
+            so_what_line = f"유가 ${oil_price[0]:,.0f}({oil_price[1]:+.1f}%). 주유비·물류비에 영향 올 수 있어요"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{c_name}과 교역 {trade_str}, {top_sector} 수입품 가격 상승 예상"
+            so_what_line = f"{c_name}과 교역 {trade_str}. {top_sector} 가격에 영향이 올 수 있어요"
         elif affected_sectors:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{c_name} 관련 {top_sector}(GDP {gdp}%) 변동성 확대"
+            so_what_line = f"{c_name} 관련 {top_sector}(GDP {gdp}%) 변동 가능"
         else:
             so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row, commodity_prices)
     else:
         if commodity_ref and commodity_ref[3] not in ("WTI", "BRENT"):
             so_what_line = _format_commodity_reason(*commodity_ref, h_name, lang)
         elif oil_price:
-            so_what_line = f"Oil ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%), gas & logistics cost pressure"
+            so_what_line = f"Oil at ${oil_price[0]:,.0f} ({oil_price[1]:+.1f}%). Gas & delivery costs may rise"
         elif affected_sectors and trade_str:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"Trade with {c_name} {trade_str}, {top_sector} import prices may rise"
+            so_what_line = f"Trade with {c_name} at {trade_str}. {top_sector} prices may be affected"
         elif affected_sectors:
             top_sector, gdp = affected_sectors[0]
-            so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%), volatility expected"
+            so_what_line = f"{c_name}-linked {top_sector} (GDP {gdp}%) may see volatility"
         else:
             so_what_line = _build_reason_sync(cluster, home_country, lang, sectors_data, trade_map, oil_row, commodity_prices)
 
-    # when_line
+    # when_line (v2.0: 구어체)
     if lang == "ko":
         if severity >= 80 and topic in ("conflict", "terror"):
-            when_line = "즉각적. 시장 이미 반영 중"
+            when_line = "바로 영향이 올 수 있어요. 시장은 이미 반영 중"
         elif severity >= 60:
-            when_line = "1-2주 내 공급망 영향"
+            when_line = "1~2주 안에 느낄 수 있어요"
         elif severity >= 40:
-            when_line = "1-3개월 모니터링 필요"
+            when_line = "한두 달 추이를 지켜봐야 해요"
         else:
-            when_line = "간접 영향. 추이 관찰"
+            when_line = "직접적 영향은 제한적이에요"
     else:
         if severity >= 80 and topic in ("conflict", "terror"):
-            when_line = "Immediate. Markets pricing in"
+            when_line = "Impact could be immediate. Markets already pricing in"
         elif severity >= 60:
-            when_line = "Supply chain impact in 1-2 weeks"
+            when_line = "You may feel it in 1-2 weeks"
         elif severity >= 40:
-            when_line = "Monitor over 1-3 months"
+            when_line = "Worth watching over 1-2 months"
         else:
-            when_line = "Indirect. Monitoring trend"
+            when_line = "Direct impact is limited for now"
 
     # relevant_commodities: SmartSummaryCard 마켓칩용
     rel_syms = _get_relevant_symbols(cc, topic, commodity_prices)

@@ -574,6 +574,17 @@ export interface ImpactSummaryTopIssue {
   relevant_commodities?: string[] | null;
   source_tier?: string | null;  // A/B/C/D
   impact_reason?: string | null;
+  // v2.0 Consumer Translation Layer
+  what_consumer?: string | null;
+  so_what_consumer?: string | null;
+  when_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  trust_detail?: string | null;
+  sensor_context?: string | null;
+  verification_label?: string | null;
+  signal_corroboration_count?: number;
+  signal_types?: string[];
 }
 
 export interface CommoditySnapshot {
@@ -644,6 +655,15 @@ export interface ImpactSummary {
   travel_advisories?: TravelAlert[];
   risk_radar?: RiskRadarOut | null;
   impact_flow?: ImpactFlowOut | null;
+  // v2.0 Weather + Wallet Gauge
+  wallet_energy?: number;
+  wallet_food?: number;
+  wallet_finance?: number;
+  wallet_travel?: number;
+  weather_emoji?: string;
+  weather_label_ko?: string;
+  weather_label_en?: string;
+  commodity_snapshot?: Record<string, { price: number; change_pct: number; symbol: string }> | null;
 }
 
 export interface RiskRadarAxis {
