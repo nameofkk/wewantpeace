@@ -125,11 +125,11 @@ function roundKScore(kscore: number): number {
 
 function getKScoreColor(kscore: number): string {
   const k = roundKScore(kscore);
-  if (k >= 8) return "#991b1b";  // 극심 - dark maroon
-  if (k >= 6) return "#ef4444";  // 심각 - red
-  if (k >= 4) return "#f97316";  // 경계 - orange
-  if (k >= 2) return "#f59e0b";  // 주의 - amber
-  return "#10b981";              // 안정 - emerald
+  if (k >= 8) return "#991B1B";  // 위험 - dark red
+  if (k >= 6) return "#EF4444";  // 주의 - red
+  if (k >= 4) return "#F97316";  // 관심 - orange
+  if (k >= 2) return "#EAB308";  // 양호 - yellow
+  return "#22C55E";              // 안정 - green
 }
 
 function getKScoreLabel(kscore: number, lang: Lang): string {

@@ -416,6 +416,11 @@ export interface NotificationItem {
   is_read: boolean;
   feedback: string | null;  // "thumbs_up" | "thumbs_down" | null
   created_at: string;
+  // v2.0 Consumer fields
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  weather_emoji?: string | null;
 }
 
 export function useNotifications(limit = 30, offset = 0) {

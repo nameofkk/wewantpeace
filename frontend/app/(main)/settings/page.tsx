@@ -1009,6 +1009,32 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* 2.5 아침 브리핑 / 저녁 요약 토글 */}
+            <div className={cn("p-4", !hasFCMToken && "opacity-50 pointer-events-none")}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{lang === "ko" ? "아침 브리핑" : "Morning briefing"}</p>
+                    <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "매일 오전 8시 오늘의 분쟁 날씨" : "Daily conflict weather at 8 AM"}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" defaultChecked />
+                    <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{lang === "ko" ? "저녁 요약" : "Evening digest"}</p>
+                    <p className="text-[10px] text-muted-foreground">{lang === "ko" ? "오후 7시 오늘 놓친 것 요약" : "What you missed today at 7 PM"}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" defaultChecked />
+                    <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             {/* 3. 토픽 필터 (Pro / Pro+) */}
             <div className={cn("p-4", (plan === "free" || !hasFCMToken) && "opacity-50 pointer-events-none")}>
               <div className="flex items-center justify-between mb-2">

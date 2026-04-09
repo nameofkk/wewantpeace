@@ -234,6 +234,18 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=5, hour=0),  # 00:05 UTC = 09:05 KST (시간 분산)
         "options": {"queue": "process"},
     },
+    # ── v2.0 Morning Briefing (매시간 → 해당 시간대 08:00 유저 필터) ──
+    "send-morning-briefing": {
+        "task": "worker.tasks.send_morning_briefing",
+        "schedule": crontab(minute=0, hour="*"),  # 매시간 정각
+        "options": {"queue": "process"},
+    },
+    # ── v2.0 Evening Digest (매시간 → 해당 시간대 19:00 유저 필터) ──
+    "send-evening-digest": {
+        "task": "worker.tasks.send_evening_digest",
+        "schedule": crontab(minute=0, hour="*"),  # 매시간 정각
+        "options": {"queue": "process"},
+    },
     # ── 비활성 RSS 피드 자동 복구 ──
     "recheck-inactive-feeds": {
         "task": "worker.tasks.recheck_inactive_feeds",

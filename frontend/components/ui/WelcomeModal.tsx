@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Globe, BarChart3, Bell, Check } from "lucide-react";
+import { X, CloudSun, Wallet, Bell, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
@@ -47,8 +47,8 @@ export default function WelcomeModal() {
   };
 
   const features = [
-    { icon: Globe, text: t(lang, "welcome_feat_1") },
-    { icon: BarChart3, text: t(lang, "welcome_feat_2") },
+    { icon: CloudSun, text: t(lang, "welcome_feat_1") },
+    { icon: Wallet, text: t(lang, "welcome_feat_2") },
     { icon: Bell, text: t(lang, "welcome_feat_3") },
   ];
 

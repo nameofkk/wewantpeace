@@ -15,10 +15,17 @@ import { UpgradeNudgeBanner } from "@/components/ui/UpgradeNudgeBanner";
 import type { Step } from "react-joyride";
 
 const NOTIF_TYPE_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
-  verified: { bg: "bg-emerald-500/15", text: "text-emerald-500", labelKo: "검증됨", labelEn: "Confirmed" },
+  verified: { bg: "bg-emerald-500/15", text: "text-emerald-500", labelKo: "✓✓ 검증됨", labelEn: "✓✓ Verified" },
   fast: { bg: "bg-red-500/20", text: "text-red-400", labelKo: "⛈️ 주의", labelEn: "⛈️ Alert" },
   daily_summary: { bg: "bg-blue-500/20", text: "text-blue-400", labelKo: "오늘의 브리핑", labelEn: "Briefing" },
   weekly_report: { bg: "bg-purple-500/20", text: "text-purple-400", labelKo: "주간 요약", labelEn: "Weekly" },
+};
+
+const TRUST_LEVEL_STYLES: Record<string, { bg: string; text: string; labelKo: string; labelEn: string }> = {
+  confirmed: { bg: "bg-emerald-600/15", text: "text-emerald-600", labelKo: "✓✓✓ 확인됨", labelEn: "✓✓✓ Confirmed" },
+  verified: { bg: "bg-emerald-500/10", text: "text-emerald-500", labelKo: "✓✓ 검증됨", labelEn: "✓✓ Verified" },
+  reported: { bg: "bg-blue-500/10", text: "text-blue-500", labelKo: "✓ 보도됨", labelEn: "✓ Reported" },
+  unconfirmed: { bg: "bg-amber-500/10", text: "text-amber-500", labelKo: "⚠️ 미확인", labelEn: "⚠️ Unconfirmed" },
 };
 
 const NOTIF_TYPE_FALLBACK = NOTIF_TYPE_STYLES.fast;
@@ -143,9 +150,10 @@ export default function NotificationsPage() {
                 {/* 내용 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    {/* 타입 뱃지 */}
+                    {/* trust_level 뱃지 (있으면 우선) → 없으면 타입 뱃지 */}
                     {(() => {
-                      const style = getNotifStyle(notif.type);
+                      const trustStyle = notif.trust_level ? TRUST_LEVEL_STYLES[notif.trust_level] : null;
+                      const style = trustStyle ?? getNotifStyle(notif.type);
                       return (
                         <span
                           className={cn(
@@ -163,11 +171,18 @@ export default function NotificationsPage() {
                     </span>
                   </div>
                   <p className="text-sm font-medium text-foreground line-clamp-2">
-                    {notif.title}
+                    {notif.weather_emoji ? `${notif.weather_emoji} ` : ""}{notif.title}
                   </p>
+                  {/* so_what_consumer 우선, 없으면 body */}
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                    {notif.body}
+                    {notif.so_what_consumer || notif.body}
                   </p>
+                  {/* wallet_line */}
+                  {notif.wallet_line && (
+                    <span className="inline-block text-[10px] text-amber-600 mt-0.5">
+                      💰 {notif.wallet_line}
+                    </span>
+                  )}
                   {/* 피드백 버튼 */}
                   <div className="flex items-center gap-2 mt-1.5">
                     <button
