@@ -7,6 +7,7 @@ interface CommodityInfo {
   price: number;
   change_pct: number;
   symbol: string;
+  history_7d?: number[];
 }
 
 interface WalletGaugeProps {
@@ -31,6 +32,20 @@ function dotColor(dots: number): string {
   if (dots >= 3) return "#F97316";
   if (dots >= 2) return "#EAB308";
   return "#22C55E";
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return null;
+  const w = 28, h = 12;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const points = data.map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`).join(" ");
+  return (
+    <svg width={w} height={h} className="shrink-0" viewBox={`0 0 ${w} ${h}`}>
+      <polyline fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  );
 }
 
 function changePctText(pct: number): string {
@@ -62,13 +77,16 @@ export function WalletGauge({ energy, food, finance, travel, lang, commoditySnap
                 {lang === "ko" ? cat.labelKo : cat.labelEn}
               </span>
 
-              {/* Price + Change */}
+              {/* Price + Sparkline + Change */}
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 {snap ? (
                   <>
                     <span className="text-[10px] font-bold tabular-nums text-foreground">
                       ${snap.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
+                    {snap.history_7d && snap.history_7d.length >= 2 && (
+                      <Sparkline data={snap.history_7d} color={snap.change_pct >= 0 ? "#EF4444" : "#3B82F6"} />
+                    )}
                     <span
                       className={cn(
                         "text-[9px] font-medium tabular-nums",

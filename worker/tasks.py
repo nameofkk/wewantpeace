@@ -2440,6 +2440,213 @@ def send_daily_engagement(self):
         raise self.retry(exc=exc)
 
 
+# ── v2.0 Morning Briefing Push ────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.send_morning_briefing",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_morning_briefing(self):
+    """매시간 실행 → 현재 UTC 시각이 로컬 08:00인 시간대 유저에게 아침 브리핑 발송."""
+
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.user import User, UserPushToken, UserPreference
+        from backend.app.models.tension_index import TensionIndex
+        from worker.push.push_service import _is_in_quiet_hours
+        from backend.app.utils.consumer import push_weather_emoji, push_severity_label
+        import pytz
+
+        now = datetime.now(timezone.utc)
+        target_local_hour = 8
+        sent = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                # 활성 푸시 토큰 보유 유저
+                rows = await db.execute(
+                    select(
+                        User.id,
+                        UserPreference.lang,
+                        UserPreference.timezone,
+                        UserPreference.home_country,
+                        UserPushToken.token,
+                        UserPushToken.platform,
+                    )
+                    .join(UserPushToken, UserPushToken.user_id == User.id)
+                    .outerjoin(UserPreference, UserPreference.user_id == User.id)
+                    .where(UserPushToken.is_active == True)
+                )
+                users = rows.all()
+
+                # 글로벌 top tension
+                top_tension = await db.execute(
+                    select(TensionIndex)
+                    .order_by(TensionIndex.raw_score.desc())
+                    .limit(1)
+                )
+                top = top_tension.scalar_one_or_none()
+
+                sent_uids = set()
+                for user in users:
+                    uid, lang, tz_name, home_country, token, platform = user
+                    if uid in sent_uids:
+                        continue
+                    tz_name = tz_name or "Asia/Seoul"
+                    lang = lang or "ko"
+
+                    # 해당 유저의 로컬 시간 확인
+                    try:
+                        local_tz = pytz.timezone(tz_name)
+                        local_now = now.astimezone(local_tz)
+                        if local_now.hour != target_local_hour:
+                            continue
+                    except Exception:
+                        continue
+
+                    if _is_in_quiet_hours(tz_name):
+                        continue
+
+                    # 브리핑 제목 구성
+                    severity = top.raw_score if top else 0
+                    emoji = push_weather_emoji(int(severity))
+                    label = push_severity_label(int(severity), lang)
+
+                    if lang == "ko":
+                        title = f"{emoji} 오늘의 분쟁 날씨: {label}"
+                        body = f"위험지수 {int(severity)}/100. 오늘의 분쟁이 내 지갑에 미치는 영향을 확인하세요."
+                    else:
+                        title = f"{emoji} Today's conflict weather: {label}"
+                        body = f"Risk level {int(severity)}/100. Check how today's conflicts may affect your wallet."
+
+                    try:
+                        await _send_fcm_to_user(
+                            uid, title, body,
+                            {"type": "morning_briefing", "weather_emoji": emoji},
+                        )
+                        sent += 1
+                        sent_uids.add(uid)
+                    except Exception:
+                        pass
+
+        logger.info("send_morning_briefing: sent=%d", sent)
+        return {"sent": sent}
+
+    try:
+        _record_heartbeat("send_morning_briefing")
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_morning_briefing 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+# ── v2.0 Evening Digest Push ─────────────────────────────────────────────
+
+
+@app.task(
+    name="worker.tasks.send_evening_digest",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def send_evening_digest(self):
+    """매시간 실행 → 현재 UTC 시각이 로컬 19:00인 시간대 유저에게 저녁 요약 발송."""
+
+    async def _run():
+        from sqlalchemy import select, func
+        from backend.app.models.user import User, UserPushToken, UserPreference
+        from backend.app.models.tension_index import TensionIndex
+        from worker.push.push_service import _is_in_quiet_hours
+        from backend.app.utils.consumer import push_weather_emoji, push_severity_label
+        import pytz
+
+        now = datetime.now(timezone.utc)
+        target_local_hour = 19
+        sent = 0
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                rows = await db.execute(
+                    select(
+                        User.id,
+                        UserPreference.lang,
+                        UserPreference.timezone,
+                        UserPreference.home_country,
+                        UserPushToken.token,
+                        UserPushToken.platform,
+                    )
+                    .join(UserPushToken, UserPushToken.user_id == User.id)
+                    .outerjoin(UserPreference, UserPreference.user_id == User.id)
+                    .where(UserPushToken.is_active == True)
+                )
+                users = rows.all()
+
+                # 오늘 가장 큰 변동 이슈
+                top_tensions = await db.execute(
+                    select(TensionIndex)
+                    .order_by(TensionIndex.raw_score.desc())
+                    .limit(3)
+                )
+                tops = top_tensions.scalars().all()
+
+                sent_uids = set()
+                for user in users:
+                    uid, lang, tz_name, home_country, token, platform = user
+                    if uid in sent_uids:
+                        continue
+                    tz_name = tz_name or "Asia/Seoul"
+                    lang = lang or "ko"
+
+                    try:
+                        local_tz = pytz.timezone(tz_name)
+                        local_now = now.astimezone(local_tz)
+                        if local_now.hour != target_local_hour:
+                            continue
+                    except Exception:
+                        continue
+
+                    if _is_in_quiet_hours(tz_name):
+                        continue
+
+                    if lang == "ko":
+                        title = "📋 오늘 놓친 것"
+                        lines = []
+                        for t_item in tops[:3]:
+                            emoji = push_weather_emoji(int(t_item.raw_score))
+                            lines.append(f"{emoji} {t_item.country_code or '글로벌'}: {push_severity_label(int(t_item.raw_score), 'ko')}")
+                        body = " | ".join(lines) if lines else "오늘은 비교적 평온했어요."
+                    else:
+                        title = "📋 What you missed today"
+                        lines = []
+                        for t_item in tops[:3]:
+                            emoji = push_weather_emoji(int(t_item.raw_score))
+                            lines.append(f"{emoji} {t_item.country_code or 'Global'}: {push_severity_label(int(t_item.raw_score), 'en')}")
+                        body = " | ".join(lines) if lines else "Relatively calm today."
+
+                    try:
+                        await _send_fcm_to_user(
+                            uid, title, body,
+                            {"type": "evening_digest"},
+                        )
+                        sent += 1
+                        sent_uids.add(uid)
+                    except Exception:
+                        pass
+
+        logger.info("send_evening_digest: sent=%d", sent)
+        return {"sent": sent}
+
+    try:
+        _record_heartbeat("send_evening_digest")
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_evening_digest 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
 # ── 만료 후 전환 오퍼 발송 ────────────────────────────────────────────────
 
 
