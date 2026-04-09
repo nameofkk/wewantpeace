@@ -480,8 +480,8 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
               )}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={cn("text-[10px] font-bold tabular-nums", badge.text)}>
-                  {roundKScore(pk).toFixed(1)}
+                <span className={cn("text-[10px] font-bold", badge.text)}>
+                  {badge.label}
                 </span>
                 {item.country_codes.length > 0 && (
                   <span className="text-[11px]">
@@ -530,10 +530,10 @@ function RisingCard({ risingItems, allItems, lang, onNavigate }: { risingItems: 
                             </>
                           ) : (
                             <span className={cn(
-                              "font-bold tabular-nums leading-none",
+                              "font-bold leading-none",
                               item.kscore >= 7 ? "text-red-400" : item.kscore >= 4 ? "text-orange-400" : "text-muted-foreground"
                             )}>
-                              K{item.kscore.toFixed(1)}
+                              {item.kscore >= 8 ? "🌪️" : item.kscore >= 6 ? "⛈️" : item.kscore >= 4 ? "🌥️" : item.kscore >= 2 ? "⛅" : "☀️"}
                             </span>
                           )}
                         </span>

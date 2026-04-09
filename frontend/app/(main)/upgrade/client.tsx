@@ -117,10 +117,33 @@ const APPLE_PRODUCT_IDS: Record<string, string> = {
 
 type BillingCycle = "monthly" | "annual" | "lifetime";
 
-const PRICING = {
-  pro:      { monthly: 6.99, annual: 62.99, annualPerMonth: 5.25, lifetime: 149.99 },
-  pro_plus: { monthly: 9.99, annual: 89.99, annualPerMonth: 7.50, lifetime: 199.99 },
+// PPP 3-Tier pricing
+const PRICING_TIERS = {
+  tier1: { // US/UK/AU/DE/CA
+    pro:      { monthly: 4.99, annual: 47.99, annualPerMonth: 4.00, lifetime: 119.99 },
+    pro_plus: { monthly: 7.99, annual: 71.99, annualPerMonth: 6.00, lifetime: 179.99 },
+  },
+  tier2: { // KR/JP/FR/IL/UAE
+    pro:      { monthly: 2.99, annual: 29.99, annualPerMonth: 2.50, lifetime: 79.99 },
+    pro_plus: { monthly: 4.99, annual: 47.99, annualPerMonth: 4.00, lifetime: 119.99 },
+  },
+  tier3: { // IN/ID/PH/BR/TR
+    pro:      { monthly: 0.99, annual: 9.99, annualPerMonth: 0.83, lifetime: 29.99 },
+    pro_plus: { monthly: 1.99, annual: 19.99, annualPerMonth: 1.67, lifetime: 49.99 },
+  },
 } as const;
+
+const TIER1_COUNTRIES = ["US","GB","AU","DE","CA","NZ","IE","CH","AT","NL","SE","NO","DK","FI"];
+const TIER3_COUNTRIES = ["IN","ID","PH","BR","TR","EG","PK","BD","VN","NG","KE","GH","TZ","ET"];
+
+function getPricingTier(homeCountry: string) {
+  if (TIER1_COUNTRIES.includes(homeCountry)) return PRICING_TIERS.tier1;
+  if (TIER3_COUNTRIES.includes(homeCountry)) return PRICING_TIERS.tier3;
+  return PRICING_TIERS.tier2; // default: KR, JP, FR, etc.
+}
+
+// backward-compatible default
+const PRICING = PRICING_TIERS.tier2;
 
 const ANNUAL_DISCOUNT = 25; // %
 const ANNUAL_MONTHS_FREE = 3;
@@ -159,7 +182,8 @@ function UpgradeContent() {
   const source = searchParams.get("source");
   const redirectError = searchParams.get("error");
   const { user, loading: authLoading } = useAuth();
-  const { lang } = useAppStore();
+  const { lang, homeCountry } = useAppStore();
+  const pricing = getPricingTier(homeCountry || "KR");
   const { data: me } = useMe();
   const currentPlan = (me as { plan?: string })?.plan ?? "free";
   const [loading, setLoading] = useState<string | null>(null);
@@ -837,7 +861,7 @@ function UpgradeContent() {
                 </div>
                 <div className="text-right shrink-0">
                   {billingCycle === "annual" && (
-                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${PRICING.pro.monthly.toFixed(2)}/mo</p>
+                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${pricing.pro.monthly.toFixed(2)}/mo</p>
                   )}
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-xs text-blue-400 font-medium">$</span>
@@ -845,14 +869,14 @@ function UpgradeContent() {
                       "text-2xl font-black text-blue-400",
                       selected === "pro" && "shimmer-text"
                     )}>
-                      {billingCycle === "monthly" ? PRICING.pro.monthly.toFixed(2)
-                       : billingCycle === "annual" ? PRICING.pro.annualPerMonth.toFixed(2)
-                       : PRICING.pro.lifetime.toFixed(2)}
+                      {billingCycle === "monthly" ? pricing.pro.monthly.toFixed(2)
+                       : billingCycle === "annual" ? pricing.pro.annualPerMonth.toFixed(2)
+                       : pricing.pro.lifetime.toFixed(2)}
                     </span>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {billingCycle === "monthly" ? (lang === "ko" ? "/월" : "/mo")
-                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${PRICING.pro.annual}/년` : `/mo · $${PRICING.pro.annual}/yr`)
+                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${pricing.pro.annual}/년` : `/mo · $${pricing.pro.annual}/yr`)
                      : (lang === "ko" ? "일회성 결제" : "one-time")}
                   </p>
                 </div>
@@ -880,7 +904,7 @@ function UpgradeContent() {
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
                   <Tag className="h-3 w-3 text-green-500 shrink-0" />
                   <span className="text-[11px] text-green-500 font-medium whitespace-nowrap">
-                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(PRICING.pro.monthly * 12 - PRICING.pro.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(PRICING.pro.monthly * 12 - PRICING.pro.annual).toFixed(2)}/yr`}
+                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(pricing.pro.monthly * 12 - pricing.pro.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(pricing.pro.monthly * 12 - pricing.pro.annual).toFixed(2)}/yr`}
                   </span>
                 </div>
               )}
@@ -1057,7 +1081,7 @@ function UpgradeContent() {
                 </div>
                 <div className="text-right shrink-0">
                   {billingCycle === "annual" && (
-                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${PRICING.pro_plus.monthly.toFixed(2)}/mo</p>
+                    <p className="text-[10px] text-muted-foreground/50 line-through mb-0.5">${pricing.pro_plus.monthly.toFixed(2)}/mo</p>
                   )}
                   <div className="flex items-baseline gap-0.5">
                     <span className="text-xs text-purple-400 font-medium">$</span>
@@ -1065,14 +1089,14 @@ function UpgradeContent() {
                       "text-2xl font-black text-purple-400",
                       selected === "pro_plus" && "shimmer-text"
                     )}>
-                      {billingCycle === "monthly" ? PRICING.pro_plus.monthly.toFixed(2)
-                       : billingCycle === "annual" ? PRICING.pro_plus.annualPerMonth.toFixed(2)
-                       : PRICING.pro_plus.lifetime.toFixed(2)}
+                      {billingCycle === "monthly" ? pricing.pro_plus.monthly.toFixed(2)
+                       : billingCycle === "annual" ? pricing.pro_plus.annualPerMonth.toFixed(2)
+                       : pricing.pro_plus.lifetime.toFixed(2)}
                     </span>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {billingCycle === "monthly" ? (lang === "ko" ? "/월" : "/mo")
-                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${PRICING.pro_plus.annual}/년` : `/mo · $${PRICING.pro_plus.annual}/yr`)
+                     : billingCycle === "annual" ? (lang === "ko" ? `/월 · $${pricing.pro_plus.annual}/년` : `/mo · $${pricing.pro_plus.annual}/yr`)
                      : (lang === "ko" ? "일회성 결제" : "one-time")}
                   </p>
                 </div>
@@ -1100,7 +1124,7 @@ function UpgradeContent() {
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-3 py-2">
                   <Tag className="h-3 w-3 text-green-500 shrink-0" />
                   <span className="text-[11px] text-green-500 font-medium whitespace-nowrap">
-                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(PRICING.pro_plus.monthly * 12 - PRICING.pro_plus.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(PRICING.pro_plus.monthly * 12 - PRICING.pro_plus.annual).toFixed(2)}/yr`}
+                    {lang === "ko" ? `${ANNUAL_MONTHS_FREE}개월 무료 · 연 $${(pricing.pro_plus.monthly * 12 - pricing.pro_plus.annual).toFixed(2)} 절약` : `${ANNUAL_MONTHS_FREE} months free · Save $${(pricing.pro_plus.monthly * 12 - pricing.pro_plus.annual).toFixed(2)}/yr`}
                   </span>
                 </div>
               )}
