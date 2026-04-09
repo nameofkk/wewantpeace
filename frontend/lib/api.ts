@@ -8,13 +8,33 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   if (devUid) return { "X-Dev-UID": devUid };
   try {
     const { waitForAuth, getIdToken } = await import("./auth");
-    await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 8초)
+    await waitForAuth(); // Firebase auth 복원 완료까지 대기 (최대 4초)
     const token = await getIdToken();
     if (token) return { Authorization: `Bearer ${token}` };
   } catch (e) {
     console.error("[apiFetch] getAuthHeaders error:", e);
   }
   return {};
+}
+
+/** 공개 엔드포인트용: auth 준비되면 토큰 붙이고, 안 되면 즉시 빈 헤더 반환 */
+async function getAuthHeadersNonBlocking(): Promise<Record<string, string>> {
+  const devUid = typeof window !== "undefined" ? localStorage.getItem("dev_uid") : null;
+  if (devUid) return { "X-Dev-UID": devUid };
+  try {
+    const { getIdToken } = await import("./auth");
+    const token = await getIdToken();
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // auth 미준비 시 무시 — 공개 엔드포인트는 인증 없이도 동작
+  }
+  return {};
+}
+
+// 공개 엔드포인트: auth 대기 없이 즉시 호출 (데이터 로딩 속도 개선)
+const PUBLIC_PREFIXES = ["/impact/", "/trending/", "/tension/", "/public/", "/search/"];
+function isPublicPath(path: string): boolean {
+  return PUBLIC_PREFIXES.some((p) => path.startsWith(p));
 }
 
 async function apiFetch<T>(
@@ -27,7 +47,10 @@ async function apiFetch<T>(
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const authHeaders = await getAuthHeaders();
+  // 공개 엔드포인트는 auth를 기다리지 않고 즉시 호출 (있으면 붙이고 없으면 없이)
+  const authHeaders = isPublicPath(path)
+    ? await getAuthHeadersNonBlocking()
+    : await getAuthHeaders();
   const hasAuth = !!authHeaders.Authorization || !!authHeaders["X-Dev-UID"];
 
   // 인증 없이 /me/* 호출 시 네트워크 요청 없이 즉시 에러 (브라우저 콘솔 401 방지)
