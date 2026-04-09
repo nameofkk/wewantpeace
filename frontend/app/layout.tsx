@@ -391,6 +391,16 @@ export default function RootLayout({
             /* SSR onboarding: 세계지도 div가 HTML에 있으면 스플래시 숨김 → LCP/SI 즉시 */
             html:has(.ob-world-map) #__splash,
             html:has(.ob-world-map) #react-splash { display: none !important; }
+            .splash-fade-out { opacity: 0; transition: opacity 0.4s ease-out; pointer-events: none; }
+          ` }} />
+          {/* 안전장치: React 하이드레이션 실패 시 5초 후 인라인 스플래시 강제 제거 */}
+          <script dangerouslySetInnerHTML={{ __html: `
+            setTimeout(function(){
+              var s=document.getElementById('__splash');
+              if(s){s.classList.add('splash-fade-out');setTimeout(function(){s.remove()},500)}
+              var r=document.getElementById('react-splash');
+              if(r){r.classList.add('splash-fade-out');setTimeout(function(){r.remove()},500)}
+            },5000);
           ` }} />
         </div>
         <Providers>

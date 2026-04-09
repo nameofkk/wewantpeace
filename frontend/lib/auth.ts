@@ -240,11 +240,11 @@ let _authReady = false;
 const _authReadyPromise: Promise<void> = IS_FIREBASE_CONFIGURED
   ? new Promise<void>((resolve) => {
       _authReadyResolve = resolve;
-      // 안전장치: 8초 후 강제 resolve (모바일 느린 환경 대비)
+      // 안전장치: 4초 후 강제 resolve (8초는 너무 김 — 데이터 로딩 블로킹 방지)
       setTimeout(() => {
         _authReady = true;
         resolve();
-      }, 8000);
+      }, 4000);
     })
   : Promise.resolve();
 
