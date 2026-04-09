@@ -474,10 +474,10 @@ export async function GET(
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                   <span style={{ color: "#E2E8F0", fontSize: 44, fontWeight: 900, fontFamily: displayFont, lineHeight: 1 }}>
-                    K{kscore.toFixed(1)}
+                    {kscore >= 8 ? "🌪️" : kscore >= 6 ? "⛈️" : kscore >= 4 ? "🌥️" : kscore >= 2 ? "⛅" : "☀️"}
                   </span>
                   <span style={{ color: "#94A3B8", fontSize: 16, fontWeight: 600 }}>
-                    KScore
+                    {lang === "en" ? "Risk Level" : "위험지수"}
                   </span>
                 </div>
                 <div style={{ display: "flex", width: "2px", height: "44px", background: "#334155" }} />

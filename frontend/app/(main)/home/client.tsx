@@ -30,6 +30,7 @@ import { SmartSummaryCardFull, SmartSummaryCompact } from "@/components/dashboar
 import { RiskRadar } from "@/components/dashboard/RiskRadar";
 import { WalletGauge } from "@/components/dashboard/WalletGauge";
 import { ImpactChainCard } from "@/components/dashboard/ImpactChainCard";
+import { MonthlyReport } from "@/components/dashboard/MonthlyReport";
 import { ProDemoWrapper } from "@/components/dashboard/ProDemoWrapper";
 import { SectorImpactCard } from "@/components/dashboard/SectorImpactCard";
 import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
@@ -649,6 +650,17 @@ function ReportContent() {
               </div>
             )}
           </m.section>
+
+          {/* ═══════════════ Monthly Report ═══════════════ */}
+          <MonthlyReport
+            energy={summary?.wallet_energy ?? 0}
+            food={summary?.wallet_food ?? 0}
+            finance={summary?.wallet_finance ?? 0}
+            travel={summary?.wallet_travel ?? 0}
+            streakDays={streakDays}
+            month={lang === "ko" ? `${new Date().getMonth() + 1}월` : new Date().toLocaleString("en", { month: "long" })}
+            lang={lang}
+          />
 
           {/* ═══════════════ Data Deep Dive Toggle ═══════════════ */}
           <button
