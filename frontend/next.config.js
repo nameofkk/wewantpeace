@@ -82,11 +82,11 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://js.dodo.dev https://*.firebaseio.com https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com",
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://js.dodo.dev https://*.firebaseio.com https://apis.google.com https://www.gstatic.com https://www.googletagmanager.com`,
               "style-src 'self' 'unsafe-inline' https://unpkg.com",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://api.wewantpeace.live https://backend-production-3af7.up.railway.app https://*.firebaseio.com https://*.googleapis.com https://*.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.gstatic.com https://accounts.google.com https://appleid.apple.com https://kauth.kakao.com https://www.google-analytics.com https://www.googletagmanager.com",
+              `connect-src 'self'${process.env.NODE_ENV === 'development' ? ' http://localhost:8000' : ''} https://api.wewantpeace.live https://backend-production-3af7.up.railway.app https://*.firebaseio.com https://*.googleapis.com https://*.cartocdn.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.gstatic.com https://accounts.google.com https://appleid.apple.com https://kauth.kakao.com https://www.google-analytics.com https://www.googletagmanager.com`,
               "frame-src https://checkout.dodopayments.com https://badge.disquiet.io https://accounts.google.com https://appleid.apple.com https://*.firebaseapp.com",
               "worker-src 'self' blob:",
               "frame-ancestors 'none'",
