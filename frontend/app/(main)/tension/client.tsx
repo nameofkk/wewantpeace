@@ -94,66 +94,37 @@ function scoreArcColor(score: number): string {
 
 function TensionGauge({ score, level, lang }: { score: number; level: 0 | 1 | 2 | 3 | 4; lang: Lang }) {
   const info = TENSION_LEVELS[level];
-  const radius = 60;
-  const circumference = Math.PI * radius;
-  const targetOffset = circumference - (score / 100) * circumference;
-  const arcColor = scoreArcColor(score);
 
-  const [animOffset, setAnimOffset] = useState(circumference);
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimOffset(targetOffset), 120);
-    return () => clearTimeout(timer);
-  }, [targetOffset]);
+  function weatherEmoji(s: number): string {
+    if (s >= 80) return "🌪️";
+    if (s >= 60) return "⛈️";
+    if (s >= 40) return "🌥️";
+    if (s >= 20) return "⛅";
+    return "☀️";
+  }
 
-  const [displayScore, setDisplayScore] = useState(0);
-  useEffect(() => {
-    const end = Math.round(score);
-    const duration = 900;
-    let raf: number;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min((now - start) / duration, 1);
-      const eased = 1 - (1 - p) ** 3;
-      setDisplayScore(Math.round(eased * end));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    const timer = setTimeout(() => { raf = requestAnimationFrame(tick); }, 180);
-    return () => { clearTimeout(timer); cancelAnimationFrame(raf); };
-  }, [score]);
+  function weatherColor(s: number): string {
+    if (s >= 80) return "#991b1b";
+    if (s >= 60) return "#ef4444";
+    if (s >= 40) return "#f97316";
+    if (s >= 20) return "#eab308";
+    return "#22c55e";
+  }
+
+  const color = weatherColor(score);
 
   return (
-    <div className="relative flex items-center justify-center">
-      <svg width="140" height="80" viewBox="0 0 140 80">
-        <path
-          d="M 10 70 A 60 60 0 0 1 130 70"
-          fill="none"
-          stroke="hsl(217 32% 17%)"
-          strokeWidth="12"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 10 70 A 60 60 0 0 1 130 70"
-          fill="none"
-          stroke={arcColor}
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${circumference}`}
-          strokeDashoffset={`${animOffset}`}
-          style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94)" }}
-        />
-      </svg>
-      <div className="absolute bottom-1 flex flex-col items-center">
-        <span className="text-2xl font-bold tabular-nums" style={{ color: arcColor }}>
-          {displayScore}
+    <div className="flex items-center justify-center gap-4 py-3">
+      <span className="text-4xl">{weatherEmoji(score)}</span>
+      <div className="flex flex-col items-center">
+        <span className="text-3xl font-bold tabular-nums" style={{ color }}>
+          {Math.round(score)}
         </span>
-        <span className="text-[9px] text-muted-foreground -mt-0.5">{t(lang, "tension_score_label")}</span>
-        <span className="flex items-center gap-1 mt-0.5">
-          <span className={cn("text-xs font-medium badge-pop", info.color)}>{getTensionLevelLabel(level, lang)}</span>
-          <InfoTooltip
-            direction="up"
-            text={t(lang, "tension_gauge_tooltip")}
-          />
-        </span>
+        <span className="text-[9px] text-muted-foreground -mt-0.5">/100</span>
+      </div>
+      <div className="flex flex-col items-start">
+        <span className={cn("text-sm font-bold", info.color)}>{getTensionLevelLabel(level, lang)}</span>
+        <span className="text-[9px] text-muted-foreground">{t(lang, "tension_score_label")}</span>
       </div>
     </div>
   );
@@ -331,6 +302,7 @@ function scoreBorderStyle(score: number): string {
 
 const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: { data: TensionData; userPlan: string; index: number; lang: Lang }) {
   const [showHistory, setShowHistory] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const [pctFilled, setPctFilled] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setPctFilled(true), 300 + index * 80);
@@ -373,12 +345,14 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
             <h3 className="text-sm font-bold">{label}</h3>
             {data.delta_24h != null && data.delta_24h !== 0 && (
               <span className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums",
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold",
                 data.delta_24h > 0
                   ? "bg-red-500/15 text-red-400"
                   : "bg-emerald-500/15 text-emerald-400"
               )}>
-                {data.delta_24h > 0 ? "▲" : "▼"}{Math.abs(data.delta_24h).toFixed(1)}
+                {data.delta_24h > 0
+                  ? (lang === "ko" ? "어제보다 ↑" : "Up from yesterday")
+                  : (lang === "ko" ? "어제보다 ↓" : "Down from yesterday")}
               </span>
             )}
             {isCritical && (
@@ -455,21 +429,29 @@ const TensionCard = memo(function TensionCard({ data, userPlan, index, lang }: {
         );
       })()}
 
-      {/* 점수 구성 */}
+      {/* 점수 구성 (접기) */}
       <div className="mt-3">
-        <p className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground mb-2">
+        <button
+          onClick={() => setShowBreakdown(v => !v)}
+          className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showBreakdown ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           {t(lang, "tension_breakdown_title")}
           <InfoTooltip
             direction="up"
             text={t(lang, "tension_breakdown_tooltip")}
           />
-        </p>
-        <ScoreBreakdown
-          event_score={data.event_score}
-          accel_score={data.accel_score}
-          spillover_score={data.spillover_score}
-          lang={lang}
-        />
+        </button>
+        {showBreakdown && (
+          <div className="mt-2">
+            <ScoreBreakdown
+              event_score={data.event_score}
+              accel_score={data.accel_score}
+              spillover_score={data.spillover_score}
+              lang={lang}
+            />
+          </div>
+        )}
       </div>
 
       {/* 원인 이슈 */}

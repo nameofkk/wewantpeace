@@ -160,13 +160,18 @@ export interface SearchResult {
   first_event_at: string;
   last_event_at: string;
   image_url: string | null;
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  verification_label?: string | null;
 }
 
 export function useSearchIssues(q: string, limit = 20) {
+  const lang = useAppStore.getState().lang || "ko";
   return useQuery({
-    queryKey: ["issues", "search", q, limit],
+    queryKey: ["issues", "search", q, limit, lang],
     queryFn: () =>
-      apiFetch<SearchResult[]>("/issues/search", { q, limit: String(limit) }),
+      apiFetch<SearchResult[]>("/issues/search", { q, limit: String(limit), lang }),
     enabled: q.length >= 2,
     staleTime: 30 * 1000,
     placeholderData: keepPreviousData,

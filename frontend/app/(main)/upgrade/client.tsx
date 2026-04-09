@@ -666,6 +666,25 @@ function UpgradeContent() {
           <p className="mt-2 text-sm text-muted-foreground">{t(lang, "upgrade_subtitle")}</p>
         </div>
 
+        {/* 놓친 알림 CTA — Loss Aversion */}
+        {currentPlan === "free" && (
+          <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4" style={{ animation: "fadeSlideUp 0.42s ease both" }}>
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⛈️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold">
+                  {lang === "ko" ? "놓치고 있는 알림이 있어요" : "You're missing alerts"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                  {lang === "ko"
+                    ? "Pro 플랜에서는 주유비·식품·항공료 변동 알림을 받을 수 있어요."
+                    : "Pro plan includes alerts for gas, grocery & flight cost changes."}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 결제 주기 토글 — Claude/ChatGPT 스타일 */}
         <div className="flex justify-center mb-8" style={{ animation: "fadeSlideUp 0.45s ease both" }}>
           <div className="inline-flex rounded-xl bg-muted/50 border border-border p-1 gap-0.5">

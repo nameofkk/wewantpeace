@@ -65,6 +65,11 @@ class SearchResultOut(BaseModel):
     first_event_at: str
     last_event_at: str
     image_url: Optional[str] = None
+    # v2.0 Consumer fields
+    so_what_consumer: Optional[str] = None
+    wallet_line: Optional[str] = None
+    trust_level: Optional[str] = None
+    verification_label: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -282,8 +287,14 @@ async def search_clusters(
     )
     result = await db.execute(stmt)
     clusters = result.scalars().all()
-    return [
-        SearchResultOut(
+    lang = request.query_params.get("lang", "ko")
+    if lang not in ("ko", "en"):
+        lang = "ko"
+
+    out = []
+    for c in clusters:
+        _cf = build_consumer_fields(c, lang)
+        out.append(SearchResultOut(
             id=str(c.id),
             title=c.title,
             title_ko=c.title_ko,
@@ -295,9 +306,12 @@ async def search_clusters(
             first_event_at=c.first_event_at.isoformat(),
             last_event_at=c.last_event_at.isoformat(),
             image_url=c.image_url,
-        )
-        for c in clusters
-    ]
+            so_what_consumer=_cf.get("so_what_consumer"),
+            wallet_line=_cf.get("wallet_line"),
+            trust_level=_cf.get("trust_level"),
+            verification_label=_cf.get("verification_label"),
+        ))
+    return out
 
 
 class CountryUcdpContextOut(BaseModel):

@@ -5,9 +5,9 @@ import HomeClient from "./client";
 const SITE_URL = "https://www.wewantpeace.live";
 
 export const metadata: Metadata = {
-  title: "My Global Risk Dashboard",
+  title: "Your Daily Conflict Weather",
   description:
-    "Your personalized global risk dashboard. See how conflicts affect you in real time — economy, trade, energy & travel risk analysis with KScore.",
+    "Track how conflicts affect your daily costs — gas, groceries, flights. Your personalized conflict weather across 195 countries.",
   alternates: {
     canonical: `${SITE_URL}/home`,
     languages: {
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "My Global Risk Dashboard | WeWantPeace",
-    description: "Your personalized global risk dashboard. See how conflicts affect you in real time with KScore.",
+    title: "Your Daily Conflict Weather | WeWantPeace",
+    description: "Track how conflicts affect your daily costs — gas, groceries, flights. Real-time analysis across 195 countries.",
     type: "website",
     url: `${SITE_URL}/home`,
     siteName: "WeWantPeace",
