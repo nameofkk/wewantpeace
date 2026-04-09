@@ -656,6 +656,35 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              {/* Aha Moment — "분쟁이 당신의 지갑에 영향을 주고 있어요" */}
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3" style={{ marginBottom: "var(--space-md)" }}>
+                <p className="text-[11px] font-bold text-foreground/80 mb-2">
+                  {lang === "ko"
+                    ? "지금 분쟁이 당신의 생활비에 영향을 주고 있어요"
+                    : "Conflicts are affecting your daily costs right now"}
+                </p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-[10px] text-foreground/60">
+                    <span>⛽</span>
+                    <span>{lang === "ko" ? "주유비 · 택배비" : "Gas & shipping"}</span>
+                    <span className="ml-auto text-amber-500 font-medium">{lang === "ko" ? "영향 있음" : "Affected"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-foreground/60">
+                    <span>🌾</span>
+                    <span>{lang === "ko" ? "식품 · 식료품" : "Groceries"}</span>
+                    <span className="ml-auto text-amber-500 font-medium">{lang === "ko" ? "영향 있음" : "Affected"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-foreground/60">
+                    <span>✈️</span>
+                    <span>{lang === "ko" ? "항공료 · 여행" : "Flights & travel"}</span>
+                    <span className="ml-auto text-amber-500 font-medium">{lang === "ko" ? "영향 있음" : "Affected"}</span>
+                  </div>
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-2">
+                  {lang === "ko" ? "어떻게 알 수 있나요? →" : "How do we know? →"}
+                </p>
+              </div>
+
               {/* 데스크탑 전용 인라인 CTA + 풋터 */}
               <div className="hidden lg:block" style={{ marginTop: "var(--space-sm)" }}>
                 <button

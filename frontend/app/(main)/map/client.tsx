@@ -111,6 +111,11 @@ interface Cluster {
   last_event_at: string;
   grouped_count?: number;
   grouped_total_events?: number;
+  // v2.0 Consumer fields
+  so_what_consumer?: string | null;
+  wallet_line?: string | null;
+  trust_level?: string | null;
+  what_consumer?: string | null;
 }
 
 // KScore 반올림: 표시값과 색상 판별에 동일한 값 사용 (0.98 vs 1.00 불일치 방지)
@@ -251,6 +256,12 @@ function ClusterPopup({ cluster, onClose, isPreview = false }: { cluster: Cluste
             )}
           </div>
           <h3 className="text-sm font-bold leading-tight">{displayTitle}</h3>
+          {cluster.so_what_consumer && (
+            <p className="text-[11px] text-foreground/70 mt-1 leading-snug">{cluster.so_what_consumer}</p>
+          )}
+          {cluster.wallet_line && (
+            <p className="text-[10px] text-amber-600 mt-0.5">💰 {cluster.wallet_line}</p>
+          )}
           {(cluster.grouped_count ?? 1) > 1 ? (
             <p className="text-[10px] text-muted-foreground mt-1">{t(lang, "map_popup_rep_note")}</p>
           ) : (

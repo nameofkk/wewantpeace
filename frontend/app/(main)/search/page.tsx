@@ -174,12 +174,33 @@ function SearchResultCard({ item, lang }: { item: SearchResult; lang: "ko" | "en
             </span>
           </div>
           <p className="text-sm font-medium leading-snug line-clamp-2">{title}</p>
+          {item.so_what_consumer && (
+            <p className="text-[11px] text-foreground/70 mt-0.5 line-clamp-1">{item.so_what_consumer}</p>
+          )}
           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
             <span>
               {item.event_count}{lang === "ko" ? "건 보도" : " reports"}
             </span>
             <span className="w-px h-3 bg-border" />
             <span>{timeAgo}</span>
+            {item.trust_level && item.trust_level !== "unconfirmed" && (
+              <>
+                <span className="w-px h-3 bg-border" />
+                <span className={
+                  item.trust_level === "confirmed" ? "text-emerald-500" :
+                  item.trust_level === "verified" ? "text-emerald-400" :
+                  "text-blue-400"
+                }>
+                  {item.trust_level === "confirmed" ? "✓✓✓" : item.trust_level === "verified" ? "✓✓" : "✓"} {item.verification_label}
+                </span>
+              </>
+            )}
+            {item.wallet_line && (
+              <>
+                <span className="w-px h-3 bg-border" />
+                <span className="text-amber-600">💰 {item.wallet_line}</span>
+              </>
+            )}
           </div>
         </div>
         {item.image_url && (

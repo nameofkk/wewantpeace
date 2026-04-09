@@ -136,7 +136,7 @@ class UserPreference(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    language: Mapped[str] = mapped_column(String(8), nullable=False, default="ko")
+    language: Mapped[str] = mapped_column(String(8), nullable=False, default="")
     min_severity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=35)
     topics: Mapped[list[str]] = mapped_column(
         StringArray,
@@ -145,7 +145,7 @@ class UserPreference(Base):
     )
     quiet_hours_start: Mapped[time | None] = mapped_column(Time, nullable=True)
     quiet_hours_end: Mapped[time | None] = mapped_column(Time, nullable=True)
-    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Seoul")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     min_kscore: Mapped[float] = mapped_column(nullable=False, default=4.0)
     intent: Mapped[str] = mapped_column(String(16), nullable=False, default="general")
     home_country: Mapped[str] = mapped_column(String(4), nullable=False, server_default="")
