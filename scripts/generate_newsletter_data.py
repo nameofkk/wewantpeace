@@ -438,7 +438,7 @@ async def generate(vol: int, lang: str) -> dict:
         wheat_price, wheat_change = None, None
         for symbol, name in [("CL=F", "oil"), ("BZ=F", "oil_brent"), ("ZW=F", "wheat")]:
             r = await db.execute(text(
-                "SELECT price_usd, change_pct FROM commodity_prices "
+                "SELECT price_usd, change_pct FROM commodity_price "
                 "WHERE symbol = :sym ORDER BY price_date DESC LIMIT 1"
             ), {"sym": symbol})
             row = r.fetchone()
@@ -453,7 +453,7 @@ async def generate(vol: int, lang: str) -> dict:
         # ── 8. 여행 경보 ──
         r = await db.execute(text(
             "SELECT DISTINCT ON (country_code) country_code, level "
-            "FROM travel_advisories WHERE level >= 3 "
+            "FROM travel_advisory WHERE level >= 3 "
             "ORDER BY country_code, updated_at DESC"
         ))
         advisories = [{"cc": row.country_code, "level": row.level} for row in r.fetchall()]
