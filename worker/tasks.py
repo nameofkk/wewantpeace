@@ -4470,15 +4470,9 @@ def generate_newsletter_draft(self):
         decode_responses=True,
     )
 
-    # 현재 최대 vol 번호 탐색
-    keys = r.keys("newsletter:draft:vol*")
-    max_vol = 0
-    for k in keys:
-        try:
-            vol_part = k.split("vol")[1].split("-")[0]
-            max_vol = max(max_vol, int(vol_part))
-        except (IndexError, ValueError):
-            pass
+    # 현재 최대 vol 번호: latest_draft_vol 기반 (키 스캔 대신 안정적)
+    latest = r.get("newsletter:latest_draft_vol")
+    max_vol = int(latest) if latest else 0
     next_vol = max_vol + 1
 
     script_path = os.path.join(
@@ -4586,8 +4580,8 @@ def send_newsletter_scheduled(self, tz_group: str):
             return {"status": "no_draft_ready"}
 
         # Get draft data from Redis
-        draft_kr_raw = await redis.get(f"newsletter:draft:vol{vol_match}-kr")
-        draft_en_raw = await redis.get(f"newsletter:draft:vol{vol_match}-us")
+        draft_kr_raw = await redis.get(f"admin:newsletter:draft:vol{vol_match}-kr")
+        draft_en_raw = await redis.get(f"admin:newsletter:draft:vol{vol_match}-us")
 
         if not draft_kr_raw and not draft_en_raw:
             logger.warning(f"Draft not found for vol {vol_match}")
