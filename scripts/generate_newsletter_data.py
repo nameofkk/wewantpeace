@@ -7,7 +7,7 @@
 
 자동 채우는 변수: ~30개 (DB 쿼리 기반)
 수동 입력 변수: ~25개 (hero_headline_html, deep_dive 등) → 빈 문자열로 설정
-결과: Redis key `newsletter:draft:vol{N}-{lang}` 에 JSON 저장 (TTL 90일)
+결과: Redis key `admin:newsletter:draft:vol{N}-{lang}` 에 JSON 저장 (TTL 90일)
 """
 
 import asyncio
@@ -353,7 +353,7 @@ async def main():
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     r = redis.from_url(redis_url, decode_responses=True)
 
-    key = f"newsletter:draft:vol{args.vol}-{args.lang}"
+    key = f"admin:newsletter:draft:vol{args.vol}-{args.lang}"
     ttl = 90 * 24 * 3600  # 90일
 
     r.set(key, json.dumps(data, ensure_ascii=False, default=str), ex=ttl)
