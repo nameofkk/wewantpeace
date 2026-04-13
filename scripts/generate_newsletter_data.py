@@ -116,21 +116,36 @@ did_you_know: "한국 에너지 자급률 OECD 38국 최하위 16%. 원유 70% �
 pro_cta: "한국 긴장도 96.8 급등 — Pro는 그 순간 알림을 받아요."
 """
     examples_en = """
-[Vol.1 Example — match this tone and specificity]
-hero_headline: "The Strait of Hormuz is blocked.\n70% of Korea's oil passes through it."
-preheader: "One strait blocked, gas prices soaring. 23 crisis countries, 854 events. Korea tension 96.8 — why it matters to you, in 2 min."
-energy_intro: "Oil $95→$118 in one week. The impact is coming to your wallet."
-editors_note: "One strait proved it can shake the world. 70% of Korea's energy passes through. When missiles fly in the Middle East, gas station prices change in Korea."
+[Vol.1 Example — match this tone and specificity. ALL TEXT MUST BE IN ENGLISH ONLY.]
+hero_headline: "The Strait of Hormuz is blocked.\n70% of your oil passes through it."
+preheader: "One strait blocked, gas prices soaring. 23 crisis countries, 854 events — why it matters to you, in 2 min."
+energy_intro: "Oil $95→$118 in one week. The impact is heading to your wallet."
+energy_narrative: "Brent crude $95 → $118 (↑24.2%, 7 days). Your daily costs: gas↑ delivery↑ heating↑ — already starting."
+editors_note: "One strait proved it can shake the world. When missiles fly in the Middle East, gas station prices change at home."
 share_headline: "The world looks different from 2 minutes ago."
+share_subtext: "Share with your coworkers, investor friends, and family who travel."
+impact: "Hormuz blockade → oil disruption → gas prices↑ → delivery costs↑ → inflation → stocks↓"
 """
     examples = examples_kr if is_kr else examples_en
 
-    system = f"""You are the editor of WeWantPeace newsletter.
-{'한국어 구어체. ~해요 체. 구체적 숫자와 비유 필수. 추상적 문장 금지.' if is_kr else 'Casual English. Specific numbers and analogies required. No abstract statements.'}
+    if is_kr:
+        system = f"""You are the editor of WeWantPeace newsletter.
+한국어 구어체. ~해요 체. 구체적 숫자와 비유 필수. 추상적 문장 금지.
 CRITICAL RULES:
+- 반드시 한국어로만 작성. 영어 섞지 마세요.
 - Use EXACT numbers from the data (prices, %, event counts, tension scores)
-- Connect EVERY point to the reader's daily life (gas, groceries, delivery, travel)
+- Connect EVERY point to the reader's daily life (주유비, 장바구니, 배달비, 여행)
 - Never use "may", "might" alone — always with specific data: "유가 $118 → 주유비 영향 올 수 있어요"
+- No generic filler. Every sentence must have new information.
+- Output ONLY valid JSON. No markdown fences."""
+    else:
+        system = f"""You are the editor of WeWantPeace newsletter.
+Write ONLY in English. Casual, conversational tone. Specific numbers and analogies required. No abstract statements.
+CRITICAL RULES:
+- MUST write ALL text in English only. No Korean or other languages.
+- Use EXACT numbers from the data (prices, %, event counts, tension scores)
+- Connect EVERY point to the reader's daily life (gas prices, grocery bills, delivery fees, travel costs)
+- Never use "may", "might" alone — always with specific data: "Oil $118 → gas prices may rise"
 - No generic filler. Every sentence must have new information.
 - Output ONLY valid JSON. No markdown fences."""
 
@@ -158,7 +173,7 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
   "brief_2_desc": "(1 sentence)",
   "brief_3_title": "({ctx['target_name']} tension headline)",
   "brief_3_desc": "(why this rank/score matters to the reader)",
-  "energy_intro": "(1 punchy sentence with price number. Like: '유가 $X→$Y, Z일. 지갑까지 오는 위기.')",
+  "energy_intro": "(1 punchy sentence with price number. Like: {'유가 $X→$Y, Z일. 지갑까지 오는 위기.' if is_kr else 'Oil $X→$Y in Z days. The impact is heading to your wallet.'})",
   "energy_p1": "(paragraph 1: what happened to prices, specific numbers)",
   "energy_p2": "(paragraph 2: how it hits daily life — gas, delivery, groceries)",
   "energy_p3": "(paragraph 3: what to watch next week)",
@@ -170,8 +185,8 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
   "deep_dive_why": "(WHY IT MATTERS — 2-3 sentences, the 'so what' for the reader)",
   "impact_1": "(step 1: triggering event)",
   "impact_2": "(step 2: market reaction — specific: oil↑, shipping↑)",
-  "impact_3": "(step 3: daily life — 주유비↑, 배달비↑, 장바구니↑)",
-  "impact_4": "(step 4: macro consequence — 인플레, 금리, 증시)",
+  "impact_3": "(step 3: daily life — {'주유비↑, 배달비↑, 장바구니↑' if is_kr else 'gas↑, delivery↑, groceries↑'})",
+  "impact_4": "(step 4: macro consequence — {'인플레, 금리, 증시' if is_kr else 'inflation, rates, stocks'})",
   "country_issue_1_name": "(issue affecting {ctx['target_name']})",
   "country_issue_1_detail": "(1-line detail)",
   "country_issue_2_name": "",
@@ -188,7 +203,7 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
   "next_week_2": "(thing to watch #2)",
   "next_week_3": "(thing to watch #3)",
   "share_headline": "(catchy 1-line, emotional, not generic)",
-  "share_subtext": "(who to share with — specific people: 출장 동료, 주식 친구, etc.)",
+  "share_subtext": "(who to share with — specific people: {'출장 동료, 주식 보는 친구, 기름값 걱정 부모님' if is_kr else 'coworkers, investor friends, family who travel'})",
   "pro_cta_headline": "(mention specific data point + Pro real-time advantage)",
   "pro_cta_subtext": "(1 sentence: free vs pro timing gap)",
   "tension_warning": "(1 alarming pattern in tension data with specific numbers)",
