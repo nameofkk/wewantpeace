@@ -42,6 +42,37 @@ COUNTRY_NAMES = {
     "MX": ("Mexico", "멕시코"), "CO": ("Colombia", "콜롬비아"),
     "BR": ("Brazil", "브라질"), "SA": ("Saudi Arabia", "사우디"),
     "AE": ("UAE", "UAE"), "TR": ("Turkey", "튀르키예"),
+    # 아프리카
+    "BF": ("Burkina Faso", "부르키나파소"), "TD": ("Chad", "차드"),
+    "NE": ("Niger", "니제르"), "CM": ("Cameroon", "카메룬"),
+    "CF": ("Central African Rep.", "중앙아프리카"), "SS": ("South Sudan", "남수단"),
+    "ER": ("Eritrea", "에리트레아"), "DJ": ("Djibouti", "지부티"),
+    "BI": ("Burundi", "부룬디"), "RW": ("Rwanda", "르완다"),
+    "UG": ("Uganda", "우간다"), "KE": ("Kenya", "케냐"),
+    "TZ": ("Tanzania", "탄자니아"), "EG": ("Egypt", "이집트"),
+    "TN": ("Tunisia", "튀니지"), "DZ": ("Algeria", "알제리"),
+    "MA": ("Morocco", "모로코"),
+    # 중앙아시아·코카서스
+    "AZ": ("Azerbaijan", "아제르바이잔"), "AM": ("Armenia", "아르메니아"),
+    "GE": ("Georgia", "조지아"), "KG": ("Kyrgyzstan", "키르기스스탄"),
+    "TJ": ("Tajikistan", "타지키스탄"), "UZ": ("Uzbekistan", "우즈베키스탄"),
+    "TM": ("Turkmenistan", "투르크메니스탄"),
+    # 남아시아·동남아
+    "BD": ("Bangladesh", "방글라데시"), "NP": ("Nepal", "네팔"),
+    "LK": ("Sri Lanka", "스리랑카"), "KH": ("Cambodia", "캄보디아"),
+    "LA": ("Laos", "라오스"),
+    # 중남미
+    "VE": ("Venezuela", "베네수엘라"), "PE": ("Peru", "페루"),
+    "EC": ("Ecuador", "에콰도르"), "BO": ("Bolivia", "볼리비아"),
+    "NI": ("Nicaragua", "니카라과"), "GT": ("Guatemala", "과테말라"),
+    "HN": ("Honduras", "온두라스"), "SV": ("El Salvador", "엘살바도르"),
+    "CU": ("Cuba", "쿠바"), "DO": ("Dominican Rep.", "도미니카공화국"),
+    "JM": ("Jamaica", "자메이카"),
+    # 중동·기타
+    "JO": ("Jordan", "요르단"), "OM": ("Oman", "오만"),
+    "QA": ("Qatar", "카타르"), "KW": ("Kuwait", "쿠웨이트"),
+    "BH": ("Bahrain", "바레인"), "BY": ("Belarus", "벨라루스"),
+    "RS": ("Serbia", "세르비아"),
 }
 
 SEVERITY_COLORS = {5: "#ef4444", 4: "#f97316", 3: "#eab308", 2: "#22c55e", 1: "#94a3b8"}
@@ -93,9 +124,24 @@ async def call_gpt(prompt: str, system: str = "") -> str:
         return ""
 
 
-async def generate_editorial(ctx: dict, lang: str) -> dict:
+async def generate_editorial(ctx: dict, lang: str, vol: int = 1) -> dict:
     """GPT로 편집 텍스트만 생성. HTML 금지. Vol.1 예시 포함."""
     is_kr = lang == "kr"
+
+    # ── 주간 변동: hero_style (P3-1) ──
+    hero_styles_kr = ["질문형 (예: '호르무즈가 막혔는데, 한국은?')", "숫자 강조 (예: '854건 — 이번 주 세계가 감지한 분쟁')", "대비형 (예: '해협 33km, 세계 원유 20%')", "일상 연결 (예: '주유소 가격표가 바뀌고 있어요')"]
+    hero_styles_en = ["Question style (e.g. 'Hormuz blocked — what about us?')", "Number-led (e.g. '854 events — the world noticed')", "Contrast (e.g. '33km strait, 20% of world oil')", "Daily life (e.g. 'Your gas station prices are changing')"]
+    hero_style = (hero_styles_kr if is_kr else hero_styles_en)[vol % 4]
+
+    # ── 주간 변동: editors_tone (P3-2) ──
+    editors_tones_kr = ["분석가 톤 — 데이터 중심, 객관적, 팩트 나열", "이웃 톤 — 친근, 비유 많이, 대화체", "선배 톤 — 경험담, 역사 비교, 교훈"]
+    editors_tones_en = ["Analyst tone — data-driven, objective, fact-focused", "Neighbor tone — friendly, metaphors, conversational", "Mentor tone — historical parallels, lessons learned"]
+    editors_tone = (editors_tones_kr if is_kr else editors_tones_en)[vol % 3]
+
+    # ── 주간 변동: did_you_know_category (P3-3) ──
+    dyk_cats_kr = ["지리/지형 (예: '호르무즈 폭 33km')", "역사 (예: '1973년 오일쇼크 때...')", "경제 (예: '한국 에너지 자급률 16%')", "군사/안보 (예: '세계 핵무기 12,500개')", "인도/생활 (예: '분쟁으로 실향민 1.1억명')"]
+    dyk_cats_en = ["Geography (e.g. 'Hormuz is 33km wide')", "History (e.g. '1973 oil shock...')", "Economy (e.g. 'Energy self-sufficiency 16%')", "Military (e.g. '12,500 nuclear weapons globally')", "Humanitarian (e.g. '110M displaced by conflict')"]
+    dyk_category = (dyk_cats_kr if is_kr else dyk_cats_en)[vol % 5]
 
     # Vol.1 스타일 예시
     examples_kr = """
@@ -128,6 +174,17 @@ impact: "Hormuz blockade → oil disruption → gas prices↑ → delivery costs
 """
     examples = examples_kr if is_kr else examples_en
 
+    dont_list = """
+DON'T:
+- 추상적 문장 ("tensions are rising", "situation is developing", "긴장이 고조되고 있다")
+- 학술 용어 ("geopolitical", "bilateral", "multilateral", "지정학적", "양자적")
+- 뻔한 결론 ("time will tell", "remains to be seen", "지켜봐야 할 것")
+- 감정적 과장 ("shocking", "devastating", "catastrophic", "충격적", "참혹한")
+DO:
+- 구체적 숫자와 사실만 ("유가 $104 → $112, 7일" / "Oil $104 → $112, 7 days")
+- 일상 연결 ("주유할 때 느낄 수 있어요" / "You'll notice at the pump")
+- Vol.1 톤 유지 ("해협 하나 막혔는데 기름값이 뛰어요" / "One strait blocked, gas prices up")
+"""
     if is_kr:
         system = f"""You are the editor of WeWantPeace newsletter.
 한국어 구어체. ~해요 체. 구체적 숫자와 비유 필수. 추상적 문장 금지.
@@ -137,7 +194,12 @@ CRITICAL RULES:
 - Connect EVERY point to the reader's daily life (주유비, 장바구니, 배달비, 여행)
 - Never use "may", "might" alone — always with specific data: "유가 $118 → 주유비 영향 올 수 있어요"
 - No generic filler. Every sentence must have new information.
-- Output ONLY valid JSON. No markdown fences."""
+- Output ONLY valid JSON. No markdown fences.
+{dont_list}
+STYLE HINTS FOR THIS VOLUME:
+- hero_headline 스타일: {hero_style}
+- editors_note 톤: {editors_tone}
+- did_you_know 카테고리: {dyk_category}"""
     else:
         system = f"""You are the editor of WeWantPeace newsletter.
 Write ONLY in English. Casual, conversational tone. Specific numbers and analogies required. No abstract statements.
@@ -147,7 +209,12 @@ CRITICAL RULES:
 - Connect EVERY point to the reader's daily life (gas prices, grocery bills, delivery fees, travel costs)
 - Never use "may", "might" alone — always with specific data: "Oil $118 → gas prices may rise"
 - No generic filler. Every sentence must have new information.
-- Output ONLY valid JSON. No markdown fences."""
+- Output ONLY valid JSON. No markdown fences.
+{dont_list}
+STYLE HINTS FOR THIS VOLUME:
+- hero_headline style: {hero_style}
+- editors_note tone: {editors_tone}
+- did_you_know category: {dyk_category}"""
 
     prompt = f"""{examples}
 
@@ -162,6 +229,7 @@ THIS WEEK'S DATA:
 - Crisis countries: {ctx['crisis_count']} (prev week: {ctx['crisis_prev']})
 - Events: {ctx['events_24h']}(24h) / {ctx['events_7d']}(7d)
 - Travel L4: {ctx['travel_l4']} countries / L3: {ctx['travel_l3']} countries
+- Oil ({ctx['energy_period']} comparison): ${ctx['oil_price_past']} → ${ctx['oil_price']} ({ctx['oil_change_period']}%)
 
 Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_headline and <b> for emphasis):
 {{
@@ -187,18 +255,11 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
   "impact_2": "(step 2: market reaction — specific: oil↑, shipping↑)",
   "impact_3": "(step 3: daily life — {'주유비↑, 배달비↑, 장바구니↑' if is_kr else 'gas↑, delivery↑, groceries↑'})",
   "impact_4": "(step 4: macro consequence — {'인플레, 금리, 증시' if is_kr else 'inflation, rates, stocks'})",
-  "country_issue_1_name": "(issue affecting {ctx['target_name']})",
-  "country_issue_1_detail": "(1-line detail)",
-  "country_issue_2_name": "",
-  "country_issue_2_detail": "",
-  "country_issue_3_name": "",
-  "country_issue_3_detail": "",
-  "country_issue_4_name": "",
-  "country_issue_4_detail": "",
   "did_you_know": "(1 surprising fact with specific number, related to this week)",
   "editors_note_p1": "(what made this week different — 1 bold statement)",
   "editors_note_p2": "(connect to reader's life with vivid metaphor)",
   "editors_note_p3": "(closing: encouragement to share, see you next week)",
+  "editors_ps": "(P.S. — {'한 줄 이탤릭 마무리. 예: 이 뉴스레터가 도움이 되셨다면, 한 분에게 전달해 주세요.' if is_kr else 'One italic closing line. e.g. If this helped, forward it to one person.'})",
   "next_week_1": "(thing to watch #1)",
   "next_week_2": "(thing to watch #2)",
   "next_week_3": "(thing to watch #3)",
@@ -208,9 +269,13 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
   "pro_cta_subtext": "(1 sentence: free vs pro timing gap)",
   "tension_warning": "(1 alarming pattern in tension data with specific numbers)",
   "calendar_1_event": "(tomorrow's expected event)",
+  "calendar_1_tags": "(1-2 tags from: {'안보/경제/에너지/외교/인도/환경' if is_kr else 'security/economy/energy/diplomacy/humanitarian/climate'})",
   "calendar_2_event": "(day+2 event)",
+  "calendar_2_tags": "(1-2 tags)",
   "calendar_3_event": "(day+3 event)",
-  "calendar_4_event": "(day+4 event)"
+  "calendar_3_tags": "(1-2 tags)",
+  "calendar_4_event": "(day+4 event)",
+  "calendar_4_tags": "(1-2 tags)"
 }}"""
 
     result = await call_gpt(prompt, system)
@@ -249,38 +314,77 @@ def build_tension_table_html(rows: list, lang: str, target_cc: str = "KR") -> st
 
 
 def build_todays_brief_html(items: list, lang: str) -> str:
-    """Vol.1 스타일: 번호 뱃지 + 컬러 보더 카드."""
+    """Vol.1 스타일: 번호 뱃지 + 컬러 보더 카드 + desc."""
     colors = ["#dc2626", "#dc2626", "#18181b"]
     bgs = ["#fef2f2", "#fef2f2", "#fafafa"]
     html = []
     for i, (title, desc) in enumerate(items[:3]):
         c, bg = colors[i], bgs[i]
+        desc_html = f'<p style="font-size:11px;color:#71717a;margin:4px 0 0;line-height:1.5;">{desc}</p>' if desc else ""
         html.append(
             f'<tr><td style="border-radius:6px;background:{bg};padding:10px 14px;border-left:3px solid {c};">'
             f'<p style="font-size:14px;color:#27272a;margin:0;line-height:1.7;">'
             f'<span style="display:inline-block;font-weight:700;text-align:center;font-size:10px;vertical-align:middle;'
             f'color:#fff;background:{c};border-radius:50%;margin-right:4px;width:18px;height:18px;line-height:18px;">{i+1}</span>'
-            f'<span style="color:#27272a;">{title}</span></p></td></tr>'
+            f'<span style="color:#27272a;">{title}</span></p>{desc_html}</td></tr>'
             f'<tr><td height="8"></td></tr>')
     return "\n".join(html)
 
 
-def build_conflict_stories_html(clusters: list, lang: str) -> str:
+def build_conflict_stories_html(clusters: list, lang: str, vol: int = 1) -> str:
     if not clusters: return ""
+    is_kr = lang == "kr"
+
+    # P3-4: conflict_stories 라벨 변동
+    label_sets_kr = [("TOP STORY", "주간 요약"), ("긴급", "지속"), ("확대", "주시")]
+    label_sets_en = [("TOP STORY", "Weekly"), ("BREAKING", "ONGOING"), ("ESCALATING", "WATCH")]
+    labels = (label_sets_kr if is_kr else label_sets_en)[vol % 3]
+
     html = []
-    for title, title_ko, cc, sev, kscore, event_count in clusters[:5]:
+    for i, cluster in enumerate(clusters[:5]):
+        title, title_ko, cc, sev, kscore, event_count, image_url = cluster
         flag = get_flag(cc)
         color = sev_color(min(sev, 5))
         bg = {"#ef4444": "#fef2f2", "#f97316": "#fff7ed", "#eab308": "#fefce8"}.get(color, "#f8fafc")
-        display = (title_ko or title or "") if lang == "kr" else (title or title_ko or "")
-        sev_l = f"심각도 {min(sev, 100)}" if lang == "kr" else f"Severity {min(sev, 100)}"
-        ev_l = f"{event_count}건" if lang == "kr" else f"{event_count} events"
-        html.append(
-            f'<div style="margin-bottom:16px;padding:12px;border-left:3px solid {color};background:{bg};">'
-            f'<div style="font-weight:bold;margin-bottom:4px;">{flag} {display[:80]}</div>'
-            f'<div style="margin-top:4px;display:flex;gap:8px;">'
-            f'<span style="background:{color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;">{sev_l}</span>'
-            f'<span style="color:#666;font-size:11px;">{ev_l}</span></div></div>')
+        display = (title_ko or title or "") if is_kr else (title or title_ko or "")
+        ev_l = f"{event_count}건 확인" if is_kr else f"{event_count} sources confirmed"
+
+        # "왜 중요" 자동 생성
+        if sev >= 5:
+            why = "즉각적인 영향 가능" if is_kr else "Immediate impact possible"
+        elif sev >= 4:
+            why = "주목할 상황" if is_kr else "Situation to watch"
+        else:
+            why = ""
+
+        # 라벨
+        tag = labels[0] if i == 0 else labels[1]
+        tag_bg = "#dc2626" if i == 0 else "#71717a"
+
+        # 첫 번째 = 큰 카드
+        if i == 0:
+            img_html = f'<img src="{image_url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:6px 6px 0 0;" alt="">' if image_url else ""
+            why_html = f'<div style="margin-top:8px;padding:8px 10px;background:#fff5f5;border-radius:4px;font-size:11px;color:#dc2626;font-weight:600;">{"왜 중요해요?" if is_kr else "Why it matters?"} {why}</div>' if why else ""
+            html.append(
+                f'<div style="margin-bottom:16px;border-radius:8px;border:1px solid #e5e5e5;overflow:hidden;">'
+                f'{img_html}'
+                f'<div style="padding:14px 16px;">'
+                f'<span style="background:{tag_bg};color:white;padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;">{tag}</span>'
+                f'<div style="font-weight:bold;font-size:15px;margin:8px 0 4px;">{flag} {display[:80]}</div>'
+                f'<div style="display:flex;gap:8px;align-items:center;">'
+                f'<span style="background:{color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;">{"심각도" if is_kr else "Severity"} {min(sev, 100)}</span>'
+                f'<span style="color:#666;font-size:11px;">{ev_l}</span></div>'
+                f'{why_html}'
+                f'</div></div>')
+        else:
+            why_span = f' · <span style="color:#dc2626;font-size:10px;">{why}</span>' if why else ""
+            html.append(
+                f'<div style="margin-bottom:10px;padding:10px 12px;border-left:3px solid {color};background:{bg};">'
+                f'<span style="background:{tag_bg};color:white;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.5px;">{tag}</span>'
+                f'<div style="font-weight:bold;margin:4px 0 2px;">{flag} {display[:80]}</div>'
+                f'<div style="display:flex;gap:8px;align-items:center;">'
+                f'<span style="background:{color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;">{"심각도" if is_kr else "Severity"} {min(sev, 100)}</span>'
+                f'<span style="color:#666;font-size:11px;">{ev_l}</span>{why_span}</div></div>')
     return "\n".join(html)
 
 
@@ -315,28 +419,46 @@ def build_deep_dive_html(title: str, p1: str, p2: str, p3: str, p4: str, why: st
 
 
 def build_numbers_html(stats: dict, lang: str) -> str:
-    """Vol.1 스타일: 2×3 KPI 그리드 + 주간 비교 테이블."""
+    """Vol.1 스타일: 2×3 KPI 그리드 + 변동률 뱃지 + 하이라이트 + 주간 비교 테이블."""
     is_kr = lang == "kr"
+
+    def _change_badge(curr, prev):
+        if not prev or prev == 0: return ""
+        pct = (curr - prev) / prev * 100
+        if abs(pct) < 0.5: return ""
+        arrow = "↑" if pct > 0 else "↓"
+        color = "#dc2626" if pct > 0 else "#22c55e"
+        return f'<span style="font-size:9px;color:{color};font-weight:600;"> {arrow}{abs(pct):.0f}%</span>'
+
+    ev24_badge = _change_badge(stats["events_24h"], stats.get("events_24h_prev"))
+    ev7d_badge = _change_badge(stats["events_7d_raw"], stats.get("events_7d_prev"))
+
     cards = [
-        (str(stats["events_24h"]), "24h " + ("분쟁" if is_kr else "conflicts"), "#dc2626"),
-        (f"{stats['top_cc_events']:,}", f"{stats['top_cc_name']} 7" + ("일" if is_kr else "d"), "#dc2626"),
-        (str(stats["crisis_count"]), "위기 국가" if is_kr else "Crisis countries", "#dc2626"),
-        (str(stats["active_issues"]), "진행 중 이슈" if is_kr else "Active issues", "#18181b"),
-        (f"{stats['events_7d']:,}", "7" + ("일 이벤트" if is_kr else "d events"), "#18181b"),
-        ("100+", "모니터링 소스" if is_kr else "Sources", "#18181b"),
+        (str(stats["events_24h"]), "24h " + ("분쟁" if is_kr else "conflicts"), "#dc2626", ev24_badge),
+        (f"{stats['top_cc_events']:,}", f"{stats['top_cc_name']} 7" + ("일" if is_kr else "d"), "#dc2626", ""),
+        (str(stats["crisis_count"]), "위기 국가" if is_kr else "Crisis countries", "#dc2626", ""),
+        (str(stats["active_issues"]), "진행 중 이슈" if is_kr else "Active issues", "#18181b", ""),
+        (f"{stats['events_7d']:,}", "7" + ("일 이벤트" if is_kr else "d events"), "#18181b", ev7d_badge),
+        ("100+", "모니터링 소스" if is_kr else "Sources", "#18181b", ""),
     ]
     rows_html = ""
     for i in range(0, 6, 3):
         cells = ""
         for j in range(3):
             idx = i + j
-            val, label, color = cards[idx]
+            val, label, color, badge = cards[idx]
             cells += f'<td width="33%" style="padding:4px;"><table style="width:100%;border:1px solid #e5e5e5;border-radius:8px;{"border-top:3px solid "+color+";" if idx < 3 else ""}">'
             cells += f'<tr><td align="center" style="padding:12px 8px;">'
-            cells += f'<p style="font-weight:800;color:{color};margin:0;font-size:22px;">{val}</p>'
+            cells += f'<p style="font-weight:800;color:{color};margin:0;font-size:22px;">{val}{badge}</p>'
             cells += f'<p style="font-size:10px;color:#71717a;margin:4px 0 0;">{label}</p>'
             cells += f'</td></tr></table></td>'
         rows_html += f"<tr>{cells}</tr>"
+
+    # 하이라이트 라인 (top cluster가 평균 대비 N배면)
+    highlight_html = ""
+    hl = stats.get("highlight")
+    if hl:
+        highlight_html = f'<p style="font-size:12px;color:#dc2626;font-weight:600;margin:10px 0 0;padding:8px 12px;background:#fef2f2;border-radius:6px;border-left:3px solid #dc2626;">{hl}</p>'
 
     # 주간 비교 테이블
     wow = stats.get("wow_rows", [])
@@ -356,17 +478,20 @@ def build_numbers_html(stats: dict, lang: str) -> str:
             wow_html += f'<td style="text-align:right;color:#ef4444;font-weight:600;font-size:10px;padding:5px 0;">{change_str}</td></tr>'
         wow_html += '</table></td></tr></table>'
 
-    return f'<table style="width:100%;border-collapse:collapse;">{rows_html}</table>{wow_html}'
+    return f'<table style="width:100%;border-collapse:collapse;">{rows_html}</table>{highlight_html}{wow_html}'
 
 
 def build_country_impact_html(steps: list, lang: str) -> str:
-    """Vol.1 스타일: 번호 + 영향 체인."""
+    """Vol.1 스타일: 번호 + 영향 체인 + → 화살표."""
     html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
     for i, step in enumerate(steps[:4]):
         c = "#dc2626" if i in [0, 3] else "#71717a"
-        bold = ' style="font-weight:700;color:#dc2626;"' if i == 3 else ""
+        is_last = i == len(steps[:4]) - 1
+        bold = ' style="font-weight:700;color:#dc2626;"' if is_last else ""
         html += f'<tr><td width="24" valign="top" style="text-align:left;padding:4px 0;font-weight:700;color:{c};">{i+1}</td>'
         html += f'<td style="text-align:left;padding:4px 0;"{bold}>{step}</td></tr>'
+        if not is_last:
+            html += '<tr><td></td><td style="padding:2px 0;color:#d4d4d8;font-size:14px;">→</td></tr>'
     html += '</table>'
     return html
 
@@ -387,8 +512,8 @@ def build_country_issues_html(issues: list, lang: str) -> str:
     return html
 
 
-def build_calendar_html(days: list, lang: str) -> str:
-    """Vol.1 스타일: 날짜열 + 이벤트열."""
+def build_calendar_html(days: list, lang: str, tag_color: str = "#dc2626") -> str:
+    """Vol.1 스타일: 날짜열 + 이벤트열 + 태그 색상 회전."""
     is_kr = lang == "kr"
     html = '<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e5e5e5;border-radius:8px;">'
     for i, (dt, event, tags) in enumerate(days[:4]):
@@ -404,19 +529,20 @@ def build_calendar_html(days: list, lang: str) -> str:
         html += f'</td><td style="background:{bg};padding:10px 12px;border-bottom:1px solid #f0f0f0;">'
         html += f'<p style="font-weight:600;font-size:13px;color:#18181b;margin:0 0 4px;">{event}</p>'
         if tags:
-            html += '<p style="margin:0;">' + " ".join(f'<span style="font-size:9px;color:#dc2626;">#{t}</span>' for t in tags) + '</p>'
+            html += '<p style="margin:0;">' + " ".join(f'<span style="font-size:9px;color:{tag_color};">#{t}</span>' for t in tags) + '</p>'
         html += '</td></tr>'
     html += '</table>'
     return html
 
 
-def build_editors_note_html(p1: str, p2: str, p3: str, lang: str = "kr") -> str:
-    """Vol.1 스타일: 에디터 노트."""
+def build_editors_note_html(p1: str, p2: str, p3: str, ps: str = "", lang: str = "kr") -> str:
+    """Vol.1 스타일: 에디터 노트 + P.S."""
     header = "에디터 한마디" if lang == "kr" else "Editor's Note"
+    ps_html = f'\n<p style="font-size:12px;line-height:1.6;color:#9d9282;margin:14px 0 0;font-style:italic;">P.S. {ps}</p>' if ps else ""
     return f"""<p style="font-size:20px;letter-spacing:-.3px;color:#2d2418;margin-top:14px;margin-bottom:20px;">{header}</p>
 <p style="font-size:14px;line-height:1.8;color:#3d3428;margin:0 0 14px;">{p1}</p>
 <p style="font-size:14px;line-height:1.8;color:#3d3428;margin:0 0 14px;">{p2}</p>
-<p style="font-size:13px;line-height:1.6;color:#7d7262;margin:0;">{p3}</p>"""
+<p style="font-size:13px;line-height:1.6;color:#7d7262;margin:0;">{p3}</p>{ps_html}"""
 
 
 def build_next_week_html(items: list) -> str:
@@ -434,22 +560,41 @@ def build_travel_html(advisories: list, lang: str) -> str:
     is_kr = lang == "kr"
     l4 = [a for a in advisories if a["level"] >= 4]
     l3 = [a for a in advisories if a["level"] == 3]
+    new_badge = '<span style="background:#dc2626;color:white;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;vertical-align:middle;">NEW</span>'
     html = []
+
+    def _name_with_badge(a):
+        flag = get_flag(a["cc"])
+        name = cn(a["cc"], lang)
+        if a.get("new"):
+            return f'{flag} <b>{name}</b>{new_badge}'
+        return f'{flag} {name}'
+
     if l4:
-        names = ", ".join(f'{get_flag(a["cc"])} <b>{cn(a["cc"], lang)}</b>' if a.get("new") else f'{get_flag(a["cc"])} {cn(a["cc"], lang)}' for a in l4[:25])
+        names = ", ".join(_name_with_badge(a) for a in l4[:25])
+        new_l4 = [a for a in l4 if a.get("new")]
+        new_line = ""
+        if new_l4:
+            new_names = ", ".join(cn(a["cc"], lang) for a in new_l4[:5])
+            new_line = f'<p style="font-size:10px;color:#dc2626;margin:6px 0 0;font-weight:600;">(+{len(new_l4)}: {new_names})</p>'
         html.append(f'''<table style="width:100%;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;"><tr><td style="padding:14px 16px;">
 <table style="width:100%;"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#dc2626;color:white;">LEVEL 4</span></td>
 <td align="right"><span style="font-weight:800;color:#dc2626;font-size:22px;">{len(l4)}</span><span style="font-size:12px;color:#dc2626;">{"개국" if is_kr else ""}</span></td></tr></table>
 <p style="font-weight:700;font-size:12px;color:#dc2626;margin:6px 0;">{"여행 금지" if is_kr else "Do Not Travel"}</p>
-<p style="font-size:11px;line-height:1.6;color:#7f1d1d;margin:0;">{names}</p>
+<p style="font-size:11px;line-height:1.6;color:#7f1d1d;margin:0;">{names}</p>{new_line}
 </td></tr></table>''')
     if l3:
-        names = ", ".join(f'{get_flag(a["cc"])} {cn(a["cc"], lang)}' for a in l3[:30])
+        names = ", ".join(_name_with_badge(a) for a in l3[:30])
+        new_l3 = [a for a in l3 if a.get("new")]
+        new_line = ""
+        if new_l3:
+            new_names = ", ".join(cn(a["cc"], lang) for a in new_l3[:5])
+            new_line = f'<p style="font-size:10px;color:#b45309;margin:6px 0 0;font-weight:600;">(+{len(new_l3)}: {new_names})</p>'
         html.append(f'''<table style="width:100%;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;margin-top:12px;"><tr><td style="padding:14px 16px;">
 <table style="width:100%;"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#b45309;color:white;">LEVEL 3</span></td>
 <td align="right"><span style="font-weight:800;color:#b45309;font-size:22px;">{len(l3)}</span><span style="font-size:12px;color:#b45309;">{"개국" if is_kr else ""}</span></td></tr></table>
 <p style="font-weight:700;font-size:12px;color:#92400e;margin:6px 0;">{"여행 재고" if is_kr else "Reconsider Travel"}</p>
-<p style="font-size:11px;line-height:1.6;color:#78350f;margin:0;">{names}</p>
+<p style="font-size:11px;line-height:1.6;color:#78350f;margin:0;">{names}</p>{new_line}
 </td></tr></table>''')
     return "\n".join(html)
 
@@ -524,13 +669,13 @@ async def generate(vol: int, lang: str) -> dict:
 
         # ── 상위 클러스터 (복합 가중: event_count 중심) ──
         r = await db.execute(text("""
-            SELECT id, title, title_ko, country_code, severity, kscore, event_count
+            SELECT id, title, title_ko, country_code, severity, kscore, event_count, image_url
             FROM issue_clusters WHERE is_active = true AND severity >= 2
             ORDER BY (event_count * 2 + kscore) DESC
             LIMIT 10
         """))
-        top_clusters = [(row.title, row.title_ko, row.country_code, row.severity, row.kscore, row.event_count) for row in r.fetchall()]
-        data["conflict_stories_html"] = build_conflict_stories_html(top_clusters, lang)
+        top_clusters = [(row.title, row.title_ko, row.country_code, row.severity, row.kscore, row.event_count, row.image_url) for row in r.fetchall()]
+        data["conflict_stories_html"] = build_conflict_stories_html(top_clusters, lang, vol=vol)
 
         # ── 긴장도 ──
         r = await db.execute(text("SELECT DISTINCT ON (country_code) country_code, raw_score FROM tension_index WHERE country_code IS NOT NULL ORDER BY country_code, time DESC"))
@@ -566,9 +711,29 @@ async def generate(vol: int, lang: str) -> dict:
                 elif name == "oil_brent" and not oil_price: oil_price, oil_change = float(row.price_usd), float(row.change_pct or 0)
                 elif name == "wheat": wheat_price, wheat_change = float(row.price_usd), float(row.change_pct or 0)
 
+        # ── 원자재 기간별 가격 (7d/30d/90d) ──
+        energy_period_idx = vol % 3  # 0=7d, 1=30d, 2=90d
+        energy_days = [7, 30, 90][energy_period_idx]
+        energy_label = ["7일", "30일", "분기"][energy_period_idx] if is_kr else ["7d", "30d", "Quarter"][energy_period_idx]
+        cutoff_date = now - timedelta(days=energy_days)
+        oil_price_past, wheat_price_past = None, None
+        for sym, target in [("WTI", "oil"), ("BRENT", "oil_brent"), ("WHEAT", "wheat")]:
+            r = await db.execute(text(
+                "SELECT price_usd FROM commodity_price WHERE symbol = :s AND price_date <= :cutoff ORDER BY price_date DESC LIMIT 1"
+            ), {"s": sym, "cutoff": cutoff_date.date()})
+            row = r.fetchone()
+            if row:
+                if target in ("oil", "oil_brent") and oil_price_past is None:
+                    oil_price_past = float(row.price_usd)
+                elif target == "wheat":
+                    wheat_price_past = float(row.price_usd)
+
+        oil_change_period = ((oil_price - oil_price_past) / oil_price_past * 100) if oil_price and oil_price_past else None
+        wheat_change_period = ((wheat_price - wheat_price_past) / wheat_price_past * 100) if wheat_price and wheat_price_past else None
+
         # ── 여행경보 ──
-        r = await db.execute(text("SELECT DISTINCT ON (country_code) country_code, level FROM travel_advisory WHERE level >= 3 ORDER BY country_code, updated_at DESC"))
-        advisories = [{"cc": row.country_code, "level": row.level} for row in r.fetchall()]
+        r = await db.execute(text("SELECT DISTINCT ON (country_code) country_code, level, updated_at FROM travel_advisory WHERE level >= 3 ORDER BY country_code, updated_at DESC"))
+        advisories = [{"cc": row.country_code, "level": row.level, "new": row.updated_at >= seven_days_ago if row.updated_at else False} for row in r.fetchall()]
         travel_l4 = len([a for a in advisories if a["level"] >= 4])
         travel_l3 = len([a for a in advisories if a["level"] == 3])
         data["travel_advisory_html"] = build_travel_html(advisories, lang)
@@ -576,6 +741,27 @@ async def generate(vol: int, lang: str) -> dict:
             f"여행 금지 {travel_l4}개국, 여행 재고 {travel_l3}개국." if is_kr
             else f"Do Not Travel: {travel_l4} countries. Reconsider: {travel_l3}."
         )
+
+        # ── country_issues (DB 기반) ──
+        r = await db.execute(text("""
+            SELECT title, title_ko, event_count FROM issue_clusters
+            WHERE is_active = true AND country_code = :cc
+            ORDER BY event_count DESC LIMIT 5
+        """), {"cc": target_cc})
+        country_issues_rows = [(row.title, row.title_ko, row.event_count) for row in r.fetchall()]
+
+        # ── 전주 이벤트 수 (numbers 변동률용) ──
+        prev_week_start = seven_days_ago - timedelta(days=7)
+        prev_24h_start = twenty_four_hours_ago - timedelta(days=7)
+        prev_24h_end = twenty_four_hours_ago - timedelta(days=6)
+        r = await db.execute(text("SELECT COUNT(*) FROM normalized_events WHERE event_time >= :s AND event_time < :e"), {"s": prev_24h_start, "e": prev_24h_end})
+        events_24h_prev = r.scalar() or 0
+        r = await db.execute(text("SELECT COUNT(*) FROM normalized_events WHERE event_time >= :s AND event_time < :e"), {"s": prev_week_start, "e": seven_days_ago})
+        events_7d_prev = r.scalar() or 0
+
+        # ── 평균 event_count (하이라이트 라인용) ──
+        r = await db.execute(text("SELECT AVG(event_count) FROM issue_clusters WHERE is_active = true AND event_count > 0"))
+        avg_event_count = r.scalar() or 1
 
     # ── GPT 편집 콘텐츠 ──
     def cl_title(c, i=0):
@@ -585,6 +771,7 @@ async def generate(vol: int, lang: str) -> dict:
 
     def cl_cc(c, i=0): return cn(c[i][2], lang) if c and i < len(c) else "N/A"
     def cl_ev(c, i=0): return c[i][5] if c and i < len(c) else 0
+    def cl_img(c, i=0): return c[i][6] if c and i < len(c) and c[i][6] else ""
 
     tension_top3 = ", ".join(f"{cn(cc, lang)} {s:.0f}" for cc, s in sorted_tension[:3])
 
@@ -603,10 +790,13 @@ async def generate(vol: int, lang: str) -> dict:
         "crisis_count": crisis_count, "crisis_prev": crisis_prev,
         "events_24h": events_24h, "events_7d": events_7d,
         "travel_l4": travel_l4, "travel_l3": travel_l3,
+        "oil_price_past": f"{oil_price_past:.1f}" if oil_price_past else "N/A",
+        "oil_change_period": f"{oil_change_period:+.1f}" if oil_change_period is not None else "N/A",
+        "energy_period": energy_label, "energy_days": energy_days,
     }
 
     print("  GPT 편집 콘텐츠 생성 중...")
-    ed = await generate_editorial(gpt_ctx, lang)
+    ed = await generate_editorial(gpt_ctx, lang, vol=vol)
 
     # ── HTML 조립 ──
     hero_raw = ed.get("hero_headline", cl_title(top_clusters, 0))
@@ -668,23 +858,36 @@ async def generate(vol: int, lang: str) -> dict:
         wow_rows.append((f"{cn(target_cc, lang)} 긴장도" if is_kr else f"{cn(target_cc, lang)} Tension",
                          f"{target_prev:.1f}", f"{target_score:.1f}", data["tension_change"]))
 
+    # 하이라이트 라인 계산
+    highlight_line = None
+    if top_clusters and avg_event_count > 0:
+        top_ev = top_clusters[0][5]
+        ratio = top_ev / avg_event_count
+        if ratio >= 2:
+            top_name = cl_title(top_clusters, 0)
+            if is_kr:
+                highlight_line = f"{top_name} {top_ev:,}건은 평소 {avg_event_count:.0f}건 대비 {ratio:.1f}배"
+            else:
+                highlight_line = f"{top_name}: {top_ev:,} events = {ratio:.1f}x the average ({avg_event_count:.0f})"
+
     data["numbers_section_html"] = build_numbers_html({
         "events_24h": events_24h, "events_7d": events_7d,
+        "events_7d_raw": events_7d if isinstance(events_7d, int) else int(str(events_7d).replace(",", "")),
+        "events_24h_prev": events_24h_prev, "events_7d_prev": events_7d_prev,
         "crisis_count": crisis_count, "active_issues": active_issues,
         "top_cc_events": top_cc_ev, "top_cc_name": top_cc_name,
-        "wow_rows": wow_rows,
+        "wow_rows": wow_rows, "highlight": highlight_line,
     }, lang)
 
     # Country impact
     steps = [ed.get(f"impact_{i}", "") for i in range(1, 5)]
     data["country_impact_html"] = build_country_impact_html(steps, lang)
 
-    # Country issues
+    # Country issues (DB 기반)
     issues = []
-    for i in range(1, 5):
-        name = ed.get(f"country_issue_{i}_name", "")
-        detail = ed.get(f"country_issue_{i}_detail", "")
-        if name: issues.append((name, detail, ""))
+    for title, title_ko, ev_count in country_issues_rows:
+        display = (title_ko or title) if is_kr else (title or title_ko)
+        issues.append((display, "", ev_count or 0))
     data["country_issues_html"] = build_country_issues_html(issues, lang)
 
     # Did you know
@@ -692,20 +895,30 @@ async def generate(vol: int, lang: str) -> dict:
 
     # Editors note
     data["editors_note_html"] = build_editors_note_html(
-        ed.get("editors_note_p1", ""), ed.get("editors_note_p2", ""), ed.get("editors_note_p3", ""), lang)
+        ed.get("editors_note_p1", ""), ed.get("editors_note_p2", ""), ed.get("editors_note_p3", ""),
+        ps=ed.get("editors_ps", ""), lang=lang)
 
     # Next week
     data["next_week_items_html"] = build_next_week_html([
         ed.get("next_week_1", ""), ed.get("next_week_2", ""), ed.get("next_week_3", "")])
 
-    # Calendar — 실제 날짜
+    # Calendar — 실제 날짜 + GPT 태그 (P2-4)
     cal_days = []
     for i in range(4):
         dt = now + timedelta(days=i)
         event = ed.get(f"calendar_{i+1}_event", "")
-        tags = ["안보" if is_kr else "security"] if i == 0 else []
+        raw_tags = ed.get(f"calendar_{i+1}_tags", "")
+        if isinstance(raw_tags, list):
+            tags = raw_tags
+        elif isinstance(raw_tags, str) and raw_tags:
+            tags = [t.strip() for t in raw_tags.replace("/", ",").split(",") if t.strip()]
+        else:
+            tags = []
         cal_days.append((dt, event, tags))
-    data["calendar_html"] = build_calendar_html(cal_days, lang)
+    # P3-5: 태그 색상 회전
+    tag_colors = ["#dc2626", "#b45309", "#059669"]
+    cal_tag_color = tag_colors[vol % 3]
+    data["calendar_html"] = build_calendar_html(cal_days, lang, tag_color=cal_tag_color)
 
     # Share, CTA, etc.
     data["share_headline"] = ed.get("share_headline", "")
@@ -719,9 +932,9 @@ async def generate(vol: int, lang: str) -> dict:
     data["streak_text"] = ""
 
     # 고정값
-    data["hero_image_url"] = ""
+    data["hero_image_url"] = cl_img(top_clusters, 0)
     data["hero_subheadline_html"] = ""
-    data["deep_dive_image_url"] = ""
+    data["deep_dive_image_url"] = cl_img(top_clusters, 0)
     data["banner_image_url"] = ""
     data["map_snapshot_url"] = ""
     data["og_image_url"] = ""
