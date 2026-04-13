@@ -395,9 +395,10 @@ def build_calendar_html(days: list, lang: str) -> str:
     return html
 
 
-def build_editors_note_html(p1: str, p2: str, p3: str) -> str:
+def build_editors_note_html(p1: str, p2: str, p3: str, lang: str = "kr") -> str:
     """Vol.1 스타일: 에디터 노트."""
-    return f"""<p style="font-size:20px;letter-spacing:-.3px;color:#2d2418;margin-top:14px;margin-bottom:20px;">에디터 한마디</p>
+    header = "에디터 한마디" if lang == "kr" else "Editor's Note"
+    return f"""<p style="font-size:20px;letter-spacing:-.3px;color:#2d2418;margin-top:14px;margin-bottom:20px;">{header}</p>
 <p style="font-size:14px;line-height:1.8;color:#3d3428;margin:0 0 14px;">{p1}</p>
 <p style="font-size:14px;line-height:1.8;color:#3d3428;margin:0 0 14px;">{p2}</p>
 <p style="font-size:13px;line-height:1.6;color:#7d7262;margin:0;">{p3}</p>"""
@@ -542,13 +543,13 @@ async def generate(vol: int, lang: str) -> dict:
 
         # ── 원자재 ──
         oil_price, oil_change, wheat_price, wheat_change = None, None, None, None
-        for sym, name in [("CL=F", "oil"), ("BZ=F", "oil_brent"), ("ZW=F", "wheat")]:
+        for sym, name in [("WTI", "oil"), ("BRENT", "oil_brent"), ("WHEAT", "wheat")]:
             r = await db.execute(text("SELECT price_usd, change_pct FROM commodity_price WHERE symbol = :s ORDER BY price_date DESC LIMIT 1"), {"s": sym})
             row = r.fetchone()
             if row:
-                if "CL" in sym and not oil_price: oil_price, oil_change = float(row.price_usd), float(row.change_pct or 0)
-                elif "BZ" in sym and not oil_price: oil_price, oil_change = float(row.price_usd), float(row.change_pct or 0)
-                elif "ZW" in sym: wheat_price, wheat_change = float(row.price_usd), float(row.change_pct or 0)
+                if name == "oil" and not oil_price: oil_price, oil_change = float(row.price_usd), float(row.change_pct or 0)
+                elif name == "oil_brent" and not oil_price: oil_price, oil_change = float(row.price_usd), float(row.change_pct or 0)
+                elif name == "wheat": wheat_price, wheat_change = float(row.price_usd), float(row.change_pct or 0)
 
         # ── 여행경보 ──
         r = await db.execute(text("SELECT DISTINCT ON (country_code) country_code, level FROM travel_advisory WHERE level >= 3 ORDER BY country_code, updated_at DESC"))
@@ -676,7 +677,7 @@ async def generate(vol: int, lang: str) -> dict:
 
     # Editors note
     data["editors_note_html"] = build_editors_note_html(
-        ed.get("editors_note_p1", ""), ed.get("editors_note_p2", ""), ed.get("editors_note_p3", ""))
+        ed.get("editors_note_p1", ""), ed.get("editors_note_p2", ""), ed.get("editors_note_p3", ""), lang)
 
     # Next week
     data["next_week_items_html"] = build_next_week_html([
