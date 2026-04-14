@@ -720,7 +720,7 @@ async def generate(vol: int, lang: str) -> dict:
         for sym, target in [("WTI", "oil"), ("BRENT", "oil_brent"), ("WHEAT", "wheat")]:
             r = await db.execute(text(
                 "SELECT price_usd FROM commodity_price WHERE symbol = :s AND price_date <= :cutoff ORDER BY price_date DESC LIMIT 1"
-            ), {"s": sym, "cutoff": cutoff_date.date()})
+            ), {"s": sym, "cutoff": cutoff_date.strftime("%Y-%m-%d")})
             row = r.fetchone()
             if row:
                 if target in ("oil", "oil_brent") and oil_price_past is None:
