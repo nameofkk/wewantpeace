@@ -5,19 +5,20 @@ export const runtime = "edge";
 
 const size = { width: 1200, height: 630 };
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.live";
 
-// ── 커스텀 폰트 (빌드 시 번들링, 런타임 외부 fetch 없음) ──
+// ── 커스텀 폰트 (public/ 절대 URL에서 fetch — standalone 호환) ──
 const notoSerifKrFont = fetch(
-  new URL("../../_fonts/NotoSerifKR-Black-latin.ttf", import.meta.url)
-).then((r) => r.arrayBuffer()).catch((): null => null);
+  `${SITE_URL}/fonts/NotoSerifKR-Black-latin.ttf`
+).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
 
 const gothicA1Font = fetch(
-  new URL("../../_fonts/GothicA1-Black-subset.ttf", import.meta.url)
-).then((r) => r.arrayBuffer()).catch((): null => null);
+  `${SITE_URL}/fonts/GothicA1-Black-subset.ttf`
+).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
 
 const interFont = fetch(
-  new URL("../../_fonts/Inter-SemiBold.ttf", import.meta.url)
-).then((r) => r.arrayBuffer()).catch((): null => null);
+  `${SITE_URL}/fonts/Inter-SemiBold.ttf`
+).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
 
 const TOPIC: Record<string, { ko: string; en: string }> = {
   conflict: { ko: "무장 충돌", en: "Armed Conflict" },
@@ -179,11 +180,11 @@ export async function GET(
 
   let logoSrc: string | null = null;
   try {
-    const logoRes = await fetch(
-      new URL("../../../../../public/logo-eye.png", import.meta.url)
-    );
-    const logoBuf = await logoRes.arrayBuffer();
-    logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
+    const logoRes = await fetch(`${SITE_URL}/logo-eye.png`);
+    if (logoRes.ok) {
+      const logoBuf = await logoRes.arrayBuffer();
+      logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
+    }
   } catch {}
 
   let issue: {
