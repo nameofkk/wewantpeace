@@ -408,14 +408,15 @@ async def list_users(
             return "apple"
         return "google"
 
-    def _sub_type(user_obj, s_status, s_billing_key, s_dodo_id):
+    def _sub_type(user_obj, s_status, s_billing_key, s_dodo_id, s_platform=None):
         """구독 타입 판별: paid / trial / promo / admin / free"""
         if user_obj.plan == "free":
             return "free"
         if s_status == "trial":
             return "trial"
         if s_status in ("active", "grace_period", "billing_retry"):
-            if s_billing_key or s_dodo_id:
+            # paid: billing_key(토스) / dodo_subscription_id / platform이 결제 플랫폼
+            if s_billing_key or s_dodo_id or s_platform in ("dodopayments", "android", "ios", "web"):
                 return "paid"
             return "promo"
         # 구독 없지만 plan != free → 어드민 수동 부여
@@ -438,7 +439,7 @@ async def list_users(
                 "created_at": u.created_at.isoformat(),
                 "last_active": u.last_active.isoformat() if u.last_active else None,
                 "visit_count": vc,
-                "sub_type": _sub_type(u, sub_status, sub_bk, sub_dodo),
+                "sub_type": _sub_type(u, sub_status, sub_bk, sub_dodo, sub_plat),
                 "sub_started_at": sub_started.isoformat() if sub_started else None,
                 "sub_expires_at": sub_expires.isoformat() if sub_expires else None,
                 "sub_trial_start": sub_ts.isoformat() if sub_ts else None,
@@ -4334,3 +4335,119 @@ async def clear_cache(
         await redis.delete(key)
         deleted += 1
     return {"deleted": deleted, "pattern": pattern}
+
+
+# ── DodoPayments 구독 동기화 (웹훅 실패 복구) ───────��────────────────────────
+
+
+@router.post("/sync-dodo-subscriptions")
+async def sync_dodo_subscriptions(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    DodoPayments API에서 active 구독 목록을 조회하여 DB와 동기화.
+    웹훅 실패 시 수동 복구용.
+    """
+    from backend.app.core.config import settings
+    from backend.app.services.area_activation import sync_area_activation
+
+    if not settings.dodo_api_key:
+        raise HTTPException(500, detail="DODO_API_KEY 미설정")
+
+    from dodopayments import DodoPayments as DodoClient
+
+    client = DodoClient(
+        bearer_token=settings.dodo_api_key,
+        environment=settings.dodo_environment,
+    )
+
+    # DodoPayments에서 active 구독 가져오기
+    dodo_subs = client.subscriptions.list(page_size=100)
+    synced = 0
+    errors = []
+
+    now = datetime.now(timezone.utc)
+
+    for dsub in dodo_subs.items:
+        if dsub.status != "active":
+            continue
+
+        metadata = dsub.metadata or {}
+        user_id_str = metadata.get("user_id", "")
+        plan = metadata.get("plan", "")
+        billing_interval = metadata.get("billing_interval", "monthly")
+
+        if not user_id_str or not plan:
+            errors.append(f"sub={dsub.subscription_id}: metadata 누락 (user_id={user_id_str}, plan={plan})")
+            continue
+
+        try:
+            user_id = uuid.UUID(user_id_str)
+        except ValueError:
+            errors.append(f"sub={dsub.subscription_id}: 잘못된 user_id={user_id_str}")
+            continue
+
+        # DB에 이미 이 dodo_subscription_id가 있는지 확인
+        existing_result = await db.execute(
+            select(Subscription).where(
+                Subscription.dodo_subscription_id == dsub.subscription_id,
+            ).limit(1)
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if existing:
+            # 이미 존재하면 상태만 업데���트
+            if existing.status != "active":
+                existing.status = "active"
+                existing.updated_at = now
+                synced += 1
+            continue
+
+        # 새 구독 레��드 생성
+        # 기존 trial/active 구독 만료 처리
+        old_result = await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user_id,
+                Subscription.status.in_(["active", "trial", "grace_period"]),
+            )
+        )
+        for old_sub in old_result.scalars().all():
+            old_sub.status = "expired" if old_sub.status == "trial" else "cancelled"
+            old_sub.cancelled_at = now
+            old_sub.updated_at = now
+
+        sub = Subscription(
+            user_id=user_id,
+            plan=plan,
+            status="active",
+            platform="dodopayments",
+            amount=dsub.recurring_pre_tax_amount or 0,
+            currency=str(dsub.currency) if dsub.currency else "USD",
+            billing_interval=billing_interval,
+            dodo_subscription_id=dsub.subscription_id,
+            dodo_customer_id=dsub.customer.customer_id if dsub.customer else None,
+            dodo_product_id=dsub.product_id,
+            auto_renewing=True,
+            started_at=dsub.created_at or now,
+            expires_at=dsub.next_billing_date,
+            next_billing_at=dsub.next_billing_date,
+        )
+        db.add(sub)
+
+        # user.plan 업데이트
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if user and not user.admin_plan_override:
+            user.plan = plan
+            await sync_area_activation(user_id, plan, db)
+
+        synced += 1
+
+    await db.commit()
+
+    return {
+        "synced": synced,
+        "total_active_in_dodo": sum(1 for s in dodo_subs.items if s.status == "active"),
+        "errors": errors,
+    }
