@@ -3229,7 +3229,6 @@ def generate_kscore_social(self):
         from backend.app.models.issue_cluster import IssueCluster
         from backend.app.models.social_post import SocialPost
         from worker.social.generators import generate_kscore_alert
-        from worker.social.telegram_bot import send_review_message
 
         created = 0
 
@@ -3281,8 +3280,10 @@ def generate_kscore_social(self):
                         posts_to_notify.append(post)
                         created += 1
 
-            for post in posts_to_notify:
-                await send_review_message(post)
+            # 자동 발행 모드: 리뷰 건너뛰고 즉시 approved 상태로 생성됨
+            # publish_approved_social 태스크가 2분 내 픽업하여 발행
+            if posts_to_notify:
+                logger.info("generate_kscore_social: %d건 자동 승인 생성 완료", len(posts_to_notify))
 
         return {"status": "ok", "created": created}
 
@@ -3561,6 +3562,9 @@ def publish_approved_social(self):
 
         if published or failed:
             logger.info("publish_approved_social: published=%d, failed=%d", published, failed)
+            # Telegram 리포트 전송
+            from worker.social.telegram_bot import send_publish_report
+            await send_publish_report(posts, published, failed)
         return {"status": "ok", "published": published, "failed": failed}
 
     try:

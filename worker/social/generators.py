@@ -245,7 +245,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         risk_level=risk,
         source_cluster_id=top_clusters[0].id,
         dedup_key=dedup_key,
-        status="pending_review",
+        status="approved",
     )
     db.add(post)
     await db.flush()
@@ -318,7 +318,7 @@ async def generate_kscore_alert(
         risk_level=risk,
         source_cluster_id=cluster.id,
         dedup_key=dedup_key,
-        status="pending_review",
+        status="approved",
     )
     db.add(post)
     await db.flush()
@@ -409,7 +409,7 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
         hashtags=hashtags,
         risk_level="low",
         dedup_key=dedup_key,
-        status="pending_review",
+        status="approved",
     )
     db.add(post)
     await db.flush()

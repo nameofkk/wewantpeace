@@ -24,6 +24,51 @@ _CONTENT_TYPE_LABEL = {
 }
 
 
+async def send_publish_report(posts: list, published: int, failed: int) -> bool:
+    """발행 완료 후 Telegram에 결과 리포트만 전송 (승인 버튼 없음)."""
+    if not SOCIAL_TG_BOT_TOKEN or not SOCIAL_TG_CHAT_ID:
+        return False
+
+    try:
+        import httpx
+
+        lines = [f"📢 SNS 자동 발행 완료: ✅ {published}건 / ❌ {failed}건\n"]
+        for post in posts:
+            status_icon = "✅" if post.status == "published" else "❌"
+            content_label = _CONTENT_TYPE_LABEL.get(post.content_type, post.content_type)
+            title = (post.body_text or "")[:80].split("\n")[0]
+            lines.append(f"{status_icon} [{content_label}] {title}")
+
+        text = "\n".join(lines)
+        if len(text) > 4000:
+            text = text[:4000] + "..."
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # 이미지가 있으면 첫 번째 published 포스트의 이미지 첨부
+            first_published = next((p for p in posts if p.status == "published" and p.image_url), None)
+            if first_published and first_published.image_url.startswith("http"):
+                try:
+                    dl = await client.get(first_published.image_url, timeout=10.0)
+                    if dl.status_code == 200:
+                        await client.post(
+                            f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendPhoto",
+                            data={"chat_id": SOCIAL_TG_CHAT_ID, "caption": text},
+                            files={"photo": ("card.png", dl.content, "image/png")},
+                        )
+                        return True
+                except Exception:
+                    pass
+
+            await client.post(
+                f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
+                json={"chat_id": SOCIAL_TG_CHAT_ID, "text": text, "disable_web_page_preview": True},
+            )
+        return True
+    except Exception:
+        logger.exception("Telegram 리포트 전송 실패")
+        return False
+
+
 async def send_review_message(post: SocialPost) -> bool:
     """Telegram으로 플랫폼별 미리보기 + 요약 승인 메시지 전송."""
     if not SOCIAL_TG_BOT_TOKEN or not SOCIAL_TG_CHAT_ID:
