@@ -1,25 +1,28 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const size = { width: 1200, height: 630 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.wewantpeace.live";
 
-// ── 커스텀 폰트 (public/ 절대 URL에서 fetch — standalone 호환) ──
-const notoSerifKrFont = fetch(
-  `${SITE_URL}/fonts/NotoSerifKR-Black-latin.ttf`
-).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
+// ── 커스텀 폰트 (filesystem에서 직접 읽기 — self-fetch 데드락 방지) ──
+const FONT_DIR = join(process.cwd(), "public", "fonts");
 
-const gothicA1Font = fetch(
-  `${SITE_URL}/fonts/GothicA1-Black-subset.ttf`
-).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
+const notoSerifKrFont = readFile(join(FONT_DIR, "NotoSerifKR-Black-latin.ttf"))
+  .then((buf) => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)
+  .catch((): null => null);
 
-const interFont = fetch(
-  `${SITE_URL}/fonts/Inter-SemiBold.ttf`
-).then((r) => r.ok ? r.arrayBuffer() : null).catch((): null => null);
+const gothicA1Font = readFile(join(FONT_DIR, "GothicA1-Black-subset.ttf"))
+  .then((buf) => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)
+  .catch((): null => null);
+
+const interFont = readFile(join(FONT_DIR, "Inter-SemiBold.ttf"))
+  .then((buf) => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)
+  .catch((): null => null);
 
 const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
   UA: { ko: "우크라이나", en: "Ukraine" },
@@ -88,11 +91,8 @@ export async function GET(
 
   let logoSrc: string | null = null;
   try {
-    const logoRes = await fetch(`${SITE_URL}/logo-eye.png`);
-    if (logoRes.ok) {
-      const logoBuf = await logoRes.arrayBuffer();
-      logoSrc = `data:image/png;base64,${Buffer.from(logoBuf).toString("base64")}`;
-    }
+    const logoBuf = await readFile(join(process.cwd(), "public", "logo-eye.png"));
+    logoSrc = `data:image/png;base64,${logoBuf.toString("base64")}`;
   } catch {}
 
   let tension: TensionData | null = null;
