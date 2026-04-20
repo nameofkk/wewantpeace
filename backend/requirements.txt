@@ -30,7 +30,7 @@ slowapi==0.1.9
 sentry-sdk[fastapi]==2.14.0
 firebase-admin>=6.3.0
 # DodoPayments
-dodopayments>=1.87.0
+dodopayments[webhooks]>=1.87.0
 # Google Play Billing
 google-auth>=2.29.0
 google-api-python-client>=2.127.0
