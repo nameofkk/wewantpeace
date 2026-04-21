@@ -122,11 +122,11 @@ function SectionHeader({ icon: Icon, title, desc, tooltip }: {
   lang?: "ko" | "en";
 }) {
   return (
-    <div className="flex items-center gap-1.5 mb-2.5 whitespace-nowrap overflow-hidden">
+    <div className="flex items-center gap-1.5 mb-2.5 flex-nowrap overflow-x-auto scrollbar-hide">
       <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <h2 className="text-[11px] font-bold text-foreground shrink-0">{title}</h2>
       <span className="text-[9px] text-muted-foreground/50 shrink-0">·</span>
-      <span className="text-[9px] text-muted-foreground/50 truncate">{desc}</span>
+      <span className="text-[9px] text-muted-foreground/50 shrink-0 whitespace-nowrap">{desc}</span>
       <InfoTooltip text={tooltip} direction="down" />
     </div>
   );
