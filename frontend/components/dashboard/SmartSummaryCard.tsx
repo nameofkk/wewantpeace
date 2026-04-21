@@ -190,7 +190,7 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
           <span className={cn("text-[9px] font-bold tabular-nums", colors.text)}>{impactScore}/100</span>
         </div>
         {impactReason && (
-          <p className="text-[9px] text-foreground/40 mt-1 leading-tight truncate">{impactReason}</p>
+          <p className="text-[9px] text-foreground/40 mt-1 leading-tight whitespace-nowrap overflow-x-auto scrollbar-hide">{impactReason}</p>
         )}
       </div>
 
@@ -297,7 +297,7 @@ export function SmartSummaryCompact({ item, index, homeCountry, lang, topIssueRa
           )}
         </div>
         {soWhatLine && (
-          <span className="text-[9px] text-foreground/50 truncate block mt-0.5 leading-tight">{soWhatLine}</span>
+          <span className="text-[9px] text-foreground/50 line-clamp-1 block mt-0.5 leading-tight">{soWhatLine}</span>
         )}
       </div>
 
