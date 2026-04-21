@@ -4480,7 +4480,7 @@ def generate_newsletter_draft(self):
                 [sys.executable, script_path, "--vol", str(next_vol), "--lang", lang],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=300,
                 env={**os.environ},
             )
             logger.info(
@@ -4500,10 +4500,17 @@ def generate_newsletter_draft(self):
             logger.error("newsletter draft %s error: %s", lang, e)
             results[lang] = {"error": str(e)}
 
-    # 최신 draft vol 번호 저장 (자동 발송에서 사용)
-    r.set("newsletter:latest_draft_vol", str(next_vol))
+    # 최소 하나 성공 시에만 vol 번호 업데이트
+    any_success = any(
+        res.get("exit_code") == 0 for res in results.values() if "exit_code" in res
+    )
+    if any_success:
+        r.set("newsletter:latest_draft_vol", str(next_vol))
+        logger.info("newsletter draft vol=%d saved to Redis", next_vol)
+    else:
+        logger.error("newsletter draft 전부 실패, vol 번호 미업데이트")
 
-    return {"status": "ok", "vol": next_vol, "results": results}
+    return {"status": "ok" if any_success else "all_failed", "vol": next_vol, "results": results}
 
 
 # ── 뉴스레터 시간대별 자동 발송 ────────────────────────────────────────────────
@@ -4595,8 +4602,9 @@ def send_newsletter_scheduled(self, tz_group: str):
         if en_path.exists():
             tpl_en = en_path.read_text(encoding="utf-8")
 
-        if not settings.smtp_user or not settings.smtp_password:
-            logger.error("SMTP not configured, skipping newsletter send")
+        resend_key = os.environ.get("RESEND_API_KEY")
+        if not resend_key and (not settings.smtp_user or not settings.smtp_password):
+            logger.error("Neither RESEND_API_KEY nor SMTP configured, skipping newsletter send")
             return {"status": "smtp_not_configured"}
 
         async with AsyncSessionLocal() as db:
@@ -4649,6 +4657,23 @@ def send_newsletter_scheduled(self, tz_group: str):
                 except Exception as e:
                     logger.warning(f"Failed to send to {user.email}: {e}")
                     failed += 1
+
+        # MarketingEmailLog 저장 (자동 발송 이력)
+        try:
+            from backend.app.models.community import MarketingEmailLog
+            vol = draft_kr.get("vol_number") if draft_kr else (draft_en.get("vol_number") if draft_en else "?")
+            log = MarketingEmailLog(
+                admin_id=None,
+                subject=f"WeWantPeace Newsletter Vol.{vol} (auto/{tz_group})",
+                body=f"자동 발송: tz_group={tz_group}",
+                sent_count=sent,
+                failed_count=failed,
+                status="completed" if sent > 0 else "failed",
+            )
+            db.add(log)
+            await db.flush()
+        except Exception as log_err:
+            logger.warning("MarketingEmailLog 저장 실패: %s", log_err)
 
         logger.info(f"Newsletter sent: tz_group={tz_group}, sent={sent}, failed={failed}")
         return {"status": "ok", "tz_group": tz_group, "sent": sent, "failed": failed}
