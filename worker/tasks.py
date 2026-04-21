@@ -3338,11 +3338,11 @@ async def _publish_post_to_platforms(
     linkedin_enabled: bool = False,
     telegram_channel_enabled: bool = False,
 ) -> bool:
-    """단일 포스트를 X/Threads/Instagram/LinkedIn/Telegram 채널에 발행. 성공 여부 반환."""
+    """단일 포스트를 X/Threads/Instagram/LinkedIn/Telegram 채널에 발행. 하나라도 성공하면 True."""
     from sqlalchemy import select
     from backend.app.models.social_post import SocialPostPlatform
 
-    all_ok = True
+    any_ok = False  # 하나라도 성공하면 True
 
     # 이미지 업로드: card_generator에서 즉시 업로드됨 (로컬 경로 폴백 처리)
     if post.image_url and not post.image_url.startswith(("http://", "https://")):
@@ -3374,12 +3374,10 @@ async def _publish_post_to_platforms(
                 published_at=datetime.now(timezone.utc) if platform_id else None,
             )
             db.add(x_record)
-            if not platform_id:
-                all_ok = False
-        elif x_record.status == "skipped":
-            pass  # 의도적 스킵
-        elif x_record.status == "failed":
-            all_ok = False
+            if platform_id:
+                any_ok = True
+        elif x_record.status == "published":
+            any_ok = True
 
     # Threads
     if threads_enabled:
@@ -3403,12 +3401,10 @@ async def _publish_post_to_platforms(
                 published_at=datetime.now(timezone.utc) if platform_id else None,
             )
             db.add(th_record)
-            if not platform_id:
-                all_ok = False
-        elif th_record.status == "skipped":
-            pass  # 의도적 스킵
-        elif th_record.status == "failed":
-            all_ok = False
+            if platform_id:
+                any_ok = True
+        elif th_record.status == "published":
+            any_ok = True
 
     # Instagram
     if instagram_enabled:
@@ -3432,12 +3428,10 @@ async def _publish_post_to_platforms(
                 published_at=datetime.now(timezone.utc) if platform_id else None,
             )
             db.add(ig_record)
-            if not platform_id:
-                all_ok = False
-        elif ig_record.status == "skipped":
-            pass  # 의도적 스킵
-        elif ig_record.status == "failed":
-            all_ok = False
+            if platform_id:
+                any_ok = True
+        elif ig_record.status == "published":
+            any_ok = True
 
     # LinkedIn
     if linkedin_enabled:
@@ -3461,12 +3455,10 @@ async def _publish_post_to_platforms(
                 published_at=datetime.now(timezone.utc) if platform_id else None,
             )
             db.add(li_record)
-            if not platform_id:
-                all_ok = False
-        elif li_record.status == "skipped":
-            pass  # 의도적 스킵
-        elif li_record.status == "failed":
-            all_ok = False
+            if platform_id:
+                any_ok = True
+        elif li_record.status == "published":
+            any_ok = True
 
     # Telegram Channel (Broadcast)
     if telegram_channel_enabled:
@@ -3490,14 +3482,12 @@ async def _publish_post_to_platforms(
                 published_at=datetime.now(timezone.utc) if platform_id else None,
             )
             db.add(tg_record)
-            if not platform_id:
-                all_ok = False
-        elif tg_record.status == "skipped":
-            pass  # 의도적 스킵
-        elif tg_record.status == "failed":
-            all_ok = False
+            if platform_id:
+                any_ok = True
+        elif tg_record.status == "published":
+            any_ok = True
 
-    return all_ok
+    return any_ok
 
 
 @app.task(
