@@ -243,7 +243,8 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
         return None, "X API 키 미설정"
 
     import time
-    _RETRYABLE_CODES = ("402", "403", "429")
+    # 402(크레딧 소진)는 재시도 무의미 → 즉시 실패 처리
+    _RETRYABLE_CODES = ("403", "429")
     _MAX_RETRIES = 2
 
     for attempt in range(_MAX_RETRIES + 1):
@@ -292,7 +293,7 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
 
         except Exception as e:
             error_msg = str(e)[:500]
-            # 402/403/429는 재시도 가치 있음 (크레딧/rate limit 일시 오류)
+            # 403/429는 재시도 가치 있음 (rate limit 일시 오류)
             if attempt < _MAX_RETRIES and any(code in error_msg for code in _RETRYABLE_CODES):
                 wait = (attempt + 1) * 30
                 logger.warning("X 트윗 발행 재시도 [%d/%d] %ds 후: %s", attempt + 1, _MAX_RETRIES, wait, error_msg)
