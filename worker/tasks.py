@@ -3192,7 +3192,6 @@ def generate_daily_social(self):
             return {"status": "disabled"}
 
         from worker.social.generators import generate_daily_movers
-        from worker.social.telegram_bot import send_review_message
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -3200,7 +3199,7 @@ def generate_daily_social(self):
                 if not post:
                     return {"status": "skipped"}
 
-            await send_review_message(post)
+            logger.info("generate_daily_social: 자동 승인 생성 완료 post=%s", post.id)
             return {"status": "ok", "post_id": str(post.id)}
 
     try:
@@ -3313,7 +3312,6 @@ def generate_weekly_social(self):
             return {"status": "disabled"}
 
         from worker.social.generators import generate_weekly_recap
-        from worker.social.telegram_bot import send_review_message
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -3321,7 +3319,7 @@ def generate_weekly_social(self):
                 if not post:
                     return {"status": "skipped"}
 
-            await send_review_message(post)
+            logger.info("generate_weekly_social: 자동 승인 생성 완료 post=%s", post.id)
             return {"status": "ok", "post_id": str(post.id)}
 
     try:

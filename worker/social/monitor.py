@@ -1,6 +1,6 @@
 """서비스 모니터링 + AI 에이전트.
 
-8가지 헬스 체크, /status 명령어, AI 질문 응답을 처리합니다.
+9가지 헬스 체크, /status 명령어, AI 질문 응답을 처리합니다.
 """
 import asyncio
 import logging
@@ -31,7 +31,7 @@ class CheckResult:
     detail: str
 
 
-# ── 8가지 헬스 체크 ───────────────────────────────────────────────────────
+# ── 9가지 헬스 체크 ───────────────────────────────────────────────────────
 
 
 async def _check_db_connection(db: AsyncSession) -> CheckResult:
@@ -184,6 +184,26 @@ async def _check_unpublished_alerts(db: AsyncSession) -> CheckResult:
     )
 
 
+async def _check_collection_silence(db: AsyncSession) -> CheckResult:
+    """9. 전체 수집 침묵 감지 — 90분 이상 새 이벤트 없으면 알림."""
+    result = await db.execute(
+        text("SELECT MAX(collected_at) FROM raw_events")
+    )
+    last = result.scalar()
+    if not last:
+        return CheckResult("collection_silence", False, "수집 기록 전혀 없음")
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - last
+    mins = int(age.total_seconds() / 60)
+    ok = mins < 90
+    return CheckResult(
+        "collection_silence",
+        ok,
+        f"마지막 수집: {mins}분 전" if ok else f"⚠️ 컬렉션 서비스 중단 의심: {mins}분간 수집 없음 (임계값 90분)",
+    )
+
+
 _ALL_CHECKS = [
     _check_db_connection,
     _check_rss_collection,
@@ -193,6 +213,7 @@ _ALL_CHECKS = [
     _check_sns_failures,
     _check_push_failures,
     _check_unpublished_alerts,
+    _check_collection_silence,
 ]
 
 
@@ -200,7 +221,7 @@ _ALL_CHECKS = [
 
 
 async def check_service_health() -> list[CheckResult]:
-    """8가지 헬스 체크 실행. 각 체크는 독립 try/except + rollback."""
+    """9가지 헬스 체크 실행. 각 체크는 독립 try/except + rollback."""
     results: list[CheckResult] = []
     async with AsyncSessionLocal() as db:
         for check_fn in _ALL_CHECKS:
@@ -294,7 +315,7 @@ async def send_monitoring_alert(results: list[CheckResult]) -> bool:
 
 
 async def handle_status_command() -> str:
-    """8가지 헬스 체크 결과 + 서비스 요약을 포맷팅."""
+    """9가지 헬스 체크 결과 + 서비스 요약을 포맷팅."""
     results = await check_service_health()
 
     from datetime import timedelta as _td
@@ -312,9 +333,9 @@ async def handle_status_command() -> str:
             fail_items.append(f"\u2022 {r.name}: {r.detail}")
 
     if all_ok:
-        verdict = "8개 항목 모두 정상 가동 중입니다."
+        verdict = "9개 항목 모두 정상 가동 중입니다."
     else:
-        verdict = f"8개 항목 중 {len(fail_items)}건에서 이상이 확인되었습니다."
+        verdict = f"9개 항목 중 {len(fail_items)}건에서 이상이 확인되었습니다."
 
     lines = [
         f"<b>시스템 현황 보고</b>",
