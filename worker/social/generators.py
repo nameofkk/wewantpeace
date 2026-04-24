@@ -1,6 +1,5 @@
 """SNS 콘텐츠 생성기 — Daily Movers / KScore Alert / Weekly Recap (bilingual)."""
 import logging
-import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -12,7 +11,7 @@ from backend.app.models.social_post import SocialPost
 
 logger = logging.getLogger(__name__)
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
 
 # 국가코드 → 해시태그 매핑
 _COUNTRY_HASHTAGS: dict[str, str] = {
@@ -67,14 +66,13 @@ def _build_hashtags(country_codes: list[str], topic: str = "") -> list[str]:
 
 
 def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
-    if not _OPENAI_KEY:
-        logger.warning("OPENAI_API_KEY 미설정, AI 생성 건너뜀")
+    if not _ai_available():
+        logger.warning("AI API 키 미설정, AI 생성 건너뜀")
         return None
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=_OPENAI_KEY, timeout=15.0)
+        client = _get_ai_client(timeout=15.0)
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_get_ai_model(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -84,7 +82,7 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
         )
         return (resp.choices[0].message.content or "").strip()
     except Exception:
-        logger.exception("OpenAI 호출 실패")
+        logger.exception("AI 호출 실패")
         return None
 
 
@@ -127,7 +125,9 @@ _BILINGUAL_SYSTEM = (
     "- Be factual but impactful — hook the reader in 2 seconds\n"
     "- Use line breaks for scannable layout\n"
     "- End with a bilingual CTA line + site URL as shown above\n"
-    "- NO hashtags (added separately), NO labels like 'EN:'/'KO:'"
+    "- NO hashtags (added separately), NO labels like 'EN:'/'KO:'\n"
+    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages mixed in.\n"
+    "- Include specific facts: country name, numbers, actions — avoid vague phrases"
 )
 
 _SPIKE_BILINGUAL_SYSTEM = (
@@ -150,7 +150,9 @@ _SPIKE_BILINGUAL_SYSTEM = (
     "- Use · or | as separators\n"
     "- Maximum impact in minimum words\n"
     "- End with bilingual CTA + URL as shown\n"
-    "- NO hashtags, NO labels"
+    "- NO hashtags, NO labels\n"
+    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
+    "- Include specific facts: numbers, locations, actors"
 )
 
 _WEEKLY_BILINGUAL_SYSTEM = (
@@ -173,7 +175,9 @@ _WEEKLY_BILINGUAL_SYSTEM = (
     "- Use · or | as separators\n"
     "- Clean, scannable format\n"
     "- End with bilingual CTA + URL as shown\n"
-    "- NO hashtags, NO labels"
+    "- NO hashtags, NO labels\n"
+    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
+    "- Use specific numbers and country names"
 )
 
 

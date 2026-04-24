@@ -24,9 +24,10 @@ logger = logging.getLogger(__name__)
 
 # ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
-if not _OPENAI_KEY:
-    logger.warning("OpenAI key not set — falling back to keyword classification")
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
+
+if not _ai_available():
+    logger.warning("AI key not set — falling back to keyword classification")
 
 _VALID_TOPICS = frozenset([
     "conflict", "terror", "coup", "sanctions", "cyber",
@@ -139,7 +140,8 @@ For all other topics: general
 - Multi-country: pick where the main action happens
 - If unclear or global (e.g. UN resolution, general policy): null
 
-Respond ONLY with JSON: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null}"""
+CRITICAL: Respond with ONLY a valid JSON object. No explanation, no markdown, no extra text.
+Format: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null}"""
 
 
 _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
@@ -155,7 +157,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
     Returns:
         (topic, sub_topic, severity, country_code) 또는 실패 시 None
     """
-    if not _OPENAI_KEY:
+    if not _ai_available():
         return None
 
     # 빈 입력 방어
@@ -165,11 +167,9 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
     user_text = f"Title: {title[:200]}\n\nBody: {body[:500]}"
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=_OPENAI_KEY, timeout=30.0)
+        client = _get_ai_client(timeout=30.0)
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_get_ai_model(),
             messages=[
                 {"role": "system", "content": _AI_CLASSIFY_PROMPT},
                 {"role": "user", "content": user_text},

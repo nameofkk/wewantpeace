@@ -6,26 +6,36 @@ GPT-4o-mini 기반 클러스터 AI 제목 생성.
 """
 import json
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
-_OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
 
 _SYSTEM_PROMPT = """\
 You are a concise news headline writer for a global conflict/crisis monitoring app.
 Given event titles and article bodies about the same issue, write ONE best headline in both English and Korean.
 
 Rules:
-- English: max 160 chars, AP style, no quotes
-- Korean: max 80 chars, 뉴스 헤드라인 스타일, 간결체
+- English: min 30 chars, max 160 chars, AP style, no quotes
+- Korean: min 10 chars, max 80 chars, 뉴스 헤드라인 스타일, 간결체
 - Read the article body carefully to understand the full context before writing the headline
 - Focus on WHAT happened, WHERE — be specific and accurate
+- Include specific details: country/city name, actor, action, number if available
 - No hashtags, no emojis, no commentary
 - Never start with "Recap", "Summary", "Breaking" or similar prefixes
 - If titles are all junk/hashtags, infer from body content, topic and country
+- Korean headline must be pure Korean (한국어만, no English mixed in except proper nouns)
 
-Respond ONLY with JSON: {"title_en": "...", "title_ko": "..."}"""
+GOOD examples:
+- EN: "Lebanon Military Launches Operation Against Hezbollah Positions in Southern Border"
+- KO: "레바논군, 남부 국경 헤즈볼라 거점에 군사작전 개시"
+
+BAD examples:
+- EN: "Conflict Update" (too vague)
+- KO: "중동 상황 악화" (too vague, no specifics)
+
+CRITICAL: Respond with ONLY a valid JSON object. No explanation, no markdown.
+Format: {"title_en": "...", "title_ko": "..."}"""
 
 
 def _build_user_prompt(
@@ -64,8 +74,8 @@ def generate_ai_title(
     Returns:
         (title_en, title_ko) 또는 실패 시 None
     """
-    if not _OPENAI_KEY:
-        logger.debug("OPENAI_API_KEY 미설정, AI 제목 생성 건너뜀")
+    if not _ai_available():
+        logger.debug("AI API 키 미설정, AI 제목 생성 건너뜀")
         return None
 
     titles = [e.get("title", "") for e in events if e.get("title")]
@@ -76,11 +86,9 @@ def generate_ai_title(
     bodies = [e["body"] for e in events if e.get("body")][:3]
 
     try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=_OPENAI_KEY)
+        client = _get_ai_client()
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_get_ai_model(),
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": _build_user_prompt(titles, topic, country_code, bodies or None)},
