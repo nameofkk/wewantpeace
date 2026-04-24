@@ -9,7 +9,6 @@ Filtered Jaccard: 국가명/토픽 키워드를 제거한 후 콘텐츠 단어�
 경계 영역(0.10~0.20)에서는 GPT-4o-mini AI 판정으로 보완.
 """
 import json
-import os
 import re
 import logging
 from datetime import datetime, timezone, timedelta
@@ -212,7 +211,8 @@ Rules:
 - SAME = same incident, just reported by different outlets or at different times
 - DIFFERENT = different incidents, even if in the same country/topic category
 - Focus on specific details: location, actors, timing, nature of event
-- Respond ONLY with JSON: {"same": true} or {"same": false}"""
+- CRITICAL: Respond with ONLY a valid JSON object. No explanation, no markdown.
+- Format: {"same": true} or {"same": false}"""
 
 
 @lru_cache(maxsize=256)
@@ -232,8 +232,8 @@ def _ai_same_event(
 
     Returns: True(같은 사건), False(다른 사건), None(API 실패)
     """
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
+    from worker.ai_config import is_available as _ai_ok, get_client as _get_client, get_model as _get_model
+    if not _ai_ok():
         return None
 
     user_msg = f"Country: {country_code or 'Unknown'}\nTopic: {topic}\n\nHeadline A: {title_a[:200]}\nHeadline B: {title_b[:200]}"
@@ -243,10 +243,9 @@ def _ai_same_event(
         user_msg += f"\nBody B (excerpt): {body_hint_b[:100]}"
 
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
+        client = _get_client()
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_get_model(),
             messages=[
                 {"role": "system", "content": _AI_MATCH_PROMPT},
                 {"role": "user", "content": user_msg},
