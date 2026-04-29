@@ -357,9 +357,14 @@ async def list_users(
     )
 
     # active subscription subquery (유저별 최신 1건 — DISTINCT ON)
+    # cancelled + expires_at > now도 유효 (결제 기간 남은 취소 구독)
+    now = datetime.now(timezone.utc)
     sub_sub = (
         select(Subscription)
-        .where(Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]))
+        .where(or_(
+            Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]),
+            and_(Subscription.status == "cancelled", Subscription.expires_at > now),
+        ))
         .distinct(Subscription.user_id)
         .order_by(Subscription.user_id, Subscription.created_at.desc())
         .subquery()
@@ -414,7 +419,7 @@ async def list_users(
             return "free"
         if s_status == "trial":
             return "trial"
-        if s_status in ("active", "grace_period", "billing_retry"):
+        if s_status in ("active", "grace_period", "billing_retry", "cancelled"):
             # paid: billing_key(토스) / dodo_subscription_id / platform이 결제 플랫폼
             if s_billing_key or s_dodo_id or s_platform in ("dodopayments", "android", "ios", "web"):
                 return "paid"
@@ -512,7 +517,7 @@ async def update_user(
             active_subs = await db.execute(
                 select(Subscription).where(
                     Subscription.user_id == user.id,
-                    Subscription.status == "active",
+                    Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]),
                 )
             )
             for sub in active_subs.scalars().all():
@@ -715,11 +720,16 @@ async def list_subscriptions(
     Sub = aliased(Subscription)
 
     # users.plan != 'free' 인 유저 조회, 최신 구독 정보 LEFT JOIN
+    # cancelled + expires_at > now도 유효한 구독
+    now_sub = datetime.now(timezone.utc)
     q = (
         select(User, Subscription)
         .outerjoin(
             Subscription,
-            (Subscription.user_id == User.id) & (Subscription.status == "active"),
+            (Subscription.user_id == User.id) & (
+                (Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"])) |
+                ((Subscription.status == "cancelled") & (Subscription.expires_at > now_sub))
+            ),
         )
         .where(User.plan != "free")
     )

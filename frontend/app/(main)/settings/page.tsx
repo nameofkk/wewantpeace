@@ -1225,6 +1225,11 @@ export default function SettingsPage() {
                   {t(lang, "settings_plan_status_active")}
                 </span>
               )}
+              {plan !== "free" && subInfo.status === "cancelled" && (
+                <span className="rounded-full bg-yellow-500/15 border border-yellow-500/30 px-2 py-0.5 text-[10px] font-semibold text-yellow-400">
+                  {t(lang, "settings_plan_status_cancelled")}
+                </span>
+              )}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {plan === "pro_plus" ? t(lang, "settings_plan_proplus_desc") :

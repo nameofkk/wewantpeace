@@ -32,6 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
   expired: "bg-red-500/20 text-red-400",
   trial: "bg-blue-500/20 text-blue-400",
   grace_period: "bg-orange-500/20 text-orange-400",
+  billing_retry: "bg-pink-500/20 text-pink-400",
 };
 
 const PLAN_BADGE: Record<string, string> = {

@@ -120,7 +120,7 @@ async def cancel_subscription(
     result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
-            Subscription.status.in_(["active", "grace_period"]),
+            Subscription.status.in_(["active", "grace_period", "trial"]),
         ).order_by(Subscription.created_at.desc()).limit(1)
     )
     sub = result.scalar_one_or_none()
