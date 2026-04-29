@@ -1246,6 +1246,7 @@ export const translations = {
     trial_upgrade_prompt: "체험 종료 전 업그레이드하면 서비스가 끊기지 않습니다",
     settings_plan_status_trial: "무료 체험 중",
     settings_plan_status_active: "구독 중",
+    settings_plan_status_cancelled: "해지 예정",
 
     // Promo code
     promo_have_code: "프로모 코드가 있으신가요?",
@@ -2939,6 +2940,7 @@ export const translations = {
     trial_upgrade_prompt: "Upgrade before trial ends for uninterrupted service",
     settings_plan_status_trial: "Free Trial",
     settings_plan_status_active: "Active",
+    settings_plan_status_cancelled: "Cancelling",
 
     // Promo code
     promo_have_code: "Have a promo code?",

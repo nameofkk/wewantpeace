@@ -1749,7 +1749,7 @@ def expire_subscriptions(self):
                     valid_sub_result = await db.execute(
                         select(Subscription).where(
                             Subscription.user_id == ruser.id,
-                            Subscription.status.in_(["active", "trial"]),
+                            Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]),
                             Subscription.expires_at > now,
                         ).limit(1)
                     )
@@ -2490,7 +2490,7 @@ def send_expired_trial_offers(self):
                     active_sub = await db.execute(
                         select(Subscription).where(
                             Subscription.user_id == sub.user_id,
-                            Subscription.status.in_(["active", "trial"]),
+                            Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]),
                         ).limit(1)
                     )
                     if active_sub.scalar_one_or_none():
@@ -2575,7 +2575,7 @@ def send_expired_trial_offers(self):
                     active_sub = await db.execute(
                         select(Subscription).where(
                             Subscription.user_id == sub.user_id,
-                            Subscription.status.in_(["active", "trial"]),
+                            Subscription.status.in_(["active", "trial", "grace_period", "billing_retry"]),
                         ).limit(1)
                     )
                     if active_sub.scalar_one_or_none():
