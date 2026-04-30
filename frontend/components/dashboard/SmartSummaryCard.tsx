@@ -77,7 +77,6 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
   const marketChips = getRelevantMarketChips(cc, market, topIssueRaw?.relevant_commodities);
   const colors = impactScoreColor(impactScore);
 
-  const whatLine = topIssueRaw?.what_line;
   const soWhatLine = topIssueRaw?.so_what_line;
   const whenLine = topIssueRaw?.when_line;
   const bodySnippet = topIssueRaw?.body_snippet;
@@ -141,19 +140,8 @@ export function SmartSummaryCardFull({ item, homeCountry, lang, market, topIssue
         </div>
       </div>
 
-      {/* ── 3-line Smart Summary ── */}
+      {/* ── Smart Summary ── */}
       <div className="px-3.5 py-3 space-y-2.5 border-t border-border/20">
-        {whatLine && (
-          <div className="flex gap-2.5">
-            <div className="shrink-0 w-[3px] rounded-full bg-red-400 self-stretch" />
-            <div className="min-w-0">
-              <span className="text-[9px] font-bold text-red-400 block mb-0.5">
-                {t(lang, "dash_smart_what" as TranslationKey)}
-              </span>
-              <span className="text-[11px] text-foreground/80 leading-snug line-clamp-2 block">{whatLine}</span>
-            </div>
-          </div>
-        )}
         {soWhatLine && (
           <div className="flex gap-2.5">
             <div className="shrink-0 w-[3px] rounded-full bg-orange-400 self-stretch" />

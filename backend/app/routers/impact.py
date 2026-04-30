@@ -545,7 +545,9 @@ async def _build_impact_summary(
         top1 = top_issues[0] if top_issues else None
         parts = []
         if top1:
-            parts.append(f"'{top1.title[:20]}' 이슈 영향 가장 큼")
+            _t = top1.title or ""
+            _t = _t[:30] + "…" if len(_t) > 30 else _t
+            parts.append(f"'{_t}' 이슈 영향 가장 큼")
         if critical_count > 0:
             parts.append(f"고영향 {critical_count}건")
         parts.append(f"활성 이슈 {total_active}건" if total_active else "주요 위기 없음")
@@ -554,7 +556,9 @@ async def _build_impact_summary(
         top1_en = top_issues[0] if top_issues else None
         parts_en = []
         if top1_en:
-            parts_en.append(f"'{top1_en.title[:20]}' has highest impact")
+            _te = top1_en.title or ""
+            _te = _te[:40] + "…" if len(_te) > 40 else _te
+            parts_en.append(f"'{_te}' has highest impact")
         if critical_count > 0:
             parts_en.append(f"{critical_count} high-impact")
         parts_en.append(f"{total_active} active issues" if total_active else "No major crisis")
