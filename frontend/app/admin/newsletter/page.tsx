@@ -633,7 +633,8 @@ export default function AdminNewsletterPage() {
   const { lang } = useAdminStore();
   const { toast } = useAdminToast();
   const [editLang, setEditLang] = useState<"kr" | "us">("kr");
-  const [vol, setVol] = useState(1);
+  const [vol, setVol] = useState<number | null>(null);
+  const [volInitialized, setVolInitialized] = useState(false);
   const [data, setData] = useState<Record<string, any>>({});
   const [previewHtml, setPreviewHtml] = useState("");
   const [sizeKb, setSizeKb] = useState(0);
@@ -715,6 +716,7 @@ export default function AdminNewsletterPage() {
   const { data: draftData, isLoading: draftLoading } = useQuery({
     queryKey: ["newsletter-draft", vol, editLang],
     queryFn: () => adminFetch<Record<string, any>>(`/admin/newsletter/draft?vol=${vol}&lang=${editLang}`),
+    enabled: vol !== null,
     refetchOnWindowFocus: false,
   });
 
@@ -729,8 +731,20 @@ export default function AdminNewsletterPage() {
 
   // 뉴스레터 발송 예약 상태 조회
   const fetchSchedule = useCallback(() => {
-    adminFetch<any>("/admin/newsletter/schedule").then(setSchedule).catch(() => {});
-  }, []);
+    adminFetch<any>("/admin/newsletter/schedule").then((s) => {
+      setSchedule(s);
+      // 최초 로드 시 최신 vol로 설정
+      if (!volInitialized && s?.latest_vol) {
+        setVol(s.latest_vol);
+        setVolInitialized(true);
+      } else if (!volInitialized) {
+        setVol(1);
+        setVolInitialized(true);
+      }
+    }).catch(() => {
+      if (!volInitialized) { setVol(1); setVolInitialized(true); }
+    });
+  }, [volInitialized]);
   useEffect(() => { fetchSchedule(); }, [fetchSchedule]);
 
   // 키보드 단축키: Ctrl+S = 저장, Ctrl+Shift+F = 검색
@@ -898,7 +912,7 @@ export default function AdminNewsletterPage() {
           <input
             type="number"
             min={1}
-            value={vol}
+            value={vol ?? ""}
             onChange={(e) => setVol(Number(e.target.value) || 1)}
             className="w-14 px-2 py-1 text-xs bg-background border border-border rounded"
           />
