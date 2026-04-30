@@ -846,22 +846,24 @@ export default function MapPage() {
         },
       });
 
-      // 국가 + 비율 라벨
+      // 국가 + 비율 라벨 (원 위에 표시)
       map.addLayer({
         id: "outage-label",
         type: "symbol",
         source: "outage-source",
         layout: {
           "text-field": ["get", "label"],
-          "text-size": 12,
+          "text-size": 11,
           "text-font": ["Open Sans Bold"],
-          "text-anchor": "center",
-          "text-allow-overlap": true,
+          "text-anchor": "bottom",
+          "text-offset": [0, -2.5],
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
         },
         paint: {
           "text-color": "#e0e7ff",
-          "text-halo-color": "#312e81",
-          "text-halo-width": 1.5,
+          "text-halo-color": "#1e1b4b",
+          "text-halo-width": 2,
         },
       });
 
@@ -1609,13 +1611,7 @@ export default function MapPage() {
         } catch { /* noop */ }
       });
 
-      // maplibre HTML 마커는 map render 이벤트 발생 시 위치가 갱신됨
-      // panBy([0,0])으로 0픽셀 이동 → render 이벤트 강제 발생 → 마커 즉시 표시
-      requestAnimationFrame(() => {
-        try {
-          currentMap.panBy([0, 0], { duration: 0, animate: false });
-        } catch { /* noop */ }
-      });
+      // maplibre는 마커 addTo 시 자동 렌더링 — 별도 트리거 불필요
     };
 
     if (maplibreRef.current) {
