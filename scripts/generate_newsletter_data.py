@@ -107,20 +107,33 @@ def tension_num(score: float) -> int:
     return 1
 
 
-# ── GPT 호출 (텍스트만 생성) ─────────────────────────────────────────────────
+# ── AI 호출 (Groq 우선, OpenAI 폴백) ──────────────────────────────────────────
+def _get_ai_client():
+    from openai import AsyncOpenAI
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if groq_key:
+        return AsyncOpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1"), "llama-3.3-70b-versatile"
+    if openai_key:
+        return AsyncOpenAI(api_key=openai_key), "gpt-4o-mini"
+    return None, ""
+
 async def call_gpt(prompt: str, system: str = "") -> str:
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        client, model = _get_ai_client()
+        if not client:
+            print("  AI key not set (GROQ_API_KEY or OPENAI_API_KEY)")
+            return ""
         messages = []
         if system: messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini", messages=messages, temperature=0.7, max_tokens=4000,
+            model=model, messages=messages, temperature=0.7, max_tokens=4000,
+            response_format={"type": "json_object"},
         )
         return resp.choices[0].message.content.strip()
     except Exception as e:
-        print(f"  GPT error: {e}")
+        print(f"  AI error: {e}")
         return ""
 
 
