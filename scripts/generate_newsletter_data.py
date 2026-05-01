@@ -772,8 +772,9 @@ async def generate(vol: int, lang: str) -> dict:
         wheat_change_period = ((wheat_price - wheat_price_past) / wheat_price_past * 100) if wheat_price and wheat_price_past else None
 
         # ── 여행경보 ──
+        thirty_days_ago = now - timedelta(days=30)
         r = await db.execute(text("SELECT DISTINCT ON (country_code) country_code, level, updated_at FROM travel_advisory WHERE level >= 3 ORDER BY country_code, updated_at DESC"))
-        advisories = [{"cc": row.country_code, "level": row.level, "new": row.updated_at >= seven_days_ago if row.updated_at else False} for row in r.fetchall()]
+        advisories = [{"cc": row.country_code, "level": row.level, "new": row.updated_at >= thirty_days_ago if row.updated_at else False} for row in r.fetchall()]
         travel_l4 = len([a for a in advisories if a["level"] >= 4])
         travel_l3 = len([a for a in advisories if a["level"] == 3])
         data["travel_advisory_html"] = build_travel_html(advisories, lang)
@@ -799,9 +800,12 @@ async def generate(vol: int, lang: str) -> dict:
         r = await db.execute(text("SELECT COUNT(*) FROM normalized_events WHERE event_time >= :s AND event_time < :e"), {"s": prev_week_start, "e": seven_days_ago})
         events_7d_prev = r.scalar() or 0
 
-        # ── 평균 event_count (하이라이트 라인용) ──
-        r = await db.execute(text("SELECT AVG(event_count) FROM issue_clusters WHERE is_active = true AND event_count > 0"))
-        avg_event_count = r.scalar() or 1
+        # ── 평균 event_count (하이라이트 라인용) — 상위 20개 평균으로 비교해야 의미 있음 ──
+        r = await db.execute(text(
+            "SELECT AVG(ec) FROM (SELECT event_count AS ec FROM issue_clusters "
+            "WHERE is_active = true AND event_count > 0 ORDER BY event_count DESC LIMIT 20) sub"
+        ))
+        avg_event_count = float(r.scalar() or 1)
 
     # ── GPT 편집 콘텐츠 ──
     def cl_title(c, i=0):
@@ -898,17 +902,18 @@ async def generate(vol: int, lang: str) -> dict:
         wow_rows.append((f"{cn(target_cc, lang)} 긴장도" if is_kr else f"{cn(target_cc, lang)} Tension",
                          f"{target_prev:.1f}", f"{target_score:.1f}", data["tension_change"]))
 
-    # 하이라이트 라인 계산
+    # 하이라이트 라인 계산 (상위 20개 평균 대비)
     highlight_line = None
     if top_clusters and avg_event_count > 0:
         top_ev = top_clusters[0][5]
         ratio = top_ev / avg_event_count
-        if ratio >= 2:
+        if ratio >= 1.5:
             top_name = cl_title(top_clusters, 0)
+            ratio_str = f"{ratio:.1f}"
             if is_kr:
-                highlight_line = f"{top_name} {top_ev:,}건은 평소 {avg_event_count:.0f}건 대비 {ratio:.1f}배"
+                highlight_line = f"{top_name} {top_ev:,}건 — 주요 이슈 평균 {avg_event_count:.0f}건 대비 {ratio_str}배"
             else:
-                highlight_line = f"{top_name}: {top_ev:,} events = {ratio:.1f}x the average ({avg_event_count:.0f})"
+                highlight_line = f"{top_name}: {top_ev:,} events — {ratio_str}x the top-20 average ({avg_event_count:.0f})"
 
     data["numbers_section_html"] = build_numbers_html({
         "events_24h": events_24h, "events_7d": events_7d,
