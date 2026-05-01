@@ -13,9 +13,30 @@ import json
 import os
 import sys
 from datetime import datetime, timezone, timedelta
+import re
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ── 한자→한글 변환 (Groq/Llama 한자 혼입 방지) ──
+_CJK_TO_KR = {
+    "影響": "영향", "戰爭": "전쟁", "緊張": "긴장", "危機": "위기",
+    "經濟": "경제", "安全": "안전", "軍事": "군사", "政治": "정치",
+    "平和": "평화", "衝突": "충돌", "攻擊": "공격", "防禦": "방어",
+    "協商": "협상", "制裁": "제재", "難民": "난민", "死亡": "사망",
+    "被害": "피해", "爆發": "폭발", "增加": "증가", "減少": "감소",
+    "地域": "지역", "國際": "국제", "世界": "세계", "石油": "석유",
+    "價格": "가격", "上昇": "상승", "下落": "하락", "供給": "공급",
+    "需要": "수요", "輸入": "수입", "輸出": "수출",
+}
+_CJK_RE = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]+")
+
+def _fix_cjk(text: str) -> str:
+    """한자를 한글로 변환. 사전에 없으면 그대로 유지."""
+    if not text: return text
+    for cjk, kr in _CJK_TO_KR.items():
+        text = text.replace(cjk, kr)
+    return text
 
 from sqlalchemy import text
 from backend.app.core.database import AsyncSessionLocal
@@ -297,7 +318,13 @@ Generate JSON with these TEXT-ONLY fields (NO HTML tags except <br> in hero_head
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1]
             if cleaned.endswith("```"): cleaned = cleaned[:-3]
-        return json.loads(cleaned)
+        parsed = json.loads(cleaned)
+        # 한국어: 한자 혼입 후처리
+        if is_kr:
+            for k, v in parsed.items():
+                if isinstance(v, str):
+                    parsed[k] = _fix_cjk(v)
+        return parsed
     except Exception as e:
         print(f"  GPT JSON parse error: {e}")
         print(f"  Raw: {result[:300]}")
