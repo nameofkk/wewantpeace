@@ -1230,7 +1230,7 @@ def retry_unprocessed(self):
 
         async with AsyncSessionLocal() as db:
             # 최근 6시간 이내 미처리 항목만 (너무 오래된 것은 무시)
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
             result = await db.execute(
                 select(RawEvent.id)
                 .where(
