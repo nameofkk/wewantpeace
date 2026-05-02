@@ -15,7 +15,7 @@ _TRANSLATION_STYLE_RE = re.compile(
     r"(?:합니다|됩니다|입니다|있습니다|했습니다|됩니다|겠습니다|봅니다"
     r"|하고 있습니다|될 것입니다|할 수 있습니다"
     r"|을 예고합니다|을 발표합니다|을 시사합니다"
-    r"|에서의 |으로의 |, 그리고 )$?"
+    r"|에서의 |으로의 |, 그리고 )$"
 )
 
 from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
