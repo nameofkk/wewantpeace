@@ -4,7 +4,6 @@ from sqlalchemy import TypeDecorator, Text, String
 from sqlalchemy.dialects.postgresql import ARRAY as PgArray, UUID as PgUUID
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 from backend.app.core.config import settings
 
 
@@ -67,52 +66,21 @@ import os as _os
 _is_sqlite = settings.database_url.startswith("sqlite")
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 
-
-def _to_transaction_mode_url(raw: str) -> str:
-    """URL을 Supabase transaction mode(6543, Supavisor)로 강제 변환."""
-    url = raw
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif url.startswith("postgresql://") and "+asyncpg" not in url:
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    url = url.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543")
-    return url
-
-
 # ── DB 연결 전략 ──────────────────────────────────────────────────────────────
-# Supabase transaction mode(6543 / Supavisor):
-#   - 연결 수 제한 없음 (Supavisor가 DB 연결 풀링 전담)
-#   - backend: NullPool → 요청마다 Supavisor에 연결·해제 (prepared stmt 충돌 원천 차단)
-#   - worker:  pool_size=1 per child + statement_cache_size=0
+# Supabase session mode(5432) 사용.
+# asyncpg + Supavisor transaction mode(6543)는 DEALLOCATE ALL 미실행으로
+# DuplicatePreparedStatementError 발생 → session mode가 유일하게 안정적인 선택.
 #
-# NullPool + transaction mode 조합으로:
-#   - EMAXCONNSESSION (15개 한도) 영구 해소
-#   - DuplicatePreparedStatementError 영구 해소
-#   - QueuePool timeout 영구 해소
-_raw_url = _os.environ.get("DATABASE_URL", "") or settings.database_url
-
-# ── 연결 모드 분기 ─────────────────────────────────────────────────────────
-# Backend: transaction mode(6543) + NullPool
-#   - NullPool: 요청마다 Supavisor에 새 연결 → prepared stmt 충돌 원천 차단
-#   - 15개 한도 문제 없음 (NullPool은 persistent 연결 0개)
-#
-# Worker: session mode(5432) + pool_size=1 per child
-#   - asyncpg prepared stmt 캐시 정상 동작 (PgBouncer 없음)
-#   - concurrency=4 → 최대 4개 연결 << 15
-if _is_worker or _is_sqlite:
-    # Worker: session mode (config.py가 5432 강제)
-    _db_url = settings.database_url
-else:
-    # Backend: transaction mode (6543) 강제 변환
-    if "pooler.supabase.com" in _raw_url:
-        _db_url = _to_transaction_mode_url(_raw_url)
-    else:
-        _db_url = settings.database_url
+# 연결 수 설계 (Supabase 한도 15개):
+#   backend:  uvicorn 1worker × (pool_size=1 + overflow=3) = 최대 4개
+#   worker:   celery -c 4 × pool_size=1                   = 4개
+#   일반 idle: 1 + 4 = 5개  /  최대 burst: 4+4=8개
+#   배포 오버랩: old(4) + new(4) + worker(4) = 12개 << 15 ✓
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
 elif _is_worker:
-    # Worker: session mode, pool_size=1 per child (concurrency=4 → 총 4개)
+    # Worker: child당 1개 연결 (concurrency=4 → 총 4개)
     _engine_kwargs = {
         "pool_size": 1,
         "max_overflow": 0,
@@ -121,17 +89,17 @@ elif _is_worker:
         "pool_timeout": 30,
     }
 else:
-    # Backend: transaction mode + NullPool
-    # json_serializer/deserializer: setup_asyncpg_json_codec 건너뜀 (prepared stmt 방지)
+    # Backend: uvicorn 1 worker, 최대 4개 연결 (burst 허용)
     _engine_kwargs = {
-        "poolclass": NullPool,
-        "json_serializer": json.dumps,
-        "json_deserializer": json.loads,
-        "connect_args": {"statement_cache_size": 0},
+        "pool_size": 1,
+        "max_overflow": 3,
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+        "pool_timeout": 30,
     }
 
 engine = create_async_engine(
-    _db_url,
+    settings.database_url,
     echo=settings.debug,
     **_engine_kwargs,
 )
