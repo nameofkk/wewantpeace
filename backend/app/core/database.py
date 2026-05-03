@@ -90,37 +90,44 @@ def _to_transaction_mode_url(raw: str) -> str:
 #   - DuplicatePreparedStatementError 영구 해소
 #   - QueuePool timeout 영구 해소
 _raw_url = _os.environ.get("DATABASE_URL", "") or settings.database_url
-if not _is_sqlite and "pooler.supabase.com" in _raw_url:
-    _db_url = _to_transaction_mode_url(_raw_url)
-else:
-    _db_url = settings.database_url
 
-# PgBouncer/Supavisor transaction mode: prepared statement 캐시 비활성화 필수
-# json_serializer/deserializer: setup_asyncpg_json_codec 건너뜀 (prepared stmt 사용 방지)
-_pgbouncer_kwargs: dict = {
-    "json_serializer": json.dumps,
-    "json_deserializer": json.loads,
-    "connect_args": {"statement_cache_size": 0},
-}
+# ── 연결 모드 분기 ─────────────────────────────────────────────────────────
+# Backend: transaction mode(6543) + NullPool
+#   - NullPool: 요청마다 Supavisor에 새 연결 → prepared stmt 충돌 원천 차단
+#   - 15개 한도 문제 없음 (NullPool은 persistent 연결 0개)
+#
+# Worker: session mode(5432) + pool_size=1 per child
+#   - asyncpg prepared stmt 캐시 정상 동작 (PgBouncer 없음)
+#   - concurrency=4 → 최대 4개 연결 << 15
+if _is_worker or _is_sqlite:
+    # Worker: session mode (config.py가 5432 강제)
+    _db_url = settings.database_url
+else:
+    # Backend: transaction mode (6543) 강제 변환
+    if "pooler.supabase.com" in _raw_url:
+        _db_url = _to_transaction_mode_url(_raw_url)
+    else:
+        _db_url = settings.database_url
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
 elif _is_worker:
-    # Worker: pool_size=1 per child (concurrency=4 → 총 4개 연결)
+    # Worker: session mode, pool_size=1 per child (concurrency=4 → 총 4개)
     _engine_kwargs = {
         "pool_size": 1,
         "max_overflow": 0,
-        "pool_pre_ping": False,
+        "pool_pre_ping": True,
         "pool_recycle": 1800,
         "pool_timeout": 30,
-        **_pgbouncer_kwargs,
     }
 else:
-    # Backend: NullPool → SQLAlchemy 로컬 풀 없음, Supavisor가 전담
-    # 요청마다 새 연결 → prepared stmt 충돌 원천 차단
+    # Backend: transaction mode + NullPool
+    # json_serializer/deserializer: setup_asyncpg_json_codec 건너뜀 (prepared stmt 방지)
     _engine_kwargs = {
         "poolclass": NullPool,
-        **_pgbouncer_kwargs,
+        "json_serializer": json.dumps,
+        "json_deserializer": json.loads,
+        "connect_args": {"statement_cache_size": 0},
     }
 
 engine = create_async_engine(
