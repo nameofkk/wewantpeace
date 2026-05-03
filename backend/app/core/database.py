@@ -102,9 +102,8 @@ if not _is_sqlite:
         # PgBouncer transaction mode: prepared statements 비활성화 필수
         _connect_args["prepared_statement_cache_size"] = 0
         _connect_args["statement_cache_size"] = 0
-    if not _is_worker:
-        # Backend만 statement_timeout 적용 (worker 긴 쿼리 — calculate_tension 등 — 보호)
-        _connect_args.setdefault("server_settings", {})["statement_timeout"] = "120000"
+    # statement_timeout 제거: transaction mode에서 prepared stmt cache 없어 쿼리 느려짐
+    # /tension/mine 같은 복잡한 쿼리가 120s 초과 → 쿼리 최적화 전까지 timeout 없음
 
 _engine_kwargs: dict = {}
 if not _is_sqlite:
