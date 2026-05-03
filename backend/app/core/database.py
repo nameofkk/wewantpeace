@@ -68,10 +68,11 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 # transaction mode(6543/PgBouncer)는 asyncpg prepared statement 충돌 문제로 미사용
 import os as _os
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
-# worker: pool_size=1, max_overflow=0 → child당 최대 1개 연결 (concurrency=6 → 총 6개)
-# backend: pool_size=2, max_overflow=2 → 최대 4개 연결
-_pool_size = 1 if _is_worker else 2
-_max_overflow = 0 if _is_worker else 2
+# worker: pool_size=1, max_overflow=0 → child당 최대 1개 연결 (concurrency=4 → 총 4개)
+# backend: pool_size=1, max_overflow=1 → uvicorn 1 worker, 최대 2개 연결
+# 배포 롤링 오버랩 시: old 2 + new 2 + worker 4 = 8개 → 15개 한도 내 안전
+_pool_size = 1
+_max_overflow = 0 if _is_worker else 1
 
 _engine_kwargs: dict = {}
 if not _is_sqlite:
