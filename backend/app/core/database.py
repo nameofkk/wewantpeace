@@ -61,18 +61,49 @@ class UUIDArray(TypeDecorator):
         return [_uuid.UUID(v) for v in json.loads(value)]
 
 _is_sqlite = settings.database_url.startswith("sqlite")
-# Supabase Transaction mode pooler (포트 6543) — PgBouncer 사용
-# prepared_statement_cache_size=0 필수 (PgBouncer는 prepared statements 미지원)
+# Worker는 transaction mode(포트 6543)를 사용 — PgBouncer 연결 제한 없음.
+# config.py의 fix_db_url_scheme이 6543→5432 자동 전환하므로,
+# worker에서는 원본 DATABASE_URL 환경변수를 직접 읽어 6543 포트로 전환.
+# prepared_statement_cache_size=0 필수 (PgBouncer transaction mode는 prepared statements 미지원)
 import os as _os
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 _pool_size = 1 if _is_worker else 3
 _max_overflow = 0 if _is_worker else 2
-_connect_args = {}
+
+def _build_worker_db_url() -> str:
+    """Worker용 transaction mode URL 생성 (포트 6543).
+    WORKER_DATABASE_URL 환경변수 → 없으면 DATABASE_URL의 5432 → 6543 자동 전환."""
+    explicit = _os.environ.get("WORKER_DATABASE_URL", "")
+    if explicit:
+        url = explicit
+    else:
+        # 원본 DATABASE_URL에서 session mode(5432) → transaction mode(6543) 전환
+        url = _os.environ.get("DATABASE_URL", settings.database_url)
+        url = url.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543")
+    # postgres:// → postgresql+asyncpg:// 변환 (6543 포트 유지)
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://") and "+asyncpg" not in url:
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+if _is_worker:
+    _db_url = _build_worker_db_url()
+else:
+    _db_url = settings.database_url
+
+_is_transaction_mode = "pooler.supabase.com:6543" in _db_url
+
+_connect_args: dict = {}
 if not _is_sqlite:
-    # Supabase Session mode pooler에서 statement timeout 설정 필수 (120초 통일)
     _connect_args["server_settings"] = {"statement_timeout": "120000"}
+    if _is_transaction_mode:
+        # PgBouncer transaction mode: prepared statements 비활성화 필수
+        _connect_args["prepared_statement_cache_size"] = 0
+        _connect_args["statement_cache_size"] = 0
+
 engine = create_async_engine(
-    settings.database_url,
+    _db_url,
     echo=settings.debug,
     **({} if _is_sqlite else {
         "pool_size": _pool_size, "max_overflow": _max_overflow,
