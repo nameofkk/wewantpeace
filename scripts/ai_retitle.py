@@ -1,12 +1,15 @@
 """
-기존 클러스터에 GPT-4o-mini AI 제목 일괄 적용.
+기존 클러스터에 AI 제목 일괄 적용.
 
 실행:
   # dry-run (변경 없이 미리보기)
   DATABASE_URL=... .venv/bin/python3 scripts/ai_retitle.py --dry-run
 
-  # 프로덕션 적용
+  # 프로덕션 적용 (전체)
   DATABASE_URL=... .venv/bin/python3 scripts/ai_retitle.py
+
+  # 배치 제한 (100개만)
+  DATABASE_URL=... .venv/bin/python3 scripts/ai_retitle.py --limit 100
 """
 import asyncio
 import sys
@@ -19,6 +22,35 @@ from backend.app.core.database import AsyncSessionLocal
 from worker.processor.ai_title import generate_ai_title
 
 DRY_RUN = "--dry-run" in sys.argv
+
+# --limit N 파싱
+LIMIT = None
+for i, arg in enumerate(sys.argv):
+    if arg == "--limit" and i + 1 < len(sys.argv):
+        LIMIT = int(sys.argv[i + 1])
+
+
+def _generate_with_retry(events, topic, country_code, max_retries=3):
+    """rate limit 429 시 대기 후 재시도."""
+    import openai
+    for attempt in range(max_retries):
+        try:
+            return generate_ai_title(events, topic, country_code)
+        except openai.RateLimitError as e:
+            if attempt == max_retries - 1:
+                print(f"  ⚠ RateLimit 최대 재시도 초과, 건너뜀")
+                return None
+            # 에러 메시지에서 대기 시간 파싱
+            wait = 65
+            import re
+            m = re.search(r"try again in (\d+)m([\d.]+)s", str(e))
+            if m:
+                wait = int(m.group(1)) * 60 + float(m.group(2)) + 2
+            print(f"  ⏳ RateLimit — {wait:.0f}초 대기 후 재시도 ({attempt+1}/{max_retries})")
+            time.sleep(wait)
+        except Exception:
+            return None
+    return None
 
 
 async def main():
@@ -44,11 +76,12 @@ async def main():
                    OR title_ko LIKE '%습니다%'
                    OR title_ko LIKE '%입니다%'
                    OR length(title_ko) > 50)
-            ORDER BY id
+            ORDER BY is_active DESC, kscore DESC, id
         """))
-        clusters = r.fetchall()
+        all_clusters = r.fetchall()
+        clusters = all_clusters[:LIMIT] if LIMIT else all_clusters
         total = len(clusters)
-        print(f"재처리 대상 {total}개 클러스터 (dry_run={DRY_RUN})")
+        print(f"재처리 대상 {total}개 클러스터 (전체={len(all_clusters)}, limit={LIMIT}, dry_run={DRY_RUN})")
 
         for i, row in enumerate(clusters):
             cid, title, title_ko, topic, country_code = row
@@ -71,7 +104,7 @@ async def main():
                 skipped += 1
                 continue
 
-            result = generate_ai_title(event_titles, topic, country_code)
+            result = _generate_with_retry(event_titles, topic, country_code)
 
             if result:
                 new_en, new_ko = result
