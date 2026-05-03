@@ -67,8 +67,8 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 # prepared_statement_cache_size=0 필수 (PgBouncer transaction mode는 prepared statements 미지원)
 import os as _os
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
-_pool_size = 1 if _is_worker else 3
-_max_overflow = 0 if _is_worker else 2
+_pool_size = 1 if _is_worker else 5
+_max_overflow = 0 if _is_worker else 5
 
 def _build_worker_db_url() -> str:
     """Worker용 transaction mode URL 생성 (포트 6543).
@@ -107,7 +107,7 @@ engine = create_async_engine(
     echo=settings.debug,
     **({} if _is_sqlite else {
         "pool_size": _pool_size, "max_overflow": _max_overflow,
-        "pool_pre_ping": True, "pool_recycle": 1800, "pool_timeout": 10,
+        "pool_pre_ping": True, "pool_recycle": 1800, "pool_timeout": 30,
         "connect_args": _connect_args,
     }),
 )
