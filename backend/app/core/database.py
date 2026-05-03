@@ -106,14 +106,24 @@ if not _is_sqlite:
         # Backend만 statement_timeout 적용 (worker 긴 쿼리 — calculate_tension 등 — 보호)
         _connect_args.setdefault("server_settings", {})["statement_timeout"] = "120000"
 
+_engine_kwargs: dict = {}
+if not _is_sqlite:
+    _engine_kwargs = {
+        "pool_size": _pool_size, "max_overflow": _max_overflow,
+        "pool_pre_ping": not _is_transaction_mode,  # transaction mode에서 pre_ping 비활성화
+        "pool_recycle": 1800, "pool_timeout": 30,
+        "connect_args": _connect_args,
+    }
+    if _is_transaction_mode:
+        # PgBouncer transaction mode: JSON codec 초기화 시 prepared statement 사용 방지
+        # json_serializer/deserializer 명시 → setup_asyncpg_json_codec 건너뜀
+        _engine_kwargs["json_serializer"] = json.dumps
+        _engine_kwargs["json_deserializer"] = json.loads
+
 engine = create_async_engine(
     _db_url,
     echo=settings.debug,
-    **({} if _is_sqlite else {
-        "pool_size": _pool_size, "max_overflow": _max_overflow,
-        "pool_pre_ping": True, "pool_recycle": 1800, "pool_timeout": 30,
-        "connect_args": _connect_args,
-    }),
+    **_engine_kwargs,
 )
 
 AsyncSessionLocal = async_sessionmaker(
