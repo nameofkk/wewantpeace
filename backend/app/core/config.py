@@ -18,12 +18,14 @@ class Settings(BaseSettings):
     @classmethod
     def fix_db_url_scheme(cls, v: str) -> str:
         """Railway는 postgres:// 또는 postgresql:// 형태로 제공 → asyncpg 드라이버로 변환.
-        Transaction mode(6543) → Session mode(5432) 자동 전환 (prepared statement 호환)."""
+        Backend는 session mode(5432) 유지 (prepared statement 호환).
+        Worker는 WORKER_DATABASE_URL로 transaction mode(6543) 별도 사용."""
         if v.startswith("postgres://"):
             v = v.replace("postgres://", "postgresql+asyncpg://", 1)
         elif v.startswith("postgresql://"):
             v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
-        # PgBouncer Transaction mode → Session mode 전환 (prepared statement 문제 방지)
+        # Backend용: PgBouncer Transaction mode → Session mode 전환 (prepared statement 문제 방지)
+        # Worker는 WORKER_DATABASE_URL 환경변수를 별도로 사용하므로 여기서는 변환
         if "pooler.supabase.com:6543" in v:
             v = v.replace("pooler.supabase.com:6543", "pooler.supabase.com:5432")
         return v
