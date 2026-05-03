@@ -61,34 +61,36 @@ class UUIDArray(TypeDecorator):
         return [_uuid.UUID(v) for v in json.loads(value)]
 
 _is_sqlite = settings.database_url.startswith("sqlite")
-# Worker는 transaction mode(포트 6543)를 사용 — PgBouncer 연결 제한 없음.
-# config.py의 fix_db_url_scheme이 6543→5432 자동 전환하므로,
-# worker에서는 원본 DATABASE_URL 환경변수를 직접 읽어 6543 포트로 전환.
-# prepared_statement_cache_size=0 필수 (PgBouncer transaction mode는 prepared statements 미지원)
+# ── DB 연결 전략 ──────────────────────────────────────────────────────────────
+# Supabase session mode(5432): 전체 15개 연결 한도 → backend+worker 합산 초과 위험
+# Supabase transaction mode(6543): PgBouncer 경유, 연결 한도 없음 → backend+worker 모두 사용
+#
+# 따라서 backend와 worker 모두 transaction mode를 사용한다.
+# config.py의 fix_db_url_scheme이 6543→5432로 강제 변환하므로,
+# 여기서는 환경변수 원본을 직접 읽어 6543으로 전환한다.
+# prepared_statement_cache_size=0 필수 (PgBouncer는 prepared statements 미지원)
 import os as _os
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 _pool_size = 1 if _is_worker else 5
 _max_overflow = 0 if _is_worker else 5
 
-def _build_worker_db_url() -> str:
-    """Worker용 transaction mode URL 생성 (포트 6543).
-    WORKER_DATABASE_URL 환경변수 → 없으면 DATABASE_URL의 5432 → 6543 자동 전환."""
-    explicit = _os.environ.get("WORKER_DATABASE_URL", "")
-    if explicit:
-        url = explicit
-    else:
-        # 원본 DATABASE_URL에서 session mode(5432) → transaction mode(6543) 전환
-        url = _os.environ.get("DATABASE_URL", settings.database_url)
-        url = url.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543")
-    # postgres:// → postgresql+asyncpg:// 변환 (6543 포트 유지)
+
+def _to_transaction_mode_url(raw: str) -> str:
+    """URL을 Supabase transaction mode(6543, PgBouncer)로 강제 변환."""
+    url = raw
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://", 1)
     elif url.startswith("postgresql://") and "+asyncpg" not in url:
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # session mode → transaction mode
+    url = url.replace("pooler.supabase.com:5432", "pooler.supabase.com:6543")
     return url
 
-if _is_worker:
-    _db_url = _build_worker_db_url()
+
+# 원본 DATABASE_URL에서 직접 변환 (config.py의 5432 강제변환 우회)
+_raw_url = _os.environ.get("DATABASE_URL", "") or settings.database_url
+if not _is_sqlite and "pooler.supabase.com" in _raw_url:
+    _db_url = _to_transaction_mode_url(_raw_url)
 else:
     _db_url = settings.database_url
 
@@ -96,11 +98,13 @@ _is_transaction_mode = "pooler.supabase.com:6543" in _db_url
 
 _connect_args: dict = {}
 if not _is_sqlite:
-    _connect_args["server_settings"] = {"statement_timeout": "120000"}
     if _is_transaction_mode:
         # PgBouncer transaction mode: prepared statements 비활성화 필수
         _connect_args["prepared_statement_cache_size"] = 0
         _connect_args["statement_cache_size"] = 0
+    if not _is_worker:
+        # Backend만 statement_timeout 적용 (worker 긴 쿼리 — calculate_tension 등 — 보호)
+        _connect_args.setdefault("server_settings", {})["statement_timeout"] = "120000"
 
 engine = create_async_engine(
     _db_url,
