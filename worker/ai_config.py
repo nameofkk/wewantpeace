@@ -9,6 +9,7 @@ OpenAI 유지 (gpt-4o-mini): newsletter, impact, monitor (~60/day)
 """
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,25 @@ elif OPENAI_API_KEY:
     logger.info("AI 클라이언트: OpenAI (gpt-4o-mini) 사용")
 else:
     logger.warning("AI API 키 미설정 — AI 기능 비활성")
+
+# ── 서킷 브레이커 (일일 토큰 한도 소진 시 자동 차단) ──────────────────────────
+_rate_limited_until: float = 0.0
+
+
+def mark_rate_limited(retry_after_seconds: float) -> None:
+    """429 TPD 발생 시 호출 — 지정 시간 동안 AI 호출을 전면 차단."""
+    global _rate_limited_until
+    _rate_limited_until = time.monotonic() + retry_after_seconds
+    logger.warning(
+        "Groq 일일 토큰 한도 소진 — %.0f초(%.1f분) 동안 AI 호출 중단",
+        retry_after_seconds,
+        retry_after_seconds / 60,
+    )
+
+
+def is_rate_limited() -> bool:
+    """현재 서킷 브레이커가 열려 있으면 True."""
+    return time.monotonic() < _rate_limited_until
 
 
 def get_client(timeout: float = 30.0):
@@ -49,5 +69,7 @@ def get_model() -> str:
 
 
 def is_available() -> bool:
-    """AI 기능 사용 가능 여부."""
+    """AI 기능 사용 가능 여부. 서킷 브레이커 차단 중이면 False."""
+    if is_rate_limited():
+        return False
     return bool(GROQ_API_KEY or OPENAI_API_KEY)

@@ -18,7 +18,7 @@ _TRANSLATION_STYLE_RE = re.compile(
     r"|에서의 |으로의 |, 그리고 )$"
 )
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited
 
 _SYSTEM_PROMPT = """\
 You are a concise news headline writer for a Korean conflict/crisis monitoring app.
@@ -175,6 +175,18 @@ def generate_ai_title(
             title_ko = title_ko[:78] + "…"
         logger.info("AI 제목 생성: en=%s / ko=%s", title_en[:50], title_ko)
         return title_en, title_ko
-    except Exception:
+    except Exception as _exc:
+        # 일일 토큰 한도 429 → 서킷 브레이커 (트레이스백 스팸 없이 조용히 차단)
+        try:
+            from openai import RateLimitError as _RateLimitError
+            if isinstance(_exc, _RateLimitError):
+                _wait = 86400.0
+                _m = re.search(r"try again in (\d+)m([\d.]+)s", str(_exc))
+                if _m:
+                    _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
+                _mark_rate_limited(_wait)
+                return None
+        except Exception:
+            pass
         logger.exception("AI 제목 생성 실패")
         return None
