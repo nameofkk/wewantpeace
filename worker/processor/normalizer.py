@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited
 
 if not _ai_available():
     logger.warning("AI key not set — falling back to keyword classification")
@@ -213,7 +213,19 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
 
         return topic, sub_topic, severity, ai_country
 
-    except Exception:
+    except Exception as _exc:
+        # 일일 토큰 한도 429 → 서킷 브레이커 (트레이스백 스팸 없이 조용히 차단)
+        try:
+            from openai import RateLimitError as _RateLimitError
+            if isinstance(_exc, _RateLimitError):
+                _wait = 86400.0
+                _m = re.search(r"try again in (\d+)m([\d.]+)s", str(_exc))
+                if _m:
+                    _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
+                _mark_rate_limited(_wait)
+                return None
+        except Exception:
+            pass
         logger.exception("AI 분류 실패 (제목: %s)", title[:80])
         return None
 
