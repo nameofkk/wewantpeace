@@ -8,6 +8,6 @@
     "numReplicas": 1,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
-    "startCommand": "sh -c 'cd /app && python3 scripts/create_indexes.py; sleep infinity'"
+    "startCommand": "sh -c 'cd /app && python3 scripts/create_indexes.py || true && celery -A worker.celery_app worker --beat --loglevel=info -Q collect,process -c 4'"
   }
 }
