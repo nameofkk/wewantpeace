@@ -67,35 +67,43 @@ _is_sqlite = settings.database_url.startswith("sqlite")
 _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 
 # ── DB 연결 전략 ──────────────────────────────────────────────────────────────
-# Supabase session mode(5432) 사용.
-# asyncpg + Supavisor transaction mode(6543)는 DEALLOCATE ALL 미실행으로
-# DuplicatePreparedStatementError 발생 → session mode가 유일하게 안정적인 선택.
+# Supabase transaction mode(6543) + PgBouncer 사용.
+# - prepared_statement_cache_size=0: DuplicatePreparedStatementError 방지
+#   (transaction mode에서 connection이 재사용되면 prepared statement 충돌 발생)
+# - PgBouncer가 connection을 효율적으로 풀링 → session mode 20개 한도 문제 해소
 #
-# 연결 수 설계 (Supabase 한도 15개):
-#   backend:  uvicorn 1worker × (pool_size=1 + overflow=3) = 최대 4개
-#   worker:   celery -c 4 × pool_size=1                   = 4개
-#   일반 idle: 1 + 4 = 5개  /  최대 burst: 4+4=8개
-#   배포 오버랩: old(4) + new(4) + worker(4) = 12개 << 15 ✓
+# 연결 수 설계:
+#   backend + worker가 N개 연결을 요청해도 PgBouncer가 소수의 실제 PG 연결로 처리
+#   → Supabase 내부 18개 + 앱 코드 수십 개 요청 모두 문제없음
+
+_txn_mode_connect_args: dict = {}
+if not _is_sqlite:
+    # asyncpg: prepared statement 캐시 비활성화 (transaction mode pooler 필수)
+    _txn_mode_connect_args = {
+        "server_settings": {"prepared_statement_cache_size": "0"}
+    }
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
 elif _is_worker:
-    # Worker: child당 1개 연결 (concurrency=4 → 총 4개)
+    # Worker: child당 1개 연결 (concurrency=4)
     _engine_kwargs = {
         "pool_size": 1,
-        "max_overflow": 0,
+        "max_overflow": 2,
         "pool_pre_ping": True,
         "pool_recycle": 1800,
         "pool_timeout": 30,
+        "connect_args": _txn_mode_connect_args,
     }
 else:
-    # Backend: uvicorn 1 worker, 최대 4개 연결 (burst 허용)
+    # Backend: uvicorn 1 worker
     _engine_kwargs = {
-        "pool_size": 1,
-        "max_overflow": 3,
+        "pool_size": 2,
+        "max_overflow": 4,
         "pool_pre_ping": True,
         "pool_recycle": 1800,
         "pool_timeout": 30,
+        "connect_args": _txn_mode_connect_args,
     }
 
 engine = create_async_engine(
