@@ -16,8 +16,11 @@ down_revision = "0057"
 def upgrade() -> None:
     # cluster_key + window_end 복합 인덱스 — clusterer.py 핵심 조회 쿼리용
     # WHERE cluster_key=? AND window_end >= ? ORDER BY last_event_at DESC
+    # CONCURRENTLY 제거: alembic은 transaction 내에서 실행되므로
+    # CONCURRENTLY는 "cannot run inside a transaction block" 에러 발생.
+    # IF NOT EXISTS로 멱등성 보장.
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ic_key_window_lastev "
+        "CREATE INDEX IF NOT EXISTS idx_ic_key_window_lastev "
         "ON issue_clusters (cluster_key, window_end DESC, last_event_at DESC)"
     )
 
