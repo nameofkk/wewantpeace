@@ -79,9 +79,9 @@ _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 _txn_mode_connect_args: dict = {}
 if not _is_sqlite:
     # asyncpg: prepared statement 캐시 비활성화 (transaction mode pooler 필수)
-    _txn_mode_connect_args = {
-        "server_settings": {"prepared_statement_cache_size": "0"}
-    }
+    # statement_cache_size=0 → asyncpg 클라이언트 측 캐시 비활성화
+    # (server_settings가 아닌 asyncpg connect() 파라미터)
+    _txn_mode_connect_args = {"statement_cache_size": 0}
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
