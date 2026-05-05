@@ -127,8 +127,10 @@ def collect_telegram(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트", total)
@@ -177,8 +179,10 @@ def collect_rss(self):
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
                 if all_ids:
-                    for raw_id in all_ids:
+                    for i, raw_id in enumerate(all_ids):
                         process_raw_event.delay(raw_id)
+                        if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                            await asyncio.sleep(0.5)
                     logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
                 else:
                     logger.info("RSS 수집 완료: 총 %d개 새 이벤트", total)
@@ -230,8 +234,10 @@ def collect_gdelt(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("GDELT 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("GDELT 수집 완료: 총 %d개", total)
@@ -278,8 +284,10 @@ def collect_acled(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("ACLED 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("ACLED 수집 완료: 총 %d개", total)
@@ -326,8 +334,10 @@ def collect_reliefweb(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("ReliefWeb 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("ReliefWeb 수집 완료: 총 %d개", total)
@@ -373,8 +383,10 @@ def collect_usgs(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("USGS 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("USGS 수집 완료: 새 이벤트 없음")
@@ -438,8 +450,10 @@ def collect_travel_advisory(self):
                 except Exception:
                     await db.rollback()
                     raise
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 # 소스별 통계 로깅
                 for r in all_results:
                     logger.info(
@@ -1246,8 +1260,10 @@ def retry_unprocessed(self):
             logger.info("미처리 raw_events 없음 — skip")
             return {"queued": 0}
 
-        for raw_id in ids:
+        for i, raw_id in enumerate(ids):
             process_raw_event.delay(raw_id)
+            if (i + 1) % 50 == 0 and i + 1 < len(ids):
+                await asyncio.sleep(0.5)
         logger.info("미처리 raw_events %d건 → process_raw_event 큐 등록", len(ids))
         return {"queued": len(ids)}
 
@@ -1399,10 +1415,11 @@ def process_pending_raw_events(self):
                 if not ids:
                     break
 
-            # 배치 디스패치
+            # 배치 디스패치 (50개마다 0.5초 지연 → Groq TPM 보호)
             for raw_id in ids:
                 process_raw_event.delay(raw_id)
                 dispatched += 1
+            await asyncio.sleep(1.0)  # 배치 간 1초 대기
 
             logger.info(
                 "process_pending: 배치 디스패치 %d건 (누적 %d/%d)",
@@ -4287,8 +4304,10 @@ def collect_ucdp(self):
                         if raw_ev.id:
                             all_ids.append(str(raw_ev.id))
                 await db.commit()
-                for raw_id in all_ids:
+                for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
+                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(0.5)
                 logger.info("UCDP 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("UCDP 수집 완료: 새 이벤트 없음")

@@ -395,27 +395,31 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "political unrest", "social unrest", "civil unrest",
     ],
     "diplomacy": [
+        # 명확한 외교 행위 (2개 이상 필요)
         "diplomat", "embassy", "treaty", "agreement", "summit",
         "negotiation", "peace deal", "sanctions lifted", "talks",
-        "president", "minister", "government", "election", "court", "supreme court",
-        "ruling", "law", "policy", "administration", "parliament",
-        "national assembly", "legislature", "congress", "senate",
-        "opposition", "political crisis", "arrested", "detained",
+        "election", "political crisis",
         # 외교/국제관계
         "foreign affairs", "foreign minister", "foreign ministry",
         "international law", "diplomatic", "bilateral", "multilateral",
         "ending war", "end the war", "peace process", "peace effort",
         "war crimes", "accountability", "ceasefire talks",
         "rapid support forces", "rsf", "paramilitary",
-        "flouting", "accuses", "accused of",
-        # 정치 위기
+        # 정치 위기 (구체적인 것만)
         "impeachment", "impeached", "indictment", "indicted",
         "resignation", "expelled", "recalled ambassador",
         "diplomatic crisis", "severed ties", "recalled envoy",
         "persona non grata", "expelled diplomats",
         # 지도자 교체 · 정치 전환
         "supreme leader", "successor", "appointed leader",
-        "assembly of experts", "political transition", "regime change",
+        "assembly of experts", "political transition",
+        # 제거된 너무 일반적인 키워드:
+        # "president", "minister", "government", "court", "supreme court",
+        # "ruling", "law", "policy", "administration", "parliament",
+        # "national assembly", "legislature", "congress", "senate",
+        # "opposition", "arrested", "detained", "regime change",
+        # "flouting", "accuses", "accused of"
+        # → 위 단어들이 단독으로 diplomacy를 결정하면 비군사 기사가 과분류됨
     ],
     "maritime": [
         "naval", "ship", "vessel", "strait", "blockade", "coast guard",
@@ -1792,7 +1796,9 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "invasion", "invade", "armed conflict", "military conflict",
                   "weapons transfer", "arms transfer",
                   "nuclear", "explosion", "troops deployed", "war zone",
-                  "war",  # 대부분의 "war" 기사는 실제 분쟁
+                  # "war" 단독 제거 — "trade war", "drug war", "culture war" 오분류 방지
+                  # 대신 구체적 군사 표현만 STRONG 유지
+                  "at war", "state of war", "act of war", "declaration of war",
                   "airstrike", "airstrikes", "ground invasion", "naval strike",
                   "military operation",
                   # WMD · 극단적 폭력
@@ -1816,7 +1822,10 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "revolution", "general strike", "civil disobedience"},
     "diplomacy": {"summit", "peace deal", "peace process", "treaty", "bilateral",
                   "diplomatic", "foreign minister", "foreign ministry",
-                  "impeachment", "impeached", "diplomatic crisis"},
+                  "impeachment", "impeached", "diplomatic crisis",
+                  "ceasefire talks", "peace talks", "peace negotiations",
+                  "diplomatic talks", "trade deal", "nuclear deal",
+                  "sanctions agreement", "sanctions lifted"},
     "coup":      {"coup", "junta", "seized power", "military takeover",
                   "martial law", "deposed", "detained president",
                   "insurrection", "sedition", "constitutional crisis",
@@ -1874,6 +1883,11 @@ def _has_terror_diplomatic_context(text: str) -> bool:
 
 # 비군사 문맥 패턴 — 이 패턴이 있으면 conflict/terror weak 키워드를 무효화
 _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+    # 비군사적 "war" 표현 — trade war, culture war 등이 conflict로 오분류되는 것 방지
+    r"\b(trade|tariff|currency|price|drug|culture|information|cyber|star|cold|price|turf|gang)\s+war\b",
+    r"\b(war on|war against)\s+(drugs|poverty|cancer|climate|inflation|terror\b)",
+    r"\bprice\s+war\b",
+    r"\bculture\s+war(s)?\b",
     # 개인 사망 (자살, 병사, 사고사)
     r"killed (him|her|them)self",
     r"took (his|her|their) (own )?life",
@@ -2099,10 +2113,18 @@ def _kw_in_text(kw: str, text: str) -> bool:
 def _classify_topic(text: str) -> str:
     """
     키워드 매칭으로 topic 분류.
-    - 강력 키워드: 1개만 매칭돼도 분류
-    - 일반 키워드: 2개 이상 매칭 필요 (오분류 방지)
-    - coup / cyber / maritime: 1개도 충분 (도메인이 좁음)
-    - 비군사 문맥(개인사망, 스포츠, 엔터)이면 conflict/terror 약한 키워드 무효화
+
+    점수 체계:
+    - STRONG 키워드: 1개 = 3점 (즉시 강력 신호)
+    - weak 키워드 임계값:
+      - coup / cyber / maritime / disaster / health / sanctions: 1개 (도메인 좁음)
+      - conflict / terror / protest: 2개 이상
+      - diplomacy: 3개 이상 (너무 광범위한 키워드 보유 → 과분류 방지)
+        단, diplomacy STRONG이 있으면 별도 3점 가산 → STRONG 1개로도 분류 가능
+
+    비군사 문맥 (개인사망, 스포츠, 엔터, trade war 등):
+    - conflict / terror weak 키워드 무효화
+    - "war" 단독은 비군사 문맥이면 conflict 기여 제거
     """
     text_lower = text.lower()
     non_military = _has_non_military_context(text_lower)
@@ -2130,16 +2152,33 @@ def _classify_topic(text: str) -> str:
         if topic == "terror" and terror_diplomatic:
             weak_hits = 0
 
-        # coup / cyber / maritime / disaster / health는 도메인이 좁아 1개도 충분
+        # 토픽별 weak 임계값 적용
         if topic in ("coup", "cyber", "maritime", "sanctions", "disaster", "health"):
+            # 도메인이 좁아 1개도 충분
             if weak_hits:
                 scores[topic] = scores.get(topic, 0) + weak_hits
+        elif topic == "diplomacy":
+            # diplomacy 키워드는 너무 광범위 → STRONG 없으면 3개 이상 필요
+            # (STRONG은 이미 위에서 3점 가산됨)
+            if weak_hits >= 3:
+                scores[topic] = scores.get(topic, 0) + weak_hits
         else:
-            # conflict / terror / diplomacy / protest는 2개 이상 필요
+            # conflict / terror / protest: 2개 이상 필요
             if weak_hits >= 2:
                 scores[topic] = scores.get(topic, 0) + weak_hits
 
-    return max(scores, key=lambda t: scores[t]) if scores else "unknown"
+    # 동점 시 특이 토픽 우선: conflict > terror > coup > sanctions > cyber > maritime > disaster > health > protest > diplomacy > unknown
+    _PRIORITY = {
+        "conflict": 10, "terror": 9, "coup": 8, "sanctions": 7,
+        "cyber": 6, "maritime": 5, "disaster": 4, "health": 3,
+        "protest": 2, "diplomacy": 1, "unknown": 0,
+    }
+    if not scores:
+        return "unknown"
+    max_score = max(scores.values())
+    # 최고 점수 토픽들 중 우선순위 높은 것 선택
+    top_topics = [t for t, s in scores.items() if s == max_score]
+    return max(top_topics, key=lambda t: _PRIORITY.get(t, 0))
 
 
 def _calculate_severity(text: str, topic: str, title: str | None = None) -> int:
