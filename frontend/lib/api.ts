@@ -694,11 +694,12 @@ export function useImpactSummary(homeCountry?: string, lang?: string, enabled = 
     placeholderData: keepPreviousData,
     retry: (count, error) => {
       const status = (error as any)?.status;
-      if (status === 401) return false;
-      if ([429, 500, 503].includes(status) && count < 1) return true;
-      return false;
+      // 인증 에러는 재시도 의미 없음
+      if (status === 401 || status === 403) return false;
+      // 최대 3회 재시도 (콜드스타트, 502, 네트워크 에러 등 포함)
+      return count < 3;
     },
-    retryDelay: 1500,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 8000),
   });
 }
 

@@ -154,13 +154,27 @@ function ReportContent() {
   const completedTours = useAppStore((s) => s.completedTours);
   const patchPrefs = usePatchPreferences();
 
+  // Zustand persist hydration guard:
+  // localStorage 복원 완료 전에 homeCountry="" 로 API 호출하면 홈 첫 로딩 에러 발생.
+  // persist.hasHydrated()가 true가 될 때까지 쿼리를 비활성화해 정확한 homeCountry로 한 번만 호출.
+  const [storeHydrated, setStoreHydrated] = useState(
+    () => useAppStore.persist.hasHydrated()
+  );
+  useEffect(() => {
+    if (useAppStore.persist.hasHydrated()) {
+      setStoreHydrated(true);
+      return;
+    }
+    return useAppStore.persist.onFinishHydration(() => setStoreHydrated(true));
+  }, []);
+
   usePageTitle(lang, "tab_home");
   const { data: me, isLoading: meLoading } = useMe();
   const meObj = me as { plan?: string; nickname?: string; display_name?: string } | undefined;
   const userPlan = meObj?.plan ?? "free";
   const nickname = meObj?.nickname || meObj?.display_name || (lang === "ko" ? "사용자" : "User");
 
-  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang);
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang, storeHydrated);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
   const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
@@ -302,7 +316,8 @@ function ReportContent() {
     } as TrendingItem));
   }, [summary, lang]);
 
-  if (summaryLoading) {
+  // 하이드레이션 미완료 또는 로딩 중 → 스켈레톤
+  if (!storeHydrated || summaryLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
