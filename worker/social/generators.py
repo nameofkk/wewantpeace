@@ -258,6 +258,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         body = f"🌍 {en_title}\n\n🌍 {ko_title}"
 
     body = _clean_markdown(body)
+    body = body + f"\n\n⚠️ Severity {max_severity}/100"
     if len(body) > 500:
         body = body[:497] + "..."
 
@@ -332,6 +333,7 @@ async def generate_kscore_alert(
         body = f"🚨 {title_en}\n\n🚨 {title_ko}"
 
     body = _clean_markdown(body)
+    body = body + f"\n\n⚠️ Severity {cluster.severity}/100"
     if len(body) > 500:
         body = body[:497] + "..."
 
@@ -425,6 +427,8 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
         )
 
     body = _clean_markdown(body)
+    top_severity = int(country_stats[0].avg_severity) if country_stats else 0
+    body = body + f"\n\n⚠️ Severity {top_severity}/100"
     if len(body) > 500:
         body = body[:497] + "..."
 
