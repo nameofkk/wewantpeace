@@ -41,14 +41,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   }
 
   const title = isEn ? (issue.title || issue.title_ko || "Issue") : (issue.title_ko || issue.title || "이슈");
-  // 카카오톡: og:title이 길면 description이 완전히 숨겨짐
-  // 영어 글자는 좁아서 35자까지 허용, 한국어는 25자
-  const maxOgTitle = isEn ? 35 : 25;
-  let ogTitle: string = title;
-  if (title.length > maxOgTitle) {
-    const cut = title.lastIndexOf(" ", maxOgTitle);
-    ogTitle = (cut > 8 ? title.slice(0, cut) : title.slice(0, maxOgTitle)) + "…";
-  }
+  const ogTitle = title;
 
   const langSuffix = isEn ? "?lang=en" : "";
   const ogImage = `${SITE_URL}/issues/${issue.id}/og${langSuffix}`;
