@@ -354,24 +354,30 @@ def build_tension_table_html(rows: list, lang: str, target_cc: str = "KR") -> st
 
 
 def build_todays_brief_html(items: list, lang: str) -> str:
-    """Vol.1 스타일: 번호 뱃지 + 컬러 보더 카드 + desc."""
+    """Vol.1 스타일: 번호 뱃지 + 컬러 보더 카드 + desc. 빈 title은 건너뜀."""
     colors = ["#dc2626", "#dc2626", "#18181b"]
     bgs = ["#fef2f2", "#fef2f2", "#fafafa"]
     html = []
+    idx = 0  # 실제 렌더 순번 (title 있는 항목만)
     for i, (title, desc) in enumerate(items[:3]):
-        c, bg = colors[i], bgs[i]
+        if not title:
+            continue  # 빈 GPT 결과 skip — 뱃지만 나오는 문제 방지
+        c, bg = colors[min(idx, 2)], bgs[min(idx, 2)]
+        badge_num = idx + 1
         desc_html = f'<p style="font-size:11px;color:#71717a;margin:4px 0 0;line-height:1.5;">{desc}</p>' if desc else ""
         html.append(
             f'<tr><td style="border-radius:6px;background:{bg};padding:10px 14px;border-left:3px solid {c};">'
             f'<p style="font-size:14px;color:#27272a;margin:0;line-height:1.7;">'
             f'<span style="display:inline-block;font-weight:700;text-align:center;font-size:10px;vertical-align:middle;'
-            f'color:#fff;background:{c};border-radius:50%;margin-right:4px;width:18px;height:18px;line-height:18px;">{i+1}</span>'
+            f'color:#fff;background:{c};border-radius:50%;margin-right:4px;width:18px;height:18px;line-height:18px;">{badge_num}</span>'
             f'<span style="color:#27272a;">{title}</span></p>{desc_html}</td></tr>'
             f'<tr><td height="8"></td></tr>')
+        idx += 1
     return "\n".join(html)
 
 
 def build_conflict_stories_html(clusters: list, lang: str, vol: int = 1) -> str:
+    """각 카드를 <tr><td> 로 래핑 — 이메일 테이블 컨텍스트에서 올바른 DOM 위치 유지."""
     if not clusters: return ""
     is_kr = lang == "kr"
 
@@ -380,7 +386,7 @@ def build_conflict_stories_html(clusters: list, lang: str, vol: int = 1) -> str:
     label_sets_en = [("TOP STORY", "Weekly"), ("BREAKING", "ONGOING"), ("ESCALATING", "WATCH")]
     labels = (label_sets_kr if is_kr else label_sets_en)[vol % 3]
 
-    html = []
+    rows = []
     for i, cluster in enumerate(clusters[:5]):
         title, title_ko, cc, sev, kscore, event_count, image_url = cluster
         flag = get_flag(cc)
@@ -401,61 +407,86 @@ def build_conflict_stories_html(clusters: list, lang: str, vol: int = 1) -> str:
         tag = labels[0] if i == 0 else labels[1]
         tag_bg = "#dc2626" if i == 0 else "#71717a"
 
-        # 첫 번째 = 큰 카드
+        # 첫 번째 = 큰 카드 (이미지 포함)
         if i == 0:
-            img_html = f'<img src="{image_url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:6px 6px 0 0;" alt="">' if image_url else ""
-            why_html = f'<div style="margin-top:8px;padding:8px 10px;background:#fff5f5;border-radius:4px;font-size:11px;color:#dc2626;font-weight:600;">{"왜 중요해요?" if is_kr else "Why it matters?"} {why}</div>' if why else ""
-            html.append(
-                f'<div style="margin-bottom:16px;border-radius:8px;border:1px solid #e5e5e5;overflow:hidden;">'
-                f'{img_html}'
-                f'<div style="padding:14px 16px;">'
+            img_html = (
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+                f'<tr><td style="padding:0;">'
+                f'<img src="{image_url}" style="display:block;width:100%;max-width:100%;height:auto;border:0;" alt="">'
+                f'</td></tr></table>'
+            ) if image_url else ""
+            why_html = (
+                f'<p style="margin:8px 0 0;padding:8px 10px;background:#fff5f5;border-radius:4px;font-size:11px;color:#dc2626;font-weight:600;">'
+                f'{"왜 중요해요?" if is_kr else "Why it matters?"} {why}</p>'
+            ) if why else ""
+            inner = (
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                f'style="border-radius:8px;border:1px solid #e5e5e5;overflow:hidden;">'
+                f'<tr><td>{img_html}</td></tr>'
+                f'<tr><td style="padding:14px 16px;">'
+                f'<p style="margin:0;">'
                 f'<span style="background:{tag_bg};color:white;padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;">{tag}</span>'
-                f'<div style="font-weight:bold;font-size:15px;margin:8px 0 4px;">{flag} {display[:80]}</div>'
-                f'<div style="display:flex;gap:8px;align-items:center;">'
+                f'</p>'
+                f'<p style="font-weight:bold;font-size:15px;margin:8px 0 4px;">{flag} {display[:80]}</p>'
+                f'<p style="margin:0;">'
                 f'<span style="background:{color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;">{"심각도" if is_kr else "Severity"} {min(sev, 100)}</span>'
-                f'<span style="color:#666;font-size:11px;">{ev_l}</span></div>'
+                f'<span style="color:#666;font-size:11px;margin-left:8px;">{ev_l}</span>'
+                f'</p>'
                 f'{why_html}'
-                f'</div></div>')
+                f'</td></tr></table>'
+            )
+            rows.append(f'<tr><td style="background:#fff;padding:0 28px 16px;">{inner}</td></tr>')
         else:
-            why_span = f' · <span style="color:#dc2626;font-size:10px;">{why}</span>' if why else ""
-            html.append(
-                f'<div style="margin-bottom:10px;padding:10px 12px;border-left:3px solid {color};background:{bg};">'
+            why_html = (
+                f'<p style="font-size:10px;color:#dc2626;margin:2px 0 0;">{why}</p>'
+            ) if why else ""
+            inner = (
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                f'style="border-radius:6px;border:1px solid #e5e5e5;border-left:3px solid {color};background:{bg};">'
+                f'<tr><td style="padding:10px 12px;">'
+                f'<p style="margin:0;">'
                 f'<span style="background:{tag_bg};color:white;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.5px;">{tag}</span>'
-                f'<div style="font-weight:bold;margin:4px 0 2px;">{flag} {display[:80]}</div>'
-                f'<div style="display:flex;gap:8px;align-items:center;">'
+                f'</p>'
+                f'<p style="font-weight:bold;font-size:13px;margin:4px 0 2px;">{flag} {display[:80]}</p>'
+                f'<p style="margin:0;">'
                 f'<span style="background:{color};color:white;padding:2px 8px;border-radius:12px;font-size:11px;">{"심각도" if is_kr else "Severity"} {min(sev, 100)}</span>'
-                f'<span style="color:#666;font-size:11px;">{ev_l}</span>{why_span}</div></div>')
-    return "\n".join(html)
+                f'<span style="color:#666;font-size:11px;margin-left:8px;">{ev_l}</span>'
+                f'</p>'
+                f'{why_html}'
+                f'</td></tr></table>'
+            )
+            rows.append(f'<tr><td style="background:#fff;padding:0 28px 10px;">{inner}</td></tr>')
+    return "\n".join(rows)
 
 
 def build_energy_html(intro: str, p1: str, p2: str, p3: str, oil_price, oil_change, lang: str) -> str:
-    """Vol.1 스타일: 인트로 + 가격카드 + 서술 단락."""
+    """Vol.1 스타일: 인트로 + 가격카드 + 서술 단락. <tr><td> 래핑으로 이메일 테이블 DOM 정확히 배치."""
     price_str = f"${oil_price:.0f}" if oil_price else "N/A"
     change_str = f"{oil_change:+.1f}%" if oil_change is not None else ""
     is_kr = lang == "kr"
     label = "한국 체감" if is_kr else "Impact"
-    html = f"""<p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p1}</p>
-<table style="width:100%;border-collapse:collapse;border-radius:8px;border:1px solid #e8e8e3;border-left:4px solid #b45309;margin-bottom:16px;">
+    inner = f"""<p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p1}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;border-radius:8px;border:1px solid #e8e8e3;border-left:4px solid #b45309;margin-bottom:16px;">
 <tr><td style="padding:14px 16px;">
 <p style="font-size:15px;font-weight:700;color:#18181b;margin:0 0 6px;">{"유가" if is_kr else "Oil"} {price_str} <span style="color:#dc2626;">{change_str}</span></p>
 <p style="font-size:13px;color:#52525b;line-height:1.65;margin:0 0 8px;">{p2}</p>
 <p style="font-size:12px;font-weight:600;color:#18181b;margin:0;"><b>{label}:</b> {p3}</p>
 </td></tr></table>"""
-    return html
+    return f'<tr><td style="background:#fff;padding:0 28px 24px;">{inner}</td></tr>'
 
 
 def build_deep_dive_html(title: str, p1: str, p2: str, p3: str, p4: str, why: str, lang: str) -> str:
-    """Vol.1 스타일: 서술 + WHY IT MATTERS 박스."""
-    html = f"""<p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p1}</p>
+    """Vol.1 스타일: 서술 + WHY IT MATTERS 박스. <tr><td> 래핑으로 이메일 테이블 DOM 정확히 배치."""
+    inner = f"""<p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p1}</p>
 <p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p2}</p>
 <p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p3}</p>
 <p style="font-size:13px;color:#71717a;line-height:1.6;margin:0 0 16px;">{p4}</p>
-<table style="width:100%;border-radius:6px;background:#fafafa;border-left:4px solid #18181b;margin-top:14px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:6px;background:#fafafa;border-left:4px solid #18181b;margin-top:14px;">
 <tr><td style="padding:14px 16px;">
 <p style="font-size:9px;font-weight:600;color:#18181b;margin:0 0 4px;letter-spacing:1.5px;">WHY IT MATTERS</p>
 <p style="font-size:13px;line-height:1.65;margin:0;color:#1e3a5f;">{why}</p>
 </td></tr></table>"""
-    return html
+    return f'<tr><td style="background:#fff;padding:0 28px 24px;">{inner}</td></tr>'
 
 
 def build_numbers_html(stats: dict, lang: str) -> str:
@@ -862,12 +893,17 @@ async def generate(vol: int, lang: str) -> dict:
         f'<span class="w6 cx">{cn(target_cc, lang)} {target_score:.1f}</span>'
     )
 
-    # Today's brief
-    briefs = [
-        (ed.get("brief_1_title", ""), ed.get("brief_1_desc", "")),
-        (ed.get("brief_2_title", ""), ed.get("brief_2_desc", "")),
-        (ed.get("brief_3_title", ""), ed.get("brief_3_desc", "")),
+    # Today's brief — GPT 실패 시 클러스터 제목으로 폴백
+    brief_fallbacks = [
+        cl_title(top_clusters, 0),
+        cl_title(top_clusters, 1),
+        (cn(target_cc, lang) + (f" 긴장도 {target_score:.1f}" if is_kr else f" Tension {target_score:.1f}")),
     ]
+    briefs = []
+    for i in range(3):
+        title = ed.get(f"brief_{i+1}_title", "").strip() or brief_fallbacks[i]
+        desc = ed.get(f"brief_{i+1}_desc", "").strip()
+        briefs.append((title, desc))
     data["todays_brief_items_html"] = build_todays_brief_html(briefs, lang)
 
     # Energy
@@ -878,9 +914,10 @@ async def generate(vol: int, lang: str) -> dict:
         oil_price, oil_change, lang
     )
 
-    # Deep dive
-    data["deep_dive_nav_label"] = ed.get("deep_dive_title", "")[:30]
-    data["deep_dive_title"] = ed.get("deep_dive_title", "")
+    # Deep dive — deep_dive_title 비어있으면 1위 클러스터 제목으로 폴백
+    _raw_dd_title = ed.get("deep_dive_title", "").strip() or cl_title(top_clusters, 0)
+    data["deep_dive_nav_label"] = _raw_dd_title[:30]
+    data["deep_dive_title"] = _raw_dd_title
     data["deep_dive_section_html"] = build_deep_dive_html(
         ed.get("deep_dive_title", ""),
         ed.get("deep_dive_p1", ""), ed.get("deep_dive_p2", ""),
@@ -924,8 +961,24 @@ async def generate(vol: int, lang: str) -> dict:
         "wow_rows": wow_rows, "highlight": highlight_line,
     }, lang)
 
-    # Country impact
-    steps = [ed.get(f"impact_{i}", "") for i in range(1, 5)]
+    # Country impact — GPT 실패 시 기본 인과 체인으로 폴백
+    _impact_fallbacks_kr = [
+        cl_title(top_clusters, 0),
+        "국제 원자재·에너지 가격 변동",
+        "물가·환율·운송비 영향",
+        "국내 수입·소비·경제 파급",
+    ]
+    _impact_fallbacks_en = [
+        cl_title(top_clusters, 0),
+        "International commodity & energy price shifts",
+        "Inflation, freight, supply chain disruption",
+        "Domestic economy — prices, jobs, stocks",
+    ]
+    _impact_fallbacks = _impact_fallbacks_kr if is_kr else _impact_fallbacks_en
+    steps = []
+    for i in range(1, 5):
+        step = ed.get(f"impact_{i}", "").strip()
+        steps.append(step or _impact_fallbacks[i - 1])
     data["country_impact_html"] = build_country_impact_html(steps, lang)
 
     # Country issues (DB 기반)
