@@ -420,7 +420,12 @@ _COUNTRY_NAMES_EN: dict[str, str] = {
 # AI 시스템 프롬프트 style guide(명사형/간결체)를 모방하기 위해 어미를 제거·변환.
 _TRANS_END_RE = re.compile(
     r'\s*(?:'
-    r'계속되고\s*있습니다|하고\s*있습니다|되고\s*있습니다'
+    # 진행형: 내용 동사를 보존하기 위해 보조동사 "하/되" 리터럴 매칭
+    # 예) "강화하고 있습니다" → "강화" 보존 (강화하 전체가 제거되지 않도록)
+    # lookbehind: 앞 음절이 한국어일 때만 하/되 suffix 제거 → 강화하, 노출되 등 내용어 보존
+    r'(?<=[가-힣])\s*(?:하|되)고\s*있습니다'
+    r'|세우고\s*있습니다'         # 세우다 (세우→보존X, 단 "세우" 자체가 목적어)
+    r'|[가-힣]고\s*있습니다'      # 단일 음절 보조형 (받고, 겪고, 나고 등)
     r'|될\s*것입니다|할\s*수\s*있습니다'
     r'|을\s*예고(?:합니다|됩니다|했습니다)'
     r'|을\s*발표(?:합니다|됩니다|했습니다)'
@@ -428,31 +433,76 @@ _TRANS_END_RE = re.compile(
     r'|을\s*촉구(?:합니다|됩니다|했습니다)'
     r'|이라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
     r'|라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
-    r'|다고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
+    # 인용 다고: "다'고 밝혔습니다" 등 인용부호 포함 변형
+    r"|다['\u2019\u02bc]?\s*고\s*(?:합니다|됩니다|했습니다|밝혔습니다)"
     r'|밝혔습니다|합니다|됩니다|입니다|있습니다|했습니다|겠습니다|봅니다|습니다'
     r')[.！？]?\s*$',
     re.UNICODE,
 )
 
+# 과거형 어미 syllable set (ㅆ받침): 했/됐/았/었/렸/났/겼/봤/왔 등
+# Unicode: ㅆ종성은 (cp - 0xAC00) % 28 == 20
+_PAST_TENSE_SYLS = frozenset(
+    chr(c) for c in range(0xAC00, 0xD7A4)
+    if (c - 0xAC00) % 28 == 20
+)
+
+# 번역 결과에서 이모지·마크다운 제거 (영문 제목에 이모지가 있으면 번역 결과에도 남음)
+_TRANS_CLEANUP_RE = re.compile(
+    r'[\U0001F1E0-\U0001F1FF\U0001F000-\U0001FFFF'
+    r'\u2600-\u27BF\uFE00-\uFE0F\u200D\u20E3'
+    r'\U000E0020-\U000E007F]+',
+    re.UNICODE,
+)
+
 
 def _fix_translation_style(text: str) -> str:
-    """Google Translate 번역투 어미 제거 → AI 스타일 간결체로 변환.
+    """Google Translate 번역투 어미 → AI 스타일 간결체 변환.
 
-    변환 예시:
+    변환 파이프라인:
+      0. 후행 마침표·줄임표 전처리 ("있습니다." → "있습니다")
+      1. 번역투 어미 제거 (합니다/됩니다/하고 있습니다 등)
+      2. 과거형 stem + 다 (지연됐 → 지연됐다, 받았 → 받았다)
+      3. 잔류 목적격 조사 제거 (압력을 → 압력)
+      4. 주어(이/가) → 쉼표 (이스라엘이 → 이스라엘,)
+      5. 에서의/으로의 정제
+
+    예시:
       "이스라엘이 가자에 대한 공습을 재개합니다"
         → "이스라엘, 가자에 대한 공습을 재개"
-      "러시아가 우크라이나 동부에 대한 공세를 강화하고 있습니다"
-        → "러시아, 우크라이나 동부에 대한 공세를 강화"
+      "동의하라는 압력을 받고 있습니다"
+        → "동의하라는 압력"
+      "지연됐습니다" → "지연됐다"
     """
+    # 0단계: 후행 마침표·줄임표 전처리 ("있습니다." 패턴 대비)
+    prepped = text.strip().rstrip('.…')
+
     # 1단계: 번역투 어미 제거
-    fixed = _TRANS_END_RE.sub("", text).strip().rstrip(".")
+    fixed = _TRANS_END_RE.sub("", prepped).strip()
     if not fixed:
         return text.strip()
-    # 2단계: 주어(이/가) → 쉼표 변환: "X이 " → "X, " (2~12자 한글/영문 주어)
+
+    # 2단계: 과거형 bare stem → 신문체 (다) 추가
+    # 例) "지연됐" → "지연됐다", "받았" → "받았다", "열렸" → "열렸다"
+    last = fixed.rstrip()
+    if last and last[-1] in _PAST_TENSE_SYLS:
+        fixed = last + '다'
+
+    # 3단계: 잔류 목적격 조사 제거 (진행형 제거 후 남은 목적어)
+    # 例) "동의하라는 압력을 받고 있습니다" → "압력을" → "압력"
+    fixed = re.sub(r'\s*(?:을|를)\s*$', '', fixed)
+
+    # 4단계: 주어(이/가) → 쉼표 변환
     fixed = re.sub(r"^([가-힣a-zA-Z·\-]{2,12})(이|가)\s+", r"\1, ", fixed)
-    # 3단계: 에서의 → 에서, 으로의 → 로
+
+    # 5단계: 에서의 → 에서, 으로의 → 로
     fixed = re.sub(r"에서의\s*", "에서 ", fixed)
     fixed = re.sub(r"으로의\s*", "로 ", fixed)
+
+    # 6단계: 보고동사 제거 후 남은 주격 조사 정리
+    # 例) "관리들이 밝혔습니다" → "밝혔습니다" 제거 → "관리들이" → "관리들"
+    fixed = re.sub(r"(?<=[가-힣])\s*[이가]\s*$", "", fixed)
+
     return fixed.strip()
 
 
@@ -501,9 +551,16 @@ def _make_cluster_title_ko(
         _, short = _make_fallback_titles(topic, country_code)
         return short
 
-    # 70자 초과 시 자르기
+    # 이모지·마크다운 제거 (영문 제목에 이모지가 포함된 경우 번역 결과에도 남음)
+    short = _TRANS_CLEANUP_RE.sub('', short).replace('**', '').strip()
+    if not short:
+        _, short = _make_fallback_titles(topic, country_code)
+        return short
+
+    # 70자 초과 시 마지막 어절 경계에서 자르기
     if len(short) > 70:
-        short = short[:68] + "…"
+        cut = short[:69].rsplit(' ', 1)[0]
+        short = (cut if len(cut) >= 20 else short[:68]) + '…'
     return short
 
 
