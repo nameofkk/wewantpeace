@@ -320,8 +320,13 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "chemical attack", "nerve agent", "sarin", "mustard gas",
         "dirty bomb", "radiological", "wmds", "weapons of mass destruction",
         "intercontinental", "icbm", "hypersonic",
-        # 추가: 군사작전 변형
+        # 군사작전 변형
         "airstrikes", "ground invasion", "naval strike",
+        # 군사 훈련 (분쟁 신호: 국경 근처 훈련, 핵 훈련 등)
+        "military exercise", "war games", "joint exercise", "joint drill",
+        "live fire exercise", "military drill", "nuclear exercise",
+        # 분쟁 확대 신호 ("war escalate", "conflict widen" 등 조합 시 2+ 충족)
+        "escalate", "escalation", "escalating", "widen", "intensify", "intensifying",
     ],
     "terror": [
         "terror", "terrorist", "hostage", "isis", "al-qaeda", "extremist",
@@ -413,6 +418,12 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         # 지도자 교체 · 정치 전환
         "supreme leader", "successor", "appointed leader",
         "assembly of experts", "political transition",
+        # 여행 경보 (level 1~4, do not travel, etc.)
+        "travel advisory", "travel warning", "travel alert",
+        "do not travel", "exercise caution", "reconsider travel",
+        # 테러 조직 지정/해제 (AI: "designating terrorist group → diplomacy")
+        "terrorist designation", "terrorist blacklist",
+        "designated terrorist", "designates terrorist",
         # 제거된 너무 일반적인 키워드:
         # "president", "minister", "government", "court", "supreme court",
         # "ruling", "law", "policy", "administration", "parliament",
@@ -432,6 +443,10 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         # 해상 위기
         "piracy", "hijacked ship", "seized vessel", "oil spill",
         "shipping disruption", "port blockade", "canal blocked",
+        # 후티/홍해 관련 (AI 프롬프트: "Houthi attacks on ships → maritime")
+        "red sea", "arabian sea", "gulf of aden", "bab el-mandeb",
+        "strait of hormuz", "houthi attack on ship", "shipping attack",
+        "attacked ship", "attacked vessel",
     ],
     "disaster": [
         "flood", "flooding", "floods", "flash flood",
@@ -1790,14 +1805,18 @@ def _translate_to_korean(text: str) -> Optional[str]:
 
 # 강력한 신호 키워드 (1개만 있어도 topic 분류 확정)
 _STRONG_KEYWORDS: dict[str, set[str]] = {
-    "conflict":  {"missile", "airstrike", "artillery", "ceasefire", "shelling",
+    "conflict":  {"missile", "airstrike", "artillery", "shelling",
                   "rocket", "mortar", "offensive", "bombardment", "warplane",
                   "nuclear weapon", "nuclear weapons", "warhead", "ballistic missile",
                   "invasion", "invade", "armed conflict", "military conflict",
                   "weapons transfer", "arms transfer",
-                  "nuclear", "explosion", "troops deployed", "war zone",
-                  # "war" 단독 제거 — "trade war", "drug war", "culture war" 오분류 방지
-                  # 대신 구체적 군사 표현만 STRONG 유지
+                  "explosion", "troops deployed", "war zone",
+                  # "ceasefire" 단독 제거 — "ceasefire talks"(외교)와 충돌 방지
+                  # 대신 휴전 위반·붕괴 등 구체적 군사 표현 유지
+                  "ceasefire violation", "ceasefire violations", "violated ceasefire",
+                  "ceasefire collapsed", "ceasefire broken",
+                  # "nuclear" 단독 제거 — "nuclear program/negotiations"(외교) 오분류 방지
+                  # "nuclear weapon/weapons"만 STRONG 유지 (위에 포함됨)
                   "at war", "state of war", "act of war", "declaration of war",
                   "airstrike", "airstrikes", "ground invasion", "naval strike",
                   "military operation",
@@ -1825,7 +1844,13 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "impeachment", "impeached", "diplomatic crisis",
                   "ceasefire talks", "peace talks", "peace negotiations",
                   "diplomatic talks", "trade deal", "nuclear deal",
-                  "sanctions agreement", "sanctions lifted"},
+                  "sanctions agreement", "sanctions lifted",
+                  # 여행 경보 (AI 프롬프트: "Travel advisories are NOT events → diplomacy")
+                  "travel advisory", "travel warning", "travel alert",
+                  # 핵 협상 (nuclear deal과 함께 → diplomacy)
+                  "nuclear talks", "nuclear negotiations", "nuclear diplomacy",
+                  # 테러 조직 지정/지정해제 — terror_diplomatic 맥락에서 diplomacy 강화
+                  "terrorist designation", "terrorist blacklist", "designated terrorist"},
     "coup":      {"coup", "junta", "seized power", "military takeover",
                   "martial law", "deposed", "detained president",
                   "insurrection", "sedition", "constitutional crisis",
@@ -1833,14 +1858,20 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
     "sanctions": {"sanctions", "embargo", "trade ban", "asset freeze", "blacklist",
                   "national emergency", "state of emergency", "ieepa",
                   "market crash", "market collapse", "trading halt",
-                  "financial crisis", "economic crisis", "sovereign default",
+                  # "economic crisis" 단독 제거 — 시위 배경(경제위기)과 제재 이벤트 혼동 방지
+                  # "market crash/collapse", "trading halt" 등 구체적 금융 이벤트만 STRONG 유지
+                  "financial crisis", "sovereign default",
                   "hyperinflation", "debt default", "capital controls",
                   "government shutdown"},
     "cyber":     {"cyberattack", "ransomware", "malware", "ddos", "data breach",
                   "cyber warfare", "internet shutdown", "election hacking",
                   "critical infrastructure"},
-    "maritime":  {"naval", "strait", "blockade", "submarine", "fleet",
-                  "piracy", "hijacked ship", "oil spill"},
+    "maritime":  {"naval", "submarine", "fleet",
+                  "piracy", "hijacked ship", "oil spill",
+                  # "strait" 단독 제거 → "strait of hormuz" 언급만으로 이란 분쟁기사가 maritime 오분류되는 문제
+                  # "blockade" 단독 제거 → 육상 봉쇄와 해상 봉쇄 구분 불가
+                  # 대신 "naval blockade"처럼 구체적 구문만 유지
+                  "naval blockade"},
     "disaster":  {"earthquake", "tsunami", "typhoon", "hurricane", "volcanic eruption",
                   "flash flood", "landslide", "mudslide", "avalanche",
                   "nuclear meltdown", "radiation leak", "chemical spill",
@@ -2167,11 +2198,18 @@ def _classify_topic(text: str) -> str:
             if weak_hits >= 2:
                 scores[topic] = scores.get(topic, 0) + weak_hits
 
-    # 동점 시 특이 토픽 우선: conflict > terror > coup > sanctions > cyber > maritime > disaster > health > protest > diplomacy > unknown
+    # 테러 외교 맥락(조직 지정/블랙리스트)이면 diplomacy STRONG 1개 상당 점수 자동 부여
+    # AI는 "designating group as terrorist → diplomacy"로 분류하지만
+    # 폴백은 terror STRONG만 무효화하고 diplomacy 점수를 주지 않아 unknown이 됨
+    if terror_diplomatic:
+        scores["diplomacy"] = scores.get("diplomacy", 0) + 3
+
+    # 동점 시 특이 토픽 우선: conflict > terror > coup > protest > sanctions > cyber > maritime > disaster > health > diplomacy > unknown
+    # protest를 sanctions보다 우선: "경제위기로 인한 시위" → sanctions보다 protest가 핵심 이벤트
     _PRIORITY = {
-        "conflict": 10, "terror": 9, "coup": 8, "sanctions": 7,
-        "cyber": 6, "maritime": 5, "disaster": 4, "health": 3,
-        "protest": 2, "diplomacy": 1, "unknown": 0,
+        "conflict": 10, "terror": 9, "coup": 8, "protest": 7, "sanctions": 6,
+        "cyber": 5, "maritime": 4, "disaster": 3, "health": 2,
+        "diplomacy": 1, "unknown": 0,
     }
     if not scores:
         return "unknown"
