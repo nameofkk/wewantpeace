@@ -35,49 +35,71 @@ def _escape_html(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _md_to_html(text: str) -> str:
+    """마크다운 → Telegram HTML 변환 (이스케이프 전에 호출).
+
+    **bold** → <b>bold</b>
+    *italic* → <i>italic</i> (** 먼저 처리해야 단일 * 오작동 방지)
+    __text__ → <u>text</u>
+    나머지 마크다운 잔재는 strip.
+    각 구간의 일반 텍스트는 HTML 이스케이프 적용.
+    """
+    import re as _re
+    # bold: **text** → <b>text</b>  (이스케이프는 구간별로)
+    parts = _re.split(r'\*\*(.+?)\*\*', text)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # bold 구간
+            result.append(f"<b>{_escape_html(part)}</b>")
+        else:
+            # italic: *text* (단독 *)
+            sub_parts = _re.split(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', part)
+            for j, sp in enumerate(sub_parts):
+                if j % 2 == 1:
+                    result.append(f"<i>{_escape_html(sp)}</i>")
+                else:
+                    # underline: __text__
+                    u_parts = _re.split(r'__(.+?)__', sp)
+                    for k, up in enumerate(u_parts):
+                        if k % 2 == 1:
+                            result.append(f"<u>{_escape_html(up)}</u>")
+                        else:
+                            result.append(_escape_html(up))
+    return "".join(result)
+
+
 def _build_text(post: SocialPost) -> str:
     """Telegram 채널용 HTML 본문 (4096자 한도).
 
     Telegram 전용 톤:
     - 뉴스 알림 스타일, 깔끔한 포맷
     - bilingual 원문 유지
-    - 볼드 헤드라인 + 일반 본문
+    - 마크다운(**bold**) → HTML <b>bold</b> 자동 변환
     - 하단 CTA 링크
     """
     body = post.body_text
 
-    # 기존 CTA/URL/해시태그 정리
+    # 기존 CTA/URL 정리 (해시태그는 Telegram 채널에서 유용하므로 유지)
     body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
     body = re.sub(r'https?://\S+', '', body).strip()
     body = re.sub(r'www\.\S+', '', body).strip()
-    body = re.sub(r'#\w+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
-    # HTML 이스케이프
-    escaped_body = _escape_html(body)
-
-    # 해시태그 (이스케이프)
-    hashtag_str = ""
-    if post.hashtags:
-        raw_tags = " ".join(post.hashtags[:5])
-        hashtag_str = _escape_html(raw_tags)
+    # 마크다운 → HTML 변환 (** → <b>, * → <i>) + HTML 이스케이프
+    escaped_body = _md_to_html(body)
 
     # CTA (HTML 링크)
     cta = (
         "\n\n"
-        "---\n"
-        '🌍 <a href="https://www.wewantpeace.live">WeWantPeace - Live Tracker</a>\n'
-        "실시간 분쟁 추적"
+        '🌍 <a href="https://www.wewantpeace.live">WeWantPeace</a> · 실시간 분쟁 추적'
     )
 
     full_text = escaped_body + cta
-    if hashtag_str:
-        full_text = f"{full_text}\n\n{hashtag_str}"
 
     # 4096자 초과 시 잘라내기
     if len(full_text) > _MAX_TEXT_LEN:
         max_body = _MAX_TEXT_LEN - len(cta) - 10
-        full_text = f"{escaped_body[:max_body]}...\n{cta}"
+        full_text = f"{escaped_body[:max_body]}...{cta}"
 
     return full_text
 
@@ -86,6 +108,7 @@ def _build_caption(post: SocialPost) -> str:
     """이미지 캡션용 축약 텍스트 (1024자 한도).
 
     sendPhoto의 caption은 1024자 제한이므로 본문을 요약.
+    마크다운(**bold**) → HTML <b>bold</b> 자동 변환.
     """
     body = post.body_text
 
@@ -96,7 +119,8 @@ def _build_caption(post: SocialPost) -> str:
     body = re.sub(r'#\w+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
-    escaped_body = _escape_html(body)
+    # 마크다운 → HTML 변환 + 이스케이프
+    escaped_body = _md_to_html(body)
 
     cta = (
         "\n\n"
@@ -107,7 +131,7 @@ def _build_caption(post: SocialPost) -> str:
 
     if len(caption) > _MAX_CAPTION_LEN:
         max_body = _MAX_CAPTION_LEN - len(cta) - 10
-        caption = f"{escaped_body[:max_body]}...\n{cta}"
+        caption = f"{escaped_body[:max_body]}...{cta}"
 
     return caption
 
