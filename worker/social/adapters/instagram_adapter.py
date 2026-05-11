@@ -5,6 +5,7 @@
 """
 import logging
 import os
+import re
 import time
 
 from backend.app.models.social_post import SocialPost
@@ -26,6 +27,12 @@ def is_configured() -> bool:
 def _build_caption(post: SocialPost) -> str:
     """본문 + CTA + 해시태그 조합 (2200자 제한)."""
     caption = post.body_text
+
+    # 마크다운 제거
+    caption = re.sub(r'\*\*(.+?)\*\*', r'\1', caption)
+    caption = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', caption)
+    caption = re.sub(r'__(.+?)__', r'\1', caption)
+    caption = re.sub(r'_(.+?)_', r'\1', caption)
 
     # CTA 추가
     if "wewantpeace" not in caption.lower():

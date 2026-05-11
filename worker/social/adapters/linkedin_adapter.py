@@ -39,6 +39,12 @@ def _build_text(post: SocialPost) -> str:
     """
     body = post.body_text
 
+    # 마크다운 제거
+    body = re.sub(r'\*\*(.+?)\*\*', r'\1', body)
+    body = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', body)
+    body = re.sub(r'__(.+?)__', r'\1', body)
+    body = re.sub(r'_(.+?)_', r'\1', body)
+
     # 기존 CTA/URL 라인 정리 (LinkedIn 전용으로 교체)
     body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
     body = re.sub(r'https?://\S+', '', body).strip()
