@@ -61,16 +61,24 @@ def _build_text(post: SocialPost) -> str:
     - 대화형, 맥락 있는 설명 (원문 전체 유지)
     - 대화 유도 질문으로 마무리
     - URL 포함 (프로필 유입)
-    - 해시태그 2~3개 (검색 발견용)
+    - 해시태그 없음 (Threads에서 불필요, 알고리즘 페널티 위험)
     """
     import hashlib
 
     body = post.body_text
 
+    # 마크다운 방어적 제거 (AI가 가끔 ** 포함 → strip)
+    body = re.sub(r'\*\*(.+?)\*\*', r'\1', body)   # **bold** → bold
+    body = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', body)  # *italic* → text
+    body = re.sub(r'__(.+?)__', r'\1', body)         # __underline__ → text
+    body = re.sub(r'_(.+?)_', r'\1', body)           # _italic_ → text
+
     # 기존 CTA/URL 라인 정리 (Threads 전용으로 교체)
     body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
     body = re.sub(r'https?://\S+', '', body).strip()
     body = re.sub(r'www\.\S+', '', body).strip()
+    # 해시태그 제거 (Threads에서 해시태그 없이 운영)
+    body = re.sub(r'#\w+', '', body).strip()
     body = re.sub(r'\n{3,}', '\n\n', body).strip()
 
     # content_type에 맞는 맥락적 대화 유도 문구 (generic → 콘텐츠 연관)
@@ -79,13 +87,10 @@ def _build_text(post: SocialPost) -> str:
     en_q, ko_q = engage_list[idx]
     engage = f"\n\n💬 {en_q}\n{ko_q}"
 
-    # Threads CTA: 링크 + 해시태그
-    hashtag_str = " ".join(post.hashtags[:3]) if post.hashtags else ""
-    link = "\n\n🔗 WeWantPeace · 실시간 분쟁 추적\nwww.wewantpeace.live"
+    # Threads CTA: 링크만 (해시태그 없음)
+    link = "\n\n🔗 wewantpeace.live"
 
     full_text = body + engage + link
-    if hashtag_str and len(full_text) + len(hashtag_str) + 1 <= 500:
-        full_text = f"{full_text}\n{hashtag_str}"
 
     # 500자 초과 시 잘라내기
     if len(full_text) > 500:
