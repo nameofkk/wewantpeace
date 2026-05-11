@@ -562,22 +562,27 @@ def build_country_impact_html(steps: list, lang: str) -> str:
         html += f'<tr><td width="24" valign="top" style="text-align:left;padding:4px 0;font-weight:700;color:{c};">{i+1}</td>'
         html += f'<td style="text-align:left;padding:4px 0;"{bold}>{step}</td></tr>'
         if not is_last:
-            html += '<tr><td></td><td style="padding:2px 0;color:#d4d4d8;font-size:14px;">→</td></tr>'
+            html += '<tr><td width="24"></td><td style="padding:2px 0;color:#d4d4d8;font-size:14px;">→</td></tr>'
     html += '</table>'
     return html
 
 
 def build_country_issues_html(issues: list, lang: str) -> str:
-    """Vol.1 스타일: 3열 이슈 테이블."""
+    """Vol.1 스타일: 3열 이슈 테이블. DB값 HTML escape 적용."""
+    import html as _html_lib
     is_kr = lang == "kr"
+    if not issues:
+        return ""
     html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
     html += f'<tr><td style="padding:8px 0;font-weight:600;font-size:9px;color:#64748b;letter-spacing:1.5px;border-bottom:2px solid #18181b;">{"이슈" if is_kr else "Issue"}</td>'
     html += f'<td style="padding:8px 0;font-weight:600;font-size:9px;color:#64748b;letter-spacing:1.5px;border-bottom:2px solid #18181b;">{"상세" if is_kr else "Detail"}</td>'
     html += f'<td width="40" style="text-align:right;padding:8px 0;font-weight:600;font-size:9px;color:#64748b;letter-spacing:1.5px;border-bottom:2px solid #18181b;">{"이벤트" if is_kr else "Events"}</td></tr>'
     for name, detail, count in issues:
         c = "#dc2626" if count and int(str(count).replace(",", "")) >= 10 else "#71717a"
-        html += f'<tr><td style="padding:8px 0;font-weight:700;color:#18181b;border-bottom:1px solid #f4f4f5;">{name}</td>'
-        html += f'<td style="padding:8px 0;color:#52525b;border-bottom:1px solid #f4f4f5;">{detail}</td>'
+        safe_name = _html_lib.escape(str(name or ""))
+        safe_detail = _html_lib.escape(str(detail or ""))
+        html += f'<tr><td style="padding:8px 0;font-weight:700;color:#18181b;border-bottom:1px solid #f4f4f5;">{safe_name}</td>'
+        html += f'<td style="padding:8px 0;color:#52525b;border-bottom:1px solid #f4f4f5;">{safe_detail}</td>'
         html += f'<td style="text-align:right;padding:8px 0;font-weight:700;color:{c};border-bottom:1px solid #f4f4f5;">{count}{"건" if is_kr else ""}</td></tr>'
     html += '</table>'
     return html
@@ -617,9 +622,12 @@ def build_editors_note_html(p1: str, p2: str, p3: str, ps: str = "", lang: str =
 
 
 def build_next_week_html(items: list) -> str:
-    html = '<table style="width:100%;border-collapse:collapse;margin-top:10px;">'
     colors = ["#ef4444", "#f59e0b", "#f59e0b"]
-    for i, item in enumerate(items[:3]):
+    filtered = [item for item in items[:3] if item and item.strip()]
+    if not filtered:
+        return ""
+    html = '<table style="width:100%;border-collapse:collapse;margin-top:10px;">'
+    for i, item in enumerate(filtered):
         c = colors[i] if i < len(colors) else "#94a3b8"
         html += f'<tr><td style="padding:4px 0;"><span style="display:inline-block;width:6px;height:6px;background:{c};border-radius:50%;vertical-align:middle;margin-right:8px;"></span>'
         html += f'<span style="font-size:13px;color:#52525b;">{item}</span></td></tr>'
@@ -628,11 +636,12 @@ def build_next_week_html(items: list) -> str:
 
 
 def build_travel_html(advisories: list, lang: str) -> str:
+    """각 섹션을 <tr><td> 로 래핑 — 이메일 테이블 컨텍스트에서 올바른 DOM 위치 유지."""
     is_kr = lang == "kr"
     l4 = [a for a in advisories if a["level"] >= 4]
     l3 = [a for a in advisories if a["level"] == 3]
     new_badge = '<span style="background:#dc2626;color:white;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;vertical-align:middle;">NEW</span>'
-    html = []
+    rows = []
 
     def _name_with_badge(a):
         flag = get_flag(a["cc"])
@@ -648,12 +657,13 @@ def build_travel_html(advisories: list, lang: str) -> str:
         if new_l4:
             new_names = ", ".join(cn(a["cc"], lang) for a in new_l4[:5])
             new_line = f'<p style="font-size:10px;color:#dc2626;margin:6px 0 0;font-weight:600;">(+{len(new_l4)}: {new_names})</p>'
-        html.append(f'''<table style="width:100%;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;"><tr><td style="padding:14px 16px;">
-<table style="width:100%;"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#dc2626;color:white;">LEVEL 4</span></td>
+        inner = f'''<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:8px;background:#fef2f2;border:1px solid #fecaca;"><tr><td style="padding:14px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#dc2626;color:white;">LEVEL 4</span></td>
 <td align="right"><span style="font-weight:800;color:#dc2626;font-size:22px;">{len(l4)}</span><span style="font-size:12px;color:#dc2626;">{"개국" if is_kr else ""}</span></td></tr></table>
 <p style="font-weight:700;font-size:12px;color:#dc2626;margin:6px 0;">{"여행 금지" if is_kr else "Do Not Travel"}</p>
 <p style="font-size:11px;line-height:1.6;color:#7f1d1d;margin:0;">{names}</p>{new_line}
-</td></tr></table>''')
+</td></tr></table>'''
+        rows.append(f'<tr><td style="background:#fff;padding:0 28px 12px;">{inner}</td></tr>')
     if l3:
         names = ", ".join(_name_with_badge(a) for a in l3[:30])
         new_l3 = [a for a in l3 if a.get("new")]
@@ -661,13 +671,14 @@ def build_travel_html(advisories: list, lang: str) -> str:
         if new_l3:
             new_names = ", ".join(cn(a["cc"], lang) for a in new_l3[:5])
             new_line = f'<p style="font-size:10px;color:#b45309;margin:6px 0 0;font-weight:600;">(+{len(new_l3)}: {new_names})</p>'
-        html.append(f'''<table style="width:100%;border-radius:8px;background:#fffbeb;border:1px solid #fde68a;margin-top:12px;"><tr><td style="padding:14px 16px;">
-<table style="width:100%;"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#b45309;color:white;">LEVEL 3</span></td>
+        inner = f'''<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-radius:8px;background:#fffbeb;border:1px solid #fde68a;"><tr><td style="padding:14px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td><span style="display:inline-block;font-weight:700;font-size:9px;border-radius:3px;letter-spacing:.5px;padding:2px 6px;background:#b45309;color:white;">LEVEL 3</span></td>
 <td align="right"><span style="font-weight:800;color:#b45309;font-size:22px;">{len(l3)}</span><span style="font-size:12px;color:#b45309;">{"개국" if is_kr else ""}</span></td></tr></table>
 <p style="font-weight:700;font-size:12px;color:#92400e;margin:6px 0;">{"여행 재고" if is_kr else "Reconsider Travel"}</p>
 <p style="font-size:11px;line-height:1.6;color:#78350f;margin:0;">{names}</p>{new_line}
-</td></tr></table>''')
-    return "\n".join(html)
+</td></tr></table>'''
+        rows.append(f'<tr><td style="background:#fff;padding:0 28px 12px;">{inner}</td></tr>')
+    return "\n".join(rows)
 
 
 # ── 메인 생성 ─────────────────────────────────────────────────────────────────
