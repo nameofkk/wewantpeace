@@ -1,5 +1,6 @@
 """SNS 콘텐츠 생성기 — Daily Movers / KScore Alert / Weekly Recap (bilingual)."""
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -23,6 +24,18 @@ _COUNTRY_HASHTAGS: dict[str, str] = {
     "JP": "#Japan", "TR": "#Turkey", "EG": "#Egypt", "SA": "#SaudiArabia",
     "NG": "#Nigeria", "CD": "#Congo", "SO": "#Somalia", "LY": "#Libya",
 }
+
+
+def _clean_markdown(text: str) -> str:
+    """AI 응답에서 마크다운 포맷 제거 (DB 저장 전 정규화).
+
+    **bold** → bold, *italic* → text, __underline__ → text, _italic_ → text
+    """
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    text = re.sub(r'_(.+?)_', r'\1', text)
+    return text
 
 
 def _risk_from_severity(severity: int) -> str:
@@ -244,6 +257,7 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         ko_title = (top.title_ko or top.title)[:60]
         body = f"🌍 {en_title}\n\n🌍 {ko_title}"
 
+    body = _clean_markdown(body)
     if len(body) > 500:
         body = body[:497] + "..."
 
@@ -317,6 +331,7 @@ async def generate_kscore_alert(
     if not body:
         body = f"🚨 {title_en}\n\n🚨 {title_ko}"
 
+    body = _clean_markdown(body)
     if len(body) > 500:
         body = body[:497] + "..."
 
@@ -409,6 +424,7 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
             f"📊 주간: {total_clusters}개 이슈 | {top3}"
         )
 
+    body = _clean_markdown(body)
     if len(body) > 500:
         body = body[:497] + "..."
 
