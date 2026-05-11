@@ -279,6 +279,21 @@ _TOPIC_LABELS_KO: dict[str, str] = {
     "unknown":   "이슈",
 }
 
+# AI 미작동 시 폴백용 — 동사 포함 간결체 (단순 명사보다 AI 스타일에 가까움)
+_TOPIC_ACTION_KO: dict[str, str] = {
+    "conflict":  "무장충돌 격화",
+    "terror":    "폭탄 테러 발생",
+    "coup":      "군사 쿠데타·정변",
+    "sanctions": "경제 제재 강화",
+    "cyber":     "사이버 공격",
+    "protest":   "대규모 시위",
+    "diplomacy": "외교 협상",
+    "maritime":  "해상 분쟁",
+    "disaster":  "재난·피해 발생",
+    "health":    "감염병 확산",
+    "unknown":   "주요 이슈",
+}
+
 _COUNTRY_NAMES_KO: dict[str, str] = {
     "US": "미국", "UA": "우크라이나", "RU": "러시아",
     "PS": "팔레스타인", "IL": "이스라엘", "IR": "이란",
@@ -395,19 +410,62 @@ _COUNTRY_NAMES_EN: dict[str, str] = {
 }
 
 
+# ── 번역투 → 간결체 후처리 ──────────────────────────────────────────────────
+# Google Translate는 뉴스 제목을 번역 시 "~합니다/됩니다/있습니다" 형태로 끝냄.
+# AI 시스템 프롬프트 style guide(명사형/간결체)를 모방하기 위해 어미를 제거·변환.
+_TRANS_END_RE = re.compile(
+    r'\s*(?:'
+    r'하고\s*있습니다|될\s*것입니다|할\s*수\s*있습니다'
+    r'|을\s*예고(?:합니다|됩니다|했습니다)'
+    r'|을\s*발표(?:합니다|됩니다|했습니다)'
+    r'|을\s*시사(?:합니다|됩니다|했습니다)'
+    r'|을\s*촉구(?:합니다|됩니다|했습니다)'
+    r'|이라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
+    r'|라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
+    r'|합니다|됩니다|입니다|있습니다|했습니다|겠습니다|봅니다|습니다'
+    r')[.！？]?\s*$',
+    re.UNICODE,
+)
+
+
+def _fix_translation_style(text: str) -> str:
+    """Google Translate 번역투 어미 제거 → AI 스타일 간결체로 변환.
+
+    변환 예시:
+      "이스라엘이 가자에 대한 공습을 재개합니다"
+        → "이스라엘, 가자에 대한 공습을 재개"
+      "러시아가 우크라이나 동부에 대한 공세를 강화하고 있습니다"
+        → "러시아, 우크라이나 동부에 대한 공세를 강화"
+    """
+    # 1단계: 번역투 어미 제거
+    fixed = _TRANS_END_RE.sub("", text).strip().rstrip(".")
+    if not fixed:
+        return text.strip()
+    # 2단계: 주어(이/가) → 쉼표 변환: "X이 " → "X, " (2~12자 한글/영문 주어)
+    fixed = re.sub(r"^([가-힣a-zA-Z·\-]{2,12})(이|가)\s+", r"\1, ", fixed)
+    # 3단계: 에서의 → 에서, 으로의 → 로
+    fixed = re.sub(r"에서의\s*", "에서 ", fixed)
+    fixed = re.sub(r"으로의\s*", "로 ", fixed)
+    return fixed.strip()
+
+
 def _make_fallback_titles(
     topic: str,
     country_code: str | None,
 ) -> tuple[str, str]:
-    """쓰레기 제목용 국가+토픽 폴백 (en, ko) 반환."""
-    topic_ko = _TOPIC_LABELS_KO.get(topic, "이슈")
+    """쓰레기 제목용 국가+토픽 폴백 (en, ko) 반환.
+
+    AI 스타일을 모방해 단순 명사 대신 동사 포함 간결체 사용.
+    예: "이란 무력충돌" → "이란, 무장충돌 격화"
+    """
+    topic_action_ko = _TOPIC_ACTION_KO.get(topic, _TOPIC_LABELS_KO.get(topic, "이슈"))
     topic_en = _TOPIC_LABELS_EN.get(topic, "Issue")
     country_ko = _COUNTRY_NAMES_KO.get(country_code or "", "")
     country_en = _COUNTRY_NAMES_EN.get(country_code or "", country_code or "")
 
     if country_ko:
-        return f"{country_en} {topic_en}", f"{country_ko} {topic_ko}"
-    return topic_en, topic_ko
+        return f"{country_en} {topic_en}", f"{country_ko}, {topic_action_ko}"
+    return topic_en, topic_action_ko
 
 
 def _make_cluster_title_ko(
@@ -415,22 +473,26 @@ def _make_cluster_title_ko(
     topic: str,
     country_code: str | None,
 ) -> str | None:
-    """
-    클러스터 홈 카드용 한국어 제목 생성.
-    해시태그만 있는 저품질 제목은 국가+토픽 폴백 제목 생성.
+    """클러스터 홈 카드용 한국어 제목 생성.
+
+    1. 쓰레기 제목 → 국가+토픽 액션 폴백 (예: "이란, 무장충돌 격화")
+    2. 일반 제목 → Google Translate + 번역투 후처리 (간결체 변환)
+    3. 번역 실패 → 폴백
     """
     if _is_junk_title(title):
         _, title_ko = _make_fallback_titles(topic, country_code)
         return title_ko
 
     title_ko = _translate_cached(title)
-    if title_ko is None:
-        logger.debug("한국어 번역 실패: %s", title[:50])
-        return None
+    if not title_ko:
+        logger.debug("한국어 번역 실패, 폴백 사용: %s", title[:50])
+        _, title_ko = _make_fallback_titles(topic, country_code)
+        return title_ko
 
-    short = title_ko.strip()
+    short = _fix_translation_style(title_ko.strip())
     if not short:
-        return None
+        _, short = _make_fallback_titles(topic, country_code)
+        return short
 
     # 70자 초과 시 자르기
     if len(short) > 70:
