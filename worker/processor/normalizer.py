@@ -1989,6 +1989,12 @@ _ENTERTAINMENT_NOISE_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) 
     r"\b(korean wave|문화 수출|cultural export|soft power)\b.{0,60}\b(drama|music|k-?pop|film|movie|entertainment)\b",
     # 연예 뉴스 일반
     r"\b(celebrity|연예인|pop star|가수)\b.{0,60}\b(dating|wedding|marriage|divorce|pregnancy|baby|scandal|comeback)\b",
+    # 스포츠 리그/수상 — 분쟁과 무관한 스포츠 기사
+    r"\b(kbo|mlb|nba|nfl|nhl|epl|premier league|k-?league|serie a|bundesliga|ligue 1|j-?league)\b",
+    r"\b(baseball|basketball|football|soccer|golf|tennis|volleyball|cricket|rugby|swimming)\b"
+    r".{0,80}\b(award|champion|season|player|pitcher|batter|hitter|scorer|match|game|standings|league title)\b",
+    r"\b(monthly award|player of the month|mvp award|batting title|home run title|golden glove|rookie of)\b",
+    r"\b(hitting streak|batting average|earned run|slugging|on-base percentage|pitching stats)\b",
 ]]
 
 _RESPONSE_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [

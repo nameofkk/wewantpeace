@@ -754,7 +754,8 @@ async def assign_cluster(
                 event.topic, event.country_code or cluster.country_code,
             )
             if ai:
-                cluster.title, cluster.title_ko = ai
+                cluster.title, _ko = ai
+                cluster.title_ko = _fix_translation_style(_ko) if _ko else _ko
             else:
                 cluster.title = event.title
                 cluster.title_ko = _make_cluster_title_ko(
@@ -768,7 +769,8 @@ async def assign_cluster(
                 cluster.topic, cluster.country_code,
             )
             if ai:
-                cluster.title, cluster.title_ko = ai
+                cluster.title, _ko = ai
+                cluster.title_ko = _fix_translation_style(_ko) if _ko else _ko
             else:
                 cluster.title_ko = _make_cluster_title_ko(
                     cluster.title, cluster.topic, cluster.country_code,
@@ -807,7 +809,8 @@ async def assign_cluster(
             [{"title": event.title, "body": event.body or ""}], event.topic, event.country_code,
         )
         if ai:
-            ai_title_en, title_ko = ai
+            ai_title_en, _ko = ai
+            title_ko = _fix_translation_style(_ko) if _ko else _ko
         else:
             ai_title_en = None
             title_ko = _make_cluster_title_ko(event.title, event.topic, event.country_code)
