@@ -363,6 +363,11 @@ def _is_junk_title(title: str) -> bool:
         return True
     if re.match(r'^(live|breaking)\s*(briefing|update|blog)\s*[:.]?\s*$', low):
         return True
+    # "BREAKING #..." or "BREAKING: ..." 단독 패턴 (해시태그 제거 후 breaking만 남음)
+    if re.match(r'^breaking[:\s!]*$', low):
+        return True
+    if re.match(r'^breaking[:\s]+live\s+update', low):
+        return True
     if re.match(r'^(오후|오전|아침|저녁|주간|일일)\s*(요약|브리핑|업데이트|정리|리포트)\s*$', low):
         return True
     # "국가명 + 토픽라벨"만 있는 2단어 제목 (예: "China Diplomacy", "Lebanon Disaster")
@@ -415,14 +420,16 @@ _COUNTRY_NAMES_EN: dict[str, str] = {
 # AI 시스템 프롬프트 style guide(명사형/간결체)를 모방하기 위해 어미를 제거·변환.
 _TRANS_END_RE = re.compile(
     r'\s*(?:'
-    r'하고\s*있습니다|될\s*것입니다|할\s*수\s*있습니다'
+    r'계속되고\s*있습니다|하고\s*있습니다|되고\s*있습니다'
+    r'|될\s*것입니다|할\s*수\s*있습니다'
     r'|을\s*예고(?:합니다|됩니다|했습니다)'
     r'|을\s*발표(?:합니다|됩니다|했습니다)'
     r'|을\s*시사(?:합니다|됩니다|했습니다)'
     r'|을\s*촉구(?:합니다|됩니다|했습니다)'
     r'|이라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
     r'|라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
-    r'|합니다|됩니다|입니다|있습니다|했습니다|겠습니다|봅니다|습니다'
+    r'|다고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
+    r'|밝혔습니다|합니다|됩니다|입니다|있습니다|했습니다|겠습니다|봅니다|습니다'
     r')[.！？]?\s*$',
     re.UNICODE,
 )
