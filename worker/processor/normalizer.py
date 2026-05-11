@@ -433,8 +433,9 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         # → 위 단어들이 단독으로 diplomacy를 결정하면 비군사 기사가 과분류됨
     ],
     "maritime": [
-        "naval", "ship", "vessel", "strait", "blockade", "coast guard",
+        "naval", "ship", "vessel", "blockade", "coast guard",
         "maritime", "submarine", "fleet", "tanker",
+        # "strait" 단독 제거: "strait of hormuz" 구체 구문이 이미 포함됨, 이중 카운트 방지
         # 이주/난민 해상 사망
         "mediterranean", "aegean", "english channel", "migrant", "migrants",
         "refugee", "refugees", "drowned", "drowning", "crossing",
@@ -444,6 +445,8 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
         "piracy", "hijacked ship", "seized vessel", "oil spill",
         "shipping disruption", "port blockade", "canal blocked",
         # 후티/홍해 관련 (AI 프롬프트: "Houthi attacks on ships → maritime")
+        # "houthi" 추가: 후티 기사의 핵심 식별자 → 임계값 2+로 올려도 후티 기사 보호
+        "houthi", "houthis",
         "red sea", "arabian sea", "gulf of aden", "bab el-mandeb",
         "strait of hormuz", "houthi attack on ship", "shipping attack",
         "attacked ship", "attacked vessel",
@@ -1868,9 +1871,8 @@ _STRONG_KEYWORDS: dict[str, set[str]] = {
                   "critical infrastructure"},
     "maritime":  {"naval", "submarine", "fleet",
                   "piracy", "hijacked ship", "oil spill",
-                  # "strait" 단독 제거 → "strait of hormuz" 언급만으로 이란 분쟁기사가 maritime 오분류되는 문제
+                  # "strait" 단독 제거 → "strait of hormuz" 언급만으로 이란 분쟁기사가 maritime 오분류
                   # "blockade" 단독 제거 → 육상 봉쇄와 해상 봉쇄 구분 불가
-                  # 대신 "naval blockade"처럼 구체적 구문만 유지
                   "naval blockade"},
     "disaster":  {"earthquake", "tsunami", "typhoon", "hurricane", "volcanic eruption",
                   "flash flood", "landslide", "mudslide", "avalanche",
@@ -1947,6 +1949,23 @@ _NON_MILITARY_CONTEXT: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in
     r"(remembrance|vigil|tribute).{0,80}(held|ceremony|service|gather|candle)",
     r"(in memory of|pay respects|laying wreaths?|wreath.laying)",
 ]]
+
+# 비질병 outbreak 문맥 — 이 패턴 감지 시 health STRONG의 'outbreak' 무효화
+# ("outbreak of war/conflict/violence", "internet outbreak" 등 전쟁/IT 문맥의 outbreak 오분류 방지)
+_NON_HEALTH_OUTBREAK: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+    r"\boutbreak\s+of\s+(war|conflict|violence|fighting|hostilities|crisis|unrest|tension)",
+    r"\bspread\s+of\s+(war|conflict|violence|fighting|the war|the conflict)",
+    r"\binternet\s+(cut|cuts|shutdown|censorship|restriction|outage|disconnect)",
+    r"\bcyber\s+outbreak",
+    # 인터넷 접근 제한 기사에서 'outbreak' 사용 방지
+    r"\b(internet|online|digital|network)\s+(access|freedom|restriction|censorship)",
+]]
+
+
+def _has_non_health_outbreak_context(text: str) -> bool:
+    """비질병 문맥에서 'outbreak' 사용 여부 감지. True면 health STRONG 'outbreak' 무효화."""
+    return any(p.search(text) for p in _NON_HEALTH_OUTBREAK)
+
 
 # ── 엔터테인먼트/관광 노이즈 패턴 ──────────────────────────────────────────
 # K-pop, 아이돌, 관광 등 분쟁 서비스에 무관한 콘텐츠 감지.
@@ -2159,6 +2178,7 @@ def _classify_topic(text: str) -> str:
     """
     text_lower = text.lower()
     non_military = _has_non_military_context(text_lower)
+    non_health_outbreak = _has_non_health_outbreak_context(text_lower)
     scores: dict[str, int] = {}
 
     terror_diplomatic = _has_terror_diplomatic_context(text_lower)
@@ -2170,6 +2190,15 @@ def _classify_topic(text: str) -> str:
         # 테러 외교 맥락이면 terror STRONG 무효화 (조직 지정/블랙리스트 기사)
         if topic == "terror" and strong_hits and terror_diplomatic:
             strong_hits = 0
+        # 비질병 문맥에서 health의 'outbreak' STRONG 무효화
+        # 예) "outbreak of war/conflict", "internet censorship outbreak" → health 오분류 방지
+        if topic == "health" and strong_hits and non_health_outbreak:
+            # 'outbreak' 이외의 다른 질병 STRONG 키워드가 없으면 전체 무효화
+            real_health_strong = sum(
+                1 for kw in strong if kw != "outbreak" and _kw_in_text(kw, text_lower)
+            )
+            if real_health_strong == 0:
+                strong_hits = 0
         if strong_hits:
             scores[topic] = scores.get(topic, 0) + strong_hits * 3  # 가중치 3배
 
