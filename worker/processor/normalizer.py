@@ -2392,6 +2392,37 @@ def _make_title(text: str, max_len: int = 120) -> str:
     return title[:max_len - 3] + "..." if len(title) > max_len else title
 
 
+_TITLE_EMOJI_RE = re.compile(
+    "["
+    "\U0001F1E0-\U0001F1FF"
+    "\U0001F000-\U0001FFFF"
+    "\u2600-\u27BF"
+    "\uFE00-\uFE0F"
+    "\u200D\u20E3"
+    "]",
+    re.UNICODE,
+)
+
+
+def _clean_title(title: str) -> str:
+    """RSS 원문 타이틀에서 이모지/해시태그/마크다운/선두 특수문자 제거."""
+    # 해시태그 제거
+    title = re.sub(r"#\S+", "", title)
+    # 이모지 제거
+    title = _TITLE_EMOJI_RE.sub("", title)
+    # 마크다운 제거 (**bold** → bold, *italic* → text 등)
+    title = re.sub(r"\*\*(.+?)\*\*", r"\1", title)
+    title = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\1", title)
+    title = re.sub(r"__(.+?)__", r"\1", title)
+    title = re.sub(r"_(.+?)_", r"\1", title)
+    # 선두 [VIDEO], (LIVE), >>> 등 메타 태그 제거
+    title = re.sub(r"^\s*[\[\(][^\]\)]{0,20}[\]\)]\s*[-–—:]*\s*", "", title)
+    title = re.sub(r"^[\W_]+", "", title)
+    # 공백 정규화
+    title = re.sub(r"\s+", " ", title).strip()
+    return title
+
+
 
 def _calculate_confidence(tier: str, severity: int) -> float:
     """소스 tier 기반 confidence 계산.
@@ -2501,9 +2532,9 @@ def normalize(
         # 비영어 제목도 영어로
         title_lang = _detect_language(raw_title)
         title_en = _translate_to_english(raw_title, title_lang) if title_lang not in ("en", "unknown") else raw_title
-        title = title_en[:120]
+        title = _clean_title(title_en)[:120]
     else:
-        title = _make_title(text_for_analysis)
+        title = _clean_title(_make_title(text_for_analysis))
 
     # 한국어 제목: 뉴스 원제목(title)을 그대로 번역 (이벤트 타임라인 표시용)
     title_ko = _translate_to_korean(title)

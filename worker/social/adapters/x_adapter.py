@@ -92,6 +92,12 @@ def _build_text(post: SocialPost) -> str:
     """
     body = post.body_text
 
+    # 마크다운 제거
+    body = re.sub(r'\*\*(.+?)\*\*', r'\1', body)
+    body = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', body)
+    body = re.sub(r'__(.+?)__', r'\1', body)
+    body = re.sub(r'_(.+?)_', r'\1', body)
+
     # URL, CTA 라인, 기존 해시태그 제거 (새로 추가할 것이므로)
     body = re.sub(r'https?://\S+', '', body).strip()
     body = re.sub(r'www\.\S+', '', body).strip()

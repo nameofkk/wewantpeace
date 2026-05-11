@@ -204,7 +204,7 @@ export function clearStoredFCMToken(): void {
 }
 
 const TOKEN_REFRESH_KEY = "fcm_token_refreshed_at";
-const TOKEN_REFRESH_INTERVAL = 12 * 60 * 60 * 1000; // 12시간
+const TOKEN_REFRESH_INTERVAL = 3 * 60 * 60 * 1000; // 3시간 (FCM 토큰 자동 교체 대응)
 
 /**
  * 앱 로드 시 FCM 토큰을 자동 갱신하여 서버에 재등록.
