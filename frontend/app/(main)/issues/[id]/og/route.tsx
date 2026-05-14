@@ -23,6 +23,7 @@ const interFont = readFile(join(FONT_DIR, "Inter-SemiBold.ttf"))
   .then((buf) => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)
   .catch((): null => null);
 
+// ── 토픽 레이블 ──
 const TOPIC: Record<string, { ko: string; en: string }> = {
   conflict:  { ko: "무장 충돌",   en: "Armed Conflict" },
   terror:    { ko: "폭력·테러",   en: "Violence & Terror" },
@@ -75,6 +76,34 @@ function getConfig(severity: number) {
   return SEVERITY_CONFIG.find((c) => severity >= c.min) ?? SEVERITY_CONFIG[SEVERITY_CONFIG.length - 1];
 }
 
+// ── 레이아웃 상수 ──
+// 풀블리드 (이미지 있음): 좌62 + 우60 = 가용폭 1078px
+const IMAGE_CONTENT_W = 1078;
+// 에디토리얼 폴백 (이미지 없음): 좌80 + 우76 = 가용폭 1044px
+const EDITORIAL_CONTENT_W = 1044;
+
+/**
+ * 텍스트 한 줄을 주어진 가용폭에 맞는 폰트 크기 자동 계산
+ *
+ * 실측 기반 문자당 폭 비율:
+ *   Gothic A1 Black (KO):       fontSize × 0.95
+ *   Noto Serif KR Black (EN):   fontSize × 0.58
+ *
+ * maxPx / minPx 로 클램핑
+ */
+function fitFontSize(
+  text: string,
+  lang: string,
+  contentW: number,
+  maxPx: number,
+  minPx: number,
+): number {
+  if (!text || text.length === 0) return maxPx;
+  const charRatio = lang === "en" ? 0.58 : 0.95;
+  const fit = Math.floor(contentW / (text.length * charRatio));
+  return Math.max(minPx, Math.min(maxPx, fit));
+}
+
 function cleanTitle(raw: string, lang: string = "ko"): string {
   let t = raw
     .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, "")
@@ -116,12 +145,14 @@ function cleanTitle(raw: string, lang: string = "ko"): string {
 }
 
 /**
- * 헤드라인을 2줄로 분할.
- * 좁아진 콘텐츠 패널(~548px)에 맞춰 임계값 조정.
+ * 헤드라인을 최대 2줄로 분할.
+ *
+ * singleLineMax: 이 글자 수 이하면 분할 없이 단일 줄 유지
+ *   KO: max 88px에서 1078px에 들어가는 글자 수 = floor(1078/(88×0.95)) = 12
+ *   EN: max 88px에서 1078px에 들어가는 글자 수 = floor(1078/(88×0.58)) = 21
  */
 function splitHeadline(text: string, lang: string = "ko"): string[] {
-  // 분할이 필요없을 정도로 짧으면 단일 줄
-  const singleLineMax = lang === "en" ? 22 : 11;
+  const singleLineMax = lang === "en" ? 21 : 12;
   if (text.length <= singleLineMax) return [text];
 
   const seps = [", ", "…", "· ", " - ", "– ", "— ", "; "];
@@ -149,12 +180,17 @@ function splitHeadline(text: string, lang: string = "ko"): string[] {
     return [line1, line2];
   }
 
-  // 영어: 구분자 없으면 단어 경계
-  if (lang === "en") {
-    const sp = text.lastIndexOf(" ", target);
-    if (sp >= 6 && sp <= text.length - 3) {
-      return [text.slice(0, sp), text.slice(sp + 1)];
+  // 구분자 없으면 공백 기준으로 midpoint에 가장 가까운 지점 분할 (KO·EN 모두)
+  let bestSpace = -1;
+  let bestSpaceDist = Infinity;
+  for (let i = 4; i < text.length - 3; i++) {
+    if (text[i] === " ") {
+      const d = Math.abs(i - target);
+      if (d < bestSpaceDist) { bestSpaceDist = d; bestSpace = i; }
     }
+  }
+  if (bestSpace > 0) {
+    return [text.slice(0, bestSpace), text.slice(bestSpace + 1)];
   }
 
   return [text];
@@ -209,176 +245,163 @@ export async function GET(
   }
 
   // ── 공통 변수 ──
-  const rawTitle   = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
-  const headline   = cleanTitle(rawTitle, lang);
-  const lines      = splitHeadline(headline, lang);
-  const config     = getConfig(issue.severity);
-  const topicLabel = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
-  const cn         = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;
+  const rawTitle    = lang === "en" ? (issue.title || issue.title_ko || "") : (issue.title_ko || issue.title || "");
+  const headline    = cleanTitle(rawTitle, lang);
+  const lines       = splitHeadline(headline, lang);
+  const config      = getConfig(issue.severity);
+  const topicLabel  = (TOPIC[issue.topic] || TOPIC.unknown)[lang];
+  const cn          = issue.country_code ? COUNTRY_NAMES[issue.country_code] : null;
   const countryName = cn ? cn[lang] : (issue.country_code ?? "");
   const displayFont = lang === "en" ? "'Noto Serif KR', serif" : "'Gothic A1', sans-serif";
   const uiFont      = "'Inter', sans-serif";
+  const metaLine    = [countryName, topicLabel].filter(Boolean).join("  ·  ");
+  const reportsText = lang === "en" ? `${issue.event_count} Reports` : `보도 ${issue.event_count}건`;
+  const sevLevelText = lang === "en" ? config.label.toUpperCase() : config.labelKo;
 
-  // 콘텐츠 패널 너비: 650px, 패딩 좌48+우52 = 내용 너비 ~550px
-  // Gothic A1 Black 기준 KO 1자 ≈ 0.95em, EN 1자 ≈ 0.55em
-  const titleSize = lang === "en"
-    ? (headline.length <= 12 ? 54 : headline.length <= 20 ? 46 : headline.length <= 30 ? 40 : 34)
-    : (headline.length <= 8  ? 56 : headline.length <= 13 ? 48 : headline.length <= 19 ? 42 : 36);
-
-  // ── 배경 이미지 (Base64) — wsrv.nl로 JPEG 변환 + 사이즈 최적화 ──
+  // ── 배경 이미지 fetch (풀블리드용: 1200×630) ──
   const MAX_IMAGE_BYTES = 800_000;
   let bgImageSrc: string | null = null;
   if (issue.image_url) {
     try {
-      const fetchUrl = `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=82&w=560&h=630&fit=cover`;
-      const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
-      if (imgRes.ok) {
+      // q=75 먼저 시도, 800KB 초과 시 q=55로 재시도
+      for (const q of [75, 55]) {
+        const fetchUrl = `https://wsrv.nl/?url=${encodeURIComponent(issue.image_url)}&output=jpg&q=${q}&w=1200&h=630&fit=cover`;
+        const imgRes = await fetch(fetchUrl, { signal: AbortSignal.timeout(5000) });
+        if (!imgRes.ok) break;
         const buf = await imgRes.arrayBuffer();
         if (buf.byteLength <= MAX_IMAGE_BYTES) {
           bgImageSrc = `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
+          break;
         }
       }
     } catch {}
   }
 
-  const metaLine = [countryName, topicLabel].filter(Boolean).join("  ·  ");
-  const reportsText = lang === "en" ? `${issue.event_count} Reports` : `보도 ${issue.event_count}건`;
-  const sevLabelText = lang === "en" ? "SEVERITY" : "위기지수";
-  const sevLevelText = lang === "en" ? config.label.toUpperCase() : config.labelKo;
-
   // ══════════════════════════════════════════════════════════
-  // LAYOUT A: 이미지 있음 — 하드 스플릿 (콘텐츠 좌 / 사진 우)
+  // LAYOUT A: 이미지 있음 — 풀블리드 + 그라디언트 오버레이
   // ══════════════════════════════════════════════════════════
   if (bgImageSrc) {
+    // 각 줄 글자수에 맞게 폰트 크기 자동 계산
+    // line1 (흰색 컨텍스트): max 88px, min 50px
+    // line2 (severity 컬러 핵심): max 100px, min 56px — 항상 line1보다 크게
+    const line1Size = fitFontSize(lines[0], lang, IMAGE_CONTENT_W, 88, 50);
+    const line2Size = lines[1]
+      ? fitFontSize(lines[1], lang, IMAGE_CONTENT_W, 100, 56)
+      : line1Size;
+
     return new ImageResponse(
       (
-        <div style={{ display: "flex", width: "100%", height: "100%", fontFamily: uiFont }}>
+        <div style={{ display: "flex", width: "100%", height: "100%", position: "relative", fontFamily: uiFont }}>
 
-          {/* ── 좌: 콘텐츠 패널 (650px) ── */}
+          {/* ── 풀블리드 사진 ── */}
+          <img
+            src={bgImageSrc}
+            style={{
+              position: "absolute", top: 0, left: 0,
+              width: "100%", height: "100%",
+              objectFit: "cover",
+            }}
+            alt=""
+          />
+
+          {/* ── 상단 그라디언트 (브랜드 배지 가독성) ── */}
           <div style={{
-            display: "flex", flexDirection: "column",
-            width: 650, height: 630,
-            background: "#0d0d0d",
-            position: "relative",
-            flexShrink: 0,
+            display: "flex",
+            position: "absolute", top: 0, left: 0, right: 0, height: 260,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.2) 65%, transparent 100%)",
+          }} />
+
+          {/* ── 하단 그라디언트 (텍스트 가독성) ── */}
+          <div style={{
+            display: "flex",
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 500,
+            background: "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.91) 30%, rgba(0,0,0,0.65) 55%, transparent 100%)",
+          }} />
+
+          {/* ── 좌측 severity 컬러 스트라이프 ── */}
+          <div style={{
+            display: "flex",
+            position: "absolute", top: 0, left: 0, width: 6, height: 630,
+            background: config.color,
+          }} />
+
+          {/* ── 상단 행: 브랜드 · severity 배지 ── */}
+          <div style={{
+            display: "flex",
+            position: "absolute", top: 0, left: 0, right: 0,
+            padding: "36px 54px",
+            justifyContent: "space-between", alignItems: "center",
           }}>
-            {/* Severity 상단 3px 엣지 */}
-            <div style={{
-              display: "flex", position: "absolute", top: 0, left: 0,
-              width: 650, height: 3, background: config.color,
-            }} />
-
-            {/* 내부 레이아웃 */}
-            <div style={{
-              display: "flex", flexDirection: "column",
-              height: "100%", padding: "46px 52px 44px 48px",
-            }}>
-              {/* 상단: 브랜드 · Severity 레이블 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <div style={{
-                    display: "flex", width: 8, height: 8,
-                    borderRadius: 4, background: config.color,
-                  }} />
-                  <span style={{
-                    color: "rgba(255,255,255,0.28)", fontSize: 12,
-                    fontWeight: 600, letterSpacing: "2.5px",
-                  }}>
-                    WEWANTPEACE
-                  </span>
-                </div>
-                <span style={{
-                  color: config.color, fontSize: 11,
-                  fontWeight: 600, letterSpacing: "3px",
-                }}>
-                  {sevLevelText}
-                </span>
-              </div>
-
-              {/* 중앙: 메타 + 헤드라인 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{
-                display: "flex", flexDirection: "column",
-                flex: 1, justifyContent: "center", gap: 16,
+                display: "flex", width: 10, height: 10,
+                borderRadius: 5, background: config.color,
+              }} />
+              <span style={{
+                color: "rgba(255,255,255,0.62)", fontSize: 14,
+                fontWeight: 700, letterSpacing: "3.5px",
               }}>
-                {metaLine ? (
-                  <span style={{
-                    color: "rgba(255,255,255,0.25)", fontSize: 12,
-                    fontWeight: 600, letterSpacing: "2px",
-                  }}>
-                    {metaLine}
-                  </span>
-                ) : null}
-
-                <div style={{
-                  display: "flex", flexDirection: "column",
-                  fontFamily: displayFont, fontWeight: 900,
-                  fontSize: titleSize, lineHeight: 1.18,
-                  letterSpacing: lang === "en" ? "-0.5px" : "-1px",
-                }}>
-                  <span style={{ color: "#fff" }}>{lines[0]}</span>
-                  {lines[1] ? (
-                    <span style={{ color: "rgba(255,255,255,0.52)" }}>{lines[1]}</span>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* 하단: 구분선 + 지표 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-                <div style={{ display: "flex", height: 1, background: "rgba(255,255,255,0.09)" }} />
-                <div style={{
-                  display: "flex", alignItems: "flex-end",
-                  justifyContent: "space-between",
-                }}>
-                  {/* 위기지수 숫자 */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-                    <span style={{
-                      fontFamily: displayFont, fontWeight: 900,
-                      fontSize: 82, lineHeight: 1, letterSpacing: "-3px",
-                      color: config.color,
-                    }}>
-                      {issue.severity}
-                    </span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, letterSpacing: "2.5px",
-                      color: "rgba(255,255,255,0.22)",
-                      paddingBottom: 12,
-                    }}>
-                      {sevLabelText}
-                    </span>
-                  </div>
-
-                  {/* 보도 건수 + 도메인 */}
-                  <div style={{
-                    display: "flex", flexDirection: "column",
-                    alignItems: "flex-end", gap: 5, paddingBottom: 5,
-                  }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.38)" }}>
-                      {reportsText}
-                    </span>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.17)" }}>
-                      wewantpeace.live
-                    </span>
-                  </div>
-                </div>
-              </div>
+                WEWANTPEACE
+              </span>
+            </div>
+            <div style={{
+              display: "flex",
+              background: config.bg, color: "#fff",
+              fontSize: 12, fontWeight: 700, letterSpacing: "3px",
+              padding: "8px 22px", borderRadius: 2,
+            }}>
+              {sevLevelText}
             </div>
           </div>
 
-          {/* ── 수직 구분선 (1px) ── */}
+          {/* ── 하단 텍스트 블록 ── */}
           <div style={{
-            display: "flex", width: 1, height: 630,
-            background: "rgba(255,255,255,0.08)", flexShrink: 0,
-          }} />
+            display: "flex", flexDirection: "column",
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            padding: `0 60px 44px 62px`,
+          }}>
+            {/* 메타 라인 */}
+            {metaLine ? (
+              <span style={{
+                color: "rgba(255,255,255,0.4)", fontSize: 22,
+                fontWeight: 600, letterSpacing: "2px", marginBottom: 14,
+              }}>
+                {metaLine}
+              </span>
+            ) : null}
 
-          {/* ── 우: 뉴스 사진 (549px) — 거의 원본 밝기 ── */}
-          <div style={{ display: "flex", flex: 1, height: 630, overflow: "hidden" }}>
-            <img
-              src={bgImageSrc}
-              width={549}
-              height={630}
-              style={{ objectFit: "cover", filter: "brightness(0.9) saturate(0.92)" }}
-              alt=""
-            />
+            {/* 헤드라인 줄 1 — 흰색 */}
+            <span style={{
+              fontFamily: displayFont, fontWeight: 900,
+              fontSize: line1Size, lineHeight: 1.06,
+              color: "#fff",
+              letterSpacing: lang === "en" ? "-1px" : "-1.5px",
+            }}>
+              {lines[0]}
+            </span>
+
+            {/* 헤드라인 줄 2 — severity 컬러 강조 */}
+            {lines[1] ? (
+              <span style={{
+                fontFamily: displayFont, fontWeight: 900,
+                fontSize: line2Size, lineHeight: 1.06,
+                color: config.color,
+                letterSpacing: lang === "en" ? "-1.5px" : "-2px",
+              }}>
+                {lines[1]}
+              </span>
+            ) : null}
+
+            {/* 보도 건수 + 도메인 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 20 }}>
+              <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 19, fontWeight: 600 }}>
+                {reportsText}
+              </span>
+              <span style={{ color: "rgba(255,255,255,0.14)", fontSize: 18 }}>|</span>
+              <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 18 }}>
+                wewantpeace.live
+              </span>
+            </div>
           </div>
         </div>
       ),
@@ -394,10 +417,11 @@ export async function GET(
   // LAYOUT B: 이미지 없음 — 크림 에디토리얼 폴백
   // ══════════════════════════════════════════════════════════
 
-  // 에디토리얼 폴백 헤드라인은 더 넓은 공간(1132px) 사용 → 폰트 크게
-  const editorialTitleSize = lang === "en"
-    ? (headline.length <= 18 ? 66 : headline.length <= 28 ? 58 : headline.length <= 38 ? 50 : 42)
-    : (headline.length <= 10 ? 72 : headline.length <= 16 ? 64 : headline.length <= 24 ? 56 : 46);
+  // 에디토리얼도 동일하게 글자수 기반 폰트 크기 계산
+  const editLine1Size = fitFontSize(lines[0], lang, EDITORIAL_CONTENT_W, 92, 52);
+  const editLine2Size = lines[1]
+    ? fitFontSize(lines[1], lang, EDITORIAL_CONTENT_W, 104, 58)
+    : editLine1Size;
 
   return new ImageResponse(
     (
@@ -418,7 +442,7 @@ export async function GET(
           right: -10, bottom: -50,
           fontFamily: displayFont, fontWeight: 900,
           fontSize: 400, lineHeight: 1,
-          color: "rgba(0,0,0,0.048)",
+          color: "rgba(0,0,0,0.038)",
           letterSpacing: "-20px",
         }}>
           {issue.severity}
@@ -427,34 +451,33 @@ export async function GET(
         {/* 콘텐츠 레이어 */}
         <div style={{
           display: "flex", flexDirection: "column",
-          height: "100%", padding: "48px 68px 44px 72px",
+          height: "100%", padding: "48px 76px 44px 80px",
           position: "relative",
         }}>
           {/* 상단 메타 */}
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {/* Severity 필 */}
             <div style={{
               display: "flex", alignItems: "center",
               background: config.bg, color: "#fff",
-              fontSize: 10, fontWeight: 600, letterSpacing: "3px",
-              padding: "5px 14px", borderRadius: 1,
+              fontSize: 11, fontWeight: 700, letterSpacing: "3px",
+              padding: "7px 18px", borderRadius: 2,
             }}>
-              {config.label.toUpperCase()}
+              {lang === "en" ? config.label.toUpperCase() : config.labelKo}
             </div>
             {countryName ? (
               <>
-                <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 15 }}>·</span>
-                <span style={{ color: "rgba(0,0,0,0.38)", fontSize: 13, fontWeight: 600 }}>
+                <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 18 }}>·</span>
+                <span style={{ color: "rgba(0,0,0,0.45)", fontSize: 15, fontWeight: 600 }}>
                   {countryName}
                 </span>
               </>
             ) : null}
-            <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 15 }}>·</span>
-            <span style={{ color: "rgba(0,0,0,0.38)", fontSize: 13, fontWeight: 600 }}>
+            <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 18 }}>·</span>
+            <span style={{ color: "rgba(0,0,0,0.45)", fontSize: 15, fontWeight: 600 }}>
               {topicLabel}
             </span>
-            <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 15 }}>·</span>
-            <span style={{ color: "rgba(0,0,0,0.38)", fontSize: 13, fontWeight: 600 }}>
+            <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 18 }}>·</span>
+            <span style={{ color: "rgba(0,0,0,0.45)", fontSize: 15, fontWeight: 600 }}>
               {reportsText}
             </span>
           </div>
@@ -464,24 +487,30 @@ export async function GET(
             display: "flex", flexDirection: "column",
             flex: 1, justifyContent: "center",
           }}>
-            {/* 상단 룰 */}
-            <div style={{ display: "flex", height: 1.5, background: "rgba(0,0,0,0.11)", marginBottom: 28 }} />
+            <div style={{ display: "flex", height: 2, background: "rgba(0,0,0,0.1)", marginBottom: 28 }} />
 
-            <div style={{
-              display: "flex", flexDirection: "column",
-              fontFamily: displayFont, fontWeight: 900,
-              fontSize: editorialTitleSize, lineHeight: 1.08,
-              letterSpacing: lang === "en" ? "-1.5px" : "-2px",
-              wordBreak: "keep-all",
-            }}>
-              <span style={{ color: "#0d0d0d" }}>{lines[0]}</span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{
+                fontFamily: displayFont, fontWeight: 900,
+                fontSize: editLine1Size, lineHeight: 1.07,
+                color: "#0d0d0d",
+                letterSpacing: lang === "en" ? "-1.5px" : "-2px",
+              }}>
+                {lines[0]}
+              </span>
               {lines[1] ? (
-                <span style={{ color: "rgba(0,0,0,0.42)" }}>{lines[1]}</span>
+                <span style={{
+                  fontFamily: displayFont, fontWeight: 900,
+                  fontSize: editLine2Size, lineHeight: 1.07,
+                  color: "rgba(0,0,0,0.36)",
+                  letterSpacing: lang === "en" ? "-1.5px" : "-2px",
+                }}>
+                  {lines[1]}
+                </span>
               ) : null}
             </div>
 
-            {/* 하단 룰 */}
-            <div style={{ display: "flex", height: 1.5, background: "rgba(0,0,0,0.11)", marginTop: 28 }} />
+            <div style={{ display: "flex", height: 2, background: "rgba(0,0,0,0.1)", marginTop: 28 }} />
           </div>
 
           {/* 하단 행 */}
@@ -489,35 +518,33 @@ export async function GET(
             display: "flex", alignItems: "center",
             justifyContent: "space-between",
           }}>
-            {/* 토픽 칩 */}
             <div style={{
               display: "flex", alignItems: "center",
-              fontSize: 11, fontWeight: 600, letterSpacing: "2px",
-              color: "rgba(0,0,0,0.35)",
-              border: "1px solid rgba(0,0,0,0.12)",
-              padding: "5px 13px", borderRadius: 1,
+              fontSize: 12, fontWeight: 700, letterSpacing: "2px",
+              color: "rgba(0,0,0,0.34)",
+              border: "1.5px solid rgba(0,0,0,0.14)",
+              padding: "7px 16px", borderRadius: 2,
             }}>
               {topicLabel.toUpperCase()}
             </div>
 
-            {/* 위기지수 + 도메인 */}
             <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <span style={{
                   fontFamily: displayFont, fontWeight: 900,
-                  fontSize: 60, lineHeight: 1, letterSpacing: "-2px",
+                  fontSize: 66, lineHeight: 1, letterSpacing: "-2px",
                   color: config.bg,
                 }}>
                   {issue.severity}
                 </span>
                 <span style={{
-                  fontSize: 10, fontWeight: 600, letterSpacing: "2px",
+                  fontSize: 11, fontWeight: 600, letterSpacing: "2px",
                   color: "rgba(0,0,0,0.28)", paddingBottom: 9,
                 }}>
-                  {sevLabelText}
+                  {lang === "en" ? "SEVERITY" : "위기지수"}
                 </span>
               </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(0,0,0,0.22)", letterSpacing: "0.5px" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(0,0,0,0.22)", letterSpacing: "0.5px" }}>
                 wewantpeace.live
               </span>
             </div>
