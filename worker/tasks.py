@@ -965,11 +965,18 @@ def calculate_tension(self):
 
     async def _run():
         from worker.processor.tension_calculator import calculate_all_tensions
+        from backend.app.core.redis import get_redis
         async with AsyncSessionLocal() as db:
             async with db.begin():
                 results = await calculate_all_tensions(db)
                 logger.info("긴장도 계산 완료: %d개국", len(results))
-                return {"status": "ok", "countries": len(results)}
+        # DB 커밋 후 캐시 무효화 — 다음 /tension/all 호출 시 신선한 DB 값 사용
+        try:
+            redis = get_redis()
+            await redis.delete("tension:all:cache")
+        except Exception as e:
+            logger.warning("tension:all:cache 무효화 실패 (무시): %s", e)
+        return {"status": "ok", "countries": len(results)}
 
     try:
         return run_async(_run())

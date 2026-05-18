@@ -360,6 +360,56 @@ async def calculate_country_tension(
     )
     all_clusters = res.scalars().all()
 
+    # ── 48h 윈도우가 비어있으면 이전 값 decay 적용 (서비스 중단 후 0 덮어쓰기 방지) ──
+    # 중단 후 재시작 직후 빈 윈도우로 0이 기록되면 복구까지 수시간 동안 0 표시됨
+    if not all_clusters:
+        prev_score_res = await db.execute(
+            select(TensionIndex.raw_score, TensionIndex.time)
+            .where(TensionIndex.country_code == country_code)
+            .order_by(TensionIndex.time.desc())
+            .limit(1)
+        )
+        prev_row = prev_score_res.first()
+        if prev_row and prev_row[0] > 5.0:
+            hours_since = (now - prev_row[1].replace(tzinfo=timezone.utc)).total_seconds() / 3600
+            decay = max(0.5, 1.0 - hours_since * 0.01)   # 1%/h 감쇠, 최저 50%
+            decayed = round(prev_row[0] * decay, 2)
+            floor = CONFLICT_FLOOR.get(country_code, 0.0)
+            raw_score = max(decayed, floor)
+            logger.debug(
+                "빈 48h 윈도우 decay: %s 이전=%.1f → decay=%.1f (%.0fh)",
+                country_code, prev_row[0], raw_score, hours_since,
+            )
+            # 퍼센타일·레벨은 decay 값 기준으로 정상 계산
+            percentile = await _get_percentile_30d(country_code, raw_score, db)
+            level = _tension_level(percentile, raw_score)
+            entry = TensionIndex(
+                time=now,
+                country_code=country_code,
+                raw_score=raw_score,
+                tension_level=level,
+                event_score=0.0,
+                accel_score=0.0,
+                spillover_score=0.0,
+                percentile_30d=percentile,
+                convergence_bonus=round(convergence_bonus, 2),
+                anomaly_z=None,
+            )
+            db.add(entry)
+            return {
+                "country_code": country_code,
+                "raw_score": raw_score,
+                "tension_level": level,
+                "percentile_30d": percentile,
+                "event_score": 0.0,
+                "accel_score": 0.0,
+                "spillover_score": 0.0,
+                "convergence_bonus": round(convergence_bonus, 2),
+                "anomaly_z": None,
+                "delta_24h": None,
+                "top5_clusters": [],
+            }
+
     # 24h 이내: 최신 (weight 1.0) / 24~48h: 오래된 (weight 0.5 decay)
     recent_clusters = [c for c in all_clusters if c.last_event_at >= recent_cutoff]
     stale_clusters  = [c for c in all_clusters if c.last_event_at < recent_cutoff]
