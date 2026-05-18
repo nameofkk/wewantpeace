@@ -273,7 +273,9 @@ def _decrypt_toss_user_data(encrypted_data: str) -> dict:
 
 
 @router.post("/toss-login", response_model=TossLoginOut)
+@limiter.limit("10/minute")
 async def toss_login(
+    request: Request,
     body: TossLoginBody,
     db: AsyncSession = Depends(get_db),
 ):
