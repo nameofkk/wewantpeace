@@ -568,7 +568,7 @@ def pregenerate_impact_briefs(self):
             )
             clusters = clusters_q.scalars().all()
 
-            redis = await get_redis()
+            redis = get_redis()
             if not redis:
                 logger.warning("pregenerate: Redis 미연결, 스킵")
                 return {"generated": 0, "skipped": 0}
