@@ -143,8 +143,10 @@ async def send_health_report(results: list) -> bool:
     message, all_issues = _build_report_message(results)
 
     # 전체 정상이면 알림 스킵 (하루 4번 "정상" 메시지 방지)
+    # info severity(sns_token_validity 미설정 등)는 조치 불가 → 스킵 판정에서 제외
     all_ok = all(getattr(r, "status", None) == "ok" for r in results)
-    if not all_issues and all_ok:
+    actionable_issues = [i for i in all_issues if i.severity != "info"]
+    if not actionable_issues and all_ok:
         logger.info("헬스체크 전체 정상 (%d개) — 텔레그램 알림 스킵", len(results))
         return True
 
