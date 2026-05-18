@@ -181,7 +181,7 @@ app.conf.beat_schedule = {
     },
     "publish-approved-social": {
         "task": "worker.tasks.publish_approved_social",
-        "schedule": crontab(minute="*/2"),  # 2분마다 approved 상태 게시물 발행
+        "schedule": crontab(minute="*/5"),  # 5분마다 approved 상태 게시물 발행
         "options": {"queue": "process"},
     },
     # ── SNS 운영 리포트 ──

@@ -142,27 +142,11 @@ async def send_health_report(results: list) -> bool:
     redis = get_redis()
     message, all_issues = _build_report_message(results)
 
-    # 이슈 없으면 간단 메시지만 전송
-    if not all_issues:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMessage",
-                    json={
-                        "chat_id": SOCIAL_TG_CHAT_ID,
-                        "text": message,
-                        "parse_mode": "HTML",
-                        "disable_web_page_preview": True,
-                    },
-                )
-                if resp.status_code == 200:
-                    logger.info("헬스체크 리포트 전송 완료 (이슈 없음)")
-                    return True
-                logger.error("헬스체크 리포트 전송 실패: %s", resp.text)
-                return False
-        except Exception:
-            logger.exception("헬스체크 리포트 전송 오류")
-            return False
+    # 전체 정상이면 알림 스킵 (하루 4번 "정상" 메시지 방지)
+    all_ok = all(getattr(r, "status", None) == "ok" for r in results)
+    if not all_issues and all_ok:
+        logger.info("헬스체크 전체 정상 (%d개) — 텔레그램 알림 스킵", len(results))
+        return True
 
     # 이슈 있는 경우: 인라인 키보드와 함께 전송
     try:
