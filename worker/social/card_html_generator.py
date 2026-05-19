@@ -179,6 +179,8 @@ body{{background:#0B0B0F;font-family:'DM Sans',sans-serif;{bg_css}}}
   line-height:1.1;
   color:#fff;
   letter-spacing:-.018em;
+  word-break:normal;
+  overflow-wrap:break-word;
   display:-webkit-box;
   -webkit-line-clamp:5;
   -webkit-box-orient:vertical;
@@ -191,6 +193,8 @@ body{{background:#0B0B0F;font-family:'DM Sans',sans-serif;{bg_css}}}
   font-size:{ko_fs}px;
   line-height:1.4;
   color:rgba(255,255,255,.80);
+  word-break:keep-all;
+  overflow-wrap:break-word;
   display:-webkit-box;
   -webkit-line-clamp:3;
   -webkit-box-orient:vertical;
@@ -320,6 +324,8 @@ body{{background:#F5F1EA;font-family:'DM Sans',sans-serif;color:#1A1A1A;}}
   font-size:24px;
   line-height:1.28;
   color:#1A1A1A;
+  word-break:normal;
+  overflow-wrap:break-word;
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
@@ -332,6 +338,8 @@ body{{background:#F5F1EA;font-family:'DM Sans',sans-serif;color:#1A1A1A;}}
   font-size:17px;
   line-height:1.45;
   color:rgba(0,0,0,.58);
+  word-break:keep-all;
+  overflow-wrap:break-word;
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
