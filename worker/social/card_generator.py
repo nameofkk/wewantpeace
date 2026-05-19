@@ -512,9 +512,10 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
             issues=issues,
             hashtags=post.hashtags,
             date=date_str,
+            image_url=bg_image_url,
         )
-    except Exception:
-        logger.debug("HTML 카드 생성 불가, PIL 폴백으로 전환")
+    except Exception as e:
+        logger.warning("HTML 카드 생성 불가, PIL 폴백으로 전환: %s", e)
 
     # ── PIL 폴백 ─────────────────────────────────────────────────────────────
     if not image_bytes:
