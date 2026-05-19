@@ -115,6 +115,27 @@ engine = create_async_engine(
     **_engine_kwargs,
 )
 
+# ── pgbouncer transaction mode: stale prepared statement 정리 ─────────────────
+# asyncpg는 statement_cache_size=0 이어도 named prepared statement를 서버 측에 생성함
+# (__asyncpg_stmt_1__, __asyncpg_stmt_2__, ...).
+# pgbouncer가 backend PG connection을 재사용할 때 stale statement가 남아 있으면
+# DuplicatePreparedStatementError 발생.
+#
+# 해결: 새 연결 체크아웃 시 DEALLOCATE ALL을 simple query protocol(파라미터 없음)로 실행.
+# simple query는 prepared statement를 사용하지 않으므로 stale statement에 영향받지 않음.
+if not _is_sqlite:
+    from sqlalchemy import event as _sa_event
+
+    @_sa_event.listens_for(engine.sync_engine, "connect")
+    def _on_connect(dbapi_connection, connection_record):
+        """새 asyncpg 연결 시 pgbouncer backend의 stale prepared statement 정리."""
+        try:
+            raw_conn = dbapi_connection._connection
+            # simple query protocol (파라미터 없음) → named prepared statement 생성 안 함
+            dbapi_connection.await_(raw_conn.execute("DEALLOCATE ALL"))
+        except Exception:
+            pass  # 첫 연결이거나 DEALLOCATE 불필요한 경우 무시
+
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
