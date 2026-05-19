@@ -3444,54 +3444,66 @@ def force_html_card_post(self):
         from backend.app.models.social_post import SocialPost
         from worker.social.generators import generate_kscore_alert
 
+        # ① 클러스터 조회
+        cluster_id = None
         async with AsyncSessionLocal() as db:
-            # 최고 severity 활성 클러스터 조회
-            r = await db.execute(
-                select(IssueCluster)
-                .where(IssueCluster.is_active == True, IssueCluster.severity >= 70)
-                .order_by(IssueCluster.kscore.desc())
-                .limit(3)
-            )
-            clusters = r.scalars().all()
-            if not clusters:
+            async with db.begin():
+                r = await db.execute(
+                    select(IssueCluster)
+                    .where(IssueCluster.is_active == True, IssueCluster.severity >= 70)
+                    .order_by(IssueCluster.kscore.desc())
+                    .limit(1)
+                )
+                cluster = r.scalar_one_or_none()
+            if not cluster:
                 return {"status": "no_cluster"}
-
-            cluster = clusters[0]
+            cluster_id = cluster.id
+            country = cluster.country_code
+            severity = cluster.severity
             logger.warning(
                 "force_html_card_post: cluster=%s country=%s sev=%d",
-                cluster.id, cluster.country_code, cluster.severity,
+                cluster_id, country, severity,
             )
 
-            # 해당 클러스터의 기존 kscore_alert 포스트 삭제 (dedup 초기화)
+        # ② 기존 dedup 포스트 삭제 (세션 분리)
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        dedup_key = f"kscore_alert:{cluster_id}:{today}"
+        async with AsyncSessionLocal() as db:
             async with db.begin():
                 await db.execute(
                     delete(SocialPost).where(
-                        SocialPost.source_cluster_id == cluster.id,
+                        SocialPost.source_cluster_id == cluster_id,
                         SocialPost.content_type == "kscore_alert",
                         SocialPost.status.in_(["draft", "approved", "pending"]),
                     )
                 )
-                # dedup_key도 삭제
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                dedup_key = f"kscore_alert:{cluster.id}:{today}"
                 await db.execute(
                     delete(SocialPost).where(SocialPost.dedup_key == dedup_key)
                 )
 
-            # 새 포스트 생성 (HTML 카드 포함)
+        # ③ 새 포스트 생성 (HTML 카드 포함, 세션 분리)
+        async with AsyncSessionLocal() as db:
             async with db.begin():
+                # 클러스터 재조회 (새 세션)
+                r2 = await db.execute(
+                    select(IssueCluster).where(IssueCluster.id == cluster_id)
+                )
+                cluster = r2.scalar_one_or_none()
+                if not cluster:
+                    return {"status": "cluster_not_found"}
                 post = await generate_kscore_alert(cluster, db)
-                if not post:
-                    return {"status": "still_blocked", "cluster_id": str(cluster.id)}
 
-            return {
-                "status": "ok",
-                "post_id": str(post.id),
-                "image_url": post.image_url,
-                "cluster_id": str(cluster.id),
-                "country": cluster.country_code,
-                "severity": cluster.severity,
-            }
+        if not post:
+            return {"status": "still_blocked", "cluster_id": str(cluster_id)}
+
+        return {
+            "status": "ok",
+            "post_id": str(post.id),
+            "image_url": post.image_url,
+            "cluster_id": str(cluster_id),
+            "country": country,
+            "severity": severity,
+        }
 
     try:
         result = run_async(_run())
