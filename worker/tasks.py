@@ -3396,13 +3396,18 @@ def test_card_real(self):
         }]
         bg_image_url = getattr(cluster, "image_url", None)
 
+        import asyncio, functools
         from worker.social.card_html_generator import generate_html_card
-        data = generate_html_card(
+        # sync_playwright는 asyncio 루프 안에서 직접 호출 불가 → run_in_executor
+        fn = functools.partial(
+            generate_html_card,
             content_type="kscore_alert",
             issues=issues,
             date=None,
             image_url=bg_image_url,
         )
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, fn)
         if data:
             return {
                 "status": "ok",
