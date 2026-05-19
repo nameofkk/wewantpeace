@@ -504,16 +504,25 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
             date_str = evt_time.strftime("%Y-%m-%d %H:%M UTC")
 
     # ── HTML/Playwright 카드 우선 시도 ──────────────────────────────────────
+    # sync_playwright()는 asyncio 이벤트 루프가 활성화된 상태에서 호출 불가.
+    # async def인 generate_card_for_post 내부에서 직접 호출하면
+    # "Playwright Sync API inside the asyncio loop" 에러 발생.
+    # → run_in_executor로 별도 스레드에서 실행 (이벤트 루프 없는 환경).
     image_bytes: bytes | None = None
     try:
+        import asyncio
+        import functools
         from worker.social.card_html_generator import generate_html_card
-        image_bytes = generate_html_card(
+        fn = functools.partial(
+            generate_html_card,
             content_type=post.content_type,
             issues=issues,
             hashtags=post.hashtags,
             date=date_str,
             image_url=bg_image_url,
         )
+        loop = asyncio.get_event_loop()
+        image_bytes = await loop.run_in_executor(None, fn)
     except Exception as e:
         logger.warning("HTML 카드 생성 불가, PIL 폴백으로 전환: %s", e)
 
