@@ -503,14 +503,29 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
         if evt_time:
             date_str = evt_time.strftime("%Y-%m-%d %H:%M UTC")
 
-    image_bytes = generate_card(
-        content_type=post.content_type,
-        issues=issues,
-        body_text=post.body_text if not issues else None,
-        hashtags=post.hashtags,
-        bg_image_url=bg_image_url,
-        date_str=date_str,
-    )
+    # ── HTML/Playwright 카드 우선 시도 ──────────────────────────────────────
+    image_bytes: bytes | None = None
+    try:
+        from worker.social.card_html_generator import generate_html_card
+        image_bytes = generate_html_card(
+            content_type=post.content_type,
+            issues=issues,
+            hashtags=post.hashtags,
+            date=date_str,
+        )
+    except Exception:
+        logger.debug("HTML 카드 생성 불가, PIL 폴백으로 전환")
+
+    # ── PIL 폴백 ─────────────────────────────────────────────────────────────
+    if not image_bytes:
+        image_bytes = generate_card(
+            content_type=post.content_type,
+            issues=issues,
+            body_text=post.body_text if not issues else None,
+            hashtags=post.hashtags,
+            bg_image_url=bg_image_url,
+            date_str=date_str,
+        )
     if not image_bytes:
         return None
 
