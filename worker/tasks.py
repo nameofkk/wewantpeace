@@ -3430,6 +3430,80 @@ def test_card_real(self):
 
 
 @app.task(
+    name="worker.tasks.force_html_card_post",
+    queue="process",
+    bind=True,
+)
+def force_html_card_post(self):
+    """HTML 카드 즉시 확인용: 상위 클러스터의 dedup 제거 후 새 포스트 강제 생성."""
+    import traceback as _tb
+
+    async def _run():
+        from sqlalchemy import select, delete
+        from backend.app.models.issue_cluster import IssueCluster
+        from backend.app.models.social_post import SocialPost
+        from worker.social.generators import generate_kscore_alert
+
+        async with AsyncSessionLocal() as db:
+            # 최고 severity 활성 클러스터 조회
+            r = await db.execute(
+                select(IssueCluster)
+                .where(IssueCluster.is_active == True, IssueCluster.severity >= 70)
+                .order_by(IssueCluster.kscore.desc())
+                .limit(3)
+            )
+            clusters = r.scalars().all()
+            if not clusters:
+                return {"status": "no_cluster"}
+
+            cluster = clusters[0]
+            logger.warning(
+                "force_html_card_post: cluster=%s country=%s sev=%d",
+                cluster.id, cluster.country_code, cluster.severity,
+            )
+
+            # 해당 클러스터의 기존 kscore_alert 포스트 삭제 (dedup 초기화)
+            async with db.begin():
+                await db.execute(
+                    delete(SocialPost).where(
+                        SocialPost.source_cluster_id == cluster.id,
+                        SocialPost.content_type == "kscore_alert",
+                        SocialPost.status.in_(["draft", "approved", "pending"]),
+                    )
+                )
+                # dedup_key도 삭제
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                dedup_key = f"kscore_alert:{cluster.id}:{today}"
+                await db.execute(
+                    delete(SocialPost).where(SocialPost.dedup_key == dedup_key)
+                )
+
+            # 새 포스트 생성 (HTML 카드 포함)
+            async with db.begin():
+                post = await generate_kscore_alert(cluster, db)
+                if not post:
+                    return {"status": "still_blocked", "cluster_id": str(cluster.id)}
+
+            return {
+                "status": "ok",
+                "post_id": str(post.id),
+                "image_url": post.image_url,
+                "cluster_id": str(cluster.id),
+                "country": cluster.country_code,
+                "severity": cluster.severity,
+            }
+
+    try:
+        result = run_async(_run())
+        logger.warning("FORCE_HTML_CARD: %s", result)
+        return result
+    except Exception:
+        tb = _tb.format_exc()
+        logger.warning("FORCE_HTML_CARD ERROR: %s", tb[:500])
+        return {"status": "error", "traceback": tb}
+
+
+@app.task(
     name="worker.tasks.generate_weekly_social",
     queue="process",
     bind=True,
