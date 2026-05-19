@@ -79,24 +79,27 @@ _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 _txn_mode_connect_args: dict = {}
 if not _is_sqlite:
     # asyncpg: prepared statement 캐시 비활성화 (transaction mode pooler 필수)
-    # statement_cache_size=0 → asyncpg 클라이언트 측 캐시 비활성화
-    # (server_settings가 아닌 asyncpg connect() 파라미터)
+    # statement_cache_size=0 → asyncpg 클라이언트 측 named prepared statement 억제
     _txn_mode_connect_args = {"statement_cache_size": 0}
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
 elif _is_worker:
-    # Worker: child당 1개 연결 (concurrency=4)
+    # ── Worker: NullPool + pgbouncer transaction mode ──────────────────────
+    # pgbouncer transaction mode에서 SQLAlchemy 레벨 connection pool을 사용하면
+    # fork된 자식 프로세스가 부모의 asyncpg 연결을 상속 → 이벤트 루프 불일치 +
+    # DuplicatePreparedStatementError 발생.
+    #
+    # NullPool: 각 AsyncSessionLocal() 호출마다 새 연결, 세션 종료 시 즉시 close.
+    # pgbouncer가 실제 PG 연결을 풀링하므로 연결 오버헤드 없음.
+    # (Celery 워커 concurrency=4 → 최대 동시 4개 연결, pgbouncer가 관리)
+    from sqlalchemy.pool import NullPool
     _engine_kwargs = {
-        "pool_size": 1,
-        "max_overflow": 2,
-        "pool_pre_ping": True,
-        "pool_recycle": 1800,
-        "pool_timeout": 30,
+        "poolclass": NullPool,
         "connect_args": _txn_mode_connect_args,
     }
 else:
-    # Backend: uvicorn 1 worker
+    # Backend: uvicorn 1 worker — 연결 풀 사용 (일반적인 웹 서버 패턴)
     _engine_kwargs = {
         "pool_size": 2,
         "max_overflow": 4,

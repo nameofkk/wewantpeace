@@ -345,17 +345,36 @@ app.conf.beat_schedule = {
 
 @worker_process_init.connect
 def on_worker_process_init(**kwargs):
-    """각 ForkPoolWorker 프로세스 시작 시 Firebase 초기화.
+    """각 ForkPoolWorker 프로세스 시작 시 실행.
 
     prefork 모드에서 worker_ready는 MainProcess에서만 실행되고
     fork된 자식 프로세스(ForkPoolWorker)에는 Firebase SDK가 전달되지 않음.
     worker_process_init은 각 자식 프로세스마다 호출됨.
+
+    # fork 안전성: 부모 프로세스의 asyncpg 연결 풀 정리
+    # -------------------------------
+    # ForkPoolWorker는 부모 프로세스를 fork하므로, 부모의 SQLAlchemy 비동기 엔진
+    # (asyncpg 연결 포함)이 자식 프로세스에 상속됨. 자식은 새 이벤트 루프를 생성하므로
+    # 부모의 연결은 이벤트 루프 불일치로 사용 불가 상태.
+    # dispose()로 풀을 비워 자식이 첫 DB 요청 시 새 연결을 생성하게 함.
+    # → DuplicatePreparedStatementError (pgbouncer transaction mode) 방지
     """
     import logging
+    _log = logging.getLogger(__name__)
+
+    # DB 엔진 풀 정리 (fork 안전성)
+    try:
+        from backend.app.core.database import engine
+        engine.sync_engine.dispose()
+        _log.info("worker_process_init: asyncpg 연결 풀 dispose 완료")
+    except Exception as e:
+        _log.warning("worker_process_init: 엔진 dispose 실패 (무시): %s", e)
+
+    # Firebase 초기화
     from backend.app.core.firebase_init import init_firebase
     ok = init_firebase()
     if not ok:
-        logging.getLogger(__name__).critical(
+        _log.critical(
             "Firebase 초기화 실패! FCM 알림 발송 불가. "
             "FIREBASE_SERVICE_ACCOUNT_JSON 환경변수를 확인하세요."
         )
