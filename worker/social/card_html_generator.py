@@ -494,26 +494,60 @@ body{{background:#0F172A;font-family:'DM Sans',sans-serif;color:#fff;}}
 
 # ── Playwright 스크린샷 ────────────────────────────────────────────────────────
 
+_CHROMIUM_ARGS = [
+    # 컨테이너/제한 환경 필수 플래그
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-zygote",
+    # 렌더링 안정화
+    "--disable-software-rasterizer",
+    "--disable-background-networking",
+    "--no-first-run",
+]
+
+
+def _store_error_to_redis(err: str) -> None:
+    """Railway 진단용: 에러를 Redis에 저장 (1시간 TTL)."""
+    try:
+        import os, redis as _redis
+        url = os.environ.get("REDIS_URL", "")
+        if not url:
+            return
+        r = _redis.from_url(url, socket_connect_timeout=3)
+        r.setex("playwright_error", 3600, err)
+    except Exception:
+        pass
+
+
 def _screenshot(html_src: str) -> bytes:
+    import traceback as _tb
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
-        try:
-            page = browser.new_page(viewport={"width": 720, "height": 900})
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=_CHROMIUM_ARGS)
             try:
-                page.set_content(html_src, wait_until="networkidle", timeout=15000)
-            except Exception:
-                pass  # 타임아웃이어도 현재 렌더 상태로 스크린샷
-            page.evaluate("() => document.fonts.ready")
-            data = page.screenshot(
-                full_page=False,
-                clip={"x": 0, "y": 0, "width": 720, "height": 900},
-                type="png",
-            )
-        finally:
-            browser.close()
-    return data
+                page = browser.new_page(viewport={"width": 720, "height": 900})
+                try:
+                    page.set_content(html_src, wait_until="networkidle", timeout=15000)
+                except Exception:
+                    pass  # 타임아웃이어도 현재 렌더 상태로 스크린샷
+                page.evaluate("() => document.fonts.ready")
+                data = page.screenshot(
+                    full_page=False,
+                    clip={"x": 0, "y": 0, "width": 720, "height": 900},
+                    type="png",
+                )
+            finally:
+                browser.close()
+        return data
+    except Exception:
+        err = _tb.format_exc()
+        logger.error("Playwright 스크린샷 실패:\n%s", err)
+        _store_error_to_redis(err)
+        raise
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
