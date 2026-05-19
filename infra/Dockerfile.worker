@@ -2,14 +2,34 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 시스템 패키지 (Playwright Chromium 의존성 포함)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     fonts-noto-cjk \
+    # Playwright headless Chromium 실행에 필요한 라이브러리
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Playwright Chromium 브라우저 설치 (공유 경로에 설치 → appuser도 접근 가능)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN playwright install chromium && chmod -R 755 /opt/playwright-browsers
 
 COPY backend/ ./backend/
 COPY worker/ ./worker/
