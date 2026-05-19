@@ -3360,6 +3360,71 @@ def test_playwright(self):
 
 
 @app.task(
+    name="worker.tasks.test_card_real",
+    queue="process",
+    bind=True,
+)
+def test_card_real(self):
+    """실제 DB 클러스터로 HTML 카드 생성 검증 (운영 데이터 불변, 업로드 없음)."""
+    import traceback as _tb
+
+    async def _run():
+        from sqlalchemy import select
+        from backend.app.models.issue_cluster import IssueCluster
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(IssueCluster)
+                .where(IssueCluster.is_active == True, IssueCluster.severity >= 60)
+                .order_by(IssueCluster.kscore.desc())
+                .limit(1)
+            )
+            cluster = result.scalar_one_or_none()
+
+        if not cluster:
+            return {"status": "no_cluster"}
+
+        issues = [{
+            "title_en": cluster.title or "",
+            "title_ko": cluster.title_ko or cluster.title or "",
+            "country_code": cluster.country_code or "",
+            "severity": cluster.severity or 0,
+            "independent_sources": getattr(cluster, "independent_sources", 0),
+            "source_tiers": getattr(cluster, "source_tiers", []) or [],
+            "is_verified": getattr(cluster, "is_verified", False),
+            "event_count": getattr(cluster, "event_count", 0),
+        }]
+        bg_image_url = getattr(cluster, "image_url", None)
+
+        from worker.social.card_html_generator import generate_html_card
+        data = generate_html_card(
+            content_type="kscore_alert",
+            issues=issues,
+            date=None,
+            image_url=bg_image_url,
+        )
+        if data:
+            return {
+                "status": "ok",
+                "size_bytes": len(data),
+                "cluster_id": str(cluster.id),
+                "country": cluster.country_code,
+                "severity": cluster.severity,
+                "has_bg_image": bool(bg_image_url),
+            }
+        return {"status": "failed", "reason": "generate_html_card returned None"}
+
+    try:
+        result = run_async(_run())
+        logger.warning("CARD_REAL_TEST: %s", result)
+        return result
+    except Exception:
+        tb = _tb.format_exc()
+        logger.warning("CARD_REAL_TEST ERROR: %s", tb)
+        return {"status": "error", "traceback": tb}
+
+
+@app.task(
     name="worker.tasks.generate_weekly_social",
     queue="process",
     bind=True,
