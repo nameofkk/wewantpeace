@@ -3322,6 +3322,44 @@ generate_spike_social = generate_kscore_social
 
 
 @app.task(
+    name="worker.tasks.test_playwright",
+    queue="process",
+    bind=True,
+)
+def test_playwright(self):
+    """Playwright 동작 여부 즉시 진단용 태스크 (운영 데이터 불변)."""
+    import traceback as _tb
+    result = {}
+    try:
+        from worker.social.card_html_generator import generate_html_card
+        data = generate_html_card(
+            content_type="kscore_alert",
+            issues=[{
+                "title_en": "Playwright Test Card",
+                "title_ko": "플레이라이트 테스트 카드",
+                "country_code": "UA",
+                "severity": 85,
+                "independent_sources": 1,
+                "source_tiers": [],
+                "is_verified": False,
+                "event_count": 1,
+            }],
+            date="2026.05.19",
+        )
+        if data:
+            result = {"status": "ok", "size_bytes": len(data)}
+            logger.warning("PLAYWRIGHT_TEST OK: %d bytes", len(data))
+        else:
+            result = {"status": "failed", "reason": "generate_html_card returned None"}
+            logger.warning("PLAYWRIGHT_TEST FAILED: returned None")
+    except Exception:
+        tb = _tb.format_exc()
+        result = {"status": "error", "traceback": tb}
+        logger.warning("PLAYWRIGHT_TEST ERROR: %s", tb)
+    return result
+
+
+@app.task(
     name="worker.tasks.generate_weekly_social",
     queue="process",
     bind=True,
