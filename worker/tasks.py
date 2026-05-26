@@ -1249,6 +1249,13 @@ def retry_unprocessed(self):
         from backend.app.models.raw_event import RawEvent
         from datetime import datetime, timezone, timedelta
 
+        # 큐 과부하 방지: process 큐가 1,000개 이상이면 건너뜀
+        _sync_r = _get_sync_redis()
+        queue_len = _sync_r.llen("process")
+        if queue_len >= 1000:
+            logger.warning("retry_unprocessed 스킵: process 큐 과부하 (%d개)", queue_len)
+            return {"queued": 0, "skipped_reason": "queue_overloaded", "queue_len": queue_len}
+
         async with AsyncSessionLocal() as db:
             # 최근 6시간 이내 미처리 항목만 (너무 오래된 것은 무시)
             cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
@@ -1259,7 +1266,7 @@ def retry_unprocessed(self):
                     RawEvent.collected_at >= cutoff,
                 )
                 .order_by(RawEvent.collected_at.asc())
-                .limit(500)  # 한 번에 최대 500건 (200→500 상향)
+                .limit(100)  # 큐 과부하 방지: 500→100
             )
             ids = [str(row[0]) for row in result.fetchall()]
 
@@ -2929,17 +2936,6 @@ async def _send_weekly_report_impl():
                 # 이메일 발송
                 _send_email(user.email, subject, html_body, sender)
 
-                # 발송 로그 기록
-                async with db.begin():
-                    await db.execute(
-                        text(
-                            "INSERT INTO marketing_email_logs"
-                            " (user_id, subject, status)"
-                            " VALUES (:uid, :subj, :st)"
-                        ),
-                        {"uid": str(user.id), "subj": subject, "st": "sent"},
-                    )
-
                 sent_total += 1
 
             except Exception as e:
@@ -2947,23 +2943,6 @@ async def _send_weekly_report_impl():
                     "send_weekly_report: 발송 실패 [user=%s, email=%s]: %s",
                     user.id, user.email, e,
                 )
-                # 실패 로그 기록
-                try:
-                    async with db.begin():
-                        await db.execute(
-                            text(
-                                "INSERT INTO marketing_email_logs"
-                                " (user_id, subject, status)"
-                                " VALUES (:uid, :subj, :st)"
-                            ),
-                            {
-                                "uid": str(user.id),
-                                "subj": "WeWantPeace Weekly Report",
-                                "st": "failed",
-                            },
-                        )
-                except Exception:
-                    logger.exception("send_weekly_report: 실패 로그 기록 중 오류 [user=%s]", user.id)
                 failed_total += 1
 
         # 배치 간 딜레이 (마지막 배치 제외)
@@ -4683,9 +4662,9 @@ def generate_newsletter_draft(self):
     )
 
     # 현재 최대 vol 번호: latest_draft_vol 기반 (키 스캔 대신 안정적)
-    latest = r.get("newsletter:latest_draft_vol")
-    max_vol = int(latest) if latest else 0
-    next_vol = max_vol + 1
+    # 원자적 INCR로 vol 번호 할당 (동시 실행 시 중복 방지)
+    next_vol = r.incr("newsletter:latest_draft_vol")
+    logger.info("newsletter draft: allocated vol=%d", next_vol)
 
     script_path = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
@@ -4720,12 +4699,11 @@ def generate_newsletter_draft(self):
             logger.error("newsletter draft %s error: %s", lang, e)
             results[lang] = {"error": str(e)}
 
-    # 최소 하나 성공 시에만 vol 번호 업데이트
+    # 성공 여부 확인 (INCR로 이미 할당됨 — 실패 시에도 vol은 소비됨)
     any_success = any(
         res.get("exit_code") == 0 for res in results.values() if "exit_code" in res
     )
     if any_success:
-        r.set("newsletter:latest_draft_vol", str(next_vol))
         logger.info("newsletter draft vol=%d saved to Redis", next_vol)
     else:
         logger.error("newsletter draft 전부 실패, vol 번호 미업데이트")
@@ -4878,22 +4856,27 @@ def send_newsletter_scheduled(self, tz_group: str):
                     logger.warning(f"Failed to send to {user.email}: {e}")
                     failed += 1
 
-        # MarketingEmailLog 저장 (자동 발송 이력)
-        try:
-            from backend.app.models.community import MarketingEmailLog
-            vol = draft_kr.get("vol_number") if draft_kr else (draft_en.get("vol_number") if draft_en else "?")
-            log = MarketingEmailLog(
-                admin_id=None,
-                subject=f"WeWantPeace Newsletter Vol.{vol} (auto/{tz_group})",
-                body=f"자동 발송: tz_group={tz_group}",
-                sent_count=sent,
-                failed_count=failed,
-                status="completed" if sent > 0 else "failed",
-            )
-            db.add(log)
-            await db.flush()
-        except Exception as log_err:
-            logger.warning("MarketingEmailLog 저장 실패: %s", log_err)
+            # MarketingEmailLog 저장 (자동 발송 이력)
+            try:
+                from backend.app.models.community import MarketingEmailLog
+                vol = draft_kr.get("vol_number") if draft_kr else (draft_en.get("vol_number") if draft_en else "?")
+                log = MarketingEmailLog(
+                    admin_id=None,
+                    subject=f"WeWantPeace Newsletter Vol.{vol} (auto/{tz_group})",
+                    body=f"자동 발송: tz_group={tz_group}, sent={sent}, failed={failed}",
+                    sent_count=sent,
+                    failed_count=failed,
+                    status="completed" if sent > 0 else "failed",
+                )
+                db.add(log)
+                await db.commit()
+                logger.info("MarketingEmailLog 저장 완료: vol=%s, sent=%d, failed=%d", vol, sent, failed)
+            except Exception as log_err:
+                logger.error("MarketingEmailLog 저장 실패: %s", log_err)
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
 
         logger.info(f"Newsletter sent: tz_group={tz_group}, sent={sent}, failed={failed}")
         return {"status": "ok", "tz_group": tz_group, "sent": sent, "failed": failed}
