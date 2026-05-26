@@ -63,14 +63,14 @@ a { color: #18181b; }
 </td>
 </tr>
 <tr>
-<td background="{{hero_image_url}}" bgcolor="#0b1120" width="600" height="180" valign="bottom" style="background-image:url('{{hero_image_url}}');background-size:cover;background-position:center;background-color:#0b1120;">
+<td background="{{hero_image_url}}" bgcolor="#0b1120" width="600" height="280" valign="bottom" style="background-image:url('{{hero_image_url}}');background-size:cover;background-position:center top;background-color:#0b1120;">
 <!--[if gte mso 9]>
-<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:180px;">
+<v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:600px;height:280px;">
 <v:fill type="frame" src="{{hero_image_url}}" color="#0b1120" />
 <v:textbox style="mso-fit-shape-to-text:false" inset="0,0,0,0">
 <![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr><td style="background:linear-gradient(180deg,rgba(11,17,32,.15) 0%,rgba(11,17,32,.85) 100%);height:180px;padding:0 28px 14px;" valign="bottom">
+<tr><td style="background:linear-gradient(180deg,rgba(11,17,32,.05) 0%,rgba(11,17,32,.6) 50%,rgba(11,17,32,.92) 100%);height:280px;padding:0 28px 16px;" valign="bottom">
 <p class="sg w6 cw fa l2 m0" style="text-shadow:0 1px 3px rgba(0,0,0,.8);opacity:.8;">WEEKLY BRIEF · VOL.{{vol_number}} · {{issue_date}}</p>
 </td></tr>
 </table>
@@ -208,7 +208,7 @@ a { color: #18181b; }
 <td class="bw pH" style="background:#fff;padding:20px 28px 8px;">
 <p id="s2" class="sg w6 fa cd l2 m0"><span class="ib r3 ca p1 bp mg">02</span> CONFLICT</p>
 <p class="nk w9 ln c0 ff mX">전쟁 · 이번주</p>
-<p class="nk fd c7 h5 mk">지금도 누군가 죽어요. <b class="cd">{{total_conflicts}}건</b> 중 가장 급한 {{urgent_count}}곳.</p>
+<p class="nk fd c7 h5 mk">지금도 누군가 죽어요. <b class="cd">{{crisis_countries_count}}개국</b>에서 <b class="cd">{{total_conflicts}}건</b>.</p>
 </td>
 </tr>
 {{{conflict_stories_html}}}

@@ -127,27 +127,18 @@ async def create_checkout(
     if not settings.dodo_api_key:
         raise HTTPException(500, detail="DodoPayments API 키가 설정되지 않았습니다.")
 
-    # 기존 활성 구독 처리 (업그레이드/중복 방지)
-    # Trial 구독은 여기서 만료하지 않음 — subscription.active 웹훅에서 처리
-    # (체크아웃 미완료 시 trial이 조기 만료되는 버그 방지)
+    # 중복 구독 방지 (같은 플랜·주기 이미 활성 시 409)
+    # ⚠ 기존 구독은 여기서 취소하지 않음 — 체크아웃 미완료 시 기존 구독이 사라지는 버그 방지
+    # 플랜 전환 시 기존 구독 정리는 subscription.active 웹훅(_handle_subscription_active)에서 수행
     existing_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
             Subscription.status.in_(["active", "grace_period"]),
         )
     )
-    now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
         if existing_sub.plan == body.plan and existing_sub.billing_interval == body.billing_interval:
             raise HTTPException(409, detail="이미 같은 플랜·결제 주기의 활성 구독이 있습니다.")
-        else:
-            existing_sub.status = "cancelled"
-            existing_sub.cancelled_at = now
-            existing_sub.updated_at = now
-            logger.info(
-                "기존 구독 취소: user=%s plan=%s/%s → 새 플랜 %s/%s 전환",
-                current_user.id, existing_sub.plan, existing_sub.billing_interval, body.plan, body.billing_interval,
-            )
 
     # 이메일이 없는 유저(토스 등) → 플레이스홀더 사용
     customer_email = current_user.email
@@ -206,21 +197,16 @@ async def create_checkout_simple(
     if not settings.dodo_api_key:
         raise HTTPException(500, detail="DodoPayments API 키가 설정되지 않았습니다.")
 
-    # 기존 구독 처리 (Trial은 웹훅에서 만료 — 체크아웃 미완료 시 조기 만료 방지)
+    # 중복 구독 방지 — 기존 구독 취소는 subscription.active 웹훅에서 처리
     existing_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == current_user.id,
             Subscription.status.in_(["active", "grace_period"]),
         )
     )
-    now = datetime.now(timezone.utc)
     for existing_sub in existing_result.scalars().all():
         if existing_sub.plan == plan and existing_sub.billing_interval == billing_interval:
             raise HTTPException(409, detail="이미 같은 플랜·결제 주기의 활성 구독이 있습니다.")
-        else:
-            existing_sub.status = "cancelled"
-            existing_sub.cancelled_at = now
-            existing_sub.updated_at = now
 
     # 토스 유저는 이메일이 없을 수 있음 → 플레이스홀더 사용
     customer_email = current_user.email
@@ -326,9 +312,14 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
 
     now = datetime.now(timezone.utc)
     next_billing = data.next_billing_date
-    expires_at = data.expires_at or next_billing
-
     billing_interval = _dodo_product_to_billing_interval(product_id)
+
+    # monthly/annual은 Dodo의 expires_at 대신 next_billing을 사용
+    # (Dodo가 monthly 구독에 expires_at=2045 같은 이상한 값을 보내는 경우 방어)
+    if billing_interval in ("monthly", "annual"):
+        expires_at = next_billing
+    else:
+        expires_at = data.expires_at or next_billing
 
     # 기존 DodoPayments 구독이 있으면 업데이트
     existing = await _find_sub_by_dodo_id(dodo_sub_id, db)
@@ -337,8 +328,11 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
         existing.plan = plan
         existing.dodo_product_id = product_id
         existing.billing_interval = billing_interval
-        existing.expires_at = expires_at
-        existing.next_billing_at = next_billing
+        existing.expires_at = expires_at if billing_interval != "lifetime" else None
+        existing.next_billing_at = next_billing if billing_interval != "lifetime" else None
+        existing.started_at = now
+        existing.cancelled_at = None
+        existing.auto_renewing = not data.cancel_at_next_billing_date if billing_interval != "lifetime" else False
         existing.updated_at = now
     else:
         sub = Subscription(
@@ -407,27 +401,24 @@ async def _handle_subscription_renewed(data, db: AsyncSession) -> None:
 
     now = datetime.now(timezone.utc)
     next_billing = data.next_billing_date
-    expires_at = data.expires_at or next_billing
+
+    # monthly/annual은 Dodo의 expires_at 대신 next_billing 사용 (2045 버그 방어)
+    if sub.billing_interval in ("monthly", "annual"):
+        expires_at = next_billing
+    else:
+        expires_at = data.expires_at or next_billing
 
     sub.status = "active"
     sub.expires_at = expires_at
     sub.next_billing_at = next_billing
+    sub.started_at = now  # 실결제일 갱신
+    sub.cancelled_at = None  # 갱신 시 취소 플래그 초기화
+    sub.auto_renewing = True
     sub.updated_at = now
-
-    # PaymentHistory 기록
-    history = PaymentHistory(
-        user_id=sub.user_id,
-        subscription_id=sub.id,
-        amount=data.recurring_pre_tax_amount,
-        currency=str(data.currency),
-        status="success",
-        platform="dodopayments",
-        pg_transaction_id=dodo_sub_id,
-    )
-    db.add(history)
     await db.flush()
 
-    logger.info("DodoPayments 구독 갱신: dodo_sub=%s expires_at=%s", dodo_sub_id, expires_at)
+    # PaymentHistory는 payment.succeeded 이벤트에서 기록 (중복 방지)
+    logger.info("DodoPayments 구독 갱신: dodo_sub=%s expires_at=%s started_at=%s", dodo_sub_id, expires_at, now)
 
 
 async def _handle_subscription_cancelled(data, db: AsyncSession) -> None:

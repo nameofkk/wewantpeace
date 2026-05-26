@@ -336,8 +336,10 @@ def _translate_cached(text: str) -> str | None:
 
 def _is_junk_title(title: str) -> bool:
     """해시태그만 있거나 의미 없는 제목인지 판별."""
+    # 마크다운 볼드(**text**) 제거 → "**BREAKING: **The U" 같은 패턴 처리
+    stripped = re.sub(r'\*{1,3}[^*]*\*{1,3}', '', title).strip()
     # 해시태그 + 이모지(국기 포함) + 특수문자 제거
-    stripped = re.sub(r'#\S+', '', title)
+    stripped = re.sub(r'#\S+', '', stripped)
     stripped = re.sub(
         '[\U0001F1E0-\U0001F1FF\U0001F000-\U0001FFFF\u2600-\u27BF'
         '\uFE00-\uFE0F\u200D\u20E3\U000E0020-\U000E007F'
@@ -382,6 +384,13 @@ def _is_junk_title(title: str) -> bool:
     # EDITORIAL / opinion 전용 접두사
     if re.match(r'^\(?(editorial|opinion|column|사설|칼럼)', low):
         return True
+    # HTTP 에러 페이지 잔여물 (크롤러가 에러 페이지를 저장한 케이스)
+    # "Error 500 (Server Error)!!1..." / "HTTP 404 Not Found"
+    if re.match(r'^(?:error\s+\d{3}|http\s+\d{3}|server\s+error)', low):
+        return True
+    # "CENTCOM:" / "AFP:" 처럼 조직명+콜론만 있는 패턴 (내용 없음)
+    if re.match(r'^[A-Za-z가-힣][A-Za-z가-힣\s.\-]{0,20}[A-Za-z가-힣]?\s*[：:]\s*$', stripped):
+        return True
     # 날짜/도시만 있는 패턴 (예: "Tehran 20 February 2026 #1")
     date_stripped = re.sub(r'\d+', '', stripped).strip()
     date_stripped = re.sub(r'(january|february|march|april|may|june|july|august|'
@@ -423,10 +432,10 @@ _TRANS_END_RE = re.compile(
     # 진행형: 내용 동사를 보존하기 위해 보조동사 "하/되" 리터럴 매칭
     # 예) "강화하고 있습니다" → "강화" 보존 (강화하 전체가 제거되지 않도록)
     # lookbehind: 앞 음절이 한국어일 때만 하/되 suffix 제거 → 강화하, 노출되 등 내용어 보존
-    r'(?<=[가-힣])\s*(?:하|되)고\s*있습니다'
-    r'|세우고\s*있습니다'         # 세우다 (세우→보존X, 단 "세우" 자체가 목적어)
-    r'|[가-힣]고\s*있습니다'      # 단일 음절 보조형 (받고, 겪고, 나고 등)
-    r'|될\s*것입니다|할\s*수\s*있습니다'
+    r'(?<=[가-힣])\s*(?:하|되)고\s*있(?:습니다|습니까)'
+    r'|세우고\s*있(?:습니다|습니까)'
+    r'|[가-힣]고\s*있(?:습니다|습니까)'  # 단일 음절 보조형 (받고, 겪고, 나고 등)
+    r'|될\s*것입니다|할\s*것입니다|할\s*수\s*있습니다|수\s*있습니다'
     r'|을\s*예고(?:합니다|됩니다|했습니다)'
     r'|을\s*발표(?:합니다|됩니다|했습니다)'
     r'|을\s*시사(?:합니다|됩니다|했습니다)'
@@ -435,8 +444,12 @@ _TRANS_END_RE = re.compile(
     r'|라고\s*(?:합니다|됩니다|했습니다|밝혔습니다)'
     # 인용 다고: "다'고 밝혔습니다" 등 인용부호 포함 변형
     r"|다['\u2019\u02bc]?\s*고\s*(?:합니다|됩니다|했습니다|밝혔습니다)"
-    r'|밝혔습니다|합니다|됩니다|입니다|있습니다|했습니다|겠습니다|봅니다|습니다'
-    r')[.！？]?\s*$',
+    r'|밝혔습니다|합니다|됩니다|입니다|있습니다|겠습니다|봅니다|습니다'
+    # 주의: "했습니다" 는 의도적으로 제외 — "습니다"가 처리하고 step2에서 "했다"로 변환됨
+    # ("구했습니다" → "구했다", "경신했습니다" → "경신했다")
+    r'|습니까|합니까|겠습니까'  # 의문형 (있습니까, 합니까 등)
+    # 주의: "ㅂ니다" (불러일으킵니다, 보여줍니다 등)는 _B_NIDA_RE 전처리로 별도 처리
+    r')[.!?！？。…]?\s*$',  # ASCII .!? + fullwidth ！？ + 。…
     re.UNICODE,
 )
 
@@ -455,32 +468,332 @@ _TRANS_CLEANUP_RE = re.compile(
     re.UNICODE,
 )
 
+# ── 폴백 품질 향상용 추가 패턴 ────────────────────────────────────────────────
+
+# ㅂ니다 형태 선처리 (불러일으킵니다, 보여줍니다 등)
+# _TRANS_END_RE 에 포함하지 않는 이유: 습니다 경로에서 lexical ㅂ받침(꼽습니다→꼽)과 구분하기 위함
+# 이 패턴은 "ㅂ받침 syllable + 니다" 구조만 매칭 → 어미 ㅂ임이 명확
+_B_NIDA_RE = re.compile(r'니다[.!?！？。…]?\s*$')
+
+# 출처 suffix 제거 ("- AP 뉴스", "- 로이터 통신", "- AFP", "| 저자명" 등)
+# 번역투 어미 뒤에 붙어 _TRANS_END_RE의 $ 앵커를 무력화하는 패턴
+# | 문자도 separator로 허용 (byline attribution 패턴)
+_SOURCE_SUFFIX_RE = re.compile(
+    r'\s*[-–—|]\s*'
+    r'(?:'
+    # 알려진 뉴스 에이전시 (짧은 약칭 우선)
+    r'AP(?:\s*(?:뉴스|News))?|AFP|Reuters|로이터(?:\s*통신)?'
+    r'|Bloomberg|BBC|CNN|연합뉴스|AP통신|UPI|Xinhua|신화통신|NHK|DW'
+    # 긴 이름 뉴스 아웃렛 (명시적 목록, 슬래시 포함 이름 처리)
+    r'|Radio\s+Free\s+Europe(?:\s*/\s*Radio\s+Liberty|\s*/\s*RL)?'
+    r'|RFE(?:\s*/\s*RL)?'
+    r'|(?:The\s+)?Jerusalem\s+Post'
+    r'|(?:The\s+)?Guardian'
+    r'|(?:The\s+)?New\s+York\s+Times|NYT'
+    r'|(?:The\s+)?Wall\s+Street\s+Journal|WSJ'
+    r'|Voice\s+of\s+America|VOA'
+    r'|Middle\s+East\s+Eye|MEE'
+    r'|Al\s+Jazeera|Aljazeera'
+    r'|Times\s+of\s+Israel'
+    r'|Haaretz|Ynet|i24\s*News'
+    r'|Sky\s+News|ITV\s+News'
+    r'|설명자|설명'         # "- 설명자" 등 타입 레이블
+    # 한국어 번역된 주요 아웃렛명 (Google Translate가 출처명을 번역하는 경우)
+    r'|라디오\s+프리\s+유럽(?:\s*/\s*라디오\s+리버(?:티)?)?'  # "라디오 리버" truncated 처리
+    r'|보이스\s+오브\s+아메리카'
+    r'|더\s+가디언|더\s+타임스|인디펜던트'
+    # 짧은 한국어 출처/인용 태그 (2자 → 동적 패턴 최소 3자 요건 우회)
+    r'|전문|대사|총리|장관|대변인|의원|당국|관리|의회|보고서|연구소|기관|책임자|대표'
+    # 영문 기관명 + 한국어 직책 ("Hermitage 최고 책임자", "Kremlin 대변인" 등)
+    r'|[A-Za-z][A-Za-z\s]{1,15}\s+(?:최고\s+)?(?:책임자|대표|소장|이사장|의장|회장|대변인|수석|관계자)'
+    # 동적 패턴: 영문 전용 (한국어 지명·내용어의 오탐 방지)
+    # 예: "Al Arabiya", "Korea Herald", "CENTCOM", "The Nation"
+    r'|[A-Z][A-Za-z0-9\s/·&]{1,17}[A-Za-z0-9]'
+    r')\s*$',
+    re.IGNORECASE,
+)
+
+# ": 보고서", ": 야당", ": WHO" 등 콜론+레이블 suffix 제거
+# 뉴스 영문 기사의 "source: label" 패턴이 번역될 때 생기는 형태
+_LABEL_SUFFIX_RE = re.compile(
+    r'\s*[：:]\s*'
+    r'(?:'
+    r'보고서|전문|설명자|야당|여당|관계자|전문가|관리|당국|연구소'
+    r'|WHO|IAEA|IMF|UN|NATO|EU|AP|AFP|Reuters|로이터|연합뉴스'
+    r'|코로나|COVID[-\s]?19?'
+    r')\s*$',
+    re.IGNORECASE,
+)
+
+# "X에 따르면/의하면" 앞머리 제거 (Google Translate가 "According to X" 직역)
+# 예) "NTSB 데이터에 따르면 ..." → "..."  /  "당국에 따르면 ..." → "..."
+# 괄호 포함 출처명도 허용: "알 하다스(Al Hadath)에 따르면" 등
+_ACCORDING_TO_RE = re.compile(
+    # \u200b (zero-width space) 허용 — 일부 출처명에 ZWS가 포함되는 경우 처리
+    r'^[가-힣A-Za-z·\-\s()\u200b]{2,40}에\s+(?:따르면|의하면)\s+',
+)
+
+# "시청:", "요약:", "속보 |" 등 영문 직역 접두사 제거
+# 例) "시청: 이스라엘..." → "이스라엘..."  "속보: 미국..." → "미국..."
+# 제거 후 남은 내용이 5자 미만이면 적용 안 함
+_VERBOSE_PREFIX_RE = re.compile(
+    r'^(?:시청|영상|요약|분석|속보|긴급|갱신|업데이트|업데이트됨|독점'
+    r'|Watch|Breaking|Exclusive|Update|Recap|Summary|Analysis|Video|Explainer'
+    r'|전문|전문가 분석'
+    # 영문 아웃렛명 prefix: "Financial Times: ..." "NYT:-"
+    r'|Financial\s+Times|The\s+Economist|Wall\s+Street\s+Journal'
+    r'|New\s+York\s+Times|Washington\s+Post|Bloomberg\s+News'
+    # 일반 영문 뉴스 에이전시 패턴: "Tasnim News Agency: ..."
+    r'|[A-Z][A-Za-z\s]{4,24}\s+(?:News\s+Agency|News|Times|Post|Herald|Tribune)'
+    r')\s*[|：:\s][-\s]*',  # ":-" 구분자도 허용 (e.g. "NYT:- 기사")
+    re.IGNORECASE,
+)
+
+# 국가·기관명 소유격(의) opener → 쉼표
+# 예) "시리아의 아사드 시대 ..." → "시리아, 아사드 시대 ..."
+_POSSESSIVE_OPENER_RE = re.compile(
+    r'^(미국|영국|중국|러시아|우크라이나|이스라엘|이란|팔레스타인|가자|시리아'
+    r'|레바논|이라크|예멘|수단|에티오피아|미얀마|북한|한국|대만|인도|파키스탄'
+    r'|아프가니스탄|소말리아|리비아|나이지리아|이집트|터키|사우디|베네수엘라'
+    r'|아이티|쿠바|일본|독일|프랑스|유엔|나토|EU|유럽연합|하마스|헤즈볼라)의\s+'
+)
+
+# "에 대한" 제거 → 명사 직접 연결 (목적어 수식 번역 단순화)
+# 예) "관리들에 대한 재판" → "관리들 재판"  /  "가자에 대한 공습" → "가자 공습"
+# leading \s+ 없음: "들에 대한" 처럼 조사 직결 형태도 커버
+_E_DAEAN_RE = re.compile(r'에\s+대(?:한|해)\s+')
+
 
 def _fix_translation_style(text: str) -> str:
     """Google Translate 번역투 어미 → AI 스타일 간결체 변환.
 
     변환 파이프라인:
+     -1.  출처 suffix 제거 ("- AP 뉴스", "- 로이터" 등)
       0.  후행 마침표·줄임표 전처리 ("있습니다." → "있습니다")
       0.5 인용 종결부호 보존 ("다'고 밝혔습니다" → "다'")
-      1.  번역투 어미 제거 (합니다/됩니다/하고 있습니다 등)
+      0.6 "X에 따르면/의하면" 앞머리 제거 → 핵심 사실만 남김
+      1.  번역투 어미 제거 (합니다/됩니다/하고 있습니다/습니다 등)
       2.  과거형 stem + 다 (지연됐 → 지연됐다, 받았 → 받았다)
       3.  잔류 목적격 조사 제거 (압력을 → 압력)
       4.  주어(이/가) → 쉼표 (이스라엘이 → 이스라엘,)
+      4.5 국가·기관명 소유격(의) opener → 쉼표 (시리아의 → 시리아,)
       5.  에서의/으로의 정제
+      5.5 "에 대한" 제거 (관리들에 대한 재판 → 관리들 재판)
       6.  보고동사 제거 후 주격 조사 정리 (관리들이 → 관리들)
       7.  잔류 인용절 보고주체 정리 (X다고 국영기관 → X다)
 
     예시:
       "이스라엘이 가자에 대한 공습을 재개합니다"
-        → "이스라엘, 가자에 대한 공습을 재개"
-      "동의하라는 압력을 받고 있습니다"
-        → "동의하라는 압력"
+        → "이스라엘, 가자 공습을 재개"
+      "NTSB 데이터에 따르면 두 엔진이 꺼지고 충돌이 발생했다고 합니다. - AP 뉴스"
+        → "두 엔진이 꺼지고 충돌이 발생했다"
+      "시리아의 아사드 시대 관리들에 대한 첫 재판이 다마스쿠스에서 열렸습니다."
+        → "시리아, 아사드 시대 관리들 첫 재판이 다마스쿠스에서 열렸다"
       "지연됐습니다" → "지연됐다"
       "회수됐다고 미군이 밝혔습니다" → "회수됐다"
       "공격했다'고 밝혔습니다" → "공격했다'"
     """
+    # -2단계: 해시태그 국가 prefix 제거 "#러시아 - #프랑스: ..." → "..."
+    # 소셜미디어 포스트의 국가 해시태그 체인이 그대로 제목에 포함된 경우
+    prepped = text.strip()
+    if prepped.startswith('#'):
+        _htag = re.sub(
+            r'^(?:#[A-Za-z가-힣]+\s*(?:\s+[-–—]+\s+|\s{2,}))+#[A-Za-z가-힣]+\s*[:：]\s*',
+            '',
+            prepped,
+        )
+        if _htag and len(_htag) >= 5:
+            prepped = _htag
+
+    # -1단계: 출처 suffix 제거 ("- AP 뉴스" 등이 $ 앵커 무력화하는 것 방지)
+    # 루프로 최대 3회 반복: "- 설명자 - The Jerusalem Post" 같은 중첩 suffix 처리
+    for _ in range(3):
+        _new = _SOURCE_SUFFIX_RE.sub('', prepped).strip()
+        _new = _LABEL_SUFFIX_RE.sub('', _new).strip()
+        # 잘린(truncated) 영문 출처명 제거: "- Radio Free Europe/Rad..." 등
+        # 조건: 대시 이후 한국어 없이 영문+공백+기호만 10자 이상이면 출처 잔여물로 간주
+        _trunc = re.sub(r'\s*[-–—]\s*[A-Za-z][A-Za-z0-9\s/&.,\'"]{9,}\s*$', '', _new).strip()
+        if len(_trunc) >= 5:
+            _new = _trunc
+        if _new == prepped or not _new:
+            break
+        prepped = _new
+    # 극단적 truncation: "보도했습니다 - T" 처럼 단일 대문자 잔여물 제거
+    _trunc1 = re.sub(r'\s*[-–—]\s*[A-Z]\s*$', '', prepped).strip()
+    if _trunc1 and len(_trunc1) >= 5:
+        prepped = _trunc1
+    if not prepped:
+        return text.strip()
+
+    # -0.5단계: "다고 [출처]가 보도했다/전했다" suffix 제거
+    # "~피해를 입었다고 SBU가 보도했다" → "~피해를 입었다"
+    # "~공격받았다고 Wafa가 보도" → "~공격받았다"
+    _report_sub = re.sub(
+        r'다고\s+[가-힣A-Za-z·\s]{1,15}[가이]\s+(?:보도했다|전했다|발표했다|확인했다|보도)\s*$',
+        '다',
+        prepped,
+    )
+    if _report_sub != prepped and len(_report_sub) >= 5:
+        prepped = _report_sub
+
     # 0단계: 후행 마침표·줄임표 전처리 ("있습니다." 패턴 대비)
-    prepped = text.strip().rstrip('.…')
+    # 후행 대시(-) 단독도 제거: "...손실입니다 -" 같은 잘린 suffix 잔여물
+    prepped = prepped.rstrip('.…')
+    prepped = re.sub(r'\s*[-–—]\s*$', '', prepped).strip()
+    # 선두 대시 제거: "— IRGC 사령관 마지드 무사비..." → "IRGC 사령관 마지드 무사비..."
+    _lead_dash = re.sub(r'^[-–—]\s*', '', prepped).strip()
+    if _lead_dash and len(_lead_dash) >= 5:
+        prepped = _lead_dash
+
+    # 0.04단계: | separator suffix 제거
+    # "내용 | 이번 주 Rabbani와 함께하는 팔레스타인" → "내용"
+    # 파이프 이후는 보통 팟캐스트/뉴스레터 메타 정보이므로 제거
+    _pipe_rm = re.sub(r'\s*\|\s+.{5,}$', '', prepped).strip()
+    if _pipe_rm and len(_pipe_rm) >= 8:
+        prepped = _pipe_rm
+
+    # 0.05단계: 후기 주석성 suffix 제거
+    # "~사용한다.. 어떤 이야기인가?" → "~사용한다"
+    # "~됐다... 이게 의미하는 것은?" 형태의 기자체 appendage
+    # 줄임표(2개 이상)+공백 뒤에 오는 의문형 suffix
+    prepped = re.sub(r'\s*[.…]{2,}\s+어떤\s+[가-힣]+인가[?？]?\s*$', '', prepped).strip()
+    prepped = re.sub(r'\s*[.…]{2,}\s+이게?\s+[가-힣\s]+인가[?？]?\s*$', '', prepped).strip()
+    # 의문문 후 짧은 한국어 주석 suffix 제거
+    # "어디에 도달했습니까? 데이터 답변" → "어디에 도달했습니까?"
+    # 의문부호 뒤 한국어 1~3 단어 (2~8자씩)
+    _q_suffix = re.sub(r'([?？])\s+(?:[가-힣]{2,8}\s?){1,3}\s*$', r'\1', prepped).strip()
+    if _q_suffix and len(_q_suffix) >= 8 and _q_suffix != prepped:
+        prepped = _q_suffix
+
+    # 0.1단계: 영문/라틴 괄호 병기 제거 ("한국어명(English Name)" → "한국어명")
+    # "스카이드웰러(Skydweller) 드론이..." → "스카이드웰러 드론이..."
+    # "수단 의사 네트워크(Sudan Doctors Network)는..." → "수단 의사 네트워크는..."
+    # "펠리시앙 카부가(Félicien Kabuga)..." → "펠리시앙 카부가..."
+    # 단: 괄호 첫 글자가 라틴 문자(ASCII+Extended)인 경우만 처리 (숫자·한국어 오탐 방지)
+    _paren_stripped = re.sub(
+        r'\s*\([A-Za-z\u00C0-\u024F][A-Za-z0-9\s\-\.\'/·\u00C0-\u024F]{1,39}\)',
+        '',
+        prepped,
+    ).strip()
+    if _paren_stripped and len(_paren_stripped) >= 5:
+        prepped = _paren_stripped
+
+    # 0.15단계: 복합 문장 분리 ("A합니다. B" → "B")
+    # "이란은 홀로 서 있지 않습니다. 중국과 러시아가 자제력을 발휘" → "중국과 러시아가 자제력을 발휘"
+    # '"우리가 승리했습니다." 이란은 전쟁 이후...' → "이란은 전쟁 이후..."
+    if '니다' in prepped or '니까' in prepped:
+        # 문장 경계: ./?/! + 선택적 닫는 따옴표 + 공백
+        _parts = re.split(r'[.!?]+["\'\u2018\u2019\u201c\u201d]?\s+', prepped)
+        if len(_parts) >= 2:
+            for _cand in reversed(_parts[1:]):
+                _cand = _cand.strip("'\"'\u2018\u2019\u201c\u201d：: ")
+                if len(_cand) >= 8 and not re.search(r'니다|니까', _cand):
+                    prepped = _cand
+                    break
+
+    # 0.16단계: "'QUOTE': 내용" → 내용 (선행 인용구가 번역투일 때, 또는 50자 초과일 때)
+    # "'우리는 전쟁 중입니다': 샘 브라운백, 경고" → "샘 브라운백, 경고"
+    # "'그들은 동물처럼 대했습니다': 가자지구 활동가 구금" → "가자지구 활동가 구금"
+    # "'다음에는 무엇이 올 것인가?': 소말리아 해적 피해자 가족들이 두려움에" → "소말리아..."
+    if '니다' in prepped or '니까' in prepped or len(prepped) > 50:
+        _m_qc = re.match(
+            r'^["\'\u2018\u201c]'               # 여는 따옴표
+            r'.+?'                               # 인용 내용
+            r'[.!?]?\s*["\'\u2019\u201d]'       # (선택) 문장부호 + 닫는 따옴표
+            r'\s*[:：]\s*'                        # 콜론+공백
+            r'(.{8,})$',                         # 이후 내용 (8자 이상)
+            prepped,
+        )
+        if _m_qc:
+            _cand = _m_qc.group(1).strip("'\"'\u2018\u2019\u201c\u201d：: ")
+            if len(_cand) >= 8 and not re.search(r'니다|니까', _cand):
+                prepped = _cand
+        else:
+            # 0.16b: 오프닝 따옴표 없는 케이스 — 한국어 글자 + [.!?]? + 닫는따옴표 + : 또는 —
+            # "우리는 전쟁 중입니다': 샘 브라운백, ..." → "샘 브라운백, ..."
+            # "없습니다' — EU는 우크라이나 난민의..." → "EU는 우크라이나 난민의..."
+            # "때입니다.': 콩고민주공화국의 에볼라..." → "콩고민주공화국의 에볼라..."
+            _m_qc2 = re.match(
+                r'^.+[가-힣][.!?]?[\'"\u2019\u201d]\s*(?:[:：]|[-–—])\s*(.{8,})$',
+                prepped,
+            )
+            if _m_qc2:
+                _cand = _m_qc2.group(1).strip("'\"'\u2018\u2019\u201c\u201d：: ")
+                if len(_cand) >= 8 and not re.search(r'니다|니까', _cand):
+                    prepped = _cand
+
+    # 0.17단계: "합니다/됩니다/입니다 + : + 내용" 패턴 처리
+    # (a) 짧은 출처 suffix 제거 → 이후 단계가 번역투 정리
+    #     "충돌합니다: 연구" → "충돌합니다"
+    #     "초래합니다: 이스라엘 언론" → "초래합니다"
+    # (b) 긴 내용 추출 (13자 이상 → 진짜 내용)
+    #     "경고합니다: 석유 재고는 단 몇 주 동안만 충분" → "석유 재고는 단 몇 주 동안만 충분"
+    #     "방어선입니다: 지역 경찰과 감시 탐지 격차" → "지역 경찰과 감시 탐지 격차"
+    if '니다' in prepped or '니까' in prepped:
+        # (b) 우선: 긴 내용 추출
+        _m_vc_long = re.match(
+            r'^.+?(?:합니다|됩니다|입니다|있습니까|습니까|습니다)[.!?]?\s*[:：]\s*(.{13,})$',
+            prepped,
+        )
+        if _m_vc_long:
+            _cand = _m_vc_long.group(1).strip("'\"'\u2018\u2019\u201c\u201d：: ")
+            if len(_cand) >= 8 and not re.search(r'니다|니까', _cand):
+                prepped = _cand
+        else:
+            # (a) 짧은 출처 제거 — 있습니다는 "고 있습니다" 문제로 제외, 나머지 습니다는 허용
+            # (?<!있)습니다: "일으켰습니다" OK, "싸우고 있습니다" 제외
+            _stripped_src = re.sub(
+                r'((?:합니다|됩니다|입니다|(?<!있)습니다)[.!?]?)\s*[:：]\s*.{1,12}\s*$',
+                r'\1',
+                prepped,
+            )
+            if _stripped_src != prepped and len(_stripped_src) >= 8:
+                prepped = _stripped_src
+            else:
+                # (c) "고 있습니다: 짧은출처" → "고 있다" (progressive form + source)
+                # "싸우고 있습니다: 키예프" → "싸우고 있다"
+                _go_issda = re.sub(
+                    r'(고\s*있)습니다[.!?]?\s*[:：]\s*.{1,12}\s*$',
+                    r'\1다',
+                    prepped,
+                )
+                if _go_issda != prepped and len(_go_issda) >= 8:
+                    prepped = _go_issda
+
+    # 0.45단계: 전체가 인용구인 번역투 처리
+    # "'평화위원회는 다른 수단으로 대량 학살을 추구하고 있습니다'" → "'추구하고 있다'"
+    # 단: 여닫는 따옴표로 완전히 감싸진 경우에만 적용 (오탐 방지)
+    _q_chars_open = ("'", '"', '\u2018', '\u201c')
+    _q_chars_close = ("'", '"', '\u2019', '\u201d')
+    if (prepped and prepped[0] in _q_chars_open and prepped[-1] in _q_chars_close
+            and ('니다' in prepped or '니까' in prepped)):
+        _inner = prepped[1:-1]
+        # 인용구 내부 번역투 제거 (재귀 대신 1회 적용)
+        # 1) "~하고 있습니다" → "~하고 있다" (진행형 보존)
+        _inner_fixed = re.sub(r'(하고\s+있)습니다$', r'\1다', _inner)
+        # 2) 나머지 습니다/합니다/됩니다 → 어미 제거
+        _inner_fixed = re.sub(
+            r'(?:합니다|됩니다|입니다|(?<!있)습니다|봅니다)$', '', _inner_fixed,
+        ).strip()
+        if _inner_fixed and _inner_fixed != _inner and len(_inner_fixed) >= 5:
+            prepped = prepped[0] + _inner_fixed + prepped[-1]
+    else:
+        # 0.46단계: "설명: '...번역투'" 형태 — 콜론 뒤 인용구 내부 번역투 처리
+        # "압력을 받고 있는 스타머: '많은 노동당 의원들은...볼 수 없습니다'" → "...없다'"
+        if '니다' in prepped or '니까' in prepped:
+            _m_dq = re.match(
+                r'^(.{5,}[:：]\s*[\'"\u2018\u201c])'       # "설명: '
+                r'(.{8,}(?:니다|니까)[.!?]?)'               # 내부 번역투
+                r'([\'"\u2019\u201d])$',                    # 닫는 따옴표
+                prepped,
+            )
+            if _m_dq:
+                _pfx, _qi, _qc = _m_dq.groups()
+                _qif = re.sub(r'(하고\s+있)습니다$', r'\1다', _qi)
+                _qif = re.sub(r'없습니다$', '없다', _qif)  # "볼 수 없습니다" → "볼 수 없다"
+                _qif = re.sub(r'(?:합니다|됩니다|입니다|(?<!있)습니다|봅니다)$', '', _qif).strip()
+                if _qif and not re.search(r'니다|니까', _qif) and len(_qif) >= 5:
+                    prepped = _pfx + _qif + _qc
 
     # 0.5단계: 인용 종결부호 보존
     # "공격했다'고 밝혔습니다" → "공격했다'"  (닫는 따옴표 보존)
@@ -492,10 +805,42 @@ def _fix_translation_style(text: str) -> str:
         prepped,
     )
 
+    # 0.54단계: 팟캐스트 prefix 제거
+    # "Mark Pfeifle과 함께 Azzawi가 진행하는 팟캐스트: 트럼프..." → "트럼프..."
+    # "Ritter의 팟캐스트: 이란과 핵 아마겟돈" → "이란과 핵 아마겟돈"
+    _pod = re.sub(r'^.{3,50}팟캐스트\s*[:：]\s*', '', prepped).strip()
+    if _pod and len(_pod) >= 5 and _pod != prepped:
+        prepped = _pod
+
+    # 0.55단계: "시청:", "요약:", "속보:" 등 영문 직역 접두사 제거
+    # 예) "시청: 이스라엘..." → "이스라엘..."  "속보: 미국..." → "미국..."
+    _stripped = _VERBOSE_PREFIX_RE.sub('', prepped).strip()
+    if len(_stripped) >= 5:  # 제거 후 너무 짧아지면 원본 유지
+        prepped = _stripped
+
+    # 0.6단계: "X에 따르면/의하면" 앞머리 제거
+    # 예) "NTSB 데이터에 따르면 ..." → "..."  /  "당국에 따르면 ..." → "..."
+    prepped = _ACCORDING_TO_RE.sub('', prepped).strip()
+    if not prepped:
+        return text.strip()
+
     # 1단계: 번역투 어미 제거
     fixed = _TRANS_END_RE.sub("", prepped).strip()
     if not fixed:
         return text.strip()
+
+    # 1.5단계: ㅂ니다 형태 후처리 (_TRANS_END_RE가 못 잡은 커스텀 ㅂ니다 동사)
+    # "불러일으킵니다", "보여줍니다" 등 → 어간("불러일으키", "보여주")으로 변환
+    # 원리: step1 후에도 "니다"로 끝나면 → _TRANS_END_RE가 처리 못한 ㅂ니다 형태
+    #       앞 음절 ㅂ받침 제거로 어간 복원 (기 + ㅂ → 기, 주 + ㅂ → 주)
+    # "꼽습니다"는 step1에서 "습니다" 제거로 "꼽" 남음 → 여기 도달 안 함 (안전)
+    _m_b = _B_NIDA_RE.search(fixed)
+    if _m_b:
+        _before = fixed[:_m_b.start()]
+        if _before:
+            _cp = ord(_before[-1])
+            if 0xAC00 <= _cp <= 0xD7A3 and (_cp - 0xAC00) % 28 == 17:  # ㅂ종성
+                fixed = _before[:-1] + chr(_cp - 17)
 
     # 2단계: 과거형 bare stem → 신문체 (다) 추가
     # 例) "지연됐" → "지연됐다", "받았" → "받았다", "열렸" → "열렸다"
@@ -510,13 +855,22 @@ def _fix_translation_style(text: str) -> str:
     # 4단계: 주어(이/가) → 쉼표 변환
     fixed = re.sub(r"^([가-힣a-zA-Z·\-]{2,12})(이|가)\s+", r"\1, ", fixed)
 
+    # 4.5단계: 국가·기관명 소유격(의) opener → 쉼표
+    # 예) "시리아의 아사드 시대 ..." → "시리아, 아사드 시대 ..."
+    fixed = _POSSESSIVE_OPENER_RE.sub(r'\1, ', fixed)
+
     # 5단계: 에서의 → 에서, 으로의 → 로
     fixed = re.sub(r"에서의\s*", "에서 ", fixed)
     fixed = re.sub(r"으로의\s*", "로 ", fixed)
 
+    # 5.5단계: "에 대한" 제거 → 명사 직접 연결
+    # 예) "관리들에 대한 재판" → "관리들 재판"
+    fixed = _E_DAEAN_RE.sub(' ', fixed)
+
     # 6단계: 보고동사 제거 후 남은 주격 조사 정리
     # 例) "관리들이 밝혔습니다" → "밝혔습니다" 제거 → "관리들이" → "관리들"
-    fixed = re.sub(r"(?<=[가-힣])\s*[이가]\s*$", "", fixed)
+    # 주의: 가는 복합어 끝(증가, 국가)과 구분 불가하므로 이(이)만 제거
+    fixed = re.sub(r"(?<=[가-힣])\s*이\s*$", "", fixed)
 
     # 7단계: 잔류 인용절 보고주체 정리
     # 例) "회수됐다고 미군" → "회수됐다"
@@ -527,6 +881,9 @@ def _fix_translation_style(text: str) -> str:
         r'\1',
         fixed,
     )
+
+    # 8단계: 이모지·마크다운 제거 (AI 타이틀 경로에서도 일관 적용)
+    fixed = _TRANS_CLEANUP_RE.sub('', fixed).replace('**', '').strip()
 
     return fixed.strip()
 
@@ -1118,7 +1475,8 @@ async def split_oversized_clusters(
                 rep.topic, rep.country_code,
             )
             if ai:
-                new_title, new_title_ko = ai
+                new_title, _ko = ai
+                new_title_ko = _fix_translation_style(_ko) if _ko else _ko
             else:
                 new_title = rep.title
                 new_title_ko = _make_cluster_title_ko(rep.title, rep.topic, rep.country_code)

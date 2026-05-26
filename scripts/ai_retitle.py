@@ -20,6 +20,7 @@ sys.path.insert(0, "/home/krshin7/Projects/wewantpeace")
 from sqlalchemy import text
 from backend.app.core.database import AsyncSessionLocal
 from worker.processor.ai_title import generate_ai_title
+from worker.processor.clusterer import _fix_translation_style
 
 DRY_RUN = "--dry-run" in sys.argv
 
@@ -64,6 +65,7 @@ async def main():
         # 2) [국가] 접두사 패턴 (reprocess_topics.py가 생성)
         # 3) 직역체 종결어미 (습니다/입니다)
         # 4) 50자 초과 (너무 김)
+        # 5) 8자 미만 (잘못된 번역 — "승천에" 3자 등)
         r = await db.execute(text("""
             SELECT id, title, title_ko, topic, country_code
             FROM issue_clusters
@@ -75,7 +77,14 @@ async def main():
                    OR title_ko LIKE '#%'
                    OR title_ko LIKE '%습니다%'
                    OR title_ko LIKE '%입니다%'
-                   OR length(title_ko) > 50)
+                   OR title_ko LIKE '%합니다%'
+                   OR title_ko LIKE '%됩니다%'
+                   OR title_ko LIKE '%봅니다%'
+                   OR title_ko LIKE '%습니까%'
+                   OR title_ko LIKE '%합니까%'
+                   OR title_ko ~ '에\s+따르면'
+                   OR length(title_ko) > 50
+                   OR length(title_ko) < 8)
             ORDER BY is_active DESC, kscore DESC, id
         """))
         all_clusters = r.fetchall()
@@ -108,6 +117,7 @@ async def main():
 
             if result:
                 new_en, new_ko = result
+                new_ko = _fix_translation_style(new_ko) if new_ko else new_ko
                 if DRY_RUN:
                     print(f"[{i+1}/{total}] #{cid}")
                     print(f"  기존: {title[:60]}")
