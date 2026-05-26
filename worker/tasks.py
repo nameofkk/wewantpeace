@@ -4085,7 +4085,8 @@ def detect_severity_outliers(self):
 def deactivate_stale_clusters(self):
     """Stale 클러스터 자동 비활성화 (매일). T11
 
-    72시간 이상 이벤트 미추가 + severity < 50 → is_active=False.
+    72시간 이상 이벤트 미추가 + severity < 30 → is_active=False.
+    severity 30 미만만 비활성화 (30-49 범위의 진행 중 분쟁은 보호).
     """
 
     async def _run():
@@ -4101,7 +4102,7 @@ def deactivate_stale_clusters(self):
                 select(func.count(IssueCluster.id)).where(
                     IssueCluster.is_active == True,  # noqa: E712
                     IssueCluster.last_event_at < stale_cutoff,
-                    IssueCluster.severity < 50,
+                    IssueCluster.severity < 30,  # 50→30: 심각도 30-49 분쟁 클러스터 보호
                 )
             )
             target_count = count_q.scalar() or 0
@@ -4112,7 +4113,7 @@ def deactivate_stale_clusters(self):
                     .where(
                         IssueCluster.is_active == True,  # noqa: E712
                         IssueCluster.last_event_at < stale_cutoff,
-                        IssueCluster.severity < 50,
+                        IssueCluster.severity < 30,  # 50→30
                     )
                     .values(is_active=False)
                 )

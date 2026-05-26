@@ -559,6 +559,7 @@ async def collect_fred_commodities(db: AsyncSession) -> int:
 MARKET_INDEX_TICKERS = {
     "KOSPI": ("^KS11", "KOSPI", "KRW"),
     "SPX": ("^GSPC", "S&P 500", "USD"),
+    "NASDAQ": ("^IXIC", "NASDAQ", "USD"),   # NASDAQ Composite (영어권 뉴스레터용)
     "NKY": ("^N225", "Nikkei 225", "JPY"),
     "DAX": ("^GDAXI", "DAX", "EUR"),
     "FTSE": ("^FTSE", "FTSE 100", "GBP"),

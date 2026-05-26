@@ -226,8 +226,12 @@ async def main():
         sys.exit(1)
 
     engine = create_async_engine(
-        db_url, pool_size=5, max_overflow=5,
-        connect_args={"prepared_statement_cache_size": 0, "statement_cache_size": 0},
+        db_url, pool_size=3, max_overflow=2,
+        connect_args={
+            "prepared_statement_cache_size": 0,
+            "statement_cache_size": 0,
+            "server_settings": {"jit": "off"},
+        },
     )
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

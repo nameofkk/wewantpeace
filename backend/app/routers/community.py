@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, UploadFile, File
 from pydantic import BaseModel
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_optional_user, get_db
@@ -827,7 +827,10 @@ async def create_comment(
     )
     comment.content_en = await _translate_to_en(body.content[:5000])
     db.add(comment)
-    post.comment_count += 1
+    # DB 레벨 원자적 증가 (동시 요청 시 race condition 방지)
+    await db.execute(
+        sa_update(Post).where(Post.id == pid).values(comment_count=Post.comment_count + 1)
+    )
     await db.flush()
     return _comment_to_out(comment, current_user.nickname)
 

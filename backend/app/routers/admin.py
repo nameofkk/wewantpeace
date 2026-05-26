@@ -4103,13 +4103,17 @@ async def send_newsletter_test(
     html = chevron.render(template, body.data)
 
     vol = body.data.get("vol_number", "?")
-    # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
+    # 이메일 제목: hero_headline_html → preheader_text 순서로 fallback
     import re as _re
     from datetime import datetime as _dt, timedelta as _td
-    _headline_raw = body.data.get("hero_headline_html", "")
-    _headline_clean = _re.sub(r'<br\s*/?>', ' ', _headline_raw)
-    _headline_text = _re.sub(r'<[^>]+>', '', _headline_clean).replace('\n', ' ')
-    _headline_text = _re.sub(r'\s+', ' ', _headline_text).strip()
+    def _clean_html_t(s: str) -> str:
+        s = _re.sub(r'<br\s*/?>', ' ', s)
+        s = _re.sub(r'<[^>]+>', '', s).replace('\n', ' ')
+        return _re.sub(r'\s+', ' ', s).strip()
+    _headline_text = _clean_html_t(body.data.get("hero_headline_html", ""))
+    if not _headline_text:
+        _pre = _clean_html_t(body.data.get("preheader_text", ""))
+        _headline_text = _pre.split(" — ")[0].strip() if _pre else ""
     _date_range = ""
     try:
         _end = _dt.strptime(body.data.get("issue_date", ""), "%Y.%m.%d")
@@ -4191,13 +4195,18 @@ async def send_newsletter_all(
         template = f.read()
 
     vol = body.data.get("vol_number", body.vol)
-    # 이메일 제목: hero_headline_html에서 HTML 태그 제거하여 사용
+    # 이메일 제목: hero_headline_html → preheader_text 순서로 fallback
     import re as _re
     from datetime import datetime as _dt, timedelta as _td
-    _headline_raw = body.data.get("hero_headline_html", "")
-    _headline_clean = _re.sub(r'<br\s*/?>', ' ', _headline_raw)
-    _headline_text = _re.sub(r'<[^>]+>', '', _headline_clean).replace('\n', ' ')
-    _headline_text = _re.sub(r'\s+', ' ', _headline_text).strip()
+    def _clean_html(s: str) -> str:
+        s = _re.sub(r'<br\s*/?>', ' ', s)
+        s = _re.sub(r'<[^>]+>', '', s).replace('\n', ' ')
+        return _re.sub(r'\s+', ' ', s).strip()
+    _headline_text = _clean_html(body.data.get("hero_headline_html", ""))
+    if not _headline_text:
+        # hero 없으면 preheader(stats 포함)의 — 이전 부분 사용
+        _pre = _clean_html(body.data.get("preheader_text", ""))
+        _headline_text = _pre.split(" — ")[0].strip() if _pre else ""
     _date_range = ""
     try:
         _end = _dt.strptime(body.data.get("issue_date", ""), "%Y.%m.%d")
