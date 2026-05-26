@@ -279,6 +279,8 @@ async def trending_top(
     """상위 20개 트렌딩 이슈 (kscore 내림차순) — 인증 불필요."""
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
 
+    # 48시간 이상 업데이트 없는 클러스터 제외 (stale 이슈 필터)
+    cutoff_48h = datetime.now(timezone.utc) - timedelta(hours=48)
     rows_q = await db.execute(
         select(
             IssueCluster.id,
@@ -294,7 +296,11 @@ async def trending_top(
             IssueCluster.last_event_at,
             IssueCluster.image_url,
         )
-        .where(IssueCluster.is_active.is_(True), IssueCluster.severity > 0)
+        .where(
+            IssueCluster.is_active.is_(True),
+            IssueCluster.severity > 0,
+            IssueCluster.last_event_at >= cutoff_48h,
+        )
         .order_by(IssueCluster.kscore.desc())
         .limit(20)
     )

@@ -176,7 +176,7 @@ function ReportContent() {
 
   const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang, storeHydrated);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
-  const { data: allTension } = useTensionAll();
+  const { data: allTension, isLoading: allTensionLoading } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
 
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel" | "detail">("market");
@@ -317,7 +317,7 @@ function ReportContent() {
   }, [summary, lang]);
 
   // 하이드레이션 미완료 또는 로딩 중 → 스켈레톤
-  if (!storeHydrated || summaryLoading) {
+  if (!storeHydrated || summaryLoading || allTensionLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 
