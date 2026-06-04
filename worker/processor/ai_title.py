@@ -38,6 +38,7 @@ Rules:
 - Never start with "Recap", "Summary", "Breaking" or similar prefixes
 - If titles are all junk/hashtags, infer from body content, topic and country
 - Korean headline must be pure Korean (한국어만, no English mixed in except proper nouns)
+- NEVER speculate or fabricate details not present in the provided titles or article bodies — if a specific fact (number, name, location) is absent from the source material, omit it rather than guess
 
 ## Korean headline style (매우 중요):
 Write like a Korean news wire editor. Use 간결체/명사형 종결.

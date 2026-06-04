@@ -142,7 +142,8 @@ _BILINGUAL_SYSTEM = (
     "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages mixed in.\n"
     "- Include specific facts: country name, numbers, actions — avoid vague phrases\n"
     "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting"
+    "- Plain text only — no special characters for formatting\n"
+    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
 )
 
 _SPIKE_BILINGUAL_SYSTEM = (
@@ -169,7 +170,8 @@ _SPIKE_BILINGUAL_SYSTEM = (
     "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
     "- Include specific facts: numbers, locations, actors\n"
     "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting"
+    "- Plain text only — no special characters for formatting\n"
+    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
 )
 
 _WEEKLY_BILINGUAL_SYSTEM = (
@@ -196,7 +198,8 @@ _WEEKLY_BILINGUAL_SYSTEM = (
     "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
     "- Use specific numbers and country names\n"
     "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting"
+    "- Plain text only — no special characters for formatting\n"
+    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
 )
 
 
