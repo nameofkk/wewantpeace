@@ -1074,7 +1074,8 @@ CRITICAL RULES:
 - Each section: 2-3 sentences with specific data points
 - Impact score MUST correlate with severity, trade dependency, and proximity factors
 - If trade dependency is high, score should reflect this proportionally
-- Respond in the requested language"""
+- Respond in the requested language
+- NEVER speculate or fabricate figures, events, or facts not present in the provided context — if a specific data point is unavailable, acknowledge the uncertainty explicitly rather than guessing"""
 
             # 원자재 컨텍스트 생성
             _commodity_context = ""
