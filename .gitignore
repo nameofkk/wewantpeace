@@ -66,6 +66,10 @@ firebase-credentials.json
 google-services.json
 GoogleService-Info.plist
 
+# ── 기자 이메일 등 개인정보 파일 ─────────────────────────────────────────────
+docs/journalist-emails.csv
+journalist-emails.csv
+
 # ── 기타 ─────────────────────────────────────────────────────────────────────
 *.pem
 *.key
