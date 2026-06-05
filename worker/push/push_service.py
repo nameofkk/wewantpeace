@@ -64,6 +64,29 @@ DAILY_PUSH_LIMITS = {
 _DAILY_PUSH_KEY_PREFIX = "push:daily:"
 _DAILY_LIMIT_NOTIFIED_PREFIX = "push:daily_limit_notified:"
 
+# ── 다이제스트 알림 모드 ───────────────────────────────────────────────────────
+# severity < DIGEST_CRITICAL_BYPASS → 10분 버퍼에 모아 요약 1건 발송
+# severity >= DIGEST_CRITICAL_BYPASS → 즉시 발송 (긴급 우회)
+DIGEST_CRITICAL_BYPASS = 90
+_DIGEST_BUF_PREFIX = "alert:digest_buf:"
+_DIGEST_USERS_KEY = "alert:digest_users"
+_DIGEST_BUF_TTL = 1800  # 버퍼 안전 TTL 30분
+
+_DIGEST_COUNTRY_NAMES_KO: dict[str, str] = {
+    "KR": "한국", "US": "미국", "JP": "일본", "CN": "중국", "TW": "대만",
+    "DE": "독일", "GB": "영국", "AU": "호주", "IN": "인도", "BR": "브라질",
+    "UA": "우크라이나", "RU": "러시아", "IL": "이스라엘", "IR": "이란",
+    "KP": "북한", "SY": "시리아", "MM": "미얀마", "ET": "에티오피아",
+    "FR": "프랑스", "IT": "이탈리아", "SA": "사우디", "TR": "터키",
+}
+_DIGEST_COUNTRY_NAMES_EN: dict[str, str] = {
+    "KR": "Korea", "US": "US", "JP": "Japan", "CN": "China", "TW": "Taiwan",
+    "DE": "Germany", "GB": "UK", "AU": "Australia", "IN": "India", "BR": "Brazil",
+    "UA": "Ukraine", "RU": "Russia", "IL": "Israel", "IR": "Iran",
+    "KP": "N.Korea", "SY": "Syria", "MM": "Myanmar", "ET": "Ethiopia",
+    "FR": "France", "IT": "Italy", "SA": "Saudi", "TR": "Turkey",
+}
+
 # 일일 상한 도달 알림 텍스트
 _DAILY_LIMIT_MESSAGES = {
     "ko": {
@@ -1118,6 +1141,7 @@ async def send_alert(
     sent_fast = 0
     all_invalid: list[str] = []
     verified_user_ids: set[_uuid.UUID] = set()  # combined 모드에서 fast 레인 중복 제거용
+    _is_digest = severity < DIGEST_CRITICAL_BYPASS  # True → 버퍼링, False → 즉시 발송
 
     # ── Verified 레인 (combined 또는 verified) ──
     if alert_kind in ("verified", "combined") and is_verified:
@@ -1129,16 +1153,13 @@ async def send_alert(
             "FCM 대상 (verified): tokens=%d, suppressed=%d, cluster=%s, cc=%s, kscore=%.1f",
             len(target_v.tokens), len(target_v.suppressed), cluster_id, country_code, kscore,
         )
-        target_v = await _apply_daily_limits(target_v, db, redis, severity=severity)
+        if not _is_digest:
+            target_v = await _apply_daily_limits(target_v, db, redis, severity=severity)
 
         # plan_locked: Free 유저가 Verified를 받으려 하는 경우
         plan_locked_v = await _get_plan_locked_users(country_code, db, alert_kind="verified")
         await _insert_suppressed_logs(
             target_v.suppressed + plan_locked_v, cluster_id, spike_event_id, "verified", db,
-        )
-
-        token_to_log_v = await _insert_pending_logs(
-            target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
         )
 
         _title_en = f"⚠️ {cluster_title}"
@@ -1154,22 +1175,41 @@ async def send_alert(
         if signal_corroboration_count > 0:
             _vbody_ko += f"\n🛡️ 신뢰 확인 + 시그널 {signal_corroboration_count}건 교차검증"
             _vbody_en += f"\n🛡️ Verified + {signal_corroboration_count} signal(s) corroborated"
-        sent_verified, invalid_v, failures_v = _split_and_send_with_context(
-            token_infos=target_v.tokens,
-            title=_title_en,
-            base_body=_vbody_en,
-            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
-            event_country=country_code,
-            topic=cluster_topic,
-            severity=severity,
-            collapse_key=collapse_key,
-            title_ko=_title_ko,
-            body_ko=_vbody_ko,
-            body_en=_vbody_en,
-        )
-        await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
-        all_invalid.extend(invalid_v)
-        # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
+
+        if _is_digest:
+            # 다이제스트 모드: FCM 즉시 발송 대신 사용자별 버퍼에 적재
+            for ti in target_v.tokens:
+                ctx_ko = generate_alert_context(ti.home_country, country_code or "", cluster_topic or "unknown", "ko")
+                ctx_en = generate_alert_context(ti.home_country, country_code or "", cluster_topic or "unknown", "en")
+                await _buffer_user_alert(
+                    user_id=ti.user_id, token_info=ti,
+                    cluster_id=cluster_id, title=cluster_title, title_ko=cluster_title_ko,
+                    country_code=country_code, severity=severity, kscore=kscore,
+                    alert_kind=alert_kind, topic=cluster_topic,
+                    context_ko=ctx_ko, context_en=ctx_en, redis=redis,
+                )
+            sent_verified = len(target_v.tokens)
+        else:
+            # 즉시 발송 (긴급: severity >= DIGEST_CRITICAL_BYPASS)
+            token_to_log_v = await _insert_pending_logs(
+                target_v.tokens, cluster_id, spike_event_id, "verified", collapse_key, db,
+            )
+            sent_verified, invalid_v, failures_v = _split_and_send_with_context(
+                token_infos=target_v.tokens,
+                title=_title_en,
+                base_body=_vbody_en,
+                data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
+                event_country=country_code,
+                topic=cluster_topic,
+                severity=severity,
+                collapse_key=collapse_key,
+                title_ko=_title_ko,
+                body_ko=_vbody_ko,
+                body_en=_vbody_en,
+            )
+            await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
+            all_invalid.extend(invalid_v)
+
         verified_user_ids = {t.user_id for t in target_v.tokens}
 
         # Redis 중복방지 설정
@@ -1193,14 +1233,11 @@ async def send_alert(
                 suppressed=target_f.suppressed,
             )
 
-        target_f = await _apply_daily_limits(target_f, db, redis, severity=severity)
+        if not _is_digest:
+            target_f = await _apply_daily_limits(target_f, db, redis, severity=severity)
 
         await _insert_suppressed_logs(
             target_f.suppressed, cluster_id, spike_event_id, "fast", db,
-        )
-
-        token_to_log_f = await _insert_pending_logs(
-            target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
         )
 
         _title_en_f = f"🚨 {cluster_title}"
@@ -1212,22 +1249,39 @@ async def send_alert(
             _body_ko_f = f"심각도 {severity} · 속보 알림"
             _body_en_f = f"Severity {severity} · Fast Alert"
 
-        sent_fast, invalid_f, failures_f = _split_and_send_with_context(
-            token_infos=target_f.tokens,
-            title=_title_en_f,
-            base_body=_body_en_f,
-            data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
-            event_country=country_code,
-            topic=cluster_topic,
-            severity=severity,
-            collapse_key=collapse_key,
-            title_ko=_title_ko_f,
-            body_ko=_body_ko_f,
-            body_en=_body_en_f,
-        )
-        await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
-        all_invalid.extend(invalid_f)
-        # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
+        if _is_digest:
+            # 다이제스트 모드: FCM 즉시 발송 대신 사용자별 버퍼에 적재
+            for ti in target_f.tokens:
+                ctx_ko = generate_alert_context(ti.home_country, country_code or "", cluster_topic or "unknown", "ko")
+                ctx_en = generate_alert_context(ti.home_country, country_code or "", cluster_topic or "unknown", "en")
+                await _buffer_user_alert(
+                    user_id=ti.user_id, token_info=ti,
+                    cluster_id=cluster_id, title=cluster_title, title_ko=cluster_title_ko,
+                    country_code=country_code, severity=severity, kscore=kscore,
+                    alert_kind=alert_kind, topic=cluster_topic,
+                    context_ko=ctx_ko, context_en=ctx_en, redis=redis,
+                )
+            sent_fast = len(target_f.tokens)
+        else:
+            # 즉시 발송 (긴급: severity >= DIGEST_CRITICAL_BYPASS)
+            token_to_log_f = await _insert_pending_logs(
+                target_f.tokens, cluster_id, spike_event_id, "fast", collapse_key, db,
+            )
+            sent_fast, invalid_f, failures_f = _split_and_send_with_context(
+                token_infos=target_f.tokens,
+                title=_title_en_f,
+                base_body=_body_en_f,
+                data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
+                event_country=country_code,
+                topic=cluster_topic,
+                severity=severity,
+                collapse_key=collapse_key,
+                title_ko=_title_ko_f,
+                body_ko=_body_ko_f,
+                body_en=_body_en_f,
+            )
+            await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
+            all_invalid.extend(invalid_f)
 
         # Redis 중복방지 설정
         await redis.setex(f"alert:fast:{cluster_id}", 259200, "1")  # 72h
@@ -1236,7 +1290,7 @@ async def send_alert(
     await cleanup_invalid_tokens(all_invalid, db)
 
     return {
-        "status": "sent",
+        "status": "buffered" if _is_digest else "sent",
         "alert_kind": alert_kind,
         "sent_verified": sent_verified,
         "sent_fast": sent_fast,
