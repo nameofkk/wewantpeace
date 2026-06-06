@@ -124,6 +124,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute="*/30"),  # 매 30분
         "options": {"queue": "process"},
     },
+    "flush-alert-digests": {
+        "task": "worker.tasks.flush_alert_digests",
+        "schedule": crontab(minute="*/15"),  # 매 15분: 다이제스트 버퍼 플러시
+        "options": {"queue": "process"},
+    },
     "reconcile-delivery-logs": {
         "task": "worker.tasks.reconcile_delivery_logs",
         "schedule": crontab(minute=0, hour=4),  # 매일 04:00 UTC

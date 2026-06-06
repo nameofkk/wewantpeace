@@ -1528,6 +1528,33 @@ push_verified_alert = lambda self_or_id, cluster_id=None: push_alert(
 
 
 @app.task(
+    name="worker.tasks.flush_alert_digests",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def flush_alert_digests(self):
+    """유저별 다이제스트 버퍼 플러시: 15분마다 pending 알림을 요약 1건으로 묶어 FCM 발송."""
+
+    async def _run():
+        from worker.push.push_service import flush_alert_digests as _flush
+        from backend.app.core.redis import get_redis
+
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                redis = get_redis()
+                result = await _flush(db=db, redis=redis)
+                logger.info("flush_alert_digests 완료: %s", result)
+                return result
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("flush_alert_digests 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.sync_store_subscriptions",
     queue="process",
     bind=True,
