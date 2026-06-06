@@ -22,7 +22,9 @@ Delivery Integrity (Sprint 2):
   - 멀티디바이스: 유저당 last_seen_at 최신 1개 토큰만 발송
   - collapse_key: spike_event_id 기반 중복 알림 완화
 """
+import json
 import logging
+import time as _time
 import uuid as _uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone, time as dt_time
@@ -50,6 +52,11 @@ _INVALID_TOKEN_ERRORS = {
 COOLDOWN_SECONDS = 3600  # 1시간 (기본)
 COOLDOWN_SECONDS_CRITICAL = 1800  # 30분 (severity >= 90)
 _COOLDOWN_KEY_PREFIX = "push:cooldown:"
+
+# ── Alert Digest Buffer: 개별 즉시 발송 → 유저별 요약 묶음 발송 ──────────────
+DIGEST_BUFFER_KEY_PREFIX = "alert:digest:"
+DIGEST_BUFFER_TTL = 7200  # 버퍼 최대 보존 2시간 (미수신 방지)
+DIGEST_MAX_DISPLAY = 3  # 요약에 표시할 최대 이벤트 건수
 
 # ── Spike Push Count: FREE 유저 spike 알림 횟수 추적 (Pro 전환 프롬프트) ──
 _SPIKE_PUSH_COUNT_PREFIX = "spike_push_count:"
@@ -1037,6 +1044,207 @@ async def _increment_spike_push_counts(
             logger.debug("spike_push_count incr 실패: user_id=%s", uid)
 
 
+# ── Alert Digest: 큐잉 + 플러시 ────────────────────────────────────────────
+
+
+async def _queue_digest_for_users(
+    token_infos: list["_TokenInfo"],
+    token_to_log_id: dict[str, "_uuid.UUID"],
+    cluster_id: str,
+    cluster_title: str,
+    cluster_title_ko: Optional[str],
+    country_code: Optional[str],
+    severity: int,
+    kscore: float,
+    lane: str,
+    redis,
+) -> int:
+    """각 사용자 다이제스트 버퍼에 알림 큐잉. 반환: 큐잉된 사용자 수."""
+    queued = 0
+    for ti in token_infos:
+        uid = str(ti.user_id)
+        log_id = token_to_log_id.get(ti.fcm_token)
+        item = json.dumps({
+            "cluster_id": cluster_id,
+            "title": cluster_title,
+            "title_ko": cluster_title_ko or cluster_title,
+            "country_code": country_code or "",
+            "severity": severity,
+            "kscore": kscore,
+            "lane": lane,
+            "ts": int(_time.time()),
+            "log_id": str(log_id) if log_id else None,
+            "platform": ti.platform,
+            "language": ti.language,
+            "tz_name": ti.tz_name,
+            "home_country": ti.home_country,
+        })
+        key = f"{DIGEST_BUFFER_KEY_PREFIX}{uid}"
+        await redis.rpush(key, item)
+        await redis.expire(key, DIGEST_BUFFER_TTL)
+        queued += 1
+    return queued
+
+
+async def flush_alert_digests(db: AsyncSession, redis) -> dict:
+    """버퍼된 알림을 유저별 다이제스트 1건으로 묶어 FCM 발송.
+
+    Celery beat 'flush-alert-digests' 태스크(15분 주기)에서 호출.
+    각 유저의 pending 알림을 요약 텍스트 1건으로 합쳐서 발송.
+    """
+    keys: list[str] = []
+    async for key in redis.scan_iter(f"{DIGEST_BUFFER_KEY_PREFIX}*"):
+        keys.append(key.decode() if isinstance(key, bytes) else key)
+
+    if not keys:
+        return {"status": "ok", "flushed_users": 0, "sent": 0}
+
+    total_sent = 0
+    flushed_users = 0
+
+    for key in keys:
+        user_id_str = key.removeprefix(DIGEST_BUFFER_KEY_PREFIX)
+
+        items_raw = await redis.lrange(key, 0, -1)
+        if not items_raw:
+            continue
+        await redis.delete(key)
+
+        items = []
+        for raw in items_raw:
+            try:
+                items.append(json.loads(raw))
+            except Exception:
+                pass
+        if not items:
+            continue
+
+        # 동일 cluster_id 중복 제거
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for it in items:
+            cid = it.get("cluster_id", "")
+            if cid and cid not in seen:
+                seen.add(cid)
+                unique.append(it)
+        items = unique
+
+        # 심각도 내림차순 정렬
+        items.sort(key=lambda x: x.get("severity", 0), reverse=True)
+
+        # 현재 활성 FCM 토큰 조회
+        try:
+            result = await db.execute(
+                select(UserPushToken).where(
+                    UserPushToken.user_id == _uuid.UUID(user_id_str),
+                    UserPushToken.status == "active",
+                ).order_by(UserPushToken.last_seen_at.desc()).limit(1)
+            )
+            token_row = result.scalar_one_or_none()
+        except Exception:
+            logger.warning("digest flush: 토큰 조회 실패 user=%s", user_id_str)
+            continue
+
+        if not token_row:
+            fail_pairs = [
+                (_uuid.UUID(it["log_id"]), "no_active_token")
+                for it in items if it.get("log_id")
+            ]
+            if fail_pairs:
+                await _update_logs_failed(fail_pairs, db)
+            continue
+
+        lang = items[0].get("language", "ko")
+        count = len(items)
+        top = items[0]
+
+        # 요약 메시지 구성
+        if lang == "ko":
+            title = "🚨 위기 알림" if count == 1 else f"🚨 위기 알림 {count}건"
+            lines = [f"· {it['title_ko']} (심각도 {it['severity']})" for it in items[:DIGEST_MAX_DISPLAY]]
+            if count > DIGEST_MAX_DISPLAY:
+                lines.append(f"외 {count - DIGEST_MAX_DISPLAY}건 더...")
+            ctx_str = generate_alert_context(
+                home_country=top.get("home_country", "KR"),
+                event_country=top.get("country_code", ""),
+                topic="unknown",
+                lang="ko",
+            ) if top.get("country_code") else "최근 위기 상황 요약"
+        else:
+            title = "🚨 Crisis Alert" if count == 1 else f"🚨 {count} Crisis Alerts"
+            lines = [f"· {it['title']} (Sev {it['severity']})" for it in items[:DIGEST_MAX_DISPLAY]]
+            if count > DIGEST_MAX_DISPLAY:
+                lines.append(f"+{count - DIGEST_MAX_DISPLAY} more...")
+            ctx_str = generate_alert_context(
+                home_country=top.get("home_country", "KR"),
+                event_country=top.get("country_code", ""),
+                topic="unknown",
+                lang="en",
+            ) if top.get("country_code") else "Recent crisis summary"
+
+        lines.append(ctx_str)
+        body = "\n".join(lines)
+
+        data = {
+            "type": "digest",
+            "count": str(count),
+            "top_cluster_id": top.get("cluster_id", ""),
+            "severity": str(top.get("severity", 0)),
+            "lane": top.get("lane", "fast"),
+            "cluster_ids": ",".join(it.get("cluster_id", "") for it in items[:5]),
+        }
+
+        token_info = _TokenInfo(
+            fcm_token=token_row.fcm_token,
+            platform=token_row.platform or "web",
+            user_id=_uuid.UUID(user_id_str),
+            home_country=top.get("home_country", ""),
+            language=lang,
+            tz_name=top.get("tz_name", ""),
+        )
+
+        try:
+            sent, invalid, failures = _split_and_send(
+                token_infos=[token_info],
+                title=title,
+                body=body,
+                data=data,
+                severity=top.get("severity", 0),
+                collapse_key=f"digest:{user_id_str}",
+            )
+            total_sent += sent
+            flushed_users += 1
+
+            # 전달 로그 업데이트
+            sent_log_ids: list[_uuid.UUID] = []
+            failed_log_pairs: list[tuple[_uuid.UUID, str]] = []
+            for it in items:
+                if not it.get("log_id"):
+                    continue
+                lid = _uuid.UUID(it["log_id"])
+                if token_row.fcm_token in failures:
+                    failed_log_pairs.append((lid, failures[token_row.fcm_token]))
+                else:
+                    sent_log_ids.append(lid)
+            await _update_logs_sent(sent_log_ids, db)
+            await _update_logs_failed(failed_log_pairs, db)
+
+            if invalid:
+                await cleanup_invalid_tokens(invalid, db)
+
+        except Exception as e:
+            logger.warning("digest flush FCM 오류 user=%s: %s", user_id_str, e)
+            fail_pairs = [
+                (_uuid.UUID(it["log_id"]), "fcm_error")
+                for it in items if it.get("log_id")
+            ]
+            if fail_pairs:
+                await _update_logs_failed(fail_pairs, db)
+
+    logger.info("alert digest flush 완료: users=%d, sent=%d", flushed_users, total_sent)
+    return {"status": "ok", "flushed_users": flushed_users, "sent": total_sent}
+
+
 # ── 메인 발송 함수 (v7: KScore 기반 알림 모델) ────────────────────────────
 
 _VERIFIED_COOLDOWN_KEY_PREFIX = "push:verified_cooldown:"
@@ -1154,21 +1362,20 @@ async def send_alert(
         if signal_corroboration_count > 0:
             _vbody_ko += f"\n🛡️ 신뢰 확인 + 시그널 {signal_corroboration_count}건 교차검증"
             _vbody_en += f"\n🛡️ Verified + {signal_corroboration_count} signal(s) corroborated"
-        sent_verified, invalid_v, failures_v = _split_and_send_with_context(
+        # 즉시 FCM 발송 대신 다이제스트 버퍼에 큐잉 (15분 주기 flush)
+        sent_verified = await _queue_digest_for_users(
             token_infos=target_v.tokens,
-            title=_title_en,
-            base_body=_vbody_en,
-            data={"cluster_id": cluster_id, "lane": "verified", "severity": str(severity), "kscore": str(kscore)},
-            event_country=country_code,
-            topic=cluster_topic,
+            token_to_log_id=token_to_log_v,
+            cluster_id=cluster_id,
+            cluster_title=cluster_title,
+            cluster_title_ko=cluster_title_ko,
+            country_code=country_code,
             severity=severity,
-            collapse_key=collapse_key,
-            title_ko=_title_ko,
-            body_ko=_vbody_ko,
-            body_en=_vbody_en,
+            kscore=kscore,
+            lane="verified",
+            redis=redis,
         )
-        await _process_delivery_results(target_v.tokens, token_to_log_v, failures_v, db)
-        all_invalid.extend(invalid_v)
+        logger.info("digest 큐잉 (verified): %d명, cluster=%s", sent_verified, cluster_id)
         # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
         verified_user_ids = {t.user_id for t in target_v.tokens}
 
@@ -1212,36 +1419,31 @@ async def send_alert(
             _body_ko_f = f"심각도 {severity} · 속보 알림"
             _body_en_f = f"Severity {severity} · Fast Alert"
 
-        sent_fast, invalid_f, failures_f = _split_and_send_with_context(
+        # 즉시 FCM 발송 대신 다이제스트 버퍼에 큐잉 (15분 주기 flush)
+        sent_fast = await _queue_digest_for_users(
             token_infos=target_f.tokens,
-            title=_title_en_f,
-            base_body=_body_en_f,
-            data={"cluster_id": cluster_id, "lane": "fast", "severity": str(severity)},
-            event_country=country_code,
-            topic=cluster_topic,
+            token_to_log_id=token_to_log_f,
+            cluster_id=cluster_id,
+            cluster_title=cluster_title,
+            cluster_title_ko=cluster_title_ko,
+            country_code=country_code,
             severity=severity,
-            collapse_key=collapse_key,
-            title_ko=_title_ko_f,
-            body_ko=_body_ko_f,
-            body_en=_body_en_f,
+            kscore=kscore,
+            lane="fast",
+            redis=redis,
         )
-        await _process_delivery_results(target_f.tokens, token_to_log_f, failures_f, db)
-        all_invalid.extend(invalid_f)
+        logger.info("digest 큐잉 (fast): %d명, cluster=%s", sent_fast, cluster_id)
         # 일일 카운터는 _check_and_increment_daily에서 이미 atomic하게 증가됨
 
         # Redis 중복방지 설정
         await redis.setex(f"alert:fast:{cluster_id}", 259200, "1")  # 72h
 
-    # 만료/무효 토큰 자동 정리
-    await cleanup_invalid_tokens(all_invalid, db)
-
     return {
-        "status": "sent",
+        "status": "queued",
         "alert_kind": alert_kind,
-        "sent_verified": sent_verified,
-        "sent_fast": sent_fast,
-        "total": sent_verified + sent_fast,
-        "cleaned_tokens": len(all_invalid),
+        "queued_verified": sent_verified,
+        "queued_fast": sent_fast,
+        "total_queued": sent_verified + sent_fast,
     }
 
 
