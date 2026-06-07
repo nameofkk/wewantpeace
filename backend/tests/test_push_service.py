@@ -15,9 +15,11 @@ from worker.push.push_service import (
     send_spike_alert,
     send_alert,
     send_verified_alert,
+    flush_alert_digests,
     generate_alert_context,
     generate_spike_context,
     DAILY_PUSH_LIMITS,
+    DIGEST_BUFFER_KEY_PREFIX,
     _is_in_cooldown,
     _set_cooldown,
     _get_target_tokens_by_platform,
@@ -81,9 +83,11 @@ async def test_cooldown_set_and_active(redis_mock):
 
 
 @pytest.mark.asyncio
-async def test_send_skipped_during_cooldown(db, redis_mock):
+async def test_send_dedup_skips_repeat_fast_alert(db, redis_mock):
+    """같은 cluster_id fast 알림은 72h 내 중복 발송 안됨 (dedup key)."""
     cluster_id = str(uuid.uuid4())
-    await _set_cooldown(cluster_id, redis_mock)
+    # 이미 fast 알림이 발송된 것처럼 dedup 키 설정
+    await redis_mock.setex(f"alert:fast:{cluster_id}", 259200, "1")
 
     result = await send_spike_alert(
         cluster_id=cluster_id,
@@ -91,24 +95,23 @@ async def test_send_skipped_during_cooldown(db, redis_mock):
         country_code="UA",
         severity=70,
         kscore=5.0,
-        is_verified=True,
+        is_verified=False,
         cluster_topic=None,
         db=db,
         redis=redis_mock,
     )
-    assert result["status"] == "cooldown"
+    assert result["status"] == "dedup"
     assert result["sent"] == 0
 
 
 # ── 레인 분리 ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
-    """notify_verified=True 사용자에게 Verified 레인 발송."""
+async def test_verified_lane_queues_to_notify_verified_users(db, redis_mock):
+    """notify_verified=True 사용자가 Verified 레인 다이제스트 버퍼에 큐잉됨."""
     _, _, token = await _make_user_with_area(db, "UA", notify_verified=True, notify_fast=False)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
-         _mock_delivery_logs():
+    with _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Kyiv attack",
@@ -121,17 +124,16 @@ async def test_verified_lane_sends_to_notify_verified_users(db, redis_mock):
             redis=redis_mock,
         )
 
-    assert result["sent_verified"] == 1
-    assert mock_fcm.called
+    assert result["status"] == "queued"
+    assert result["queued_verified"] >= 1
 
 
 @pytest.mark.asyncio
 async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
-    """is_verified=False이면 Verified 레인 발송 안됨."""
+    """is_verified=False이면 Verified 레인 큐잉 안됨."""
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(0, [], {})) as mock_fcm, \
-         _mock_delivery_logs():
+    with _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -144,16 +146,15 @@ async def test_verified_lane_skipped_if_not_verified(db, redis_mock):
             redis=redis_mock,
         )
 
-    assert result["sent_verified"] == 0
+    assert result["queued_verified"] == 0
 
 
 @pytest.mark.asyncio
-async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
-    """notify_fast=True Pro 사용자에게 Fast 레인 발송."""
+async def test_fast_lane_queues_to_subscribers(db, redis_mock):
+    """관심국가 구독자가 Fast 레인 다이제스트 버퍼에 큐잉됨."""
     await _make_user_with_area(db, "UA", notify_fast=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm, \
-         _mock_delivery_logs():
+    with _mock_delivery_logs():
         result = await send_spike_alert(
             cluster_id=str(uuid.uuid4()),
             cluster_title="Test",
@@ -166,26 +167,30 @@ async def test_fast_lane_sends_to_notify_fast_users(db, redis_mock):
             redis=redis_mock,
         )
 
-    assert result["sent_fast"] == 1
+    assert result["status"] == "queued"
+    assert result["queued_fast"] >= 1
 
 
 @pytest.mark.asyncio
-async def test_notify_fast_false_no_fast_lane(db, redis_mock):
-    """notify_fast=False 사용자는 Fast 레인 대상 아님."""
+async def test_v7_fast_alert_all_active_subscribers(db, redis_mock):
+    """v7: Fast alert는 notify_fast 필드 무관하게 관심국가 모든 활성 구독자 대상."""
     await _make_user_with_area(db, "UA", notify_fast=False)
 
-    target = await _get_target_tokens_by_platform("UA", notify_fast=True, kscore=10.0, cluster_topic=None, db=db)
-    assert len(target.tokens) == 0
+    # alert_kind="fast"로 조회하면 notify_fast=False도 포함됨 (v7 정책)
+    target = await _get_target_tokens_by_platform(
+        "UA", notify_fast=False, kscore=10.0, cluster_topic=None, db=db, alert_kind="fast",
+    )
+    assert isinstance(target.tokens, list)
+    assert len(target.tokens) >= 1
 
 
 @pytest.mark.asyncio
-async def test_cooldown_set_after_send(db, redis_mock):
-    """발송 후 쿨다운 설정됨."""
+async def test_dedup_key_set_after_queue(db, redis_mock):
+    """큐잉 후 dedup 키 설정 → 같은 cluster_id 재발송 방지됨."""
     cluster_id = str(uuid.uuid4())
     await _make_user_with_area(db, "UA", notify_verified=True)
 
-    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})), \
-         _mock_delivery_logs():
+    with _mock_delivery_logs():
         await send_spike_alert(
             cluster_id=cluster_id,
             cluster_title="Test",
@@ -198,7 +203,9 @@ async def test_cooldown_set_after_send(db, redis_mock):
             redis=redis_mock,
         )
 
-    assert await _is_in_cooldown(cluster_id, redis_mock)
+    # 큐잉 후 fast + verified dedup 키 모두 설정돼야 함
+    assert await redis_mock.exists(f"alert:fast:{cluster_id}")
+    assert await redis_mock.exists(f"alert:verified:{cluster_id}")
 
 
 @pytest.mark.asyncio
@@ -307,3 +314,88 @@ async def test_v7_verified_alert_pro_only(db, redis_mock):
     )
     # notify_verified=True인 유저만 대상 (Pro/Pro+ 제한은 plan_locked에서 처리)
     assert isinstance(target.tokens, list)
+
+
+# ── 다이제스트 flush 테스트 ───────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_digest_queued_in_redis_after_send(db, redis_mock):
+    """send_alert 후 Redis 다이제스트 버퍼에 항목이 쌓임."""
+    _, _, token = await _make_user_with_area(db, "UA", notify_fast=True)
+
+    with _mock_delivery_logs():
+        result = await send_alert(
+            cluster_id=str(uuid.uuid4()),
+            cluster_title="Test fast alert",
+            country_code="UA",
+            severity=60,
+            kscore=5.0,
+            is_verified=False,
+            cluster_topic=None,
+            alert_kind="fast",
+            db=db,
+            redis=redis_mock,
+        )
+
+    assert result["status"] == "queued"
+    # Redis에 다이제스트 키가 생겼어야 함
+    keys = [k async for k in redis_mock.scan_iter(f"{DIGEST_BUFFER_KEY_PREFIX}*")]
+    assert len(keys) >= 1
+
+
+@pytest.mark.asyncio
+async def test_flush_alert_digests_clears_buffer_and_sends(db, redis_mock):
+    """flush_alert_digests(): Redis 버퍼를 읽어 FCM 발송 시도, 버퍼 초기화."""
+    import json
+    user, _, push_token = await _make_user_with_area(db, "UA", notify_fast=True)
+
+    # 직접 버퍼에 항목 삽입
+    key = f"{DIGEST_BUFFER_KEY_PREFIX}{user.id}"
+    item = json.dumps({
+        "cluster_id": str(uuid.uuid4()),
+        "title": "Test event",
+        "title_ko": "테스트 이벤트",
+        "country_code": "UA",
+        "severity": 65,
+        "kscore": 5.0,
+        "lane": "fast",
+        "ts": 1700000000,
+        "log_id": None,
+        "platform": "web",
+        "language": "ko",
+        "tz_name": "Asia/Seoul",
+        "home_country": "KR",
+    })
+    await redis_mock.rpush(key, item)
+
+    with patch("worker.push.push_service._split_and_send", return_value=(1, [], {})) as mock_fcm:
+        result = await flush_alert_digests(db=db, redis=redis_mock)
+
+    assert result["flushed_users"] == 1
+    assert mock_fcm.called
+    # 버퍼 키가 삭제됐어야 함
+    remaining_keys = [k async for k in redis_mock.scan_iter(f"{DIGEST_BUFFER_KEY_PREFIX}*")]
+    assert len(remaining_keys) == 0
+
+
+@pytest.mark.asyncio
+async def test_flush_digests_noop_on_empty_buffer(db, redis_mock):
+    """버퍼가 비어있으면 flush는 아무것도 안 함."""
+    result = await flush_alert_digests(db=db, redis=redis_mock)
+    assert result["flushed_users"] == 0
+    assert result["sent"] == 0
+
+
+class TestDigestConstants:
+    """다이제스트 버퍼 상수 확인."""
+
+    def test_buffer_key_prefix(self):
+        assert DIGEST_BUFFER_KEY_PREFIX == "alert:digest:"
+
+    def test_digest_ttl_2h(self):
+        from worker.push.push_service import DIGEST_BUFFER_TTL
+        assert DIGEST_BUFFER_TTL == 7200
+
+    def test_digest_max_display(self):
+        from worker.push.push_service import DIGEST_MAX_DISPLAY
+        assert DIGEST_MAX_DISPLAY == 3
