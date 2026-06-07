@@ -1281,13 +1281,14 @@ async def send_alert(
         dedup_key = f"alert:fast:{cluster_id}"
         if await redis.exists(dedup_key):
             logger.info("Fast alert 중복 스킵: cluster_id=%s", cluster_id)
-            if alert_kind == "fast":
+            # combined은 fast+verified 동시 발송이므로 fast 키 존재 시 전체 스킵
+            if alert_kind in ("fast", "combined"):
                 return {"status": "dedup", "sent": 0}
     if alert_kind in ("verified", "combined"):
         dedup_key_v = f"alert:verified:{cluster_id}"
         if await redis.exists(dedup_key_v):
             logger.info("Verified alert 중복 스킵: cluster_id=%s", cluster_id)
-            if alert_kind == "verified":
+            if alert_kind in ("verified", "combined"):
                 return {"status": "dedup", "sent": 0}
 
     # Cross-cluster 유사도 중복방지: 같은 국가 + 유사 제목의 다른 클러스터에

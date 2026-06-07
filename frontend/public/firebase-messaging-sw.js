@@ -21,18 +21,28 @@ messaging.onBackgroundMessage((payload) => {
   const title = data.title || payload.notification?.title || "WeWantPeace 알림";
   const body = data.body || payload.notification?.body || "";
 
+  // digest 알림: top_cluster_id로 이동, 태그도 통일해서 중복 표시 방지
+  const isDigest = data.type === "digest";
+  const targetClusterId = isDigest
+    ? data.top_cluster_id
+    : data.cluster_id;
+
+  const url = data.type === "engagement"
+    ? "/"
+    : targetClusterId && targetClusterId !== "test"
+      ? `/issues/${targetClusterId}`
+      : "/";
+
+  const tag = isDigest
+    ? `wwp-digest-${data.lane || "alert"}`
+    : data.cluster_id || "wwp-notification";
+
   self.registration.showNotification(title, {
     body,
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-96.png",
-    tag: data.cluster_id || "wwp-notification",
-    data: {
-      url: data.type === "engagement"
-        ? "/"
-        : data.cluster_id && data.cluster_id !== "test"
-          ? `/issues/${data.cluster_id}`
-          : "/",
-    },
+    tag,
+    data: { url },
     actions: [
       { action: "view", title: "자세히 보기" },
       { action: "dismiss", title: "닫기" },
