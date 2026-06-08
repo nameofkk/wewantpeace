@@ -4,13 +4,14 @@
 from __future__ import annotations
 import hmac
 import logging
+import os
 import uuid
 from hashlib import sha256
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Header
 from pydantic import BaseModel
 from sqlalchemy import select, func, and_, or_, cast, Date, text, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,34 @@ from backend.app.services.area_activation import sync_area_activation
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/bot-stats")
+async def bot_stats(
+    x_bot_key: Optional[str] = Header(None, alias="X-Bot-Key"),
+    db: AsyncSession = Depends(get_db),
+):
+    """도핑봇 전용 사업지표 — X-Bot-Key 헤더(BOT_STATS_KEY env)로만 접근. 읽기전용 집계만 반환."""
+    expected = os.environ.get("BOT_STATS_KEY")
+    if not expected or not x_bot_key or not hmac.compare_digest(x_bot_key, expected):
+        raise HTTPException(status_code=403, detail="forbidden")
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
+    new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
+    dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
+    subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(Subscription.status == "active"))).scalar() or 0
+    monthly_revenue = (await db.execute(select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start))).scalar() or 0
+    active_clusters = (await db.execute(select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0))).scalar() or 0
+    events_today = (await db.execute(select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start))).scalar() or 0
+    push_tokens = (await db.execute(select(func.count()).select_from(UserPushToken))).scalar() or 0
+    return {
+        "total_users": int(total_users), "new_today": int(new_today), "dau": int(dau),
+        "subscribers": int(subscribers), "monthly_revenue": int(monthly_revenue),
+        "active_clusters": int(active_clusters), "events_today": int(events_today),
+        "push_tokens": int(push_tokens),
+    }
 
 
 def _send_email(to: str, subject: str, html: str, from_addr: str | None = None):
