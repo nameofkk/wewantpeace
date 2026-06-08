@@ -59,12 +59,29 @@ async def bot_stats(
     active_clusters = (await db.execute(select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0))).scalar() or 0
     events_today = (await db.execute(select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start))).scalar() or 0
     push_tokens = (await db.execute(select(func.count()).select_from(UserPushToken))).scalar() or 0
+    feedback_count = (await db.execute(select(func.count()).select_from(Feedback))).scalar() or 0
     return {
         "total_users": int(total_users), "new_today": int(new_today), "dau": int(dau),
         "subscribers": int(subscribers), "monthly_revenue": int(monthly_revenue),
         "active_clusters": int(active_clusters), "events_today": int(events_today),
-        "push_tokens": int(push_tokens),
+        "push_tokens": int(push_tokens), "feedback_count": int(feedback_count),
     }
+
+
+@router.get("/bot-feedback")
+async def bot_feedback(
+    x_bot_key: Optional[str] = Header(None, alias="X-Bot-Key"),
+    db: AsyncSession = Depends(get_db),
+):
+    """도핑봇 전용 — 최근 인앱 피드백(의견 보내기) 메시지. X-Bot-Key 헤더로만. 읽기전용."""
+    expected = os.environ.get("BOT_STATS_KEY")
+    if not expected or not x_bot_key or not hmac.compare_digest(x_bot_key, expected):
+        raise HTTPException(status_code=403, detail="forbidden")
+    total = (await db.execute(select(func.count()).select_from(Feedback))).scalar() or 0
+    rows = (await db.execute(select(Feedback).order_by(Feedback.created_at.desc()).limit(40))).scalars().all()
+    items = [{"message": (r.message or "")[:300], "category": r.category, "status": r.status,
+              "at": r.created_at.isoformat() if r.created_at else None} for r in rows]
+    return {"total": int(total), "recent": items}
 
 
 def _send_email(to: str, subject: str, html: str, from_addr: str | None = None):
