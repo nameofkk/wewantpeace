@@ -1617,7 +1617,7 @@ export const translations = {
     // Free 유저 데모 배너/CTA
     demo_banner_intel: "샘플 데이터입니다. Pro 구독 시 실시간 인텔리전스를 확인할 수 있습니다.",
     demo_banner_impact: "데모 데이터입니다. Pro 구독 시 실제 영향 분석을 확인할 수 있습니다.",
-    demo_banner_weekly: "주간 리포트는 현재 준비중입니다.",
+    demo_banner_weekly: "주간 리포트는 Pro+ 플랜에서 이용할 수 있습니다.",
     demo_cta_pro: "Pro 구독하기",
     demo_cta_proplus: "Pro+ 구독하기",
 
@@ -3311,7 +3311,7 @@ export const translations = {
     // Free user demo banners/CTA
     demo_banner_intel: "Sample data. Subscribe to Pro for real-time intelligence.",
     demo_banner_impact: "Demo data. Subscribe to Pro for real impact analysis.",
-    demo_banner_weekly: "Weekly reports are coming soon.",
+    demo_banner_weekly: "Weekly reports are available on the Pro+ plan.",
     demo_cta_pro: "Subscribe to Pro",
     demo_cta_proplus: "Subscribe to Pro+",
 

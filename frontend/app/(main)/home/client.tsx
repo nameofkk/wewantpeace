@@ -49,6 +49,9 @@ import {
   ChevronDown,
   X,
   Check,
+  FileText,
+  ArrowRight,
+  Lock,
 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { LogoIcon } from "@/components/ui/logo-icon";
@@ -183,6 +186,7 @@ function ReportContent() {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [tourRun, setTourRun] = useState(false);
   const isPro = userPlan === "pro" || userPlan === "pro_plus";
+  const isProPlus = userPlan === "pro_plus";
 
   // 온보딩 완료 후 tour=1 파라미터로 자동 시작 (데이터 로딩 완료 후)
   // searchParams를 deps에서 제거: replaceState로 URL 변경 시 re-render가 timer를 취소하는 레이스 컨디션 방지
@@ -1003,6 +1007,61 @@ function ReportContent() {
                 : "Aggregated analysis of trade dependency and risk across all active conflict issues."}
             />
             <SectorImpactCard embedded />
+          </m.section>
+
+          {/* ═══════════════ SECTION E: 주간 리포트 진입점 ═══════════════ */}
+          <m.section custom={4} initial="hidden" animate="visible" variants={sectionVariants}>
+            {isProPlus ? (
+              <Link
+                href="/reports/weekly"
+                className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-card/80 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold text-foreground">
+                        {lang === "ko" ? "주간 리포트" : "Weekly Report"}
+                      </span>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                        Pro+
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {lang === "ko" ? "이번 주 주요 글로벌 분쟁 요약" : "This week's major global conflict summary"}
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </Link>
+            ) : (
+              <Link
+                href="/upgrade?source=weekly_report_home"
+                className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-card/80 transition-colors group opacity-80"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-semibold text-foreground/70">
+                        {lang === "ko" ? "주간 리포트" : "Weekly Report"}
+                      </span>
+                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                        Pro+
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {lang === "ko" ? "Pro+ 플랜에서 이용 가능합니다" : "Available on Pro+ plan"}
+                    </p>
+                  </div>
+                </div>
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </Link>
+            )}
           </m.section>
 
           {/* ═══════════════ Newsletter CTA ═══════════════ */}
