@@ -120,7 +120,7 @@ const RAW_METRIC_LABELS_KO: Record<string, string> = {
 };
 
 export default function KpiPage() {
-  const lang = "ko" as Lang;
+  const { lang } = useAdminStore();
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);

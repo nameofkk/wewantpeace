@@ -18,7 +18,7 @@ interface LogEntry {
 }
 
 export default function AdminLogsPage() {
-  const lang = "ko" as Lang;
+  const { lang } = useAdminStore();
   const { user } = useAuth();
   const [page, setPage] = useState(1);
 
