@@ -736,6 +736,27 @@ async def track_event(
         )
         db.add(pe)
 
+    # ── 퍼널 계측 (로그인 유저만) ──────────────────────────────────────────────
+    if current_user:
+        from backend.app.services.funnel import (
+            log_funnel_event, CORE_ACTION_EVENTS, EV_ACTIVATION, EV_RETURN,
+        )
+        # 활성화: 첫 핵심행동(이슈/클러스터 열람·관심지역 설정) 최초 1회만 기록
+        if body.name in CORE_ACTION_EVENTS:
+            await log_funnel_event(
+                db, EV_ACTIVATION, current_user.id,
+                props={"via": body.name}, session_id=body.session_id,
+                platform=body.platform, once=True,
+            )
+        # 재방문: 가입일 이후의 날에 다시 들어온 경우 하루 1회만 기록
+        if current_user.created_at and \
+                current_user.created_at.date() < datetime.now(timezone.utc).date():
+            await log_funnel_event(
+                db, EV_RETURN, current_user.id,
+                session_id=body.session_id, platform=body.platform,
+                once_per_day=True,
+            )
+
     await db.flush()
     return {"status": "ok"}
 

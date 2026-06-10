@@ -115,6 +115,10 @@ async def activate_store_subscription(
         user.plan = plan
         await sync_area_activation(user_id, plan, db)
 
+    # 퍼널 계측: 유료전환 (최초 1회)
+    from backend.app.services.funnel import log_funnel_event, EV_PAID
+    await log_funnel_event(db, EV_PAID, user_id, props={"plan": plan, "platform": platform}, once=True)
+
     await db.flush()
     return sub
 
@@ -171,6 +175,10 @@ async def handle_store_event(
         if user:
             user.plan = sub.plan
             await sync_area_activation(sub.user_id, sub.plan, db)
+
+        # 퍼널 계측: 유료전환 (최초 1회 — 갱신은 중복 적재 안 됨)
+        from backend.app.services.funnel import log_funnel_event, EV_PAID
+        await log_funnel_event(db, EV_PAID, sub.user_id, props={"plan": sub.plan, "platform": platform}, once=True)
 
     elif event_type in ("CANCELED", "EXPIRED", "DID_FAIL_TO_RENEW", "REVOKE",
                          "SUBSCRIPTION_STATE_EXPIRED", "SUBSCRIPTION_STATE_REVOKED"):

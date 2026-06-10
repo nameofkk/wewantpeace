@@ -503,6 +503,11 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
             pg_transaction_id=payment_id,
         )
         db.add(history)
+
+        # 퍼널 계측: 유료전환 (최초 1회 — 갱신 결제는 중복 적재 안 됨)
+        from backend.app.services.funnel import log_funnel_event, EV_PAID
+        await log_funnel_event(db, EV_PAID, sub.user_id, props={"plan": sub.plan, "platform": "dodopayments"}, once=True)
+
         await db.flush()
 
         logger.info("DodoPayments 결제 성공 기록: payment_id=%s dodo_sub=%s", payment_id, dodo_sub_id)
@@ -587,6 +592,10 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
     if not user.admin_plan_override:
         user.plan = plan
         await sync_area_activation(user_id, plan, db)
+
+    # 퍼널 계측: 유료전환 (최초 1회)
+    from backend.app.services.funnel import log_funnel_event, EV_PAID
+    await log_funnel_event(db, EV_PAID, user_id, props={"plan": plan, "platform": "dodopayments", "billing": "lifetime"}, once=True)
 
     await db.flush()
 
