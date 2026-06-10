@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, TIMESTAMP
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, TIMESTAMP, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from backend.app.core.database import Base
@@ -63,4 +63,16 @@ class PaymentHistory(Base):
 
     __table_args__ = (
         CheckConstraint("status IN ('success','failed','refunded')", name="ck_payment_status"),
+        # 같은 결제건이 두 번 적재되는 걸 DB 차원에서 막는 백스톱.
+        # 웹훅 재전송 / sync 백필이 겹치면 같은 (platform, pg_transaction_id, status)
+        # 행이 두 번 들어가서 매출이 부풀려지던 버그가 있었음.
+        # status까지 키에 넣은 이유: 같은 거래의 success → refunded 처럼
+        # 상태가 다른 정상 기록은 막으면 안 되니까.
+        # pg_transaction_id 없는(NULL) 레거시/내부 기록은 여러 개 허용(부분 인덱스).
+        Index(
+            "uq_payment_history_pg_txn",
+            "platform", "pg_transaction_id", "status",
+            unique=True,
+            postgresql_where=text("pg_transaction_id IS NOT NULL"),
+        ),
     )

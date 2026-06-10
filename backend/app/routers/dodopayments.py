@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_db, _verify_firebase_token, _get_or_create_user
@@ -91,6 +92,24 @@ def _get_dodo_client() -> DodoPayments:
         bearer_token=settings.dodo_api_key,
         environment=settings.dodo_environment,
     )
+
+
+async def _payment_already_recorded(db: AsyncSession, payment_id: str | None) -> bool:
+    """이 dodo payment_id가 이미 success로 적재됐는지 확인.
+
+    웹훅 재전송 / sync 백필이 같은 결제건을 두 번 넣어서 매출이 부풀려지던 걸 막는다.
+    dodo payment_id는 결제 1건당 고유하고, 웹훅은 success만 적재하므로 status=success로 본다.
+    """
+    if not payment_id:
+        return False
+    result = await db.execute(
+        select(PaymentHistory.id).where(
+            PaymentHistory.platform == "dodopayments",
+            PaymentHistory.pg_transaction_id == payment_id,
+            PaymentHistory.status == "success",
+        ).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 # ── 스키마 ────────────────────────────────────────────────────────────────────
@@ -486,6 +505,13 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
     payment_id = data.payment_id
     dodo_sub_id = getattr(data, "subscription_id", None)
 
+    # 멱등성 가드: 같은 결제(payment_id)가 이미 적재됐으면 통째로 건너뜀.
+    # 웹훅이 여러 번 와도(재전송), sync 백필이랑 겹쳐도 PaymentHistory가 두 번 안 들어가게.
+    # lifetime 경로의 구독 중복 생성까지 여기서 같이 막힌다.
+    if payment_id and await _payment_already_recorded(db, payment_id):
+        logger.info("DodoPayments payment_succeeded: 이미 기록된 결제 건너뜀 payment_id=%s", payment_id)
+        return
+
     # 구독 결제인 경우: PaymentHistory만 기록 (구독 활성화는 subscription.active에서 처리)
     if dodo_sub_id:
         sub = await _find_sub_by_dodo_id(dodo_sub_id, db)
@@ -502,7 +528,14 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
             platform="dodopayments",
             pg_transaction_id=payment_id,
         )
-        db.add(history)
+        # savepoint로 감싸서 동시 웹훅 경합(둘 다 사전 체크 통과)으로 유니크 인덱스가
+        # 걸려도 500 안 내고 멱등하게 넘어감. 사전 체크가 1차, 이게 최종 방어선.
+        try:
+            async with db.begin_nested():
+                db.add(history)
+        except IntegrityError:
+            logger.info("DodoPayments payment_succeeded: 동시 적재 경합 감지, 건너뜀 payment_id=%s", payment_id)
+            return
 
         # 퍼널 계측: 유료전환 (최초 1회 — 갱신 결제는 중복 적재 안 됨)
         from backend.app.services.funnel import log_funnel_event, EV_PAID
