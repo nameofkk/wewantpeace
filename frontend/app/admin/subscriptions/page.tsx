@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { t } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, CreditCard, HelpCircle, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatMoneyFromCents } from "@/lib/utils";
 import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
 
@@ -135,8 +135,9 @@ export default function AdminSubscriptionsPage() {
     return new Date(d).toLocaleDateString(locale);
   };
 
+  // amount는 "USD 센트" 정수(예: 699 = $6.99)라서 표시 직전에 100으로 나눠 통화 형식으로 변환한다.
   const formatAmount = (amount: number, currency: string) => {
-    return `${amount.toLocaleString(locale)} ${currency}`;
+    return formatMoneyFromCents(amount, currency || "USD", locale);
   };
 
   return (

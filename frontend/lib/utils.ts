@@ -14,6 +14,21 @@ export function usePageTitle(lang: Lang, key: TranslationKey) {
   }, [lang, key]);
 }
 
+/**
+ * 금액 표시용 단위 변환 헬퍼.
+ * DB·API는 결제 금액을 "USD 센트" 정수로 다룬다 (예: 699 = $6.99, 월 매출 합계도 센트 합).
+ * 화면에 그대로 뿌리면 100배로 부풀려지므로, 표시 직전에 100으로 나눠 통화 형식으로 변환한다.
+ *   formatMoneyFromCents(699)            → "$6.99"
+ *   formatMoneyFromCents(123400)         → "$1,234.00"
+ *   formatMoneyFromCents(699, "EUR")     → "€6.99"
+ */
+export function formatMoneyFromCents(cents: number, currency = "USD", locale = "en-US"): string {
+  return (cents / 100).toLocaleString(locale, {
+    style: "currency",
+    currency,
+  });
+}
+
 export const TENSION_LEVELS = {
   0: { label: "안정", color: "text-emerald-400", bg: "bg-emerald-500/20", border: "border-emerald-500/50" },
   1: { label: "주의", color: "text-amber-300",   bg: "bg-amber-500/25",   border: "border-amber-400/60" },

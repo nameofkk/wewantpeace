@@ -6,7 +6,7 @@ import {
   Users, Flag, Layers, FileText, Activity, CreditCard,
   AlertTriangle, Bell, Workflow, TrendingUp, ArrowUpRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatMoneyFromCents } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getCountryName } from "@/lib/countries";
 import Link from "next/link";
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
     {
       label: t(lang, "admin_active_subs"),
       value: stats?.subscribers ?? 0,
-      sub: `$${(stats?.monthly_revenue ?? 0).toLocaleString()} ${t(lang, "admin_monthly_revenue")}`,
+      sub: `${formatMoneyFromCents(stats?.monthly_revenue ?? 0)} ${t(lang, "admin_monthly_revenue")}`,
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
