@@ -4509,10 +4509,90 @@ async def sync_dodo_subscriptions(
 
         synced += 1
 
+    # 새로 만든 구독 레코드에 id를 부여(백필 단계에서 subscription_id로 연결하기 위해)
+    await db.flush()
+
+    # ── Dodo 결제 내역 백필 ──────────────────────────────────────────────
+    # 웹훅이 403으로 막혀 payment_history에 안 들어간 과거 결제를 Dodo API에서
+    # 직접 긁어와 채운다. 매출(monthly_revenue)은 payment_history.created_at
+    # 기준 집계라서, created_at은 반드시 Dodo 결제 실제 시각으로 넣는다.
+    payments_backfilled = 0
+    payments_skipped_no_sub = 0
+
+    try:
+        all_payments = list(client.payments.list(page_size=100))
+    except Exception as e:  # noqa: BLE001 - 외부 API 실패는 errors로 보고
+        all_payments = []
+        errors.append(f"payments.list 실패: {e}")
+
+    if all_payments:
+        # 결제가 가리키는 dodo 구독들에 대응하는 로컬 Subscription 조회
+        dodo_sub_ids = {p.subscription_id for p in all_payments if p.subscription_id}
+        local_subs: dict[str, Subscription] = {}
+        if dodo_sub_ids:
+            sub_rows = await db.execute(
+                select(Subscription).where(
+                    Subscription.dodo_subscription_id.in_(dodo_sub_ids)
+                )
+            )
+            for s in sub_rows.scalars().all():
+                local_subs[s.dodo_subscription_id] = s
+
+        def _map_status(p) -> str | None:
+            """Dodo 결제 상태 → payment_history.status. 최종 상태만 기록."""
+            if getattr(p, "refund_status", None) is not None:
+                return "refunded"
+            if p.status == "succeeded":
+                return "success"
+            if p.status in ("failed", "cancelled"):
+                return "failed"
+            return None  # processing/requires_* 등 미확정 상태는 건너뜀
+
+        # 기록 대상(최종 상태 + 로컬 구독 매칭 가능) 후보 수집
+        candidates = []  # (payment, local_sub, mapped_status)
+        for p in all_payments:
+            mapped = _map_status(p)
+            if mapped is None:
+                continue
+            local_sub = local_subs.get(p.subscription_id) if p.subscription_id else None
+            if local_sub is None:
+                payments_skipped_no_sub += 1
+                continue
+            candidates.append((p, local_sub, mapped))
+
+        # pg_transaction_id 기준 중복 제거(이미 기록된 결제는 건너뜀)
+        candidate_ids = [p.payment_id for p, _, _ in candidates]
+        existing_ids: set[str] = set()
+        if candidate_ids:
+            existing_rows = await db.execute(
+                select(PaymentHistory.pg_transaction_id).where(
+                    PaymentHistory.pg_transaction_id.in_(candidate_ids)
+                )
+            )
+            existing_ids = {row[0] for row in existing_rows.all()}
+
+        for p, local_sub, mapped in candidates:
+            if p.payment_id in existing_ids:
+                continue
+            db.add(PaymentHistory(
+                user_id=local_sub.user_id,
+                subscription_id=local_sub.id,
+                amount=p.total_amount,
+                currency=str(p.currency) if p.currency else "USD",
+                status=mapped,
+                platform="dodopayments",
+                pg_transaction_id=p.payment_id,
+                created_at=p.created_at,  # 매출 집계 정확성: 실제 결제 시각 보존
+            ))
+            existing_ids.add(p.payment_id)  # 같은 응답 내 중복 방어
+            payments_backfilled += 1
+
     await db.commit()
 
     return {
         "synced": synced,
         "total_active_in_dodo": sum(1 for s in dodo_subs.items if s.status == "active"),
+        "payments_backfilled": payments_backfilled,
+        "payments_skipped_no_sub": payments_skipped_no_sub,
         "errors": errors,
     }
