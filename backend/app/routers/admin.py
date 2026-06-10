@@ -36,6 +36,10 @@ from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
 
+# 매출 집계는 한국시간(KST, UTC+9) 기준 "이번달 1일 0시"로 끊는다.
+# created_at은 timestamptz라서 타임존 붙은 값으로 비교하면 DB가 알아서 맞춰준다.
+KST = timezone(timedelta(hours=9))
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -50,7 +54,8 @@ async def bot_stats(
         raise HTTPException(status_code=403, detail="forbidden")
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
+    month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
     dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
@@ -244,7 +249,8 @@ async def get_stats(
         select(func.count()).select_from(Subscription).where(Subscription.status == "active")
     )).scalar()
 
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
+    month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     monthly_revenue = (await db.execute(
         select(func.coalesce(func.sum(PaymentHistory.amount), 0))
         .where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start)
