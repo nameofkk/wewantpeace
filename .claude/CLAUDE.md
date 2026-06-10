@@ -25,6 +25,11 @@ git push
 - worker 배포 시: 임시로 `Dockerfile.worker`로 변경 후 배포, 즉시 복원
 - frontend 배포 시: 임시로 `Dockerfile.frontend`로 변경 후 배포, 즉시 복원
 
+## worker 레플리카 주의사항 (railway-worker.json)
+- `railway-worker.json`의 `deploy.numReplicas`는 반드시 `1`로 고정
+- 이유: `startCommand`가 `celery worker --beat`로 beat 스케줄러를 워커에 붙여서 돌림. 레플리카를 2 이상으로 올리면 beat가 복제돼 예약 태스크(`sync_dodo_subscriptions` 등)가 중복 실행됨
+- beat를 별도 서비스로 분리하기 전까지는 절대 증설 금지 (로컬 `infra/docker-compose.yml`은 `worker-beat`로 이미 분리돼 있음, 프로덕션도 동일하게 분리하면 그때 해제 가능)
+
 ## i18n 규칙
 - UI 텍스트 수정 시 한국어(ko) + 영어(en) 동시 수정
 - `frontend/lib/i18n.ts` — ko/en 블록 모두 업데이트
