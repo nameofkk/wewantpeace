@@ -7,6 +7,7 @@ API 소스, 중복률, FCM 전송, 구독 무결성, 긴장도 지수, Redis,
 데이터 품질 감사를 점검합니다.
 """
 import asyncio
+import json
 import logging
 import os
 import uuid
@@ -1618,4 +1619,55 @@ async def run_all_checks() -> list[HealthCheckResult]:
             )
         results.append(r)
 
+    # 계산된 19종 결과를 Redis에 스냅샷 저장 (읽기전용 /status 엔드포인트가 읽음).
+    # 여기서 새 헬스 로직을 돌리는 게 아니라, 이미 계산된 결과를 그대로 캐싱만 한다.
+    await _persist_results(results)
+
     return results
+
+
+# ── 결과 스냅샷 캐싱 (읽기전용 /status 노출용) ──────────────────────────────
+
+HEALTH_SNAPSHOT_KEY = "health:last_results"
+# health_check는 6시간마다 도니까, 한 번 누락돼도 다음 실행까지 남도록 TTL은 넉넉히.
+_SNAPSHOT_TTL = 60 * 60 * 25  # 25시간
+
+
+def serialize_result(r: "HealthCheckResult") -> dict:
+    """HealthCheckResult를 /status가 그대로 내보낼 수 있는 dict로 변환."""
+    return {
+        "check_name": r.check_name,
+        "status": r.status,
+        "message": r.message,
+        "issues": [
+            {
+                "severity": i.severity,
+                "message": i.message,
+                "auto_fix_available": i.auto_fix_available,
+                "fix_action": i.fix_action,
+            }
+            for i in r.issues
+        ],
+    }
+
+
+async def _persist_results(results: list["HealthCheckResult"]) -> None:
+    """run_all_checks 결과를 Redis에 JSON 스냅샷으로 저장."""
+    try:
+        redis = get_redis()
+        ok = sum(1 for r in results if r.status == "ok")
+        warning = sum(1 for r in results if r.status == "warning")
+        critical = sum(1 for r in results if r.status == "critical")
+        overall = "critical" if critical else ("warning" if warning else "ok")
+        payload = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "overall": overall,
+            "total": len(results),
+            "ok": ok,
+            "warning": warning,
+            "critical": critical,
+            "checks": [serialize_result(r) for r in results],
+        }
+        await redis.set(HEALTH_SNAPSHOT_KEY, json.dumps(payload, ensure_ascii=False), ex=_SNAPSHOT_TTL)
+    except Exception:
+        logger.warning("헬스 결과 스냅샷 저장 실패 (무시)", exc_info=True)
