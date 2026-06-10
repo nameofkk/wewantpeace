@@ -39,6 +39,7 @@ async def verify_subscription(
         "auto_renewing": bool,
         "state": str,
         "acknowledgement_state": int,
+        "order_id": str,   # 최신 주문 ID(latestOrderId). 갱신마다 바뀌므로 결제 거래번호로 사용.
         "raw": dict,
     }
     """
@@ -63,6 +64,9 @@ async def verify_subscription(
     line_items = result.get("lineItems", [])
     product_id = line_items[0].get("productId", "") if line_items else ""
     expiry_time = line_items[0].get("expiryTime", "") if line_items else ""
+    # latestOrderId: 구독 가입 주문 → 갱신될 때마다 ..0, ..1 식으로 새 주문 ID가 붙는다.
+    # purchase_token은 구독 내내 그대로라 갱신 결제 거래번호로 쓰면 중복되므로, 이 값을 쓴다.
+    order_id = result.get("latestOrderId", "")
     auto_renewing = result.get("autoResumeTimeMillis") is None and subscription_state in (
         "SUBSCRIPTION_STATE_ACTIVE",
         "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
@@ -78,6 +82,7 @@ async def verify_subscription(
         "auto_renewing": auto_renewing,
         "state": subscription_state,
         "acknowledgement_state": result.get("acknowledgementState", 0),
+        "order_id": order_id,
         "raw": result,
     }
 
