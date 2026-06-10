@@ -106,6 +106,207 @@ async def test_handler_skips_already_recorded_payment(db):
     assert await _count_history(db, "pay_resend_1") == 1
 
 
+async def _make_paid_sub(db, *, amount=699, payment_id="pay_x", plan="pro"):
+    """user + active sub + success PaymentHistory 한 세트 생성."""
+    user = await _make_user(db)
+    user.plan = plan
+    sub = Subscription(
+        user_id=user.id, plan=plan, status="active", platform="dodopayments",
+        amount=amount, currency="USD", billing_interval="monthly",
+        dodo_subscription_id=f"dsub-{uuid.uuid4().hex[:8]}",
+    )
+    db.add(sub)
+    await db.flush()
+    hist = PaymentHistory(
+        user_id=user.id, subscription_id=sub.id, amount=amount, currency="USD",
+        status="success", platform="dodopayments", pg_transaction_id=payment_id,
+    )
+    db.add(hist)
+    await db.flush()
+    return user, sub, hist
+
+
+@pytest.mark.asyncio
+async def test_refund_full_marks_refunded_and_revokes(db):
+    """전액 환불: success → refunded, 구독 expired, user.plan free."""
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_full_1")
+
+    data = SimpleNamespace(payment_id="pay_full_1", amount=699)
+    await dodopayments._handle_refund_succeeded(data, db)
+
+    await db.refresh(hist)
+    await db.refresh(sub)
+    await db.refresh(user)
+    assert hist.status == "refunded"
+    assert hist.amount == 699  # 금액은 그대로, 상태만 바뀜
+    assert sub.status == "expired"
+    assert sub.auto_renewing is False
+    assert user.plan == "free"
+
+
+@pytest.mark.asyncio
+async def test_refund_no_amount_treated_as_full(db):
+    """amount 없는 환불 이벤트는 전액 환불로 본다."""
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_noamt_1")
+
+    data = SimpleNamespace(payment_id="pay_noamt_1", amount=None)
+    await dodopayments._handle_refund_succeeded(data, db)
+
+    await db.refresh(hist)
+    await db.refresh(user)
+    assert hist.status == "refunded"
+    assert user.plan == "free"
+
+
+@pytest.mark.asyncio
+async def test_refund_partial_reduces_amount_keeps_access(db):
+    """부분 환불: 매출에서 환불액만 차감, 등급 유지."""
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_part_1")
+
+    data = SimpleNamespace(payment_id="pay_part_1", amount=200)
+    await dodopayments._handle_refund_succeeded(data, db)
+
+    await db.refresh(hist)
+    await db.refresh(sub)
+    await db.refresh(user)
+    assert hist.status == "success"   # 여전히 매출에 잡힘
+    assert hist.amount == 499         # 699 - 200
+    assert sub.status == "active"     # 등급 유지
+    assert user.plan == "pro"
+
+
+@pytest.mark.asyncio
+async def test_refund_idempotent(db):
+    """환불 웹훅 재전송: 두 번 와도 refunded 1건 유지, 예외 없음."""
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_idem_1")
+    data = SimpleNamespace(payment_id="pay_idem_1", amount=699)
+
+    await dodopayments._handle_refund_succeeded(data, db)
+    await dodopayments._handle_refund_succeeded(data, db)  # 재전송
+
+    res = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.pg_transaction_id == "pay_idem_1",
+            PaymentHistory.status == "refunded",
+        )
+    )
+    assert res.scalar_one() == 1
+    # success 행은 남아있지 않아야 매출에서 빠진다
+    res2 = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.pg_transaction_id == "pay_idem_1",
+            PaymentHistory.status == "success",
+        )
+    )
+    assert res2.scalar_one() == 0
+
+
+@pytest.mark.asyncio
+async def test_refund_missing_original_no_crash(db):
+    """원결제 기록이 없는 환불 이벤트는 조용히 넘어간다(크래시 X)."""
+    data = SimpleNamespace(payment_id="pay_ghost_1", amount=699)
+    await dodopayments._handle_refund_succeeded(data, db)  # 예외 없이 통과
+    assert await _count_history(db, "pay_ghost_1") == 0
+
+
+@pytest.mark.asyncio
+async def test_refund_revenue_excludes_refunded(db):
+    """매출 집계(success amount 합)가 환불 반영을 정확히 한다."""
+    # 전액 환불 1건 + 부분 환불 1건 + 멀쩡한 결제 1건
+    await _make_paid_sub(db, amount=699, payment_id="rev_full")
+    await _make_paid_sub(db, amount=699, payment_id="rev_part")
+    await _make_paid_sub(db, amount=699, payment_id="rev_ok")
+
+    await dodopayments._handle_refund_succeeded(
+        SimpleNamespace(payment_id="rev_full", amount=699), db)
+    await dodopayments._handle_refund_succeeded(
+        SimpleNamespace(payment_id="rev_part", amount=300), db)
+
+    total = await db.execute(
+        select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(
+            PaymentHistory.status == "success"
+        )
+    )
+    # rev_full 전액 빠짐(0), rev_part 300 차감(399), rev_ok 그대로(699) → 1098
+    assert total.scalar_one() == 399 + 699
+
+
+@pytest.mark.asyncio
+async def test_backfill_updates_existing_success_to_refunded(db):
+    """admin 백필: 이미 success로 있던 결제가 Dodo에서 refunded로 오면 갱신(스킵 X)."""
+    from backend.app.routers.admin import _backfill_payment_candidates
+
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_bf_1")
+
+    # Dodo가 같은 결제를 이제 refunded로 보고함
+    dodo_payment = SimpleNamespace(
+        payment_id="pay_bf_1", total_amount=699, currency="USD",
+        created_at=hist.created_at,
+    )
+    candidates = [(dodo_payment, sub, "refunded")]
+
+    backfilled, refunded = await _backfill_payment_candidates(db, candidates)
+    await db.flush()
+
+    assert (backfilled, refunded) == (0, 1)
+    await db.refresh(hist)
+    assert hist.status == "refunded"
+    # success 행이 더는 없어야 매출에서 빠진다
+    res = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.pg_transaction_id == "pay_bf_1",
+            PaymentHistory.status == "success",
+        )
+    )
+    assert res.scalar_one() == 0
+
+
+@pytest.mark.asyncio
+async def test_backfill_skips_true_duplicate(db):
+    """admin 백필: 같은 상태로 이미 있으면 진짜 중복 → 새로 안 넣음."""
+    from backend.app.routers.admin import _backfill_payment_candidates
+
+    user, sub, hist = await _make_paid_sub(db, amount=699, payment_id="pay_bf_2")
+    dodo_payment = SimpleNamespace(
+        payment_id="pay_bf_2", total_amount=699, currency="USD",
+        created_at=hist.created_at,
+    )
+    candidates = [(dodo_payment, sub, "success")]
+
+    backfilled, refunded = await _backfill_payment_candidates(db, candidates)
+    assert (backfilled, refunded) == (0, 0)
+    assert await _count_history(db, "pay_bf_2") == 1
+
+
+@pytest.mark.asyncio
+async def test_backfill_inserts_new_refund_when_no_success(db):
+    """admin 백필: success 기록이 아예 없던 결제가 refunded로 오면 새 행으로 적재."""
+    from backend.app.routers.admin import _backfill_payment_candidates
+
+    user = await _make_user(db)
+    sub = Subscription(
+        user_id=user.id, plan="pro", status="active", platform="dodopayments",
+        amount=699, currency="USD", billing_interval="monthly",
+        dodo_subscription_id="dsub-new",
+    )
+    db.add(sub)
+    await db.flush()
+
+    dodo_payment = SimpleNamespace(
+        payment_id="pay_bf_3", total_amount=699, currency="USD",
+        created_at=user.created_at,
+    )
+    candidates = [(dodo_payment, sub, "refunded")]
+
+    backfilled, refunded = await _backfill_payment_candidates(db, candidates)
+    await db.flush()
+    assert (backfilled, refunded) == (1, 0)
+    res = await db.execute(
+        select(PaymentHistory.status).where(PaymentHistory.pg_transaction_id == "pay_bf_3")
+    )
+    assert res.scalar_one() == "refunded"
+
+
 @pytest.mark.asyncio
 async def test_payment_already_recorded_helper(db):
     """_payment_already_recorded 헬퍼 단위 검증."""

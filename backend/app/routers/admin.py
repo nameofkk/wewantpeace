@@ -4413,6 +4413,66 @@ async def clear_cache(
 # ── DodoPayments 구독 동기화 (웹훅 실패 복구) ───────��────────────────────────
 
 
+async def _backfill_payment_candidates(db: AsyncSession, candidates: list) -> tuple[int, int]:
+    """Dodo 결제 후보들을 payment_history에 적재/갱신.
+
+    candidates: (payment, local_sub, mapped_status) 튜플 리스트.
+    반환: (새로 적재한 건수, success→refunded로 갱신한 건수).
+
+    예전엔 pg_transaction_id가 이미 있으면 무조건 스킵했는데, 그러면 처음 success로
+    들어간 결제가 나중에 Dodo에서 refunded로 바뀌어도 "이미 있음"으로 건너뛰어서
+    매출(success 행만 집계)에서 영영 안 빠지는 버그가 있었다.
+    그래서 txn별로 어떤 상태들이 이미 있는지(+ 행 객체)를 들고 있다가,
+    refunded가 새로 오면 기존 success 행을 refunded로 갱신한다.
+    """
+    backfilled = 0
+    refunded = 0
+
+    candidate_ids = [p.payment_id for p, _, _ in candidates]
+    existing_by_txn: dict[str, dict[str, PaymentHistory]] = {}
+    if candidate_ids:
+        existing_rows = await db.execute(
+            select(PaymentHistory).where(
+                PaymentHistory.platform == "dodopayments",
+                PaymentHistory.pg_transaction_id.in_(candidate_ids),
+            )
+        )
+        for row in existing_rows.scalars().all():
+            existing_by_txn.setdefault(row.pg_transaction_id, {})[row.status] = row
+
+    for p, local_sub, mapped in candidates:
+        statuses = existing_by_txn.setdefault(p.payment_id, {})
+
+        # 같은 상태로 이미 기록돼 있으면 진짜 중복 → 스킵
+        if mapped in statuses:
+            continue
+
+        # 환불이 새로 도착했는데 기존에 success 행이 있으면,
+        # 새 행을 넣지 말고 그 success 행을 refunded로 갱신(매출에서 차감).
+        if mapped == "refunded" and "success" in statuses:
+            success_row = statuses.pop("success")
+            success_row.status = "refunded"
+            statuses["refunded"] = success_row
+            refunded += 1
+            continue
+
+        row = PaymentHistory(
+            user_id=local_sub.user_id,
+            subscription_id=local_sub.id,
+            amount=p.total_amount,
+            currency=str(p.currency) if p.currency else "USD",
+            status=mapped,
+            platform="dodopayments",
+            pg_transaction_id=p.payment_id,
+            created_at=p.created_at,  # 매출 집계 정확성: 실제 결제 시각 보존
+        )
+        db.add(row)
+        statuses[mapped] = row  # 같은 응답 내 중복 방어
+        backfilled += 1
+
+    return backfilled, refunded
+
+
 @router.post("/sync-dodo-subscriptions")
 async def sync_dodo_subscriptions(
     admin: User = Depends(require_admin),
@@ -4526,6 +4586,7 @@ async def sync_dodo_subscriptions(
     # 기준 집계라서, created_at은 반드시 Dodo 결제 실제 시각으로 넣는다.
     payments_backfilled = 0
     payments_skipped_no_sub = 0
+    payments_refunded = 0
 
     try:
         all_payments = list(client.payments.list(page_size=100))
@@ -4568,32 +4629,7 @@ async def sync_dodo_subscriptions(
                 continue
             candidates.append((p, local_sub, mapped))
 
-        # pg_transaction_id 기준 중복 제거(이미 기록된 결제는 건너뜀)
-        candidate_ids = [p.payment_id for p, _, _ in candidates]
-        existing_ids: set[str] = set()
-        if candidate_ids:
-            existing_rows = await db.execute(
-                select(PaymentHistory.pg_transaction_id).where(
-                    PaymentHistory.pg_transaction_id.in_(candidate_ids)
-                )
-            )
-            existing_ids = {row[0] for row in existing_rows.all()}
-
-        for p, local_sub, mapped in candidates:
-            if p.payment_id in existing_ids:
-                continue
-            db.add(PaymentHistory(
-                user_id=local_sub.user_id,
-                subscription_id=local_sub.id,
-                amount=p.total_amount,
-                currency=str(p.currency) if p.currency else "USD",
-                status=mapped,
-                platform="dodopayments",
-                pg_transaction_id=p.payment_id,
-                created_at=p.created_at,  # 매출 집계 정확성: 실제 결제 시각 보존
-            ))
-            existing_ids.add(p.payment_id)  # 같은 응답 내 중복 방어
-            payments_backfilled += 1
+        payments_backfilled, payments_refunded = await _backfill_payment_candidates(db, candidates)
 
     await db.commit()
 
@@ -4601,6 +4637,7 @@ async def sync_dodo_subscriptions(
         "synced": synced,
         "total_active_in_dodo": sum(1 for s in dodo_subs.items if s.status == "active"),
         "payments_backfilled": payments_backfilled,
+        "payments_refunded": payments_refunded,
         "payments_skipped_no_sub": payments_skipped_no_sub,
         "errors": errors,
     }

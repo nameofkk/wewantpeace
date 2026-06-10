@@ -292,6 +292,10 @@ async def dodo_webhook(
         await _handle_payment_succeeded(event.data, db)
     elif event_type == "payment.failed":
         logger.info("DodoPayments 결제 실패 이벤트: payment_id=%s", getattr(event.data, "payment_id", "?"))
+    elif event_type == "refund.succeeded":
+        await _handle_refund_succeeded(event.data, db)
+    elif event_type == "refund.failed":
+        logger.info("DodoPayments 환불 실패 이벤트: payment_id=%s", getattr(event.data, "payment_id", "?"))
     else:
         logger.info("DodoPayments 처리하지 않는 이벤트: %s", event_type)
 
@@ -498,6 +502,95 @@ async def _handle_subscription_retry(data, db: AsyncSession) -> None:
     await db.flush()
 
     logger.info("DodoPayments 결제 재시도: dodo_sub=%s user=%s", dodo_sub_id, sub.user_id)
+
+
+async def _handle_refund_succeeded(data, db: AsyncSession) -> None:
+    """refund.succeeded: 환불된 만큼 매출에서 빼고, 전액 환불이면 등급도 회수한다.
+
+    매출(monthly_revenue)은 payment_history에서 status='success'인 행의 amount만
+    더하는 구조다. 그래서 환불을 이렇게 반영한다.
+    - 전액 환불: 원결제 success 행을 refunded로 바꿔서 매출에서 통째로 빠지게 + 등급 free 회수.
+    - 부분 환불: success 행 amount를 환불액만큼 깎아서 매출이 딱 그만큼만 줄게(등급 유지).
+    이렇게 해야 1달러 부분 환불에 699달러 매출이 통째로 날아가는 과차감을 막는다.
+    """
+    payment_id = getattr(data, "payment_id", None)
+    refund_amount = getattr(data, "amount", None)
+    if not payment_id:
+        logger.warning("DodoPayments refund: payment_id 누락 (data=%s)", data)
+        return
+
+    # 원결제 success 행 조회
+    result = await db.execute(
+        select(PaymentHistory).where(
+            PaymentHistory.platform == "dodopayments",
+            PaymentHistory.pg_transaction_id == payment_id,
+            PaymentHistory.status == "success",
+        ).limit(1)
+    )
+    paid = result.scalar_one_or_none()
+
+    if paid is None:
+        # 이미 refunded로 바뀌었거나(웹훅 재전송), success 기록 자체가 없던 결제
+        already = await db.execute(
+            select(PaymentHistory.id).where(
+                PaymentHistory.platform == "dodopayments",
+                PaymentHistory.pg_transaction_id == payment_id,
+                PaymentHistory.status == "refunded",
+            ).limit(1)
+        )
+        if already.scalar_one_or_none() is not None:
+            logger.info("DodoPayments refund: 이미 환불 처리됨, 건너뜀 payment_id=%s", payment_id)
+        else:
+            logger.warning("DodoPayments refund: 원결제 기록 없음 payment_id=%s", payment_id)
+        return
+
+    sub_id = paid.subscription_id
+    paid_amount = paid.amount
+
+    # 전액 환불 판정. refund amount가 없으면(전액 환불 이벤트가 금액을 안 주는 경우) 전액으로 본다.
+    is_full = refund_amount is None or refund_amount >= paid_amount
+
+    if is_full:
+        # success → refunded 갱신.
+        # savepoint로 감싸서, 같은 거래의 refunded 행이 이미 있던 비정상 데이터라
+        # 유니크 인덱스(platform, pg_transaction_id, status)에 걸려도 500 안 내고 정리한다.
+        try:
+            async with db.begin_nested():
+                paid.status = "refunded"
+                await db.flush()
+        except IntegrityError:
+            logger.info(
+                "DodoPayments refund: refunded 행 이미 존재 → 중복 success 행 제거 payment_id=%s",
+                payment_id,
+            )
+            await db.delete(paid)
+            await db.flush()
+    else:
+        # 부분 환불: 매출에서 환불액만큼만 차감(등급은 유지)
+        paid.amount = max(0, paid_amount - refund_amount)
+        await db.flush()
+
+    # 전액 환불일 때만 구독·유저 등급 회수
+    if is_full and sub_id:
+        sub_result = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+        sub = sub_result.scalar_one_or_none()
+        if sub and sub.status != "expired":
+            now = datetime.now(timezone.utc)
+            sub.status = "expired"
+            sub.auto_renewing = False
+            sub.updated_at = now
+
+            user_result = await db.execute(select(User).where(User.id == sub.user_id))
+            user = user_result.scalar_one_or_none()
+            if user and not user.admin_plan_override:
+                user.plan = "free"
+                await sync_area_activation(user.id, "free", db)
+            await db.flush()
+
+    logger.info(
+        "DodoPayments 환불 처리 완료: payment_id=%s full=%s sub=%s",
+        payment_id, is_full, sub_id,
+    )
 
 
 async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
