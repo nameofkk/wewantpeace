@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.subscription import Subscription, PaymentHistory
@@ -14,6 +15,77 @@ from backend.app.core.store_products import (
 from backend.app.services.area_activation import sync_area_activation
 
 logger = logging.getLogger(__name__)
+
+
+async def _payment_already_recorded(
+    db: AsyncSession, platform: str, pg_transaction_id: str | None, status: str
+) -> bool:
+    """이 거래(platform + pg_transaction_id + status)가 이미 적재됐는지 확인.
+
+    스토어 웹훅은 재전송이 흔하고(구글/애플 둘 다 ack 못 받으면 같은 갱신 알림을 또 보냄),
+    sync 백필이랑도 겹친다. payment_history엔 (platform, pg_transaction_id, status)
+    부분 유니크 인덱스가 걸려 있어서, 같은 거래를 두 번 넣으려 하면 IntegrityError가 나고
+    웹훅 처리 트랜잭션이 통째로 롤백돼서 500이 떨어진다. 그걸 사전에 막는 1차 방어선.
+    """
+    if not pg_transaction_id:
+        return False
+    result = await db.execute(
+        select(PaymentHistory.id).where(
+            PaymentHistory.platform == platform,
+            PaymentHistory.pg_transaction_id == pg_transaction_id,
+            PaymentHistory.status == status,
+        ).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _record_payment_idempotent(
+    db: AsyncSession,
+    *,
+    user_id,
+    subscription_id,
+    amount,
+    status: str,
+    platform: str,
+    pg_transaction_id: str | None,
+    pg_response: dict,
+) -> bool:
+    """PaymentHistory를 멱등하게 적재. 이미 있으면(또는 경합으로 막히면) 조용히 건너뜀.
+
+    Dodo(dodopayments.py)랑 같은 2단 방어:
+    1) 사전 중복체크 — 같은 거래가 이미 들어가 있으면 insert 자체를 안 한다.
+    2) savepoint(begin_nested)로 감싼 insert — 사전 체크를 둘 다 통과한 동시 웹훅 경합으로
+       유니크 인덱스가 걸려도 IntegrityError만 savepoint 안에서 롤백되고, 바깥 트랜잭션은
+       살아남는다. 갱신 알림이 500 안 내고 멱등하게 넘어가게 하는 최종 방어선.
+
+    적재했으면 True, 중복이라 건너뛰었으면 False.
+    """
+    if await _payment_already_recorded(db, platform, pg_transaction_id, status):
+        logger.info(
+            "Webhook: 이미 기록된 결제 건너뜀 platform=%s tx=%s status=%s",
+            platform, pg_transaction_id, status,
+        )
+        return False
+
+    history = PaymentHistory(
+        user_id=user_id,
+        subscription_id=subscription_id,
+        amount=amount,
+        status=status,
+        platform=platform,
+        pg_transaction_id=pg_transaction_id,
+        pg_response=pg_response,
+    )
+    try:
+        async with db.begin_nested():
+            db.add(history)
+    except IntegrityError:
+        logger.info(
+            "Webhook: 동시 적재 경합 감지, 건너뜀 platform=%s tx=%s status=%s",
+            platform, pg_transaction_id, status,
+        )
+        return False
+    return True
 
 
 async def _cancel_existing_active(user_id, db: AsyncSession) -> None:
@@ -158,8 +230,9 @@ async def handle_store_event(
         sub.auto_renewing = auto_renewing
         sub.updated_at = now
 
-        # 결제 기록
-        db.add(PaymentHistory(
+        # 결제 기록 (재전송/경합에도 멱등 — 중복이면 조용히 건너뜀)
+        await _record_payment_idempotent(
+            db,
             user_id=sub.user_id,
             subscription_id=sub.id,
             amount=sub.amount,
@@ -167,7 +240,7 @@ async def handle_store_event(
             platform=platform,
             pg_transaction_id=transaction_id or original_transaction_id,
             pg_response=raw_payload,
-        ))
+        )
 
         # User.plan 갱신
         user_result = await db.execute(select(User).where(User.id == sub.user_id))
@@ -216,7 +289,8 @@ async def handle_store_event(
         sub.status = "expired"
         sub.auto_renewing = False
         sub.updated_at = now
-        db.add(PaymentHistory(
+        await _record_payment_idempotent(
+            db,
             user_id=sub.user_id,
             subscription_id=sub.id,
             amount=sub.amount,
@@ -224,7 +298,7 @@ async def handle_store_event(
             platform=platform,
             pg_transaction_id=transaction_id or original_transaction_id,
             pg_response=raw_payload,
-        ))
+        )
         # User.plan → free
         user_result = await db.execute(select(User).where(User.id == sub.user_id))
         user = user_result.scalar_one_or_none()

@@ -10,7 +10,6 @@ import uuid
 
 import pytest
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 
 from backend.app.models.user import User
 from backend.app.models.subscription import Subscription, PaymentHistory
@@ -92,17 +91,55 @@ async def test_renewals_with_distinct_order_ids_do_not_conflict(db):
 
 
 @pytest.mark.asyncio
-async def test_same_transaction_id_twice_still_conflicts(db):
-    """회귀 가드: 같은 거래번호로 두 번 갱신하면 유니크 인덱스가 막는다.
+async def test_same_transaction_id_twice_is_idempotent(db):
+    """같은 거래번호로 두 번 갱신 웹훅이 와도(재전송) 멱등하게 넘어간다.
 
-    이게 바로 purchase_token을 그대로 쓰던 옛날 버그의 재현이다.
-    orderId를 써야 하는 이유를 못 박아둔다.
+    예전엔 같은 거래번호 두 번이면 유니크 인덱스에 걸려 IntegrityError가 나고
+    웹훅 트랜잭션이 통째로 롤백 → 500이 떨어졌다. 이제 handle_store_event가
+    사전 중복체크로 결제 행을 한 번만 넣고, 두 번째는 조용히 건너뛴다.
+    Dodo(_handle_payment_succeeded)랑 같은 멱등 동작.
     """
     user, sub = await _make_android_sub(db)
 
-    await _renew(db, PURCHASE_TOKEN, "GPA.same-order-id")
+    r1 = await _renew(db, PURCHASE_TOKEN, "GPA.same-order-id")
     await db.flush()
 
-    with pytest.raises(IntegrityError):
-        await _renew(db, PURCHASE_TOKEN, "GPA.same-order-id")
-        await db.flush()
+    # 재전송: 예외 없이 통과해야 하고, success 행은 여전히 1건
+    r2 = await _renew(db, PURCHASE_TOKEN, "GPA.same-order-id")
+    await db.flush()
+
+    assert r1["status"] == "ok"
+    assert r2["status"] == "ok"
+    assert await _count_success(db, sub.id) == 1
+
+
+@pytest.mark.asyncio
+async def test_refund_resend_is_idempotent(db):
+    """환불 웹훅 재전송도 멱등 — refunded 행 1건 유지, 예외 없음."""
+    user, sub = await _make_android_sub(db)
+
+    async def _refund():
+        return await handle_store_event(
+            platform="android",
+            event_type="REFUND",
+            original_transaction_id=PURCHASE_TOKEN,
+            transaction_id="GPA.refund-order-id",
+            product_id="pro_monthly",
+            expires_at=None,
+            auto_renewing=False,
+            raw_payload={"event": "REFUND"},
+            db=db,
+        )
+
+    await _refund()
+    await db.flush()
+    await _refund()  # 재전송
+    await db.flush()
+
+    res = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.subscription_id == sub.id,
+            PaymentHistory.status == "refunded",
+        )
+    )
+    assert res.scalar_one() == 1
