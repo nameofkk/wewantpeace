@@ -319,11 +319,18 @@ async def google_rtdn_webhook(
         except (ValueError, AttributeError):
             pass
 
+    # 거래번호(transaction_id)는 구글 orderId를 쓴다.
+    # purchase_token은 구독 내내 고정이라 갱신마다 같은 값이 들어가서
+    # payment_history (platform, pg_transaction_id, status) 유니크 인덱스에 충돌했음.
+    # orderId는 갱신마다 새로 발급돼서 충돌이 안 난다. 없으면 토큰으로 폴백.
+    # 단, 구독 조회 키인 original_transaction_id는 토큰 그대로 둬야 매칭이 된다.
+    order_id = result.get("order_id") or purchase_token
+
     await handle_store_event(
         platform="android",
         event_type=event_type,
         original_transaction_id=purchase_token[:256],
-        transaction_id=purchase_token[:256],
+        transaction_id=order_id[:200],
         product_id=result.get("product_id"),
         expires_at=expires_at,
         auto_renewing=result.get("auto_renewing", False),
