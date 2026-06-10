@@ -86,6 +86,55 @@ async def _find_sub_by_dodo_id(dodo_subscription_id: str, db: AsyncSession) -> S
     return result.scalar_one_or_none()
 
 
+async def _payment_already_recorded(payment_id: str | None, db: AsyncSession) -> bool:
+    """같은 pg_transaction_id 결제가 이미 기록됐는지 (웹훅 재전송 중복 방지)."""
+    if not payment_id:
+        return False
+    result = await db.execute(
+        select(PaymentHistory.id).where(
+            PaymentHistory.pg_transaction_id == payment_id,
+        ).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _backfill_orphan_payments(dodo_sub_id: str, sub_id, user_id, db: AsyncSession) -> int:
+    """
+    웹훅 순서 역전으로 user/subscription 연결 없이 먼저 기록된 결제를 백필.
+
+    payment.succeeded가 subscription.active보다 먼저 도착하면 구독을 못 찾아서
+    PaymentHistory를 subscription_id=NULL(필요시 user_id=NULL)로 일단 기록해 둠.
+    구독이 활성화되는 이 시점에 dodo_subscription_id로 찾아서 연결해 준다.
+
+    JSONB ->> 연산자는 Postgres 전용이라 SQLite 테스트와 호환되지 않으므로,
+    미연결 dodopayments 결제만 좁게 조회한 뒤 파이썬에서 매칭한다(미연결 건은 드묾).
+    """
+    result = await db.execute(
+        select(PaymentHistory).where(
+            PaymentHistory.subscription_id.is_(None),
+            PaymentHistory.platform == "dodopayments",
+        )
+    )
+    linked = 0
+    for ph in result.scalars().all():
+        meta = ph.pg_response or {}
+        if meta.get("dodo_subscription_id") != dodo_sub_id:
+            continue
+        ph.subscription_id = sub_id
+        if ph.user_id is None:
+            ph.user_id = user_id
+        new_meta = dict(meta)
+        new_meta["pending_link"] = False
+        ph.pg_response = new_meta
+        linked += 1
+    if linked:
+        logger.info(
+            "DodoPayments 미연결 결제 백필: dodo_sub=%s count=%d → sub=%s user=%s",
+            dodo_sub_id, linked, sub_id, user_id,
+        )
+    return linked
+
+
 def _get_dodo_client() -> DodoPayments:
     return DodoPayments(
         bearer_token=settings.dodo_api_key,
@@ -353,8 +402,15 @@ async def _handle_subscription_active(data, db: AsyncSession) -> None:
         )
         db.add(sub)
 
-    # 기존 trial/active 구독 만료 처리 (체크아웃 시작이 아닌 결제 확정 시점에 정리)
+    # 새 구독이면 flush로 PK를 채워야 백필/정리에서 id를 쓸 수 있음
+    if not existing:
+        await db.flush()
     new_sub_id = existing.id if existing else sub.id
+
+    # 웹훅 순서 역전으로 먼저 들어온 미연결 결제를 이 구독에 연결
+    await _backfill_orphan_payments(dodo_sub_id, new_sub_id, user_id, db)
+
+    # 기존 trial/active 구독 만료 처리 (체크아웃 시작이 아닌 결제 확정 시점에 정리)
     old_subs_result = await db.execute(
         select(Subscription).where(
             Subscription.user_id == user_id,
@@ -486,26 +542,69 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
     payment_id = data.payment_id
     dodo_sub_id = getattr(data, "subscription_id", None)
 
-    # 구독 결제인 경우: PaymentHistory만 기록 (구독 활성화는 subscription.active에서 처리)
+    # 웹훅 재전송 중복 방지: 같은 payment_id가 이미 기록됐으면 스킵
+    if await _payment_already_recorded(payment_id, db):
+        logger.info("DodoPayments payment_succeeded 중복 스킵: payment_id=%s", payment_id)
+        return
+
+    # 구독 결제인 경우: PaymentHistory 기록 (구독 활성화는 subscription.active에서 처리)
     if dodo_sub_id:
         sub = await _find_sub_by_dodo_id(dodo_sub_id, db)
-        if not sub:
-            logger.warning("DodoPayments payment_succeeded: 구독을 찾을 수 없음 dodo_sub=%s", dodo_sub_id)
+
+        if sub:
+            # 정상 경로: 구독이 이미 존재 → 바로 연결해서 기록
+            history = PaymentHistory(
+                user_id=sub.user_id,
+                subscription_id=sub.id,
+                amount=data.total_amount,
+                currency=str(data.currency),
+                status="success",
+                platform="dodopayments",
+                pg_transaction_id=payment_id,
+            )
+            db.add(history)
+            await db.flush()
+            logger.info("DodoPayments 결제 성공 기록: payment_id=%s dodo_sub=%s", payment_id, dodo_sub_id)
             return
 
+        # 웹훅 순서 역전: subscription.active가 아직 안 와서 구독을 못 찾음.
+        # 매출을 버리지 않고, dodo_subscription_id를 pg_response에 남겨서 미연결로 기록.
+        # subscription.active 처리 시 _backfill_orphan_payments가 연결해 준다.
+        # 가능하면 payment metadata의 user_id로 user는 즉시 연결.
+        metadata = getattr(data, "metadata", None) or {}
+        user_id = None
+        user_id_str = metadata.get("user_id", "")
+        if user_id_str:
+            try:
+                user_id = _uuid.UUID(user_id_str)
+                exists = await db.execute(select(User.id).where(User.id == user_id))
+                if exists.scalar_one_or_none() is None:
+                    user_id = None
+            except ValueError:
+                user_id = None
+
+        customer = getattr(data, "customer", None)
         history = PaymentHistory(
-            user_id=sub.user_id,
-            subscription_id=sub.id,
+            user_id=user_id,
+            subscription_id=None,
             amount=data.total_amount,
             currency=str(data.currency),
             status="success",
             platform="dodopayments",
             pg_transaction_id=payment_id,
+            pg_response={
+                "dodo_subscription_id": dodo_sub_id,
+                "dodo_customer_id": getattr(customer, "customer_id", None) if customer else None,
+                "pending_link": True,
+            },
         )
         db.add(history)
         await db.flush()
-
-        logger.info("DodoPayments 결제 성공 기록: payment_id=%s dodo_sub=%s", payment_id, dodo_sub_id)
+        logger.warning(
+            "DodoPayments payment_succeeded: 구독 미발견 → 미연결 매출로 기록(백필 대기) "
+            "payment_id=%s dodo_sub=%s user=%s",
+            payment_id, dodo_sub_id, user_id,
+        )
         return
 
     # 일회성 결제 (lifetime): metadata에서 사용자 정보 추출하여 구독 생성
