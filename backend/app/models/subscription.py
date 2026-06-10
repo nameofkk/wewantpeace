@@ -51,7 +51,10 @@ class PaymentHistory(Base):
     __tablename__ = "payment_history"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # 웹훅 순서 역전(payment.succeeded가 subscription.active보다 먼저 도착) 시
+    # 아직 user를 못 찾아도 매출을 버리지 않고 기록하기 위해 nullable.
+    # subscription.active 처리 때 dodo_subscription_id로 백필됨.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     subscription_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"), nullable=True)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(4), nullable=False, default="USD")
