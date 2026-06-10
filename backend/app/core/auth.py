@@ -102,6 +102,11 @@ async def _get_or_create_user(firebase_uid: str, db: AsyncSession, email: Option
         pref = UserPreference(user_id=user.id)
         db.add(pref)
         await db.flush()
+
+        # 퍼널 계측: 가입 이벤트 (모든 인증 경로의 신규 유저 생성 지점)
+        from backend.app.services.funnel import log_funnel_event, EV_SIGNUP
+        await log_funnel_event(db, EV_SIGNUP, user.id, props={"role": role})
+        await db.flush()
     elif email and not user.email:
         # 기존 사용자인데 email이 없으면 업데이트
         user.email = email

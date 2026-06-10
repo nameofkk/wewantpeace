@@ -60,12 +60,20 @@ async def bot_stats(
     events_today = (await db.execute(select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start))).scalar() or 0
     push_tokens = (await db.execute(select(func.count()).select_from(UserPushToken))).scalar() or 0
     feedback_count = (await db.execute(select(func.count()).select_from(Feedback))).scalar() or 0
-    return {
+    out = {
         "total_users": int(total_users), "new_today": int(new_today), "dau": int(dau),
         "subscribers": int(subscribers), "monthly_revenue": int(monthly_revenue),
         "active_clusters": int(active_clusters), "events_today": int(events_today),
         "push_tokens": int(push_tokens), "feedback_count": int(feedback_count),
     }
+    # 퍼널 지표 추가 (activation_rate / retention_d1·d7·d30 / conversion_rate / funnel)
+    # 계측 집계가 실패해도 기존 지표는 그대로 반환되도록 방어적으로 처리.
+    try:
+        from backend.app.services.funnel import compute_funnel_metrics
+        out.update(await compute_funnel_metrics(db, now))
+    except Exception:
+        logger.exception("bot-stats funnel metrics 집계 실패")
+    return out
 
 
 @router.get("/bot-feedback")
