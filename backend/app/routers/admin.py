@@ -39,6 +39,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+async def _monthly_revenue_by_currency(db: AsyncSession, month_start: datetime) -> dict[str, int]:
+    """이번 달 성공 결제를 통화별로 합산해서 반환. 값은 최소 통화 단위(센트 등) 정수.
+    통화가 섞이면 그냥 다 더하는 건 의미가 없어서 통화별로 쪼개 둔다."""
+    rows = (await db.execute(
+        select(PaymentHistory.currency, func.coalesce(func.sum(PaymentHistory.amount), 0))
+        .where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start)
+        .group_by(PaymentHistory.currency)
+    )).all()
+    return {str(cur or "USD").upper(): int(amt or 0) for cur, amt in rows}
+
+
 @router.get("/bot-stats")
 async def bot_stats(
     x_bot_key: Optional[str] = Header(None, alias="X-Bot-Key"),
@@ -55,7 +66,8 @@ async def bot_stats(
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
     dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
     subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(Subscription.status == "active"))).scalar() or 0
-    monthly_revenue = (await db.execute(select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start))).scalar() or 0
+    revenue_by_currency = await _monthly_revenue_by_currency(db, month_start)
+    monthly_revenue = revenue_by_currency.get("USD", 0)  # 하위호환: 기존 USD 합계(최소 단위)
     active_clusters = (await db.execute(select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0))).scalar() or 0
     events_today = (await db.execute(select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start))).scalar() or 0
     push_tokens = (await db.execute(select(func.count()).select_from(UserPushToken))).scalar() or 0
@@ -63,6 +75,7 @@ async def bot_stats(
     return {
         "total_users": int(total_users), "new_today": int(new_today), "dau": int(dau),
         "subscribers": int(subscribers), "monthly_revenue": int(monthly_revenue),
+        "monthly_revenue_by_currency": revenue_by_currency,
         "active_clusters": int(active_clusters), "events_today": int(events_today),
         "push_tokens": int(push_tokens), "feedback_count": int(feedback_count),
     }
@@ -237,10 +250,8 @@ async def get_stats(
     )).scalar()
 
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly_revenue = (await db.execute(
-        select(func.coalesce(func.sum(PaymentHistory.amount), 0))
-        .where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start)
-    )).scalar() or 0
+    revenue_by_currency = await _monthly_revenue_by_currency(db, month_start)
+    monthly_revenue = revenue_by_currency.get("USD", 0)  # 하위호환: 기존 USD 합계(최소 단위)
 
     pending_reports = (await db.execute(
         select(func.count()).select_from(Report).where(Report.status == "pending")
@@ -333,6 +344,7 @@ async def get_stats(
         "dau": dau,
         "subscribers": subscribers,
         "monthly_revenue": monthly_revenue,
+        "monthly_revenue_by_currency": revenue_by_currency,
         "pending_reports": pending_reports,
         "active_clusters": active_clusters,
         "events_today": events_today,

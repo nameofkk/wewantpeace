@@ -12,6 +12,30 @@ import { getCountryName } from "@/lib/countries";
 import Link from "next/link";
 import { useAdminStore, adminFetch } from "@/lib/admin-utils";
 
+// 소수점 없는 통화(원/엔 등)는 100으로 나누면 안 됨 — Stripe/Dodo zero-decimal 목록 기준
+const ZERO_DECIMAL_CURRENCIES = new Set([
+  "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG",
+  "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF",
+]);
+
+// 결제 금액은 최소 통화 단위(달러면 센트)로 저장됨 → 표시용으로 큰 단위로 변환하고 통화 기호까지 붙임
+function formatRevenue(minorAmount: number, currency: string, lang: string): string {
+  const cur = (currency || "USD").toUpperCase();
+  const zeroDecimal = ZERO_DECIMAL_CURRENCIES.has(cur);
+  const major = zeroDecimal ? minorAmount : minorAmount / 100;
+  const locale = lang === "ko" ? "ko-KR" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: cur,
+      maximumFractionDigits: zeroDecimal ? 0 : 2,
+    }).format(major);
+  } catch {
+    // 알 수 없는 통화 코드면 숫자 + 코드로 폴백
+    return `${major.toLocaleString(locale)} ${cur}`;
+  }
+}
+
 interface WeekComparisonItem {
   this: number;
   last: number;
@@ -24,6 +48,7 @@ interface AdminStats {
   subscribers: number;
   pending_reports: number;
   monthly_revenue: number;
+  monthly_revenue_by_currency?: Record<string, number>;
   active_clusters: number;
   events_today: number;
   crisis_countries: number;
@@ -107,6 +132,16 @@ export default function AdminDashboard() {
   const top10Tension = (tensionData ?? []).slice(0, 10);
   const stageLabels = lang === "ko" ? STAGE_LABELS_KO : STAGE_LABELS_EN;
 
+  // 통화별 매출 — 통화가 여러 개면 " / "로 이어서 표시, 없으면 USD 합계로 폴백
+  const revByCurrency = stats?.monthly_revenue_by_currency;
+  const revenueText =
+    revByCurrency && Object.keys(revByCurrency).length > 0
+      ? Object.entries(revByCurrency)
+          .filter(([, amount]) => amount > 0)
+          .map(([currency, amount]) => formatRevenue(amount, currency, lang))
+          .join(" / ") || formatRevenue(0, "USD", lang)
+      : formatRevenue(stats?.monthly_revenue ?? 0, "USD", lang);
+
   const kpiCards = [
     {
       label: t(lang, "admin_total_users"),
@@ -120,7 +155,7 @@ export default function AdminDashboard() {
     {
       label: t(lang, "admin_active_subs"),
       value: stats?.subscribers ?? 0,
-      sub: `$${(stats?.monthly_revenue ?? 0).toLocaleString()} ${t(lang, "admin_monthly_revenue")}`,
+      sub: `${revenueText} ${t(lang, "admin_monthly_revenue")}`,
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
