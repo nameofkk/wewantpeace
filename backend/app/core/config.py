@@ -109,6 +109,21 @@ class Settings(BaseSettings):
     disable_auth: bool = False
     upload_dir: str = "media/uploads"
 
+    # 배포 버전 식별 — Railway가 빌드 때 자동 주입하는 커밋 SHA.
+    # 로컬/다른 환경에서는 GIT_COMMIT_SHA로도 줄 수 있게 폴백 둠. 둘 다 없으면 빈 문자열.
+    railway_git_commit_sha: str = ""
+    git_commit_sha: str = ""
+
+    @property
+    def commit_sha(self) -> str:
+        """배포된 커밋 전체 SHA (없으면 빈 문자열)."""
+        return self.railway_git_commit_sha or self.git_commit_sha or ""
+
+    @property
+    def commit_short(self) -> str:
+        """배포된 커밋 짧은 SHA(앞 7자리). 없으면 빈 문자열."""
+        return self.commit_sha[:7]
+
     # 수집 설정
     telegram_collect_interval: int = 300   # 5분 (초)
     rss_collect_interval: int = 600        # 10분 (초)
