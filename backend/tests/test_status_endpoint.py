@@ -77,10 +77,22 @@ async def test_status_all_healthy(client_and_redis):
     assert data["health"]["age_seconds"] is not None
     assert data["health"]["checks"][0]["check_name"] == "redis_health"
 
+    # 가용성 = 마지막 수집(collect_rss, 3분 전)이 임계값 안 → available True
+    assert data["available"] is True
+    assert data["collection"]["available"] is True
+    assert data["collection"]["source_task"] == "collect_rss"
+    assert data["collection"]["age_seconds"] < 15 * 60
+    # 배포 커밋 SHA 블록 존재 (값은 환경변수 유무에 따라 None일 수 있음)
+    assert "version" in data
+    assert "commit" in data["version"] and "commit_short" in data["version"]
+
 
 @pytest.mark.asyncio
 async def test_status_beat_dead_is_down(client_and_redis):
     c, fake = client_and_redis
+    now = datetime.now(timezone.utc)
+    # 수집은 살아있게(2분 전) 두고 beat 키만 없앤다 → down 원인을 beat로 고립
+    await fake.set("celery:last_run:collect_rss", _iso(now - timedelta(minutes=2)), ex=3600)
     # beat 키 자체가 없음 → Beat 멈춤 → overall down
     await fake.set("health:last_results", json.dumps({"overall": "ok", "generated_at": None, "checks": []}))
 
@@ -89,7 +101,8 @@ async def test_status_beat_dead_is_down(client_and_redis):
     assert resp.status_code == 200
     assert data["beat"]["alive"] is False
     assert data["beat"]["last_heartbeat"] is None
-    assert data["overall"] == "down"
+    assert data["available"] is True  # 수집은 살아있음
+    assert data["overall"] == "down"  # 그래도 beat 죽어서 down
 
 
 @pytest.mark.asyncio
@@ -97,6 +110,7 @@ async def test_status_critical_health_is_down(client_and_redis):
     c, fake = client_and_redis
     now = datetime.now(timezone.utc)
     await fake.set("beat:heartbeat", _iso(now), ex=600)
+    await fake.set("celery:last_run:collect_rss", _iso(now - timedelta(minutes=2)), ex=3600)
     snapshot = {
         "generated_at": _iso(now),
         "overall": "critical", "total": 19, "ok": 17, "warning": 1, "critical": 1,
@@ -118,11 +132,83 @@ async def test_status_missing_snapshot_is_degraded(client_and_redis):
     c, fake = client_and_redis
     now = datetime.now(timezone.utc)
     await fake.set("beat:heartbeat", _iso(now), ex=600)
-    # health 스냅샷 없음 → health=None → degraded
+    await fake.set("celery:last_run:collect_rss", _iso(now - timedelta(minutes=2)), ex=3600)
+    # health 스냅샷 없음 → health=None → degraded (단, 수집·beat는 살아있음)
     resp = await c.get("/status")
     data = resp.json()
+    assert data["available"] is True
     assert data["health"] is None
     assert data["overall"] == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_status_stale_collection_is_down(client_and_redis):
+    """beat·health가 멀쩡해도 마지막 수집이 N분 넘게 끊기면 down (가용성 재정의 핵심)."""
+    c, fake = client_and_redis
+    now = datetime.now(timezone.utc)
+    # beat 살아있고
+    await fake.set("beat:heartbeat", _iso(now), ex=600)
+    # 수집 태스크는 20분 전이 마지막 (임계값 15분 초과) → 수집 끊김
+    await fake.set("celery:last_run:collect_rss", _iso(now - timedelta(minutes=20)), ex=3600)
+    await fake.set("celery:last_run:collect_telegram_channels", _iso(now - timedelta(minutes=22)), ex=3600)
+    # 헬스 스냅샷은 전부 ok
+    await fake.set("health:last_results", json.dumps({
+        "overall": "ok", "generated_at": _iso(now), "total": 19, "ok": 19,
+        "warning": 0, "critical": 0, "checks": [],
+    }))
+
+    resp = await c.get("/status")
+    data = resp.json()
+    assert resp.status_code == 200
+    assert data["beat"]["alive"] is True       # beat는 살아있는데
+    assert data["available"] is False           # 수집이 끊겨서 available False
+    assert data["collection"]["age_seconds"] >= 15 * 60
+    assert data["collection"]["source_task"] == "collect_rss"  # 둘 중 더 최근(20분) 게 기준
+    assert data["overall"] == "down"            # 응답은 200이어도 down
+
+
+@pytest.mark.asyncio
+async def test_status_no_collection_record_is_down(client_and_redis):
+    """수집 기록 자체가 없으면 available False, collection 필드는 None으로."""
+    c, fake = client_and_redis
+    now = datetime.now(timezone.utc)
+    await fake.set("beat:heartbeat", _iso(now), ex=600)
+    # collect_* 키 전혀 없음, tension 같은 비수집 태스크만 있음
+    await fake.set("celery:last_run:calculate_tension", _iso(now - timedelta(minutes=1)), ex=3600)
+
+    resp = await c.get("/status")
+    data = resp.json()
+    assert data["available"] is False
+    assert data["collection"]["last_collection"] is None
+    assert data["collection"]["source_task"] is None
+    assert data["overall"] == "down"
+
+
+@pytest.mark.asyncio
+async def test_status_reports_commit_sha(client_and_redis, monkeypatch):
+    """배포 커밋 SHA가 설정돼 있으면 version 블록에 그대로 노출된다."""
+    from backend.app.routers import status as status_router
+
+    monkeypatch.setattr(status_router.settings, "railway_git_commit_sha", "abcdef1234567890", raising=False)
+    monkeypatch.setattr(status_router.settings, "git_commit_sha", "", raising=False)
+
+    now = datetime.now(timezone.utc)
+    await fake_set_healthy(fake=client_and_redis[1], now=now)
+
+    resp = await client_and_redis[0].get("/status")
+    data = resp.json()
+    assert data["version"]["commit"] == "abcdef1234567890"
+    assert data["version"]["commit_short"] == "abcdef1"
+
+
+async def fake_set_healthy(fake, now):
+    """건강한 기본 상태(beat·수집·헬스 ok)를 fakeredis에 깔아주는 헬퍼."""
+    await fake.set("beat:heartbeat", _iso(now), ex=600)
+    await fake.set("celery:last_run:collect_rss", _iso(now - timedelta(minutes=2)), ex=3600)
+    await fake.set("health:last_results", json.dumps({
+        "overall": "ok", "generated_at": _iso(now), "total": 19, "ok": 19,
+        "warning": 0, "critical": 0, "checks": [],
+    }))
 
 
 @pytest.mark.asyncio
