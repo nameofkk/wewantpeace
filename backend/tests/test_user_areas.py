@@ -201,7 +201,8 @@ async def test_notify_verified_default_true(client_with_user):
 
 
 @pytest.mark.asyncio
-async def test_notify_fast_default_false(client_with_user):
+async def test_notify_fast_default_true(client_with_user):
+    """v7: notify_fast(신속 알림)는 모든 플랜에서 기본 활성화(True)."""
     async with client_with_user as c:
         resp = await c.post("/me/areas", json={"country_code": "KR"})
-    assert resp.json()["notify_fast"] is False
+    assert resp.json()["notify_fast"] is True

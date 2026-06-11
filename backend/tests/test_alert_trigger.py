@@ -40,41 +40,34 @@ class TestSpikeDetectorGuard:
         """USE_SPIKE_DETECTION=False → evaluate_spike()는 즉시 (False, None) 반환."""
         from worker.processor.spike_detector import evaluate_spike
 
-        # Mock 파라미터 (실제 DB 불필요 — 가드에서 즉시 반환)
+        # 플래그 비활성 → 가드에서 즉시 반환(실제 DB/redis 불필요)
         result = await evaluate_spike(
             cluster_id="test-uuid",
             severity=90,
             event_count=100,
             independent_sources=10,
-            db=AsyncMock(),
-            redis=AsyncMock(),
+            first_event_at=None,
+            redis=None,
         )
         assert result == (False, None)
 
     @pytest.mark.asyncio
     async def test_evaluate_spike_respects_flag(self):
-        """USE_SPIKE_DETECTION=True일 때는 가드를 통과해야 함."""
-        with patch("worker.processor.spike_detector.USE_SPIKE_DETECTION", True):
-            from importlib import reload
-            import worker.processor.spike_detector as sd
-            reload(sd)
-            # True일 때는 실제 로직으로 진입 → DB가 필요하므로 예외 발생 예상
-            # (실제 DB 없이 호출하면 에러) — 가드를 통과했음을 확인
-            try:
-                await sd.evaluate_spike(
-                    cluster_id="test-uuid",
-                    severity=90,
-                    event_count=100,
-                    independent_sources=10,
-                    db=AsyncMock(),
-                    redis=AsyncMock(),
-                )
-            except Exception:
-                pass  # DB 없으므로 에러 OK — 가드 통과 확인만
+        """USE_SPIKE_DETECTION=True일 때는 가드를 통과해 실제 트리거 로직으로 진입한다."""
+        from worker.processor.spike_detector import evaluate_spike
 
-        # 원복: 테스트 격리
-        with patch("worker.processor.spike_detector.USE_SPIKE_DETECTION", False):
-            pass
+        # evaluate_spike는 호출 시점에 calibration에서 플래그를 읽으므로 그쪽을 패치. DB 저장은 목으로 차단.
+        with patch("worker.processor.calibration.USE_SPIKE_DETECTION", True), \
+             patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="x"):
+            result = await evaluate_spike(
+                cluster_id="test-uuid",
+                severity=90,
+                event_count=100,
+                independent_sources=10,
+                first_event_at=None,
+                redis=None,
+            )
+        assert result[0] is True  # 플래그 ON + 조건 충족 → 가드 통과해 트리거
 
 
 class TestAlertTriggerConditions:
