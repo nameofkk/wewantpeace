@@ -297,20 +297,25 @@ async def health_check(request: Request):
     from backend.app.core.redis import get_redis
     from sqlalchemy import text
 
-    status = {"api": "ok"}
+    status = {"app": app.title, "version": app.version, "api": "ok"}
+    db_ok = True
     try:
         async with AsyncSessionLocal() as s:
             await s.execute(text("SELECT 1"))
         status["db"] = "ok"
     except Exception:
         status["db"] = "error"
+        db_ok = False
     try:
         r = get_redis()
         await r.ping()
         status["redis"] = "ok"
     except Exception:
-        status["redis"] = "error"
-    code = 200 if all(v == "ok" for v in status.values()) else 503
+        status["redis"] = "error"  # 캐시 장애는 degraded일 뿐 — API는 서빙 가능
+    # readiness는 DB만 치명적: DB 죽으면 503, redis 장애는 status를 degraded로만 표기하고 200 유지(헬스체크가 컨테이너를 죽이지 않게). top-level status는 DB 기준.
+    status["status"] = "ok" if db_ok else "error"
+    status["degraded"] = (status.get("redis") != "ok")
+    code = 200 if db_ok else 503
     return JSONResponse(status, status_code=code)
 
 

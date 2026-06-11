@@ -445,7 +445,12 @@ async def tension_history(
     if user_level < required_level:
         raise HTTPException(
             status_code=403,
-            detail=f"이 기능은 {min_plan} 이상 플랜에서 사용할 수 있습니다.",
+            detail={
+                "code": "PLAN_REQUIRED",
+                "required": min_plan,
+                "current": current_user.plan if current_user else "free",
+                "message": f"이 기능은 {min_plan} 이상 플랜에서 사용할 수 있습니다.",
+            },
         )
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
