@@ -264,20 +264,20 @@ async def create_area(
     if plan == "free" and count >= FREE_AREA_LIMIT:
         raise HTTPException(
             status_code=403,
-            detail=f"Free 플랜은 관심 지역을 최대 {FREE_AREA_LIMIT}개까지 등록할 수 있습니다. 업그레이드해주세요.",
+            detail={
+                "code": "FREE_AREA_LIMIT",
+                "limit": FREE_AREA_LIMIT,
+                "message": f"Free 플랜은 관심 지역을 최대 {FREE_AREA_LIMIT}개까지 등록할 수 있습니다. 업그레이드해주세요.",
+            },
         )
     if plan == "pro" and count >= PRO_AREA_LIMIT:
         raise HTTPException(
             status_code=403,
-            detail=f"Pro 플랜은 관심 지역을 최대 {PRO_AREA_LIMIT}개까지 등록할 수 있습니다. Pro+로 업그레이드해주세요.",
-        )
-
-    # v7: notify_fast는 모든 플랜에서 허용 (신속 알림)
-    # notify_verified는 Pro 이상만 허용 (신뢰 알림)
-    if body.notify_verified and _PLAN_ORDER.get(current_user.plan.lower(), 0) < _PLAN_ORDER.get("pro", 1):
-        raise HTTPException(
-            status_code=403,
-            detail="신뢰 알림 기능은 Pro 이상 플랜에서 사용할 수 있습니다.",
+            detail={
+                "code": "PRO_AREA_LIMIT",
+                "limit": PRO_AREA_LIMIT,
+                "message": f"Pro 플랜은 관심 지역을 최대 {PRO_AREA_LIMIT}개까지 등록할 수 있습니다. Pro+로 업그레이드해주세요.",
+            },
         )
 
     # 중복 방지: 같은 country_code가 이미 있으면 기존 레코드 반환

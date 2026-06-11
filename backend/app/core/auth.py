@@ -145,8 +145,12 @@ async def get_current_user(
     user = await _get_or_create_user(firebase_uid, db, email=firebase_email)
 
     # last_active 갱신 (1시간 이상 경과 시만 업데이트 — DB 부하 최소화)
+    # sqlite 등 일부 백엔드는 timezone-naive datetime을 돌려주므로, aware now와 빼기 전에 UTC aware로 보정(naive-aware 혼합 TypeError 방지).
     now = datetime.now(timezone.utc)
-    if not user.last_active or (now - user.last_active) > timedelta(hours=1):
+    last_active = user.last_active
+    if last_active is not None and last_active.tzinfo is None:
+        last_active = last_active.replace(tzinfo=timezone.utc)
+    if not last_active or (now - last_active) > timedelta(hours=1):
         user.last_active = now
         await db.flush()
 

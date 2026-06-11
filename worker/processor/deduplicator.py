@@ -35,14 +35,20 @@ async def check_duplicate(dedup_key: str, db: AsyncSession) -> bool:
     """
     lock_id = _dedup_lock_id(dedup_key)
 
-    # 1. Advisory lock: 동일 dedup_key INSERT가 동시에 일어나도 직렬화
-    await db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
+    # advisory lock + FOR UPDATE는 Postgres 전용. sqlite(테스트)는 미지원이라 건너뜀(테스트는 직렬 실행이라 경합 없음). 프로덕션(Postgres) 동작은 그대로.
+    dialect = getattr(getattr(db.bind, "dialect", None), "name", "")
+    is_pg = dialect == "postgresql"
 
-    # 2. 기존 비중복 레코드 확인 (FOR UPDATE로 잠금)
-    result = await db.execute(
-        select(NormalizedEvent).where(
-            NormalizedEvent.dedup_key == dedup_key,
-            NormalizedEvent.is_duplicate == False,
-        ).limit(1).with_for_update()
-    )
+    # 1. Advisory lock: 동일 dedup_key INSERT가 동시에 일어나도 직렬화
+    if is_pg:
+        await db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
+
+    # 2. 기존 비중복 레코드 확인 (Postgres는 FOR UPDATE로 잠금)
+    q = select(NormalizedEvent).where(
+        NormalizedEvent.dedup_key == dedup_key,
+        NormalizedEvent.is_duplicate == False,
+    ).limit(1)
+    if is_pg:
+        q = q.with_for_update()
+    result = await db.execute(q)
     return result.scalar_one_or_none() is not None

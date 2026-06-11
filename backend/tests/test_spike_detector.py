@@ -57,6 +57,7 @@ async def test_cooldown_normal_uses_longer_ttl(redis_mock):
 # ── 스파이크 감지: 트리거 ON ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
+@patch("worker.processor.calibration.USE_SPIKE_DETECTION", True)  # v7에서 기본 비활성 — 트리거 로직 자체를 검증하려 플래그 ON 패치
 @patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-id-001")
 async def test_spike_triggers_when_all_conditions_met(mock_save, redis_mock):
     """event_count >= 8, severity >= 40, sources >= 3, age <= 48h → 스파이크."""
@@ -76,6 +77,7 @@ async def test_spike_triggers_when_all_conditions_met(mock_save, redis_mock):
 
 
 @pytest.mark.asyncio
+@patch("worker.processor.calibration.USE_SPIKE_DETECTION", True)  # v7 비활성 — 트리거 로직 검증용 ON
 @patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-id-002")
 async def test_spike_triggers_at_exact_thresholds(mock_save, redis_mock):
     """정확한 임계치에서도 트리거."""
@@ -190,6 +192,7 @@ async def test_spike_cooldown_prevents_retrigger(redis_mock):
 # ── 쿨다운 설정 확인 ──────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
+@patch("worker.processor.calibration.USE_SPIKE_DETECTION", True)  # v7 비활성 — 트리거 로직 검증용 ON
 @patch("worker.processor.spike_detector._save_spike_event", new_callable=AsyncMock, return_value="spike-cd")
 async def test_spike_sets_cooldown_after_trigger(mock_save, redis_mock):
     """스파이크 발동 후 쿨다운이 자동 설정됨."""
