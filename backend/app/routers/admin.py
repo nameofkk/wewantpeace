@@ -4593,6 +4593,7 @@ async def sync_dodo_subscriptions(
     payments_backfilled = 0
     payments_skipped_no_sub = 0
     payments_refunded = 0
+    payments_linked = 0
 
     try:
         all_payments = list(client.payments.list(page_size=100))
@@ -4612,6 +4613,13 @@ async def sync_dodo_subscriptions(
             )
             for s in sub_rows.scalars().all():
                 local_subs[s.dodo_subscription_id] = s
+
+        # 웹훅이 payment.succeeded를 먼저 받아 subscription_id=NULL로 보존해 둔 결제행을,
+        # 이제 (위에서 새로 만들었거나 이미 있던) 구독에 연결한다. subscription.active 웹훅이
+        # 끝내 안 와도 sync가 한 번 돌면 고아 결제행이 구독에 붙는다.
+        from backend.app.routers.dodopayments import _link_orphan_payments
+        for s in local_subs.values():
+            payments_linked += await _link_orphan_payments(db, s)
 
         def _map_status(p) -> str | None:
             """Dodo 결제 상태 → payment_history.status. 최종 상태만 기록."""
@@ -4645,5 +4653,6 @@ async def sync_dodo_subscriptions(
         "payments_backfilled": payments_backfilled,
         "payments_refunded": payments_refunded,
         "payments_skipped_no_sub": payments_skipped_no_sub,
+        "payments_linked": payments_linked,
         "errors": errors,
     }
