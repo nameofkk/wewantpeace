@@ -4501,14 +4501,20 @@ async def sync_dodo_subscriptions(
         environment=settings.dodo_environment,
     )
 
-    # DodoPayments에서 active 구독 가져오기
-    dodo_subs = client.subscriptions.list(page_size=100)
+    # DodoPayments에서 active 구독 가져오기.
+    # 주의: paginator의 .items는 첫 페이지(최대 page_size건)만 담는다. 구독이 100건을
+    # 넘으면 일부가 누락되므로, paginator를 list()로 순회해 전체 페이지를 끌어온다.
+    # (SDK가 __iter__에서 has_next_page/get_next_page로 자동 페이지네이션한다.)
+    try:
+        all_dodo_subs = list(client.subscriptions.list(page_size=100))
+    except Exception as e:  # noqa: BLE001 - 외부 API 실패는 errors로 보고
+        raise HTTPException(502, detail=f"subscriptions.list 실패: {e}")
     synced = 0
     errors = []
 
     now = datetime.now(timezone.utc)
 
-    for dsub in dodo_subs.items:
+    for dsub in all_dodo_subs:
         if dsub.status != "active":
             continue
 
@@ -4649,7 +4655,7 @@ async def sync_dodo_subscriptions(
 
     return {
         "synced": synced,
-        "total_active_in_dodo": sum(1 for s in dodo_subs.items if s.status == "active"),
+        "total_active_in_dodo": sum(1 for s in all_dodo_subs if s.status == "active"),
         "payments_backfilled": payments_backfilled,
         "payments_refunded": payments_refunded,
         "payments_skipped_no_sub": payments_skipped_no_sub,
