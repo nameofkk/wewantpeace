@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 
 from backend.app.models.user import User
 from backend.app.models.subscription import Subscription, PaymentHistory
-from backend.app.services.subscription_service import handle_store_event
+from backend.app.services.subscription_service import handle_store_event, activate_store_subscription
 
 
 PURCHASE_TOKEN = "tok_android_stable_0001"
@@ -111,6 +111,43 @@ async def test_same_transaction_id_twice_is_idempotent(db):
     assert r1["status"] == "ok"
     assert r2["status"] == "ok"
     assert await _count_success(db, sub.id) == 1
+
+
+@pytest.mark.asyncio
+async def test_verify_retry_is_idempotent(db):
+    """같은 거래로 verify를 두 번 호출해도(앱 재시도/중복 호출) 멱등하게 넘어간다.
+
+    예전엔 activate_store_subscription이 결제 행을 생짜 db.add로 넣어서,
+    같은 transaction_id로 verify가 두 번 오면 (platform, pg_transaction_id, status)
+    유니크 인덱스에 걸려 IntegrityError → 500이 떨어졌다. 이제 _record_payment_idempotent로
+    넣어서, 두 번째는 조용히 건너뛰고 success 행은 1건만 유지한다.
+    """
+    user = User(id=uuid.uuid4(), firebase_uid=f"fb-{uuid.uuid4().hex[:10]}", plan="free")
+    db.add(user)
+    await db.flush()
+
+    async def _verify():
+        return await activate_store_subscription(
+            user_id=user.id,
+            platform="android",
+            product_id="com.wewantpeace.pro_monthly",
+            transaction_id="GPA.verify-retry-0001",
+            original_transaction_id="tok_verify_retry",
+            expires_at=None,
+            auto_renewing=True,
+            raw_response={"source": "verify"},
+            db=db,
+        )
+
+    sub1 = await _verify()
+    await db.flush()
+
+    # 재시도: 예외 없이 통과해야 하고, success 행은 여전히 1건
+    sub2 = await _verify()
+    await db.flush()
+
+    assert sub1.id == sub2.id  # 같은 구독을 갱신, 새로 안 만듦
+    assert await _count_success(db, sub1.id) == 1
 
 
 @pytest.mark.asyncio
