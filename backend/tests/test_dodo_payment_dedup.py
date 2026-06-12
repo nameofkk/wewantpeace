@@ -308,6 +308,135 @@ async def test_backfill_inserts_new_refund_when_no_success(db):
 
 
 @pytest.mark.asyncio
+async def test_payment_succeeded_preserves_when_sub_missing(db):
+    """구독을 아직 못 찾아도 결제행을 버리지 않고 subscription_id=NULL로 보존한다.
+
+    payment.succeeded가 subscription.active보다 먼저 도착하는 순서 역전 상황.
+    예전엔 여기서 return으로 결제를 버려 매출이 누락됐다.
+    """
+    user = await _make_user(db)
+    data = SimpleNamespace(
+        payment_id="pay_orphan_1",
+        subscription_id="dsub_not_yet",
+        total_amount=699,
+        currency="USD",
+        metadata={"user_id": str(user.id), "plan": "pro"},
+    )
+    await dodopayments._handle_payment_succeeded(data, db)
+
+    res = await db.execute(
+        select(PaymentHistory).where(PaymentHistory.pg_transaction_id == "pay_orphan_1")
+    )
+    row = res.scalar_one()
+    assert row.status == "success"
+    assert row.subscription_id is None              # 아직 구독에 연결 안 됨
+    assert row.user_id == user.id
+    assert row.pg_response["dodo_subscription_id"] == "dsub_not_yet"  # 나중에 연결할 단서
+    # 매출(success 합산)엔 곧장 잡힌다
+    total = await db.execute(
+        select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(
+            PaymentHistory.status == "success",
+            PaymentHistory.pg_transaction_id == "pay_orphan_1",
+        )
+    )
+    assert total.scalar_one() == 699
+
+
+@pytest.mark.asyncio
+async def test_orphan_payment_dropped_when_user_unresolvable(db):
+    """구독도 사용자도 특정 못 하면(메타데이터·이메일 없음) 보존 불가 → 행 없음."""
+    data = SimpleNamespace(
+        payment_id="pay_orphan_2",
+        subscription_id="dsub_ghost",
+        total_amount=699,
+        currency="USD",
+        metadata={},
+        customer=None,
+    )
+    await dodopayments._handle_payment_succeeded(data, db)
+    assert await _count_history(db, "pay_orphan_2") == 0
+
+
+@pytest.mark.asyncio
+async def test_orphan_payment_resend_stays_idempotent(db):
+    """보존된 고아 결제도 웹훅 재전송 시 멱등 — 두 번 와도 1건."""
+    user = await _make_user(db)
+    data = SimpleNamespace(
+        payment_id="pay_orphan_resend",
+        subscription_id="dsub_x2",
+        total_amount=699,
+        currency="USD",
+        metadata={"user_id": str(user.id), "plan": "pro"},
+    )
+    await dodopayments._handle_payment_succeeded(data, db)
+    await dodopayments._handle_payment_succeeded(data, db)  # 재전송
+    assert await _count_history(db, "pay_orphan_resend") == 1
+
+
+@pytest.mark.asyncio
+async def test_orphan_payment_linked_when_subscription_appears(db):
+    """보존된 고아 결제행이 뒤늦게 생긴 구독에 _link_orphan_payments로 연결된다."""
+    user = await _make_user(db)
+    # 1) payment.succeeded 먼저 도착 → 구독 없음 → 보존
+    data = SimpleNamespace(
+        payment_id="pay_orphan_3",
+        subscription_id="dsub_late",
+        total_amount=699,
+        currency="USD",
+        metadata={"user_id": str(user.id), "plan": "pro"},
+    )
+    await dodopayments._handle_payment_succeeded(data, db)
+
+    # 2) 뒤늦게 구독 생성(subscription.active / sync가 만든 셈)
+    sub = Subscription(
+        user_id=user.id, plan="pro", status="active", platform="dodopayments",
+        amount=699, currency="USD", billing_interval="monthly",
+        dodo_subscription_id="dsub_late",
+    )
+    db.add(sub)
+    await db.flush()
+
+    # 3) 연결
+    linked = await dodopayments._link_orphan_payments(db, sub)
+    assert linked == 1
+
+    res = await db.execute(
+        select(PaymentHistory).where(PaymentHistory.pg_transaction_id == "pay_orphan_3")
+    )
+    row = res.scalar_one()
+    assert row.subscription_id == sub.id  # 이제 구독에 붙음
+
+
+@pytest.mark.asyncio
+async def test_link_orphan_ignores_other_subscription(db):
+    """다른 dodo_subscription_id의 고아 행은 잘못 연결하지 않는다."""
+    user = await _make_user(db)
+    db.add(PaymentHistory(
+        user_id=user.id, amount=699, currency="USD", status="success",
+        platform="dodopayments", pg_transaction_id="pay_orphan_4",
+        subscription_id=None,
+        pg_response={"dodo_subscription_id": "dsub_AAA", "unlinked": True},
+    ))
+    await db.flush()
+    sub = Subscription(
+        user_id=user.id, plan="pro", status="active", platform="dodopayments",
+        amount=699, currency="USD", billing_interval="monthly",
+        dodo_subscription_id="dsub_BBB",  # 다른 구독
+    )
+    db.add(sub)
+    await db.flush()
+
+    linked = await dodopayments._link_orphan_payments(db, sub)
+    assert linked == 0
+    res = await db.execute(
+        select(PaymentHistory.subscription_id).where(
+            PaymentHistory.pg_transaction_id == "pay_orphan_4"
+        )
+    )
+    assert res.scalar_one() is None  # 그대로 NULL
+
+
+@pytest.mark.asyncio
 async def test_payment_already_recorded_helper(db):
     """_payment_already_recorded 헬퍼 단위 검증."""
     user = await _make_user(db)
