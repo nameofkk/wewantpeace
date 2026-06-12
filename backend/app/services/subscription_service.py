@@ -168,9 +168,14 @@ async def activate_store_subscription(
             next_billing_at=expires_at,
         )
         db.add(sub)
+        # 결제 기록 전에 flush해서 sub.id를 채운다.
+        # id는 파이썬 default(uuid4)라 flush 전엔 None이라서, 안 하면 결제 행의
+        # subscription_id가 NULL로 들어가 구독이랑 안 엮인다(환불 회수·매출 추적에 필요).
+        await db.flush()
 
-    # 결제 기록
-    db.add(PaymentHistory(
+    # 결제 기록 (verify 재시도/웹훅 경합에도 멱등 — 같은 거래 중복이면 조용히 건너뜀)
+    await _record_payment_idempotent(
+        db,
         user_id=user_id,
         subscription_id=sub.id,
         amount=amount,
@@ -178,7 +183,7 @@ async def activate_store_subscription(
         platform=platform,
         pg_transaction_id=transaction_id,
         pg_response=raw_response,
-    ))
+    )
 
     # User.plan 업데이트
     user_result = await db.execute(select(User).where(User.id == user_id))
