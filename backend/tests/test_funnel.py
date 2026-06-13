@@ -1,6 +1,6 @@
 """퍼널 계측 테스트 — 이벤트 적재(once/once_per_day) + 지표 집계."""
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 
 import pytest
 
@@ -119,3 +119,43 @@ async def test_compute_funnel_metrics_empty(db):
     assert m["activation_rate"] == 0.0
     assert m["conversion_rate"] == 0.0
     assert m["funnel"]["signup"] == 0
+
+
+def test_local_date_buckets_by_kst():
+    """날짜 버킷은 한국시간 기준이어야 한다.
+
+    UTC 06-09 23:00 = KST 06-10 08:00 → '오늘'은 06-10 이어야 함.
+    UTC로 끊으면 06-09로 새서 가입일·활동일이 하루씩 어긋난다.
+    """
+    from backend.app.services.funnel import _local_date
+
+    # KST 06-10 08:00 (한국 아침) → UTC로는 전날 23:00
+    assert _local_date(datetime(2026, 6, 9, 23, 0, tzinfo=UTC)) == date(2026, 6, 10)
+    # KST 06-10 00:30 (한국 자정 직후) → UTC 06-09 15:30
+    assert _local_date(datetime(2026, 6, 9, 15, 30, tzinfo=UTC)) == date(2026, 6, 10)
+    # naive는 UTC로 간주 → KST 변환
+    assert _local_date(datetime(2026, 6, 9, 23, 0)) == date(2026, 6, 10)
+
+
+@pytest.mark.asyncio
+async def test_retention_respects_kst_day_boundary(db):
+    """가입과 재방문이 같은 한국 달력일 안이면 D1 리텐션으로 잡히면 안 된다.
+
+    가입: KST 06-09 08:00 (= UTC 06-08 23:00) → 가입일 KST 06-09
+    재방문: KST 06-09 22:00 (= UTC 06-09 13:00) → 같은 날 06-09
+    UTC로 끊으면 가입 06-08 / 활동 06-09라 D1 retained로 오인된다(버그).
+    KST로 끊으면 둘 다 06-09라 D1 retained 아님.
+    """
+    now = datetime(2026, 6, 12, 3, 0, tzinfo=UTC)  # 여유있게 D1 판정 가능
+    u = _user(datetime(2026, 6, 8, 23, 0, tzinfo=UTC))  # KST 06-09 08:00 가입
+    db.add(u)
+    await db.flush()
+    db.add(_ev(u.id, "issue_view", datetime(2026, 6, 9, 13, 0, tzinfo=UTC)))  # KST 06-09 22:00, 같은 날
+    await db.flush()
+
+    m = await compute_funnel_metrics(db, now)
+    # 활성화는 됨(핵심행동 1건), 하지만 가입일과 같은 날이라 D1 재방문/리텐션은 아님
+    assert m["funnel"]["activation"] == 1
+    assert m["funnel"]["return"] == 0
+    assert m["retention_detail"]["d1"]["cohort_size"] == 1
+    assert m["retention_detail"]["d1"]["retained"] == 0

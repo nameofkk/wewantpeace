@@ -40,6 +40,17 @@ logger = logging.getLogger(__name__)
 # created_at은 timestamptz라서 타임존 붙은 값으로 비교하면 DB가 알아서 맞춰준다.
 KST = timezone(timedelta(hours=9))
 
+
+def _today_start_kst() -> datetime:
+    """한국시간 자정(오늘 0시)을 timestamptz 비교용 aware datetime으로 반환.
+
+    DAU·신규가입·오늘 이벤트 같은 '하루' 단위 집계는 전부 이 경계를 쓴다.
+    UTC 자정으로 끊으면 경계가 한국시간 오전 9시라, 한국 새벽 0~9시 활동/가입이 전날로 새서
+    월매출(month_start, 이미 KST)이나 운영자가 보는 '오늘'과 숫자가 어긋난다.
+    """
+    return datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -53,7 +64,7 @@ async def bot_stats(
     if not expected or not x_bot_key or not hmac.compare_digest(x_bot_key, expected):
         raise HTTPException(status_code=403, detail="forbidden")
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _today_start_kst()  # 한국시간 자정 기준 '오늘' (월매출 month_start와 동일 기준)
     # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
     month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
@@ -240,7 +251,7 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _today_start_kst()  # 한국시간 자정 기준 '오늘' (월매출 month_start와 동일 기준)
 
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar()
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar()
@@ -306,7 +317,9 @@ async def get_stats(
     geo_fail_rate = round(geo_fail_24h / max(1, events_24h) * 100, 1)
 
     # ── 주간 비교 (이번 주 vs 지난 주) — 2개 쿼리로 통합 ──
-    this_week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    # 주 경계도 한국시간 기준(월요일 0시 KST)으로 끊는다 — 일/월 단위 집계와 동일 기준
+    now_kst = datetime.now(KST)
+    this_week_start = (now_kst - timedelta(days=now_kst.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     last_week_start = this_week_start - timedelta(days=7)
     last_week_end = this_week_start
 
@@ -2579,15 +2592,16 @@ async def generate_kpi_snapshot(
     from backend.app.models.paywall_event import PaywallEvent
 
     now = datetime.now(timezone.utc)
-    # 직전 주 월~일
-    today = now.date()
+    # 직전 주 월~일 — 한국시간 기준으로 끊는다 (대시보드 일/월 집계와 동일 기준)
+    today = datetime.now(KST).date()
     days_since_monday = today.weekday()
     this_monday = today - timedelta(days=days_since_monday)
     last_monday = this_monday - timedelta(days=7)
     last_sunday = this_monday - timedelta(days=1)
 
-    week_start_dt = datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=timezone.utc)
-    week_end_dt = datetime.combine(last_sunday, datetime.max.time()).replace(tzinfo=timezone.utc)
+    # 주 시작/끝을 KST 자정~자정으로. timestamptz 컬럼과 aware 값으로 비교돼 DB가 맞춰준다.
+    week_start_dt = datetime.combine(last_monday, datetime.min.time()).replace(tzinfo=KST)
+    week_end_dt = datetime.combine(last_sunday, datetime.max.time()).replace(tzinfo=KST)
 
     # 중복 체크
     existing = await db.execute(

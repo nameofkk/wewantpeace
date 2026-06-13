@@ -36,6 +36,10 @@ _BACKFILL_SESSION = "backfill"
 # 리텐션 코호트 조회 lookback 상한 (일). d30까지 커버하려고 넉넉히.
 RETENTION_WINDOW_DAYS = 120
 
+# 날짜 경계 기준 타임존. 한국 서비스라 '하루'는 한국시간 자정~자정으로 끊는다.
+# (admin.py의 DAU/신규가입/월매출 경계와 동일한 KST 기준 — 대시보드 전체가 같은 '하루'를 봐야 함)
+KST = timezone(timedelta(hours=9))
+
 
 async def log_funnel_event(
     db: AsyncSession,
@@ -51,7 +55,7 @@ async def log_funnel_event(
     """app_events에 퍼널 이벤트 한 건 적재.
 
     once=True        : 해당 user_id + name 이벤트가 이미 있으면 적재 안 함 (최초 1회만).
-    once_per_day=True: 오늘(UTC) 같은 user_id + name 이벤트가 이미 있으면 적재 안 함.
+    once_per_day=True: 오늘(KST) 같은 user_id + name 이벤트가 이미 있으면 적재 안 함.
 
     적재했으면 True, 중복으로 건너뛰면 False.
     flush는 호출부 트랜잭션에 맡긴다(여기선 add만; 단, 중복 체크 쿼리는 즉시 실행).
@@ -63,8 +67,8 @@ async def log_funnel_event(
                 AppEvent.name == name,
             )
             if once_per_day:
-                now = datetime.now(timezone.utc)
-                day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                # 한국시간 자정 기준 '오늘' (timestamptz라 KST aware 값으로 비교하면 DB가 맞춰줌)
+                day_start = datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
                 q = q.where(AppEvent.created_at >= day_start)
             q = q.limit(1)
             existing = (await db.execute(q)).first()
@@ -85,11 +89,15 @@ async def log_funnel_event(
         return False
 
 
-def _utc_date(dt: datetime) -> date:
-    """timestamp를 UTC 기준 날짜로. naive면 UTC로 간주."""
+def _local_date(dt: datetime) -> date:
+    """timestamp를 KST(한국시간) 기준 날짜로. naive면 UTC로 간주한 뒤 KST로 변환.
+
+    리텐션 코호트/활동일 버킷을 한국 달력 하루로 끊는다. UTC로 끊으면 경계가 한국 오전 9시라
+    실제 사용 세션 한복판을 갈라서 가입일·재방문일이 엇갈린다.
+    """
     if dt.tzinfo is None:
-        return dt.date()
-    return dt.astimezone(timezone.utc).date()
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(KST).date()
 
 
 def _retention_from_maps(
@@ -147,7 +155,7 @@ async def compute_funnel_metrics(db: AsyncSession, now: datetime) -> dict:
 
     # ── 리텐션/재방문용 데이터: 윈도 내 코호트 + 활동일을 메모리로 ───────────────
     window_start = now - timedelta(days=RETENTION_WINDOW_DAYS + 30)
-    today = _utc_date(now)
+    today = _local_date(now)
 
     cohort_rows = (await db.execute(
         select(User.id, User.created_at).where(
@@ -156,7 +164,7 @@ async def compute_funnel_metrics(db: AsyncSession, now: datetime) -> dict:
         )
     )).all()
     signup_day: dict[uuid.UUID, date] = {
-        uid: _utc_date(created) for uid, created in cohort_rows if created is not None
+        uid: _local_date(created) for uid, created in cohort_rows if created is not None
     }
 
     activity_rows = (await db.execute(
@@ -170,7 +178,7 @@ async def compute_funnel_metrics(db: AsyncSession, now: datetime) -> dict:
     for uid, created in activity_rows:
         if created is None:
             continue
-        activity_days.setdefault(uid, set()).add(_utc_date(created))
+        activity_days.setdefault(uid, set()).add(_local_date(created))
 
     # return = 가입일 이후의 다른 날에 활동 기록이 있는 distinct 사용자
     returned = sum(
