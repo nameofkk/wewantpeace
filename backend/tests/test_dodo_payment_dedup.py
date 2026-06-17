@@ -442,6 +442,9 @@ async def test_payment_already_recorded_helper(db):
     user = await _make_user(db)
     assert await dodopayments._payment_already_recorded(db, "pay_helper_1") is False
     assert await dodopayments._payment_already_recorded(db, None) is False
+    # 빈/공백 tx id는 멱등 키로 못 쓰니 항상 '미적재'로 본다(스킵).
+    assert await dodopayments._payment_already_recorded(db, "") is False
+    assert await dodopayments._payment_already_recorded(db, "   ") is False
 
     db.add(PaymentHistory(
         user_id=user.id, amount=699, currency="USD",
@@ -449,3 +452,15 @@ async def test_payment_already_recorded_helper(db):
     ))
     await db.flush()
     assert await dodopayments._payment_already_recorded(db, "pay_helper_1") is True
+    # 앞뒤 공백이 섞여 와도 정규화돼서 같은 거래로 인식된다.
+    assert await dodopayments._payment_already_recorded(db, "  pay_helper_1  ") is True
+
+
+def test_normalize_tx_id():
+    """빈/공백 tx id가 None으로 정규화되는지 — 부분 유니크 인덱스 IS NULL 일관성의 핵심."""
+    assert dodopayments._normalize_tx_id(None) is None
+    assert dodopayments._normalize_tx_id("") is None
+    assert dodopayments._normalize_tx_id("   ") is None
+    assert dodopayments._normalize_tx_id("\t\n") is None
+    assert dodopayments._normalize_tx_id("pay_1") == "pay_1"
+    assert dodopayments._normalize_tx_id("  pay_1  ") == "pay_1"
