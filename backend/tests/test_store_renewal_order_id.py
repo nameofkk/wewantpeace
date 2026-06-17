@@ -19,6 +19,13 @@ from backend.app.services.subscription_service import handle_store_event, activa
 PURCHASE_TOKEN = "tok_android_stable_0001"
 
 
+def _async_ret(value):
+    """monkeypatch용: 호출하면 value를 돌려주는 async 함수."""
+    async def _fn(*args, **kwargs):
+        return value
+    return _fn
+
+
 async def _make_android_sub(db) -> tuple[User, Subscription]:
     user = User(id=uuid.uuid4(), firebase_uid=f"fb-{uuid.uuid4().hex[:10]}", plan="pro")
     db.add(user)
@@ -148,6 +155,56 @@ async def test_verify_retry_is_idempotent(db):
 
     assert sub1.id == sub2.id  # 같은 구독을 갱신, 새로 안 만듦
     assert await _count_success(db, sub1.id) == 1
+
+
+@pytest.mark.asyncio
+async def test_google_verify_uses_order_id_as_transaction_id(db, monkeypatch):
+    """google/verify도 거래번호를 구글 orderId로 박아야 한다(웹훅과 동일).
+
+    예전엔 verify가 결제 거래번호로 purchase_token을 그대로 써서, 갱신/재구매 때
+    같은 토큰이 payment_history (platform, pg_transaction_id, status) 유니크 인덱스에
+    충돌했다. 이제 verify_subscription이 주는 order_id(latestOrderId)를 transaction_id로
+    쓰고, 구독 조회 키인 original_transaction_id만 토큰으로 남긴다.
+    """
+    from backend.app.routers import store_subscriptions as router_mod
+    from backend.app.services import google_play_billing as gpb
+
+    monkeypatch.setattr(gpb, "verify_subscription", _async_ret({
+        "valid": True,
+        "order_id": "GPA.verify-order-9999",
+        "acknowledgement_state": 1,
+        "expiry_time": "",
+        "auto_renewing": True,
+        "raw": {},
+    }))
+    monkeypatch.setattr(gpb, "acknowledge_subscription", _async_ret(None))
+
+    user = User(id=uuid.uuid4(), firebase_uid=f"fb-{uuid.uuid4().hex[:10]}", plan="free")
+    db.add(user)
+    await db.flush()
+
+    body = router_mod.GoogleVerifyBody(
+        purchase_token="tok_verify_orderid",
+        product_id="com.wewantpeace.pro_monthly",
+    )
+    await router_mod.google_verify(body=body, current_user=user, db=db)
+    await db.flush()
+
+    # 구독 조회 키는 토큰, 거래번호는 orderId
+    res = await db.execute(
+        select(Subscription).where(Subscription.user_id == user.id)
+    )
+    sub = res.scalar_one()
+    assert sub.store_original_transaction_id == "tok_verify_orderid"
+    assert sub.store_transaction_id == "GPA.verify-order-9999"
+
+    # 결제 행 pg_transaction_id도 orderId
+    res = await db.execute(
+        select(PaymentHistory.pg_transaction_id).where(
+            PaymentHistory.subscription_id == sub.id
+        )
+    )
+    assert res.scalar_one() == "GPA.verify-order-9999"
 
 
 @pytest.mark.asyncio
