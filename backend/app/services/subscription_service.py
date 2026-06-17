@@ -17,6 +17,61 @@ from backend.app.services.area_activation import sync_area_activation
 logger = logging.getLogger(__name__)
 
 
+def _parse_store_timestamp(value) -> datetime | None:
+    """스토어 웹훅의 시각 값을 timezone-aware datetime으로 파싱한다.
+
+    구글/애플은 시각을 밀리초 epoch 정수(또는 그 문자열)나 ISO8601 문자열로 준다.
+    파싱 실패하거나 값이 없으면 None을 돌려서 호출부가 now() 기본값으로 폴백하게 한다.
+    """
+    if value is None:
+        return None
+    # 밀리초 epoch (int 또는 숫자 문자열)
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+        except (ValueError, OSError, OverflowError):
+            return None
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if s.isdigit():
+            try:
+                return datetime.fromtimestamp(int(s) / 1000, tz=timezone.utc)
+            except (ValueError, OSError, OverflowError):
+                return None
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    return None
+
+
+def _store_event_paid_at(platform: str, raw_payload: dict, event_type: str) -> datetime | None:
+    """스토어 웹훅 페이로드에서 실제 결제(이벤트 발생) 시각을 뽑는다.
+
+    PaymentHistory.created_at에 '처리 시각'(DB now) 대신 실제 결제시각을 넣어서,
+    웹훅이 늦게 도착해도 매출 집계 날짜가 안 밀리게 한다. 못 뽑으면 None → now() 폴백.
+
+    애플(V2): data.transactionInfo.purchaseDate(ms)가 그 거래의 결제시각.
+              환불이면 revocationDate(ms)를 우선 사용.
+    구글(RTDN): pubsub 메시지의 eventTimeMillis(ms)가 알림(=갱신/결제) 발생 시각.
+    """
+    if not isinstance(raw_payload, dict):
+        return None
+    if platform == "ios":
+        tx_info = (raw_payload.get("data") or {}).get("transactionInfo") or {}
+        if event_type == "REFUND":
+            return _parse_store_timestamp(
+                tx_info.get("revocationDate") or tx_info.get("purchaseDate")
+            )
+        return _parse_store_timestamp(tx_info.get("purchaseDate"))
+    if platform == "android":
+        return _parse_store_timestamp(raw_payload.get("eventTimeMillis"))
+    return None
+
+
 async def _payment_already_recorded(
     db: AsyncSession, platform: str, pg_transaction_id: str | None, status: str
 ) -> bool:
@@ -49,6 +104,7 @@ async def _record_payment_idempotent(
     platform: str,
     pg_transaction_id: str | None,
     pg_response: dict,
+    paid_at: datetime | None = None,
 ) -> bool:
     """PaymentHistory를 멱등하게 적재. 이미 있으면(또는 경합으로 막히면) 조용히 건너뜀.
 
@@ -57,6 +113,10 @@ async def _record_payment_idempotent(
     2) savepoint(begin_nested)로 감싼 insert — 사전 체크를 둘 다 통과한 동시 웹훅 경합으로
        유니크 인덱스가 걸려도 IntegrityError만 savepoint 안에서 롤백되고, 바깥 트랜잭션은
        살아남는다. 갱신 알림이 500 안 내고 멱등하게 넘어가게 하는 최종 방어선.
+
+    paid_at는 실제 결제(이벤트) 시각. 주면 PaymentHistory.created_at에 그대로 박아서
+    매출 집계가 '처리 시각'이 아닌 '실제 결제시각' 기준이 되게 한다. None이면 모델 기본값
+    (now())이 적용된다.
 
     적재했으면 True, 중복이라 건너뛰었으면 False.
     """
@@ -76,6 +136,9 @@ async def _record_payment_idempotent(
         pg_transaction_id=pg_transaction_id,
         pg_response=pg_response,
     )
+    # paid_at 없으면 모델 default(now())가 적용되도록 명시 설정을 건너뛴다.
+    if paid_at is not None:
+        history.created_at = paid_at
     try:
         async with db.begin_nested():
             db.add(history)
@@ -223,6 +286,8 @@ async def handle_store_event(
         return {"status": "subscription_not_found"}
 
     now = datetime.now(timezone.utc)
+    # 실제 결제(이벤트) 시각 — 결제 기록 created_at에 쓴다. 못 뽑으면 None → now() 폴백.
+    paid_at = _store_event_paid_at(platform, raw_payload, event_type)
 
     # 이벤트 타입별 처리
     if event_type in ("RENEWED", "DID_RENEW", "SUBSCRIBED", "SUBSCRIPTION_STATE_ACTIVE"):
@@ -245,6 +310,7 @@ async def handle_store_event(
             platform=platform,
             pg_transaction_id=transaction_id or original_transaction_id,
             pg_response=raw_payload,
+            paid_at=paid_at,
         )
 
         # User.plan 갱신
@@ -303,6 +369,7 @@ async def handle_store_event(
             platform=platform,
             pg_transaction_id=transaction_id or original_transaction_id,
             pg_response=raw_payload,
+            paid_at=paid_at,
         )
         # User.plan → free
         user_result = await db.execute(select(User).where(User.id == sub.user_id))
