@@ -13,7 +13,10 @@ from sqlalchemy import func, select
 
 from backend.app.models.user import User
 from backend.app.models.subscription import Subscription, PaymentHistory
-from backend.app.services.subscription_service import handle_store_event, activate_store_subscription
+from backend.app.services.subscription_service import (
+    handle_store_event, activate_store_subscription,
+    _record_payment_idempotent, _normalize_tx_id,
+)
 
 
 PURCHASE_TOKEN = "tok_android_stable_0001"
@@ -180,3 +183,50 @@ async def test_refund_resend_is_idempotent(db):
         )
     )
     assert res.scalar_one() == 1
+
+
+def test_normalize_tx_id_service():
+    """서비스 레이어 정규화도 빈/공백을 None으로 통일한다."""
+    assert _normalize_tx_id(None) is None
+    assert _normalize_tx_id("") is None
+    assert _normalize_tx_id("   ") is None
+    assert _normalize_tx_id("GPA.1") == "GPA.1"
+    assert _normalize_tx_id("  GPA.1  ") == "GPA.1"
+
+
+@pytest.mark.asyncio
+async def test_empty_tx_id_renewals_stored_as_null_not_collapsed(db):
+    """tx id가 빈 문자열인 갱신 결제는 NULL로 저장돼 서로 충돌하지 않는다.
+
+    빈 문자열 ''을 그대로 저장하면 부분 유니크 인덱스(WHERE pg_transaction_id
+    IS NOT NULL)가 ''을 '진짜 키'로 잡아서, tx id 없는 서로 다른 갱신 결제 두 건이
+    같은 '' 키로 충돌(IntegrityError → 500)하거나 두 번째가 통째로 막혔다.
+    정규화로 ''→None을 만들면 인덱스가 무시(IS NULL)해서 둘 다 멀쩡히 보존된다.
+    """
+    user, sub = await _make_android_sub(db)
+
+    # 빈 문자열 tx id로 두 번 적재 — 둘 다 NULL로 들어가고 충돌 없어야 함
+    ok1 = await _record_payment_idempotent(
+        db, user_id=user.id, subscription_id=sub.id, amount=699,
+        status="success", platform="android", pg_transaction_id="",
+        pg_response={"src": "renew-1"},
+    )
+    await db.flush()
+    ok2 = await _record_payment_idempotent(
+        db, user_id=user.id, subscription_id=sub.id, amount=699,
+        status="success", platform="android", pg_transaction_id="   ",
+        pg_response={"src": "renew-2"},
+    )
+    await db.flush()
+
+    assert ok1 is True
+    assert ok2 is True
+    assert await _count_success(db, sub.id) == 2
+
+    # 저장된 tx id는 빈 문자열이 아니라 NULL이어야 한다
+    res = await db.execute(
+        select(PaymentHistory.pg_transaction_id).where(
+            PaymentHistory.subscription_id == sub.id
+        )
+    )
+    assert all(r[0] is None for r in res.all())
