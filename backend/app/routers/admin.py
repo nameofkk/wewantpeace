@@ -117,6 +117,13 @@ async def bot_stats(
         out.update(await compute_funnel_metrics(db, now))
     except Exception:
         logger.exception("bot-stats funnel metrics 집계 실패")
+    # 분쟁 알림 가치 전달 지표(노스스타) — 실제 전달 건수 + 열람률.
+    # 마찬가지로 집계 실패해도 기존 지표는 그대로 반환되도록 방어적으로 처리.
+    try:
+        from backend.app.services.notification_metrics import compute_notification_metrics
+        out.update(await compute_notification_metrics(db, now))
+    except Exception:
+        logger.exception("bot-stats notification metrics 집계 실패")
     return out
 
 

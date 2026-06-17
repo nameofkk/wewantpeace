@@ -610,7 +610,19 @@ async def mark_read(
     notif = result.scalar_one_or_none()
     if not notif:
         raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다.")
+    was_unread = not notif.is_read
     notif.is_read = True
+    # 분쟁 알림을 처음 열어봤을 때만 열람 이벤트 적재(가치 전달 노스스타). 이미 읽은 건 중복 적재 X.
+    if was_unread:
+        from backend.app.services.notification_metrics import (
+            log_notif_opened, CONFLICT_NOTIF_TYPES,
+        )
+        if notif.type in CONFLICT_NOTIF_TYPES:
+            await log_notif_opened(
+                db, current_user.id, channel="inapp",
+                notif_id=notif.id,
+                cluster_id=str(notif.cluster_id) if notif.cluster_id else None,
+            )
     await db.flush()
     return {"status": "ok"}
 
@@ -723,6 +735,20 @@ async def track_event(
         platform=body.platform,
     )
     db.add(ae)
+
+    # 분쟁 알림 열람(푸시/인앱 탭) 이벤트 → notif_opened로 수렴(가치 전달 노스스타, 푸시 탭 포함)
+    if current_user:
+        from backend.app.services.notification_metrics import (
+            log_notif_opened, NOTIF_OPEN_EVENT_NAMES,
+        )
+        if body.name in NOTIF_OPEN_EVENT_NAMES:
+            _p = body.props or {}
+            await log_notif_opened(
+                db, current_user.id,
+                channel=_p.get("channel") or "push",
+                cluster_id=_p.get("cluster_id"),
+                session_id=body.session_id, platform=body.platform,
+            )
 
     # paywall events also go to dedicated table (authenticated only)
     if body.name.startswith("paywall_") and current_user:
