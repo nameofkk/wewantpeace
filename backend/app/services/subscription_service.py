@@ -187,7 +187,15 @@ async def activate_store_subscription(
     if not plan:
         raise ValueError(f"Unknown product_id: {product_id}")
 
-    amount = PLAN_AMOUNTS.get(plan, 0)
+    # 금액 매핑 누락 가드: GOOGLE_PRODUCTS/APPLE_PRODUCTS엔 plan이 있는데
+    # PLAN_AMOUNTS엔 빠져 있으면(미래 상품 추가·금액 누락) .get(plan, 0)이
+    # 0원 success를 박아서 매출이 조용히 누락된다. None이면 막고 큰 소리로 터뜨린다.
+    amount = PLAN_AMOUNTS.get(plan)
+    if amount is None:
+        raise ValueError(
+            f"PLAN_AMOUNTS에 금액 매핑 없음: plan={plan!r} "
+            f"(platform={platform}, product_id={product_id}) — store_products.PLAN_AMOUNTS에 추가 필요"
+        )
     now = datetime.now(timezone.utc)
 
     # 동일 original_transaction_id로 기존 구독 조회 (갱신인 경우)
