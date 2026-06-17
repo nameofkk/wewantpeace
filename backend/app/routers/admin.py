@@ -51,6 +51,25 @@ def _today_start_kst() -> datetime:
     return datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
+# 프로모 구독 = platform이 'promo:'로 시작하고 amount=0인 무료 체험 구독.
+# (subscriptions.py에서 redeem-promo가 platform="promo:CODE", amount=0으로 만든다)
+# 돈을 한 푼도 안 낸 사람이라 '유료 구독자(subscribers)' 지표에 섞이면 지표가 거짓이 된다.
+# 그래서 유료 카운트에서는 빼고, 프로모는 따로(promo_subscribers) 보여준다.
+_IS_PROMO_SUB = and_(Subscription.platform.like("promo:%"), Subscription.amount == 0)
+
+
+def _active_not_expired(now: datetime):
+    """status='active'이고 아직 만료 안 된 구독을 거르는 조건.
+
+    status가 'active'여도 expires_at이 지난 좀비 구독은 뺀다.
+    expires_at이 NULL이면 만료 시각 자체가 안 잡힌 구독이라 유효한 걸로 본다(예: 만료 없는 web).
+    """
+    return and_(
+        Subscription.status == "active",
+        or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
+    )
+
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -70,11 +89,14 @@ async def bot_stats(
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
     dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
-    # status가 'active'여도 expires_at이 지난 좀비 구독은 빼고 센다.
-    # expires_at이 NULL이면 만료 시각 자체가 안 잡힌 구독이라 유효한 걸로 본다(예: 만료 없는 프로모/web).
+    # subscribers = 실제 돈 내는 유료 구독자만. 프로모(platform 'promo:%' + amount=0)는 제외한다.
+    # (만료 안 지난 active 기준 — 좀비 구독은 _active_not_expired가 걸러줌)
     subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(
-        Subscription.status == "active",
-        or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
+        _active_not_expired(now), ~_IS_PROMO_SUB,
+    ))).scalar() or 0
+    # 프로모 무료 구독자는 매출 0이라 유료 지표랑 섞으면 안 돼서 따로 센다.
+    promo_subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(
+        _active_not_expired(now), _IS_PROMO_SUB,
     ))).scalar() or 0
     monthly_revenue = (await db.execute(select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start))).scalar() or 0
     active_clusters = (await db.execute(select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0))).scalar() or 0
@@ -83,7 +105,8 @@ async def bot_stats(
     feedback_count = (await db.execute(select(func.count()).select_from(Feedback))).scalar() or 0
     out = {
         "total_users": int(total_users), "new_today": int(new_today), "dau": int(dau),
-        "subscribers": int(subscribers), "monthly_revenue": int(monthly_revenue),
+        "subscribers": int(subscribers), "promo_subscribers": int(promo_subscribers),
+        "monthly_revenue": int(monthly_revenue),
         "active_clusters": int(active_clusters), "events_today": int(events_today),
         "push_tokens": int(push_tokens), "feedback_count": int(feedback_count),
     }
@@ -261,9 +284,17 @@ async def get_stats(
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar()
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar()
     dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar()
+    # 유료 구독자만 — 프로모(amount=0)와 만료된 좀비 active는 제외 (bot-stats와 동일 기준)
     subscribers = (await db.execute(
-        select(func.count()).select_from(Subscription).where(Subscription.status == "active")
-    )).scalar()
+        select(func.count()).select_from(Subscription).where(
+            _active_not_expired(now), ~_IS_PROMO_SUB,
+        )
+    )).scalar() or 0
+    promo_subscribers = (await db.execute(
+        select(func.count()).select_from(Subscription).where(
+            _active_not_expired(now), _IS_PROMO_SUB,
+        )
+    )).scalar() or 0
 
     # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
     month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -345,10 +376,11 @@ async def get_stats(
         select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= last_week_start, NormalizedEvent.created_at < last_week_end)
     )).scalar() or 0
 
+    # 주간 신규 구독 비교도 프로모(platform 'promo:%' + amount=0)는 유료 구독에서 뺀다 — bot-stats와 동일 기준
     wc_q2 = await db.execute(text("""
         SELECT
-            COUNT(*) FILTER (WHERE created_at >= :tw AND status IN ('active','trial')) AS subs_this,
-            COUNT(*) FILTER (WHERE created_at >= :lw AND created_at < :lwe AND status IN ('active','trial')) AS subs_last,
+            COUNT(*) FILTER (WHERE created_at >= :tw AND status IN ('active','trial') AND NOT (platform LIKE 'promo:%' AND amount = 0)) AS subs_this,
+            COUNT(*) FILTER (WHERE created_at >= :lw AND created_at < :lwe AND status IN ('active','trial') AND NOT (platform LIKE 'promo:%' AND amount = 0)) AS subs_last,
             COUNT(*) FILTER (WHERE trial_start >= :tw) AS trials_this,
             COUNT(*) FILTER (WHERE trial_start >= :lw AND trial_start < :lwe) AS trials_last
         FROM subscriptions WHERE (created_at >= :lw OR trial_start >= :lw)
@@ -364,6 +396,7 @@ async def get_stats(
         "new_today": new_today,
         "dau": dau,
         "subscribers": subscribers,
+        "promo_subscribers": promo_subscribers,
         "monthly_revenue": monthly_revenue,
         "pending_reports": pending_reports,
         "active_clusters": active_clusters,
