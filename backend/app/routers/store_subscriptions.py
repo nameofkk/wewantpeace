@@ -82,11 +82,18 @@ async def google_verify(
         except (ValueError, AttributeError):
             pass
 
+    # 거래번호(transaction_id)는 구글 orderId를 쓴다. (google/rtdn 웹훅과 동일)
+    # purchase_token은 구독 내내 고정이라 갱신마다 같은 값이라
+    # payment_history (platform, pg_transaction_id, status) 유니크 인덱스에 충돌함.
+    # orderId(latestOrderId)는 갱신마다 새로 발급돼 충돌이 안 난다. 없으면 토큰으로 폴백.
+    # 단, 구독 조회 키인 original_transaction_id는 토큰 그대로 둬야 매칭이 된다.
+    order_id = result.get("order_id") or body.purchase_token
+
     sub = await activate_store_subscription(
         user_id=current_user.id,
         platform="android",
         product_id=body.product_id,
-        transaction_id=body.purchase_token[:256],
+        transaction_id=order_id[:200],
         original_transaction_id=body.purchase_token[:256],
         expires_at=expires_at,
         auto_renewing=result.get("auto_renewing", True),
