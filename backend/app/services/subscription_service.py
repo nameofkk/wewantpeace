@@ -72,6 +72,23 @@ def _store_event_paid_at(platform: str, raw_payload: dict, event_type: str) -> d
     return None
 
 
+def _normalize_tx_id(pg_transaction_id: str | None) -> str | None:
+    """tx id를 정규화한다 — 빈 문자열·공백만 있는 값은 전부 None 하나로 모은다.
+
+    멱등 키로 못 쓰는 값('', '   ', None)을 None 한 가지로 통일하는 이유:
+    payment_history엔 (platform, pg_transaction_id, status) 부분 유니크 인덱스가
+    'WHERE pg_transaction_id IS NOT NULL'로 걸려 있다. 그런데 빈 문자열 ''은 NULL이
+    아니라서 인덱스가 '진짜 키'로 잡는다. 그러면 tx id 없이 들어오는 서로 다른 갱신
+    결제들이 전부 같은 '' 키로 충돌해서, 멱등 사전체크는 스킵되는데(아래 not 가드) DB
+    인덱스는 막아버리는 엇갈린 상태가 된다. 정규화로 ''→None을 만들어서 '키 없는 결제'는
+    인덱스에서도 일관되게 빠지게(IS NULL) 하고, 멱등 체크도 똑같이 스킵되게 맞춘다.
+    """
+    if pg_transaction_id is None:
+        return None
+    stripped = pg_transaction_id.strip()
+    return stripped or None
+
+
 async def _payment_already_recorded(
     db: AsyncSession, platform: str, pg_transaction_id: str | None, status: str
 ) -> bool:
@@ -82,6 +99,7 @@ async def _payment_already_recorded(
     부분 유니크 인덱스가 걸려 있어서, 같은 거래를 두 번 넣으려 하면 IntegrityError가 나고
     웹훅 처리 트랜잭션이 통째로 롤백돼서 500이 떨어진다. 그걸 사전에 막는 1차 방어선.
     """
+    pg_transaction_id = _normalize_tx_id(pg_transaction_id)
     if not pg_transaction_id:
         return False
     result = await db.execute(
@@ -120,6 +138,10 @@ async def _record_payment_idempotent(
 
     적재했으면 True, 중복이라 건너뛰었으면 False.
     """
+    # 빈/공백 tx id는 None으로 정규화 — 멱등 사전체크와 DB 부분 유니크 인덱스가
+    # '키 없는 결제'를 똑같이(IS NULL) 취급하게 맞춰서, tx id 빠진 갱신 결제가
+    # 인덱스에 '' 키로 충돌하거나 매출이 부풀려지는 엇갈린 상태를 막는다.
+    pg_transaction_id = _normalize_tx_id(pg_transaction_id)
     if await _payment_already_recorded(db, platform, pg_transaction_id, status):
         logger.info(
             "Webhook: 이미 기록된 결제 건너뜀 platform=%s tx=%s status=%s",
