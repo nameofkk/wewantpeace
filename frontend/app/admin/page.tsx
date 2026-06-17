@@ -22,6 +22,7 @@ interface AdminStats {
   new_today: number;
   dau: number;
   subscribers: number;
+  promo_subscribers: number;
   pending_reports: number;
   monthly_revenue: number;
   active_clusters: number;
@@ -120,7 +121,7 @@ export default function AdminDashboard() {
     {
       label: t(lang, "admin_active_subs"),
       value: stats?.subscribers ?? 0,
-      sub: `${formatMoneyFromCents(stats?.monthly_revenue ?? 0)} ${t(lang, "admin_monthly_revenue")}`,
+      sub: `${formatMoneyFromCents(stats?.monthly_revenue ?? 0)} ${t(lang, "admin_monthly_revenue")} · ${t(lang, "admin_promo_subs")} ${stats?.promo_subscribers ?? 0}`,
       icon: CreditCard,
       color: "text-purple-400",
       bg: "bg-purple-500/10",
