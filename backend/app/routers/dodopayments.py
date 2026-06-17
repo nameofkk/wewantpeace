@@ -94,12 +94,30 @@ def _get_dodo_client() -> DodoPayments:
     )
 
 
+def _normalize_tx_id(pg_transaction_id: str | None) -> str | None:
+    """tx id를 정규화한다 — 빈 문자열·공백만 있는 값은 전부 None 하나로 모은다.
+
+    멱등 키로 못 쓰는 값('', '   ', None)을 None 한 가지로 통일하는 이유:
+    payment_history엔 (platform, pg_transaction_id, status) 부분 유니크 인덱스가
+    'WHERE pg_transaction_id IS NOT NULL'로 걸려 있다. 그런데 빈 문자열 ''은 NULL이
+    아니라서 인덱스가 '진짜 키'로 잡는다. 그러면 tx id 없이 들어오는 서로 다른 갱신
+    결제들이 전부 같은 '' 키로 충돌해서, 멱등 사전체크는 스킵되는데(아래 not 가드) DB
+    인덱스는 막아버리는 엇갈린 상태가 된다. 정규화로 ''→None을 만들어서 '키 없는 결제'는
+    인덱스에서도 일관되게 빠지게(IS NULL) 하고, 멱등 체크도 똑같이 스킵되게 맞춘다.
+    """
+    if pg_transaction_id is None:
+        return None
+    stripped = pg_transaction_id.strip()
+    return stripped or None
+
+
 async def _payment_already_recorded(db: AsyncSession, payment_id: str | None) -> bool:
     """이 dodo payment_id가 이미 success로 적재됐는지 확인.
 
     웹훅 재전송 / sync 백필이 같은 결제건을 두 번 넣어서 매출이 부풀려지던 걸 막는다.
     dodo payment_id는 결제 1건당 고유하고, 웹훅은 success만 적재하므로 status=success로 본다.
     """
+    payment_id = _normalize_tx_id(payment_id)
     if not payment_id:
         return False
     result = await db.execute(
@@ -684,7 +702,10 @@ async def _handle_refund_succeeded(data, db: AsyncSession) -> None:
 
 async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
     """payment.succeeded: PaymentHistory 기록 + lifetime 일회성 결제 처리."""
-    payment_id = data.payment_id
+    # 빈/공백 tx id는 None으로 정규화 — 멱등 사전체크와 DB 부분 유니크 인덱스가
+    # '키 없는 결제'를 똑같이(IS NULL) 취급하게 맞춰서, tx id 빠진 갱신 결제가
+    # 인덱스에 '' 키로 충돌하거나 매출이 부풀려지는 엇갈린 상태를 막는다.
+    payment_id = _normalize_tx_id(data.payment_id)
     dodo_sub_id = getattr(data, "subscription_id", None)
 
     # 멱등성 가드: 같은 결제(payment_id)가 이미 적재됐으면 통째로 건너뜀.
