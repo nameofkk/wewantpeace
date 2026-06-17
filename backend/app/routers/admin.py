@@ -70,7 +70,12 @@ async def bot_stats(
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
     dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
-    subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(Subscription.status == "active"))).scalar() or 0
+    # status가 'active'여도 expires_at이 지난 좀비 구독은 빼고 센다.
+    # expires_at이 NULL이면 만료 시각 자체가 안 잡힌 구독이라 유효한 걸로 본다(예: 만료 없는 프로모/web).
+    subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(
+        Subscription.status == "active",
+        or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
+    ))).scalar() or 0
     monthly_revenue = (await db.execute(select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start))).scalar() or 0
     active_clusters = (await db.execute(select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0))).scalar() or 0
     events_today = (await db.execute(select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= today_start))).scalar() or 0
