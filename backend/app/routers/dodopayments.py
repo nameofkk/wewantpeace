@@ -112,6 +112,23 @@ async def _payment_already_recorded(db: AsyncSession, payment_id: str | None) ->
     return result.scalar_one_or_none() is not None
 
 
+def _payment_created_at(data) -> datetime:
+    """웹훅 결제 데이터에서 실제 결제시각을 뽑는다.
+
+    Dodo Payment 객체의 created_at(결제가 일어난 시각, timezone-aware)을 그대로 쓴다.
+    이게 PaymentHistory.created_at에 들어가야 매출 집계가 '처리 시각'이 아닌 '실제 결제
+    시각' 기준으로 잡힌다. 웹훅 재전송이 며칠 늦게 와도 매출 날짜가 안 밀린다.
+    값이 없거나(이론상) tz 정보가 빠지면 안전하게 now()로 폴백한다.
+    """
+    ts = getattr(data, "created_at", None)
+    if isinstance(ts, datetime):
+        # tz 없는 naive 값이 오면 UTC로 간주 (DB 컬럼이 timezone-aware라 비교 깨짐 방지)
+        if ts.tzinfo is None:
+            return ts.replace(tzinfo=timezone.utc)
+        return ts
+    return datetime.now(timezone.utc)
+
+
 async def _resolve_user_for_payment(data, db: AsyncSession) -> User | None:
     """결제/구독 웹훅 데이터에서 사용자를 찾는다.
 
@@ -677,6 +694,8 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
         logger.info("DodoPayments payment_succeeded: 이미 기록된 결제 건너뜀 payment_id=%s", payment_id)
         return
 
+    paid_at = _payment_created_at(data)
+
     # 구독 결제인 경우: PaymentHistory만 기록 (구독 활성화는 subscription.active에서 처리)
     if dodo_sub_id:
         sub = await _find_sub_by_dodo_id(dodo_sub_id, db)
@@ -718,6 +737,7 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
             platform="dodopayments",
             pg_transaction_id=payment_id,
             pg_response=pg_response,
+            created_at=paid_at,
         )
         # savepoint로 감싸서 동시 웹훅 경합(둘 다 사전 체크 통과)으로 유니크 인덱스가
         # 걸려도 500 안 내고 멱등하게 넘어감. 사전 체크가 1차, 이게 최종 방어선.
@@ -812,6 +832,7 @@ async def _handle_payment_succeeded(data, db: AsyncSession) -> None:
         status="success",
         platform="dodopayments",
         pg_transaction_id=payment_id,
+        created_at=paid_at,
     )
     db.add(history)
 
