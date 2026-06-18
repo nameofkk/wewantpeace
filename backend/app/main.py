@@ -290,6 +290,14 @@ app.include_router(newsletter_router.router)
 app.include_router(status_router.router)
 
 
+@app.get("/livez")
+async def livez():
+    # 라이브니스 전용: 프로세스가 살아서 요청을 받을 수 있는지만 확인.
+    # DB/redis 의존성 없음 → 배포 부팅 중 외부 의존성이 잠깐 끊겨도 헬스체크가 컨테이너를 죽이지 않음.
+    # (readiness/DB 상태가 필요하면 /health 사용)
+    return {"status": "alive"}
+
+
 @app.get("/health")
 @limiter.limit("60/minute")
 async def health_check(request: Request):
