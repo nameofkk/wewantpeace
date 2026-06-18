@@ -290,6 +290,22 @@ app.include_router(newsletter_router.router)
 app.include_router(status_router.router)
 
 
+@app.get("/livez")
+@limiter.exempt
+async def liveness(request: Request):
+    """라이브니스 프로브 — "프로세스가 살아있냐"만 본다.
+
+    의도적으로 의존성(DB·Redis)을 전혀 건드리지 않고 항상 200을 준다.
+    - readiness("서빙 가능하냐")는 /health가 담당한다. DB 죽으면 503.
+    - liveness가 DB/Redis를 검사하면, 그게 잠깐 흔들릴 때 오케스트레이터가
+      멀쩡한 프로세스를 죽이고 재시작해버린다(재시작해도 DB는 안 살아나는데).
+      그래서 liveness는 프로세스 응답성만 본다.
+    - @limiter.exempt로 SlowAPIMiddleware 디폴트 리밋(200/분)에서도 제외 →
+      프로브가 트래픽 폭주 중에도 레이트리밋에 막혀 컨테이너가 죽는 일이 없게.
+    """
+    return {"status": "alive"}
+
+
 @app.get("/health")
 @limiter.limit("60/minute")
 async def health_check(request: Request):
