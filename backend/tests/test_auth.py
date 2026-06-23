@@ -118,6 +118,24 @@ async def test_dev_auth_creates_user_on_first_call(client_dev_auth):
 
 
 @pytest.mark.asyncio
+async def test_new_user_last_active_set_on_create(test_db):
+    """신규 유저 생성 시 last_active가 None이 아니라 생성 시점으로 채워져야 함."""
+    from datetime import datetime, timezone
+
+    uid = f"la-{uuid.uuid4()}"
+    before = datetime.now(timezone.utc)
+    user = await auth_module._get_or_create_user(uid, test_db)
+    after = datetime.now(timezone.utc)
+
+    assert user.last_active is not None
+    la = user.last_active
+    if la.tzinfo is None:
+        la = la.replace(tzinfo=timezone.utc)
+    # 생성 직전~직후 사이의 시각이어야 함
+    assert before <= la <= after
+
+
+@pytest.mark.asyncio
 async def test_dev_auth_same_user_on_second_call(client_dev_auth):
     """같은 UID는 같은 User 반환."""
     uid = f"same-{uuid.uuid4()}"
