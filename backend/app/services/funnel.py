@@ -25,6 +25,10 @@ EV_ACTIVATION = "activation"
 EV_RETURN = "return"
 EV_PAID = "paid"
 
+# 일자별 활동 로그 — '오늘(KST) 첫 인증요청'마다 하루 1건만 적재된다(auth.py).
+# DAU를 last_active(1시간 스로틀)에서 떼어내 이 이벤트의 distinct 사용자 수로 세기 위한 것.
+EV_DAILY_ACTIVE = "daily_active"
+
 # 활성화(activation) = 이 서비스의 '가치 첫 경험'.
 # WeWantPeace의 핵심 가치는 실제 분쟁 인텔리전스를 직접 들여다보거나(이슈/클러스터 상세),
 # 내 관심지역 감시를 설정하는 것. 이 중 하나라도 처음 하면 활성화로 본다.
