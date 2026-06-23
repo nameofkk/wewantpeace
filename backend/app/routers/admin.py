@@ -70,6 +70,25 @@ def _active_not_expired(now: datetime):
     )
 
 
+def _dau_query(today_start: datetime):
+    """오늘(KST) 활동한 distinct 사용자 수 쿼리 — 일자별 활동 로그(app_events daily_active) 기준.
+
+    예전엔 User.last_active >= today_start로 셌는데, last_active가 1시간 스로틀이라
+    자정 직후 재방문이 전날 값으로 남아 DAU에서 빠지는 문제가 있었다(core/auth.py 참고).
+    이제 auth.py가 '오늘 첫 인증요청'마다 daily_active 이벤트를 하루 1건 적재하므로 그걸 센다.
+    once_per_day로 하루 1건이 보장되지만, 경쟁 상황 대비해 distinct user_id로 센다.
+    """
+    from backend.app.services.funnel import EV_DAILY_ACTIVE
+    return (
+        select(func.count(func.distinct(AppEvent.user_id)))
+        .where(
+            AppEvent.name == EV_DAILY_ACTIVE,
+            AppEvent.user_id.isnot(None),
+            AppEvent.created_at >= today_start,
+        )
+    )
+
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -88,7 +107,7 @@ async def bot_stats(
     month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar() or 0
-    dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar() or 0
+    dau = (await db.execute(_dau_query(today_start))).scalar() or 0
     # subscribers = 실제 돈 내는 유료 구독자만. 프로모(platform 'promo:%' + amount=0)는 제외한다.
     # (만료 안 지난 active 기준 — 좀비 구독은 _active_not_expired가 걸러줌)
     subscribers = (await db.execute(select(func.count()).select_from(Subscription).where(
@@ -283,7 +302,7 @@ async def get_stats(
 
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar()
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start))).scalar()
-    dau = (await db.execute(select(func.count()).select_from(User).where(User.last_active >= today_start))).scalar()
+    dau = (await db.execute(_dau_query(today_start))).scalar() or 0
     # 유료 구독자만 — 프로모(amount=0)와 만료된 좀비 active는 제외 (bot-stats와 동일 기준)
     subscribers = (await db.execute(
         select(func.count()).select_from(Subscription).where(
