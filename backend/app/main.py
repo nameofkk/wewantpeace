@@ -320,7 +320,26 @@ async def health_check(request: Request):
         status["redis"] = "ok"
     except Exception:
         status["redis"] = "error"  # 캐시 장애는 degraded일 뿐 — API는 서빙 가능
-    # readiness는 DB만 치명적: DB 죽으면 503, redis 장애는 status를 degraded로만 표기하고 200 유지(헬스체크가 컨테이너를 죽이지 않게). top-level status는 DB 기준.
+
+    # 최근 24시간 이벤트 수집량 (수집 중단 감지용)
+    try:
+        async with AsyncSessionLocal() as s:
+            row = await s.execute(text(
+                "SELECT COUNT(*) FROM raw_events WHERE created_at >= NOW() - INTERVAL '24 hours'"
+            ))
+            status["events_24h"] = row.scalar() or 0
+    except Exception:
+        status["events_24h"] = -1
+
+    # Celery beat/worker 생존 확인 (beat_heartbeat 태스크가 5분마다 TTL 600s로 갱신)
+    try:
+        r = get_redis()
+        hb = await r.exists("beat:heartbeat")
+        status["worker_heartbeat"] = "ok" if hb else "dead"
+    except Exception:
+        status["worker_heartbeat"] = "error"
+
+    # readiness는 DB만 치명적
     status["status"] = "ok" if db_ok else "error"
     status["degraded"] = (status.get("redis") != "ok")
     code = 200 if db_ok else 503
