@@ -18,6 +18,9 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# DAU 등 '하루' 경계는 한국시간 자정 기준 (admin.py / funnel.py와 동일)
+KST = timezone(timedelta(hours=9))
+
 # .env의 DISABLE_AUTH=true를 pydantic_settings를 통해 읽음 (os.getenv는 shell 환경변수만 봄)
 _disable_auth_raw = settings.disable_auth or os.getenv("DISABLE_AUTH", "false").lower() == "true"
 
@@ -104,8 +107,11 @@ async def _get_or_create_user(firebase_uid: str, db: AsyncSession, email: Option
         await db.flush()
 
         # 퍼널 계측: 가입 이벤트 (모든 인증 경로의 신규 유저 생성 지점)
-        from backend.app.services.funnel import log_funnel_event, EV_SIGNUP
+        # 신규 유저는 생성 즉시 last_active가 '오늘'로 박혀서 get_current_user의 first_visit_today
+        # 게이트를 통과 못 하므로, 오늘 활동(daily_active)도 여기서 함께 적재한다(오늘 DAU에 잡히게).
+        from backend.app.services.funnel import log_funnel_event, EV_SIGNUP, EV_DAILY_ACTIVE
         await log_funnel_event(db, EV_SIGNUP, user.id, props={"role": role})
+        await log_funnel_event(db, EV_DAILY_ACTIVE, user.id, once_per_day=True)
         await db.flush()
     elif email and not user.email:
         # 기존 사용자인데 email이 없으면 업데이트
@@ -150,8 +156,23 @@ async def get_current_user(
     last_active = user.last_active
     if last_active is not None and last_active.tzinfo is None:
         last_active = last_active.replace(tzinfo=timezone.utc)
+
+    # DAU는 last_active(1시간 스로틀)가 아니라 일자별 활동 로그로 센다.
+    # 1시간 스로틀 때문에 자정 직후 재방문이 전날 last_active로 남아 DAU에서 새던 문제가 있었다.
+    # 그래서 '오늘(KST) 첫 인증요청'에 daily_active 이벤트를 하루 1건만 적재하고, admin DAU는 그걸 센다.
+    # 첫 접속 판정은 last_active를 갱신하기 '전' 값으로 한다(갱신하면 항상 오늘이라 판정 불가).
+    today_kst = now.astimezone(KST).date()
+    first_visit_today = last_active is None or last_active.astimezone(KST).date() < today_kst
+
     if not last_active or (now - last_active) > timedelta(hours=1):
         user.last_active = now
+        await db.flush()
+
+    if first_visit_today:
+        # once_per_day=True로 한 번 더 가드 — 동시요청 경쟁이나 판정 오차로 인한 중복 적재 방지.
+        # 계측 실패가 인증 자체를 깨뜨리면 안 되므로 log_funnel_event가 예외를 삼킨다.
+        from backend.app.services.funnel import log_funnel_event, EV_DAILY_ACTIVE
+        await log_funnel_event(db, EV_DAILY_ACTIVE, user.id, once_per_day=True)
         await db.flush()
 
     return user
