@@ -94,7 +94,9 @@ async def _get_or_create_user(firebase_uid: str, db: AsyncSession, email: Option
             default_display = "토스 사용자"
         else:
             default_display = None
-        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname, email=email, display_name=default_display)
+        # 신규 유저는 생성 시점을 last_active로 함께 세팅 (DB default에만 의존하지 않고 flush 전에도 값 보장)
+        now = datetime.now(timezone.utc)
+        user = User(firebase_uid=firebase_uid, plan="free", role=role, nickname=nickname, email=email, display_name=default_display, last_active=now)
         db.add(user)
         await db.flush()
 
