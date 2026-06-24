@@ -254,12 +254,12 @@ app.conf.beat_schedule = {
     # ── Intelligence Layers: 시그널 수집 + 교차검증 ──
     "collect-firms": {
         "task": "worker.tasks.collect_firms",
-        "schedule": crontab(minute="*/15"),  # 15분마다 (NASA FIRMS)
+        "schedule": crontab(minute="*/60"),  # 1시간마다 (실행 30분 소요, 15분은 워커 영구점유)
         "options": {"queue": "collect"},
     },
     "collect-outage": {
         "task": "worker.tasks.collect_outage",
-        "schedule": crontab(minute="*/15"),  # 15분마다 (IODA)
+        "schedule": crontab(minute="*/30"),  # 30분마다 (IODA)
         "options": {"queue": "collect"},
     },
     "collect-cloudflare-radar": {
@@ -269,7 +269,7 @@ app.conf.beat_schedule = {
     },
     "collect-gps-jam": {
         "task": "worker.tasks.collect_gps_jam",
-        "schedule": crontab(minute="*/15"),  # 15분마다
+        "schedule": crontab(minute="*/30"),  # 30분마다 (실행 8분 소요)
         "options": {"queue": "collect"},
     },
     "collect-ucdp": {
@@ -404,8 +404,18 @@ def on_worker_ready(**kwargs):
             if _r.exists(_k):
                 _r.delete(_k)
                 _logger.info("배포 시 stale lock 삭제: %s", _k)
+
+        # process 큐 과부하 시 stale 태스크 퍼지 (이전 장애에서 쌓인 미처리 태스크)
+        _q_len = _r.llen("process")
+        if _q_len > 3000:
+            _r.delete("process")
+            _logger.warning(
+                "배포 시 process 큐 퍼지: %d개 stale 태스크 삭제 "
+                "(retry_unprocessed가 DB에서 재큐잉)",
+                _q_len,
+            )
     except Exception as _e:
-        _logger.warning("stale lock 정리 실패 (무시): %s", _e)
+        _logger.warning("stale lock/큐 정리 실패 (무시): %s", _e)
 
     app.send_task("worker.tasks.calculate_tension", queue="process")
     app.send_task("worker.tasks.calculate_trending", queue="process")
