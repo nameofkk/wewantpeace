@@ -120,20 +120,30 @@ class GDELTCollector:
         params = {
             "mode": "artlist",
             "format": "json",
-            "maxrecords": "250",
-            "timespan": "15min",
+            "maxrecords": "100",
+            "timespan": "30min",
             "sort": "datedesc",
             **api_params,
             "query": api_params.get("query", default_query),
         }
 
-        # Exponential backoff 재시도 (5s, 10s, 20s)
+        # Exponential backoff 재시도 (30s, 60s, 120s — GDELT rate limit 대응)
         MAX_RETRIES = 3
         data = None
         for attempt in range(MAX_RETRIES):
             try:
                 async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
                     async with session.get(api_endpoint, params=params) as resp:
+                        if resp.status == 429:
+                            # Rate limit — 더 오래 대기
+                            wait = 2 ** attempt * 30  # 30s, 60s, 120s
+                            if attempt < MAX_RETRIES - 1:
+                                logger.warning("GDELT 429 rate limit, %ds 대기 후 재시도 %d/%d", wait, attempt + 1, MAX_RETRIES)
+                                await asyncio.sleep(wait)
+                                continue
+                            else:
+                                result.errors.append("GDELT rate limit (429) — 모든 재시도 소진")
+                                return result
                         if resp.status != 200:
                             raise aiohttp.ClientResponseError(
                                 resp.request_info, resp.history,
@@ -141,9 +151,11 @@ class GDELTCollector:
                             )
                         data = await resp.json(content_type=None)
                 break  # 성공 시 루프 탈출
+            except aiohttp.ClientResponseError:
+                raise  # 위에서 처리
             except Exception as e:
                 if attempt < MAX_RETRIES - 1:
-                    wait = 2 ** attempt * 5  # 5s, 10s, 20s
+                    wait = 2 ** attempt * 15  # 15s, 30s
                     logger.warning("GDELT fetch 재시도 %d/%d (%ds 후): %s", attempt + 1, MAX_RETRIES, wait, e)
                     await asyncio.sleep(wait)
                 else:

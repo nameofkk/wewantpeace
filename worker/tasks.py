@@ -1249,12 +1249,14 @@ def retry_unprocessed(self):
         from backend.app.models.raw_event import RawEvent
         from datetime import datetime, timezone, timedelta
 
-        # 큐 과부하 방지: process 큐가 1,000개 이상이면 건너뜀
+        # 큐 과부하 시 배치 축소 (완전 스킵 대신 소량 처리)
         _sync_r = _get_sync_redis()
         queue_len = _sync_r.llen("process")
-        if queue_len >= 1000:
-            logger.warning("retry_unprocessed 스킵: process 큐 과부하 (%d개)", queue_len)
+        if queue_len >= 5000:
+            logger.warning("retry_unprocessed 스킵: process 큐 심각 과부하 (%d개)", queue_len)
             return {"queued": 0, "skipped_reason": "queue_overloaded", "queue_len": queue_len}
+        # 1000~5000: 배치 크기 축소하여 계속 처리
+        batch_limit = 20 if queue_len >= 1000 else 100
 
         async with AsyncSessionLocal() as db:
             # 최근 6시간 이내 미처리 항목만 (너무 오래된 것은 무시)
@@ -1266,7 +1268,7 @@ def retry_unprocessed(self):
                     RawEvent.collected_at >= cutoff,
                 )
                 .order_by(RawEvent.collected_at.asc())
-                .limit(100)  # 큐 과부하 방지: 500→100
+                .limit(batch_limit)
             )
             ids = [str(row[0]) for row in result.fetchall()]
 
