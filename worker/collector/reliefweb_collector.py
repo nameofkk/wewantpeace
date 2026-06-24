@@ -52,18 +52,35 @@ class ReliefWebCollector:
         api_params = source.api_params or {}
         params = {**api_params}
 
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
-                async with session.get(api_endpoint, params=params) as resp:
-                    if resp.status != 200:
-                        result.errors.append(f"HTTP {resp.status}")
-                        return result
-                    data = await resp.json(content_type=None)
-        except asyncio.TimeoutError:
-            result.errors.append("API 타임아웃")
-            return result
-        except Exception as e:
-            result.errors.append(f"API 오류: {e}")
+        # v1 API가 410 반환 시 v2로 자동 전환
+        endpoints_to_try = [api_endpoint]
+        if "/v1/" in api_endpoint:
+            endpoints_to_try.append(api_endpoint.replace("/v1/", "/v2/"))
+
+        data = None
+        for ep in endpoints_to_try:
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
+                    async with session.get(ep, params=params) as resp:
+                        if resp.status == 410 and ep != endpoints_to_try[-1]:
+                            logger.warning("ReliefWeb API %s 반환 410 (Gone), v2로 전환 시도", ep)
+                            continue
+                        if resp.status != 200:
+                            result.errors.append(f"HTTP {resp.status}")
+                            return result
+                        data = await resp.json(content_type=None)
+                        if ep != api_endpoint:
+                            logger.info("ReliefWeb API v2 전환 성공: %s", ep)
+                break
+            except asyncio.TimeoutError:
+                result.errors.append("API 타임아웃")
+                return result
+            except Exception as e:
+                result.errors.append(f"API 오류: {e}")
+                return result
+
+        if data is None:
+            result.errors.append("API 응답 없음 (v1/v2 모두 실패)")
             return result
 
         reports = data.get("data", [])

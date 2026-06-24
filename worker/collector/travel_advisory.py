@@ -541,6 +541,13 @@ class UKTravelAdvisoryCollector:
     TIMEOUT = 30  # seconds per request
 
     @staticmethod
+    def _to_str(v) -> str:
+        """GOV.UK API가 string 대신 list를 반환하는 경우 안전 변환."""
+        if isinstance(v, list):
+            return " ".join(str(x) for x in v)
+        return str(v) if v else ""
+
+    @staticmethod
     def _parse_fcdo_severity(document: dict) -> int:
         """FCDO 문서에서 severity를 추출.
 
@@ -548,16 +555,19 @@ class UKTravelAdvisoryCollector:
         """
         details = document.get("details", {})
 
+        # GOV.UK API가 list를 반환할 수 있으므로 안전 변환
+        _to_str = UKTravelAdvisoryCollector._to_str
+
         # 1) alert_status 필드 확인
-        alert_status = (details.get("alert_status") or "").lower().strip()
+        alert_status = _to_str(details.get("alert_status")).lower().strip()
         if alert_status:
             for phrase, sev in _UK_SEVERITY_MAP:
                 if phrase in alert_status:
                     return sev
 
         # 2) summary 또는 body에서 텍스트 매칭
-        summary = (details.get("summary") or "").lower()
-        body = (details.get("body") or "").lower()
+        summary = _to_str(details.get("summary")).lower()
+        body = _to_str(details.get("body")).lower()
         combined = f"{summary} {body}"
 
         # 더 엄격한 것(all travel) 먼저 매칭

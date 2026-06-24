@@ -50,7 +50,7 @@ app.conf.beat_schedule = {
     # ── API 소스 수집 (소스 확장 Phase 3) ──
     "collect-gdelt": {
         "task": "worker.tasks.collect_gdelt",
-        "schedule": crontab(minute="*/15"),  # 15분마다
+        "schedule": crontab(minute="*/30"),  # 30분마다 (429 rate limit 방지)
         "options": {"queue": "collect"},
     },
     "collect-acled": {

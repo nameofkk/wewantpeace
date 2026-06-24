@@ -556,8 +556,11 @@ class RSSCollector:
     async def collect_all(self, db: AsyncSession, redis=None) -> list[RSSCollectResult]:
         """
         모든 활성 RSS 소스에서 수집.
-        Semaphore(5)로 동시 HTTP 요청 수 제한.
+        피드별 독립 세션 사용 — 한 피드 실패가 다른 피드에 영향 주지 않음.
+        MissingGreenlet 방지: commit 후 세션 재사용 시 greenlet 유실 문제 해소.
         """
+        from backend.app.core.database import AsyncSessionLocal
+
         stmt = select(SourceChannel).where(
             SourceChannel.is_active == True,
             SourceChannel.source_type == "rss",
@@ -569,63 +572,63 @@ class RSSCollector:
             logger.info("활성 RSS 채널 없음")
             return []
 
-        # 동시 요청 최대 5개 제한
-        sem = asyncio.Semaphore(5)
-
-        # 세션 공유 안전성을 위해 순차 실행 (asyncio.gather 대신)
-        # 피드별 flush+commit — 하나 실패해도 나머지는 저장됨
-        # autoflush 비활성화: dedup SELECT가 pending INSERT를 premature flush하는 것 방지
-        db.autoflush = False
-        results = []
+        # 채널 정보를 plain dict로 복사 (세션 독립성 보장)
+        channel_snapshots = []
         for ch in channels:
-            async with sem:
-                try:
-                    result = await self.collect_feed(ch, db, redis=redis)
-                    # Per-feed flush+commit — 피드별로 DB에 즉시 저장
+            channel_snapshots.append({
+                "id": ch.id,
+                "display_name": ch.display_name,
+                "feed_url": ch.feed_url,
+                "obj": ch,
+            })
+
+        results = []
+        for snap in channel_snapshots:
+            ch = snap["obj"]
+            ch_name = snap["display_name"]
+            try:
+                # 피드별 독립 세션 — MissingGreenlet 방지
+                async with AsyncSessionLocal() as feed_db:
+                    feed_db.autoflush = False
+                    result = await self.collect_feed(ch, feed_db, redis=redis)
                     if result.collected > 0:
                         try:
-                            await db.flush()
-                            await db.commit()
+                            await feed_db.flush()
+                            await feed_db.commit()
                         except Exception as db_err:
-                            await db.rollback()
+                            await feed_db.rollback()
                             logger.error(
                                 "RSS 피드 %s DB 저장 실패: %s",
-                                ch.display_name, db_err,
+                                ch_name, db_err,
                             )
                             result.errors.append(f"DB 저장 실패: {db_err}")
                             result.collected = 0
                             result.raw_event_ids.clear()
-                    logger.info(
-                        "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
-                        ch.display_name,
-                        result.collected,
-                        result.skipped,
-                        result.errors,
+                logger.info(
+                    "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
+                    ch_name,
+                    result.collected,
+                    result.skipped,
+                    result.errors,
+                )
+                results.append(result)
+                status = "error" if result.errors else "ok"
+                await self._save_collect_status(
+                    redis, snap["id"], status, result.collected, result.skipped,
+                    "; ".join(result.errors),
+                )
+            except Exception as e:
+                logger.error("RSS 채널 %s 수집 오류: %s", ch_name, e)
+                results.append(
+                    RSSCollectResult(
+                        feed_url=snap["feed_url"] or "",
+                        display_name=ch_name,
+                        errors=[str(e)],
                     )
-                    results.append(result)
-                    # Redis에 채널별 수집 상태 저장
-                    status = "error" if result.errors else "ok"
-                    await self._save_collect_status(
-                        redis, ch.id, status, result.collected, result.skipped,
-                        "; ".join(result.errors),
-                    )
-                except Exception as e:
-                    logger.error("RSS 채널 %s 수집 오류: %s", ch.display_name, e)
-                    # 세션이 rollback 상태일 수 있으므로 복구
-                    try:
-                        await db.rollback()
-                    except Exception:
-                        pass
-                    results.append(
-                        RSSCollectResult(
-                            feed_url=ch.feed_url or "",
-                            display_name=ch.display_name,
-                            errors=[str(e)],
-                        )
-                    )
-                    await self._save_collect_status(
-                        redis, ch.id, "error", 0, 0, str(e),
-                    )
+                )
+                await self._save_collect_status(
+                    redis, snap["id"], "error", 0, 0, str(e),
+                )
         return results
 
     @staticmethod
