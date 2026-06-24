@@ -39,12 +39,12 @@ app.conf.update(
 app.conf.beat_schedule = {
     "collect-telegram": {
         "task": "worker.tasks.collect_telegram",
-        "schedule": crontab(minute="*/5"),  # 5분마다 (채널 12개 대응)
+        "schedule": crontab(minute="*/10"),  # 10분마다 (채널 5개, 8초 소요)
         "options": {"queue": "collect"},
     },
     "collect-rss": {
         "task": "worker.tasks.collect_rss",
-        "schedule": crontab(minute="*/5"),  # 5분마다
+        "schedule": crontab(minute="*/10"),  # 10분마다 (64피드 순회 ~10분 소요)
         "options": {"queue": "collect"},
     },
     # ── API 소스 수집 (소스 확장 Phase 3) ──
@@ -65,7 +65,7 @@ app.conf.beat_schedule = {
     },
     "collect-usgs": {
         "task": "worker.tasks.collect_usgs",
-        "schedule": crontab(minute="*/5"),  # 5분마다 (M5.0+ 지진)
+        "schedule": crontab(minute="*/15"),  # 15분마다 (M5.0+ 지진)
         "options": {"queue": "collect"},
     },
     "collect-travel-advisory": {
@@ -75,12 +75,12 @@ app.conf.beat_schedule = {
     },
     "calc-tension": {
         "task": "worker.tasks.calculate_tension",
-        "schedule": crontab(minute="1,6,11,16,21,26,31,36,41,46,51,56"),  # 5분마다 (+1분 오프셋)
+        "schedule": crontab(minute="1,16,31,46"),  # 15분마다 (+1분 오프셋, 워커 부하 분산)
         "options": {"queue": "process"},
     },
     "calc-trending": {
         "task": "worker.tasks.calculate_trending",
-        "schedule": crontab(minute="2,7,12,17,22,27,32,37,42,47,52,57"),  # 5분마다 (+2분 오프셋)
+        "schedule": crontab(minute="6,21,36,51"),  # 15분마다 (+6분 오프셋)
         "options": {"queue": "process"},
     },
     "retry-unprocessed": {
@@ -176,7 +176,7 @@ app.conf.beat_schedule = {
     },
     "generate-kscore-social": {
         "task": "worker.tasks.generate_kscore_social",
-        "schedule": crontab(minute="*/10"),  # 10분마다 (부하 분산)
+        "schedule": crontab(minute="*/30"),  # 30분마다 (부하 분산)
         "options": {"queue": "process"},
     },
     "generate-weekly-social": {
@@ -186,7 +186,7 @@ app.conf.beat_schedule = {
     },
     "publish-approved-social": {
         "task": "worker.tasks.publish_approved_social",
-        "schedule": crontab(minute="*/5"),  # 5분마다 approved 상태 게시물 발행
+        "schedule": crontab(minute="*/15"),  # 15분마다 approved 상태 게시물 발행
         "options": {"queue": "process"},
     },
     # ── SNS 운영 리포트 ──
@@ -203,7 +203,7 @@ app.conf.beat_schedule = {
     # ── 서비스 모니터링 ──
     "monitor-service-health": {
         "task": "worker.tasks.monitor_service_health",
-        "schedule": crontab(minute="3,8,13,18,23,28,33,38,43,48,53,58"),  # 5분마다 (+3분 오프셋)
+        "schedule": crontab(minute="3,18,33,48"),  # 15분마다 (+3분 오프셋)
         "options": {"queue": "process"},
     },
     # ── P1 파이프라인 품질 ──
@@ -279,7 +279,7 @@ app.conf.beat_schedule = {
     },
     "correlate-signals": {
         "task": "worker.tasks.correlate_signals",
-        "schedule": crontab(minute="4,9,14,19,24,29,34,39,44,49,54,59"),  # 5분마다 (+4분 오프셋)
+        "schedule": crontab(minute="4,19,34,49"),  # 15분마다 (+4분 오프셋)
         "options": {"queue": "process"},
     },
     "cleanup-expired-signals": {
