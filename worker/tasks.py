@@ -161,10 +161,18 @@ def collect_rss(self):
 
         # 중복 실행 방지 (이전 사이클이 아직 실행 중이면 skip)
         lock_key = "lock:collect_rss"
-        acquired = await redis.set(lock_key, "1", ex=600, nx=True)  # 10분 TTL
+        # lock TTL 20분 (64피드 순회에 ~10분 소요)
+        acquired = await redis.set(lock_key, "1", ex=1200, nx=True)
         if not acquired:
-            logger.info("RSS 수집 skip: 이전 사이클 실행 중")
-            return {"status": "skipped", "reason": "already_running"}
+            # stale lock 감지: TTL이 원래 설정보다 많이 남아있으면 이전 배포 잔여 lock
+            ttl = await redis.ttl(lock_key)
+            if ttl and ttl > 1200:
+                await redis.delete(lock_key)
+                logger.warning("RSS stale lock 삭제 (TTL=%ds), 재시도", ttl)
+                acquired = await redis.set(lock_key, "1", ex=1200, nx=True)
+            if not acquired:
+                logger.info("RSS 수집 skip: 이전 사이클 실행 중")
+                return {"status": "skipped", "reason": "already_running"}
 
         try:
             async with AsyncSessionLocal() as db:
