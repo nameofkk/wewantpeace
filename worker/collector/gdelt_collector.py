@@ -120,15 +120,15 @@ class GDELTCollector:
         params = {
             "mode": "artlist",
             "format": "json",
-            "maxrecords": "100",
-            "timespan": "30min",
+            "maxrecords": "50",
+            "timespan": "1h",
             "sort": "datedesc",
             **api_params,
             "query": api_params.get("query", default_query),
         }
 
-        # Exponential backoff 재시도 (30s, 60s, 120s — GDELT rate limit 대응)
-        MAX_RETRIES = 3
+        # Exponential backoff 재시도 (60s, 180s — GDELT rate limit 대응)
+        MAX_RETRIES = 2
         data = None
         for attempt in range(MAX_RETRIES):
             try:
@@ -136,7 +136,7 @@ class GDELTCollector:
                     async with session.get(api_endpoint, params=params) as resp:
                         if resp.status == 429:
                             # Rate limit — 더 오래 대기
-                            wait = 2 ** attempt * 30  # 30s, 60s, 120s
+                            wait = 2 ** attempt * 60  # 60s, 120s
                             if attempt < MAX_RETRIES - 1:
                                 logger.warning("GDELT 429 rate limit, %ds 대기 후 재시도 %d/%d", wait, attempt + 1, MAX_RETRIES)
                                 await asyncio.sleep(wait)

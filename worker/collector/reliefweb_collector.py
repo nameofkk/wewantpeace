@@ -52,6 +52,10 @@ class ReliefWebCollector:
         api_params = source.api_params or {}
         params = {**api_params}
 
+        # v2 API 필수: appname 파라미터 (2025-11 이후 필수)
+        if "appname" not in params:
+            params["appname"] = "wewantpeace"
+
         # v1 API가 410 반환 시 v2로 자동 전환
         endpoints_to_try = [api_endpoint]
         if "/v1/" in api_endpoint:
@@ -62,8 +66,8 @@ class ReliefWebCollector:
             try:
                 async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.TIMEOUT)) as session:
                     async with session.get(ep, params=params) as resp:
-                        if resp.status == 410 and ep != endpoints_to_try[-1]:
-                            logger.warning("ReliefWeb API %s 반환 410 (Gone), v2로 전환 시도", ep)
+                        if resp.status in (410, 403) and ep != endpoints_to_try[-1]:
+                            logger.warning("ReliefWeb API %s 반환 %d, v2로 전환 시도", ep, resp.status)
                             continue
                         if resp.status != 200:
                             result.errors.append(f"HTTP {resp.status}")
