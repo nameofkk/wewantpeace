@@ -22,7 +22,7 @@ _TRANSLATION_STYLE_RE = re.compile(
     r")[.!?。…]?$"                               # 후행 마침표 허용
 )
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited, is_groq_rate_limited, USE_GROQ
 
 _SYSTEM_PROMPT = """\
 You are a concise news headline writer for a Korean conflict/crisis monitoring app.
@@ -181,15 +181,21 @@ def generate_ai_title(
         logger.info("AI 제목 생성: en=%s / ko=%s", title_en[:50], title_ko)
         return title_en, title_ko
     except Exception as _exc:
-        # 일일 토큰 한도 429 → 서킷 브레이커 (트레이스백 스팸 없이 조용히 차단)
+        # 429 → 서킷 브레이커 (Groq만 차단, OpenAI 429는 개별 재시도에 맡김)
         try:
             from openai import RateLimitError as _RateLimitError
             if isinstance(_exc, _RateLimitError):
-                _wait = 86400.0
-                _m = re.search(r"try again in (\d+)m([\d.]+)s", str(_exc))
-                if _m:
-                    _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
-                _mark_rate_limited(_wait)
+                _exc_str = str(_exc)
+                _is_groq = "groq" in _exc_str.lower() or (USE_GROQ and not is_groq_rate_limited())
+                if _is_groq:
+                    _wait = 300.0  # 기본 5분
+                    _m = re.search(r"try again in (\d+)m([\d.]+)s", _exc_str)
+                    if _m:
+                        _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
+                    _wait = min(_wait, 900.0)  # 최대 15분
+                    _mark_rate_limited(_wait)
+                else:
+                    logger.warning("OpenAI 429 — Groq 차단 없이 다음 시도에서 재시도")
                 return None
         except Exception:
             pass

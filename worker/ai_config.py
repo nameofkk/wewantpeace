@@ -43,6 +43,18 @@ else:
 _REDIS_BLOCK_KEY = "ai:groq_blocked"
 _redis_sync_client = None
 
+# 배포/재시작 시 이전 차단 키 정리 (24시간 차단이 남아있을 수 있음)
+def _clear_stale_block():
+    """기존 차단 키가 남아있으면 삭제 (배포 직후 AI 복구용)."""
+    try:
+        r = _get_redis_sync()
+        ttl = r.ttl(_REDIS_BLOCK_KEY)
+        if ttl and ttl > 900:  # 15분 이상 남았으면 비정상 (이전 24시간 차단)
+            r.delete(_REDIS_BLOCK_KEY)
+            logger.info("이전 Groq 차단 키 삭제 (TTL=%ds → 배포 후 초기화)", ttl)
+    except Exception as e:
+        logger.debug("차단 키 정리 실패 (무시): %s", e)
+
 
 def _get_redis_sync():
     """동기 Redis 클라이언트 반환 (celery sync 컨텍스트용)."""
@@ -133,3 +145,10 @@ def is_available() -> bool:
     if USE_OPENAI:
         return True
     return False
+
+
+# 모듈 로드 시 이전 차단 키 정리
+try:
+    _clear_stale_block()
+except Exception:
+    pass
