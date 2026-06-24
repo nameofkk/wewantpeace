@@ -387,7 +387,26 @@ def on_worker_process_init(**kwargs):
 
 @worker_ready.connect
 def on_worker_ready(**kwargs):
-    """워커 시작 시 긴장도·트렌딩 즉시 계산 + Telegram 봇 시작."""
+    """워커 시작 시 stale lock 정리 + 긴장도·트렌딩 즉시 계산 + Telegram 봇 시작."""
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+
+    # 이전 배포에서 남은 stale lock 정리 (배포 시 프로세스 종료로 lock 해제 안 됨)
+    try:
+        import redis as _redis_lib
+        import os
+        _r = _redis_lib.from_url(
+            os.getenv("REDIS_URL", os.getenv("REDIS_PRIVATE_URL", "redis://localhost:6379")),
+            decode_responses=True, socket_timeout=2,
+        )
+        _stale_keys = ["lock:collect_rss", "lock:collect_gdelt", "lock:collect_telegram"]
+        for _k in _stale_keys:
+            if _r.exists(_k):
+                _r.delete(_k)
+                _logger.info("배포 시 stale lock 삭제: %s", _k)
+    except Exception as _e:
+        _logger.warning("stale lock 정리 실패 (무시): %s", _e)
+
     app.send_task("worker.tasks.calculate_tension", queue="process")
     app.send_task("worker.tasks.calculate_trending", queue="process")
 
