@@ -677,8 +677,11 @@ async def get_paywall_cap(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """오늘(UTC) paywall shown 횟수와 잔여 노출 가능 횟수 반환."""
-    today_start = datetime.now(timezone.utc).replace(
+    """오늘(KST) paywall shown 횟수와 잔여 노출 가능 횟수 반환."""
+    # '오늘' 경계는 한국시간 자정 기준 — DAU/신규가입/월매출(admin.py)·퍼널(funnel.py)과 동일.
+    # UTC 자정으로 끊으면 일일 캡이 한국시간 오전 9시에 리셋돼서 운영자가 보는 '오늘'과 어긋난다.
+    from backend.app.services.funnel import KST
+    today_start = datetime.now(KST).replace(
         hour=0, minute=0, second=0, microsecond=0,
     )
     result = await db.execute(
@@ -740,6 +743,7 @@ async def track_event(
     if current_user:
         from backend.app.services.funnel import (
             log_funnel_event, CORE_ACTION_EVENTS, EV_ACTIVATION, EV_RETURN,
+            _local_date,
         )
         # 활성화: 첫 핵심행동(이슈/클러스터 열람·관심지역 설정) 최초 1회만 기록
         if body.name in CORE_ACTION_EVENTS:
@@ -748,9 +752,12 @@ async def track_event(
                 props={"via": body.name}, session_id=body.session_id,
                 platform=body.platform, once=True,
             )
-        # 재방문: 가입일 이후의 날에 다시 들어온 경우 하루 1회만 기록
+        # 재방문: 가입일 이후의 '다른 한국 달력일'에 다시 들어온 경우 하루 1회만 기록.
+        # 날짜 경계는 반드시 KST(_local_date)로 끊는다 — UTC date로 끊으면 한국 새벽 0~9시에
+        # 가입한 유저(UTC상 전날)가 같은 KST 날 재방문해도 return으로 잘못 잡힌다.
+        # (지표 계산 compute_funnel_metrics가 이미 KST 기준이라, 적재도 같은 기준이어야 안 어긋남)
         if current_user.created_at and \
-                current_user.created_at.date() < datetime.now(timezone.utc).date():
+                _local_date(current_user.created_at) < _local_date(datetime.now(timezone.utc)):
             await log_funnel_event(
                 db, EV_RETURN, current_user.id,
                 session_id=body.session_id, platform=body.platform,
