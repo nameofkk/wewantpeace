@@ -142,18 +142,30 @@ async def compute_funnel_metrics(db: AsyncSession, now: datetime) -> dict:
     )).scalar() or 0
 
     # activation = 핵심행동(또는 명시적 activation 이벤트)을 한 번이라도 한 distinct 사용자
+    # User로 inner join해서 탈퇴(status='deleted') 유저는 분자에서도 뺀다.
+    # signup(분모)이 탈퇴를 빼는데 여기서 안 빼면 activation_rate가 부풀려지고, 극단적으론
+    # 탈퇴 유저 때문에 100%를 넘을 수도 있다. (탈퇴는 soft delete라 app_events.user_id가 남음)
     activation = (await db.execute(
-        select(func.count(func.distinct(AppEvent.user_id))).where(
+        select(func.count(func.distinct(AppEvent.user_id)))
+        .select_from(AppEvent)
+        .join(User, User.id == AppEvent.user_id)
+        .where(
             AppEvent.user_id.isnot(None),
             AppEvent.name.in_(tuple(CORE_ACTION_EVENTS) + (EV_ACTIVATION,)),
             (AppEvent.session_id.is_(None)) | (AppEvent.session_id != _BACKFILL_SESSION),
+            User.status != "deleted",
         )
     )).scalar() or 0
 
     # paid = 성공 결제가 1건이라도 있는 distinct 사용자 (생애 전환)
+    # 여기도 탈퇴 유저는 분자에서 제외 — conversion_rate 분모(signup)와 기준을 맞춘다.
     paid = (await db.execute(
-        select(func.count(func.distinct(PaymentHistory.user_id))).where(
+        select(func.count(func.distinct(PaymentHistory.user_id)))
+        .select_from(PaymentHistory)
+        .join(User, User.id == PaymentHistory.user_id)
+        .where(
             PaymentHistory.status == "success",
+            User.status != "deleted",
         )
     )).scalar() or 0
 
