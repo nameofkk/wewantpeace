@@ -185,6 +185,120 @@ async def test_refund_resend_is_idempotent(db):
     assert res.scalar_one() == 1
 
 
+async def _revenue(db, sub_id) -> int:
+    """매출 집계와 동일 기준 — status='success'인 결제행 amount 합."""
+    res = await db.execute(
+        select(func.coalesce(func.sum(PaymentHistory.amount), 0)).where(
+            PaymentHistory.subscription_id == sub_id,
+            PaymentHistory.status == "success",
+        )
+    )
+    return res.scalar_one()
+
+
+@pytest.mark.asyncio
+async def test_store_refund_deducts_revenue(db):
+    """스토어 환불이 들어오면 원결제 success 행이 refunded로 뒤집혀 매출에서 빠진다.
+
+    매출(monthly_revenue)은 status='success' 행 amount 합이다. 예전엔 환불이 별도
+    refunded 행만 추가하고 원 success 행을 그대로 둬서, 환불해도 매출이 안 줄었다
+    (스토어 환불 매출 미반영 버그). dodo 환불처럼 원행을 뒤집어 매출에서 빠지게 한다.
+    """
+    user, sub = await _make_android_sub(db)
+
+    # 원결제 1건(success) — orderId를 거래번호로
+    await _renew(db, PURCHASE_TOKEN, "GPA.paid-order-1")
+    await db.flush()
+    assert await _revenue(db, sub.id) == 699  # 매출 잡힘
+
+    # 같은 거래 환불
+    await handle_store_event(
+        platform="android",
+        event_type="REFUND",
+        original_transaction_id=PURCHASE_TOKEN,
+        transaction_id="GPA.paid-order-1",
+        product_id="pro_monthly",
+        expires_at=None,
+        auto_renewing=False,
+        raw_payload={"event": "REFUND"},
+        db=db,
+    )
+    await db.flush()
+
+    # 매출에서 빠져야 한다(원 success 행이 refunded로 뒤집힘)
+    assert await _revenue(db, sub.id) == 0
+    # refunded 행은 1건, success 행은 0건 (행 중복 생성 없이 상태만 전환)
+    assert await _count_success(db, sub.id) == 0
+    refunded = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.subscription_id == sub.id,
+            PaymentHistory.status == "refunded",
+        )
+    )
+    assert refunded.scalar_one() == 1
+    # 유저 등급 회수
+    await db.refresh(user)
+    assert user.plan == "free"
+
+
+@pytest.mark.asyncio
+async def test_store_refund_resend_after_flip_is_idempotent(db):
+    """원결제를 뒤집은 환불이 재전송돼도 refunded 행이 늘지 않는다."""
+    user, sub = await _make_android_sub(db)
+    await _renew(db, PURCHASE_TOKEN, "GPA.paid-order-2")
+    await db.flush()
+
+    async def _refund():
+        return await handle_store_event(
+            platform="android", event_type="REFUND",
+            original_transaction_id=PURCHASE_TOKEN, transaction_id="GPA.paid-order-2",
+            product_id="pro_monthly", expires_at=None, auto_renewing=False,
+            raw_payload={"event": "REFUND"}, db=db,
+        )
+
+    await _refund()
+    await db.flush()
+    await _refund()  # 재전송
+    await db.flush()
+
+    assert await _revenue(db, sub.id) == 0
+    refunded = await db.execute(
+        select(func.count()).select_from(PaymentHistory).where(
+            PaymentHistory.subscription_id == sub.id,
+            PaymentHistory.status == "refunded",
+        )
+    )
+    assert refunded.scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_google_revoked_deducts_revenue_and_downgrades(db):
+    """구글 RTDN REVOKED(타입 12, 환불성 회수)도 매출 차감 + 등급 회수된다.
+
+    예전엔 'REVOKED'가 취소 그룹('REVOKE')과 철자가 달라 어디에도 안 걸려 무시됐다.
+    그 결과 환불됐는데도 구독이 active로 남고(유저 pro 유지) 원결제가 매출에 그대로 남았다.
+    """
+    user, sub = await _make_android_sub(db)
+    await _renew(db, PURCHASE_TOKEN, "GPA.paid-order-3")
+    await db.flush()
+    assert await _revenue(db, sub.id) == 699
+
+    res = await handle_store_event(
+        platform="android", event_type="REVOKED",
+        original_transaction_id=PURCHASE_TOKEN, transaction_id="GPA.paid-order-3",
+        product_id="pro_monthly", expires_at=None, auto_renewing=False,
+        raw_payload={"event": "REVOKED"}, db=db,
+    )
+    await db.flush()
+
+    assert res["status"] == "ok"  # 무시되지 않고 처리됨
+    assert await _revenue(db, sub.id) == 0
+    await db.refresh(sub)
+    await db.refresh(user)
+    assert sub.status == "expired"
+    assert user.plan == "free"
+
+
 def test_normalize_tx_id_service():
     """서비스 레이어 정규화도 빈/공백을 None으로 통일한다."""
     assert _normalize_tx_id(None) is None

@@ -386,21 +386,78 @@ async def handle_store_event(
         sub.auto_renewing = False
         sub.updated_at = now
 
-    elif event_type == "REFUND":
+    elif event_type in ("REFUND", "REVOKED"):
+        # REFUND: 애플 환불 알림. REVOKED: 구글 RTDN 타입 12(환불·차지백으로 만료 전 구독 회수).
+        # 예전엔 "REVOKED"가 취소 그룹("REVOKE"/"SUBSCRIPTION_STATE_REVOKED")과 철자가 달라
+        # 어디에도 안 걸리고 통째로 무시됐다 → 구독이 안 끊기고(유저는 pro 유지) 원결제도
+        # 매출에 그대로 남았다. 환불로 똑같이 처리한다(매출 차감 + 등급 회수).
         sub.status = "expired"
         sub.auto_renewing = False
         sub.updated_at = now
-        await _record_payment_idempotent(
-            db,
-            user_id=sub.user_id,
-            subscription_id=sub.id,
-            amount=sub.amount,
-            status="refunded",
-            platform=platform,
-            pg_transaction_id=transaction_id or original_transaction_id,
-            pg_response=raw_payload,
-            paid_at=paid_at,
-        )
+
+        # 환불은 원래 success 결제행을 refunded로 '뒤집어서' 매출(success 합산)에서 빠지게 한다.
+        # 예전엔 별도 refunded 행만 추가하고 success 행을 그대로 둬서, 환불해도 매출이
+        # 안 줄어드는 버그가 있었다(dodo 환불은 원행을 뒤집는데 스토어만 안 했음).
+        # 뒤집을 원행 매칭: 같은 거래번호의 success 행 우선 → 없으면 이 구독의 최신 success 행.
+        refund_tx = _normalize_tx_id(transaction_id or original_transaction_id)
+        paid = None
+        if refund_tx:
+            res = await db.execute(
+                select(PaymentHistory).where(
+                    PaymentHistory.platform == platform,
+                    PaymentHistory.pg_transaction_id == refund_tx,
+                    PaymentHistory.status == "success",
+                ).limit(1)
+            )
+            paid = res.scalar_one_or_none()
+        if paid is None:
+            res = await db.execute(
+                select(PaymentHistory).where(
+                    PaymentHistory.subscription_id == sub.id,
+                    PaymentHistory.status == "success",
+                ).order_by(PaymentHistory.created_at.desc()).limit(1)
+            )
+            paid = res.scalar_one_or_none()
+
+        if paid is not None:
+            # success → refunded 로 상태 전환(행 추가 아님). savepoint로 감싸서, 같은 거래의
+            # refunded 행이 이미 있던 비정상 데이터면 유니크 인덱스(platform, tx, status)에
+            # 걸려도 500 안 내고 중복 success 행을 제거한다(dodo 환불과 동일 처리).
+            try:
+                async with db.begin_nested():
+                    paid.status = "refunded"
+                    await db.flush()
+            except IntegrityError:
+                logger.info(
+                    "Webhook 환불: refunded 행 이미 존재 → 중복 success 행 제거 tx=%s",
+                    paid.pg_transaction_id,
+                )
+                await db.delete(paid)
+                await db.flush()
+        else:
+            # 뒤집을 success 행이 없음 — 이미 환불 처리됐거나(재전송) 원결제 기록 자체가 없던 경우.
+            # 이미 이 구독에 refunded 행이 있으면 멱등 스킵, 없으면 환불 사실만 기록(매출 영향 없음).
+            existing_refunded = await db.execute(
+                select(PaymentHistory.id).where(
+                    PaymentHistory.subscription_id == sub.id,
+                    PaymentHistory.status == "refunded",
+                ).limit(1)
+            )
+            if existing_refunded.scalar_one_or_none() is None:
+                await _record_payment_idempotent(
+                    db,
+                    user_id=sub.user_id,
+                    subscription_id=sub.id,
+                    amount=sub.amount,
+                    status="refunded",
+                    platform=platform,
+                    pg_transaction_id=refund_tx,
+                    pg_response=raw_payload,
+                    paid_at=paid_at,
+                )
+            else:
+                logger.info("Webhook 환불: 이미 환불 처리됨, 건너뜀 sub=%s", sub.id)
+
         # User.plan → free
         user_result = await db.execute(select(User).where(User.id == sub.user_id))
         user = user_result.scalar_one_or_none()
