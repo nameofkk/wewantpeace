@@ -173,6 +173,55 @@ async def _record_payment_idempotent(
     return True
 
 
+async def _reverse_one_success_payment(
+    db: AsyncSession,
+    sub: "Subscription",
+    platform: str,
+    refund_tx: str | None,
+    original_tx: str | None,
+) -> bool:
+    """스토어 환불 시 매출(monthly_revenue)에서 원결제 1건을 빼준다.
+
+    매출은 payment_history에서 status='success'인 행의 amount 합이다. 그래서 환불을
+    반영하려면 환불된 만큼 success 행을 매출에서 덜어내야 한다(dodo 환불과 같은 사상).
+    예전 REFUND 처리는 refunded 행만 새로 넣고 원래 success 행은 손 안 대서, 환불해도
+    매출이 한 푼도 안 줄던 버그가 있었다.
+
+    환불 이벤트의 거래번호는 원결제와 다를 수 있다(구글은 환불에 별도 refund orderId를
+    주고, 갱신 결제마다 orderId가 갈린다). 그래서 거래번호 정확 매칭을 먼저 시도하고,
+    없으면 이 구독의 가장 최근 success 결제를 원결제로 보고 그 행의 amount를 0으로 만든다
+    (스토어 구독 환불은 전액 환불이라 통째로 뺀다). 차감했으면 True.
+
+    호출부에서 '이 환불을 처음 본 경우(refunded 원장 행을 새로 넣은 경우)'에만 부르므로,
+    웹훅 재전송으로 같은 환불이 다시 와도 매출이 중복으로 깎이지 않는다.
+    """
+    norm = _normalize_tx_id(refund_tx) or _normalize_tx_id(original_tx)
+    paid = None
+    if norm:
+        paid = (await db.execute(
+            select(PaymentHistory).where(
+                PaymentHistory.platform == platform,
+                PaymentHistory.pg_transaction_id == norm,
+                PaymentHistory.status == "success",
+                PaymentHistory.amount > 0,
+            ).limit(1)
+        )).scalar_one_or_none()
+    if paid is None:
+        paid = (await db.execute(
+            select(PaymentHistory).where(
+                PaymentHistory.subscription_id == sub.id,
+                PaymentHistory.status == "success",
+                PaymentHistory.amount > 0,
+            ).order_by(PaymentHistory.created_at.desc()).limit(1)
+        )).scalar_one_or_none()
+    if paid is None:
+        # 되돌릴 success 결제 기록 자체가 없는 경우(결제 적재 전 환불 등) — 매출 영향 없음.
+        return False
+    paid.amount = 0
+    await db.flush()
+    return True
+
+
 async def _cancel_existing_active(user_id, db: AsyncSession) -> None:
     """기존 활성 구독 취소."""
     existing = await db.execute(
