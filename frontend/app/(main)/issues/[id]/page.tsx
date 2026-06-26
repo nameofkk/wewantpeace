@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { fetchIssueServer } from "@/lib/server/issues";
 import IssueDetailClient from "./client";
 
-export const revalidate = 120;
+export const revalidate = 3600;
 export const dynamicParams = true;
 
 interface Props {
