@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, Response
-from sqlalchemy import select, func, distinct
+from sqlalchemy import select, func, distinct, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 
@@ -377,12 +377,14 @@ async def platform_stats(
     cutoff_24h = now - timedelta(hours=24)
     cutoff_7d = now - timedelta(days=7)
 
-    # 전체 이벤트 수
-    total_events = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent)
-    )).scalar() or 0
+    # 전체 이벤트 수 — pg_class 통계 추정치 사용 (풀스캔 금지: Disk IO 과다 소비 원인)
+    # reltuples는 ANALYZE 기준 근사치이므로 ±수% 오차 허용
+    _reltuples = (await db.execute(
+        text("SELECT reltuples::bigint FROM pg_class WHERE relname = 'normalized_events'")
+    )).scalar()
+    total_events = max(0, int(_reltuples or 0))
 
-    # 최근 24시간 이벤트 수
+    # 최근 24시간 이벤트 수 — created_at 인덱스 활용 범위 스캔
     events_24h = (await db.execute(
         select(func.count()).select_from(NormalizedEvent)
         .where(NormalizedEvent.created_at >= cutoff_24h)

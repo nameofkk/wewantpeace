@@ -133,8 +133,8 @@ export function useClusters(params?: Record<string, string>) {
   return useQuery({
     queryKey: ["issues", paramKey],
     queryFn: () => apiFetch("/issues", params),
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 3 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
   });
 }
 
