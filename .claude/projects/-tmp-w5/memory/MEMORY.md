@@ -1,0 +1,1 @@
+- [금액은 USD 센트 저장](money-stored-as-usd-cents.md) — 표시할 땐 formatMoneyFromCents로 변환, 안 하면 100배 버그
