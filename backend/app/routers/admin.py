@@ -4375,7 +4375,8 @@ async def send_newsletter_all(
     for u in users:
         try:
             token = hmac.new(_cfg.secret_key.encode(), str(u.id).encode(), sha256).hexdigest()[:32]
-            user_data = {**body.data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+            # apex(wewantpeace.live)는 DNS 레코드가 없어 열리지 않는다 — 반드시 www를 쓸 것.
+            user_data = {**body.data, "unsubscribe_url": f"https://www.wewantpeace.live/unsubscribe?token={token}"}
             user_html = chevron.render(template, user_data)
             recipients.append((u.email, subject_text, user_html))
         except Exception:

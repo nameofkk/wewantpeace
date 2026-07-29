@@ -4882,7 +4882,8 @@ def send_newsletter_scheduled(self, tz_group: str):
                         continue
 
                     token = _hmac.new(settings.secret_key.encode(), str(user.id).encode(), _sha256).hexdigest()[:32]
-                    user_data = {**data, "unsubscribe_url": f"https://wewantpeace.live/unsubscribe?token={token}"}
+                    # apex(wewantpeace.live)는 DNS 레코드가 없어 열리지 않는다 — 반드시 www를 쓸 것.
+                    user_data = {**data, "unsubscribe_url": f"https://www.wewantpeace.live/unsubscribe?token={token}"}
                     html = chevron.render(template, user_data)
 
                     vol = data.get("vol_number", "?")
