@@ -14,13 +14,15 @@
     "@react-native-firebase/app": "^23.8.6",
     "@react-native-firebase/messaging": "^23.8.6",
     "expo": "~55.0.4",
+    "expo-build-properties": "~55.0.16",
     "expo-device": "~55.0.9",
     "expo-linking": "~55.0.7",
     "expo-splash-screen": "~55.0.10",
     "expo-status-bar": "~55.0.4",
     "react": "19.2.0",
     "react-native": "0.83.2",
-    "react-native-iap": "^14.7.12",
+    "react-native-iap": "14.7.12",
+    "react-native-nitro-modules": "^0.31.10",
     "react-native-webview": "13.16.0"
   },
   "devDependencies": {

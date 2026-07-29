@@ -311,8 +311,12 @@ async def health_check(request: Request):
         async with AsyncSessionLocal() as s:
             await s.execute(text("SELECT 1"))
         status["db"] = "ok"
-    except Exception:
+    except Exception as e:
+        # 원인 없이 "error"만 남기면 운영에서 추적이 불가능하다 — 로그에 예외를 남기고
+        # 응답에는 자격증명이 섞이지 않는 예외 타입만 노출한다.
+        logger.error("health: DB 연결 실패 (%s): %s", type(e).__name__, e, exc_info=True)
         status["db"] = "error"
+        status["db_error_type"] = type(e).__name__
         db_ok = False
     try:
         r = get_redis()
@@ -325,10 +329,12 @@ async def health_check(request: Request):
     try:
         async with AsyncSessionLocal() as s:
             row = await s.execute(text(
-                "SELECT COUNT(*) FROM raw_events WHERE created_at >= NOW() - INTERVAL '24 hours'"
+                # raw_events의 수집 시각 컬럼은 collected_at이다 (created_at은 존재하지 않음).
+                "SELECT COUNT(*) FROM raw_events WHERE collected_at >= NOW() - INTERVAL '24 hours'"
             ))
             status["events_24h"] = row.scalar() or 0
-    except Exception:
+    except Exception as e:
+        logger.error("health: events_24h 집계 실패 (%s): %s", type(e).__name__, e)
         status["events_24h"] = -1
 
     # Celery beat/worker 생존 확인 (beat_heartbeat 태스크가 5분마다 TTL 600s로 갱신)

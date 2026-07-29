@@ -2,7 +2,7 @@
   "expo": {
     "name": "WeWantPeace",
     "slug": "wewantpeace",
-    "version": "2.1.0",
+    "version": "3.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.wewantpeace.app",
-      "versionCode": 13,
+      "versionCode": 16,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A1A2E"
@@ -32,7 +32,17 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "react-native-iap",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          }
+        }
+      ]
     ]
   }
 }

@@ -13,10 +13,12 @@ jobs:
     name: Trigger Railway Deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Redeploy all services via Railway API
+      - name: Deploy all services at this commit via Railway API
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
+          set -euo pipefail
           API="https://backboard.railway.app/graphql/v2"
 
           # 서비스 ID
@@ -24,19 +26,30 @@ jobs:
           WORKER="2ee51089-125e-4e77-95e8-0fc3b8935ec5"
           FRONTEND="aefe12db-4de1-43e8-8098-5be3751d3518"
 
+          # serviceInstanceRedeploy는 "지금 떠 있는 배포"를 그대로 다시 띄울 뿐,
+          # 연결된 GitHub 레포의 새 커밋을 가져오지 않는다.
+          # → 새 코드를 실제로 반영하려면 commitSha를 넘기는 serviceInstanceDeployV2를 써야 한다.
+          QUERY='mutation Deploy($serviceId: String!, $environmentId: String!, $commitSha: String!) { serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId, commitSha: $commitSha) }'
+
           deploy_service() {
-            local SVC_ID=$1
-            local SVC_NAME=$2
-            echo "Deploying $SVC_NAME..."
-            RESULT=$(curl -s -X POST "$API" \
+            SVC_ID=$1
+            SVC_NAME=$2
+            echo "Deploying $SVC_NAME at $COMMIT_SHA ..."
+            PAYLOAD=$(jq -n \
+              --arg q "$QUERY" \
+              --arg s "$SVC_ID" \
+              --arg e "$RAILWAY_ENV_ID" \
+              --arg c "$COMMIT_SHA" \
+              '{query: $q, variables: {serviceId: $s, environmentId: $e, commitSha: $c}}')
+            RESULT=$(curl -sS -X POST "$API" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
-              -d "{\"query\":\"mutation { serviceInstanceRedeploy(environmentId: \\\"$RAILWAY_ENV_ID\\\", serviceId: \\\"$SVC_ID\\\") }\"}")
-            if echo "$RESULT" | grep -q '"errors"'; then
-              echo "::error::Failed to deploy $SVC_NAME"
+              -d "$PAYLOAD")
+            if echo "$RESULT" | jq -e '.errors' >/dev/null 2>&1; then
+              echo "::error::Failed to deploy $SVC_NAME: $(echo "$RESULT" | jq -c '.errors')"
               return 1
             fi
-            echo "$SVC_NAME: deployed successfully"
+            echo "$SVC_NAME: deploy triggered ($(echo "$RESULT" | jq -c '.data'))"
           }
 
           deploy_service "$BACKEND" "backend"
