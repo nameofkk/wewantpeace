@@ -149,8 +149,15 @@ export default function NewPostPage() {
     setImageUrls((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  if (!authLoading && !user) {
-    router.replace("/login");
+  // 렌더 도중 router.replace()를 부르면 서버 프리렌더에서 location에 접근해
+  // "ReferenceError: location is not defined"로 이 페이지의 정적 생성이 실패한다
+  // (빌드 로그에서 확인). 리다이렉트는 이펙트에서 하고 렌더는 null만 반환한다.
+  const needsLogin = !authLoading && !user;
+  useEffect(() => {
+    if (needsLogin) router.replace("/login");
+  }, [needsLogin, router]);
+
+  if (needsLogin) {
     return null;
   }
 
