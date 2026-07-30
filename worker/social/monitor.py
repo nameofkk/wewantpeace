@@ -24,6 +24,10 @@ _OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
 # Anti-spam TTL (초)
 _ALERT_COOLDOWN = 1800  # 30분
 
+# 고KScore 클러스터가 SNS에 발행되기까지 허용하는 유예 (분).
+# 발행은 시간당 몇 건씩 순차 처리되므로, 갓 들어온 이슈가 아직 미발행인 건 정상이다.
+_PUBLISH_GRACE_MINUTES = 90
+
 
 @dataclass
 class CheckResult:
@@ -182,7 +186,13 @@ async def _check_push_failures(db: AsyncSession) -> CheckResult:
 
 
 async def _check_unpublished_alerts(db: AsyncSession) -> CheckResult:
-    """8. v7: 미발행 고KScore 클러스터 (KScore >= 5.0)."""
+    """8. v7: 미발행 고KScore 클러스터 (KScore >= 5.0).
+
+    발행 유예(_PUBLISH_GRACE_MINUTES)를 둔다. 예전에는 유예가 없어서 방금 생성된
+    클러스터도 즉시 "미발행"으로 잡혔다 — SNS 발행은 시간당 몇 건씩 순차 처리되므로
+    갓 들어온 이슈가 아직 발행되지 않은 건 정상이다. 실제로 경보 3건 중 1건은
+    생성 25분 된 클러스터였다. 유예를 넘겼는데도 발행되지 않은 것만 진짜 누락이다.
+    """
     result = await db.execute(
         text("""
             SELECT COUNT(*) FROM issue_clusters ic
@@ -190,19 +200,23 @@ async def _check_unpublished_alerts(db: AsyncSession) -> CheckResult:
               AND ic.kscore >= 5.0
               AND ic.is_active = true
               AND ic.last_event_at >= NOW() - INTERVAL '6 hours'
+              AND ic.last_event_at <= NOW() - make_interval(mins => :grace)
               AND NOT EXISTS (
                   SELECT 1 FROM social_posts sp
                   WHERE sp.source_cluster_id = ic.id
                     AND sp.created_at >= NOW() - INTERVAL '24 hours'
               )
-        """)
+        """),
+        {"grace": _PUBLISH_GRACE_MINUTES},
     )
     count = result.scalar() or 0
     ok = count == 0
     return CheckResult(
         "unpublished_alerts",
         ok,
-        "모든 고KScore 클러스터 처리됨" if ok else f"미발행 알림: {count}건 (KScore≥5.0, severity≥70)",
+        "모든 고KScore 클러스터 처리됨"
+        if ok
+        else f"미발행 알림: {count}건 (KScore≥5.0, severity≥70, {_PUBLISH_GRACE_MINUTES}분 유예 초과)",
     )
 
 
