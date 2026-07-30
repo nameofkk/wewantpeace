@@ -24,6 +24,11 @@ from backend.app.routers import newsletter as newsletter_router
 from backend.app.routers import status as status_router
 import structlog
 
+from backend.app.core.log_redaction import install as _install_log_redaction
+
+# 로그에 토큰·시크릿이 평문으로 남지 않게 한다 (log_redaction.py 주석 참고)
+_install_log_redaction()
+
 logger = structlog.get_logger()
 
 # Sentry 초기화 (앱 시작 전)

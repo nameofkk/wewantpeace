@@ -1,7 +1,25 @@
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_ready, worker_process_init
+from celery.signals import (
+    worker_ready,
+    worker_process_init,
+    after_setup_logger,
+    after_setup_task_logger,
+)
 import os
+
+# 로그에 비밀값이 남지 않도록 리댁션 필터를 건다.
+# 텔레그램 봇 토큰이 httpx의 요청 URL 로그에 평문으로 찍혀 실제로 탈취당한 적이 있다.
+# Celery가 로깅 설정을 덮어쓰므로 import 시점 + 설정 완료 시점 양쪽에 건다.
+from backend.app.core.log_redaction import install as _install_log_redaction
+
+_install_log_redaction()
+
+
+@after_setup_logger.connect
+@after_setup_task_logger.connect
+def _reinstall_log_redaction(**_kwargs):
+    _install_log_redaction()
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
