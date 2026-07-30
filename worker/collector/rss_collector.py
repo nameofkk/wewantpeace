@@ -572,6 +572,13 @@ class RSSCollector:
             logger.info("활성 RSS 채널 없음")
             return []
 
+        # 채널 목록을 읽은 시점에 바깥 트랜잭션을 끊는다.
+        # 이 함수는 이후로 db를 전혀 쓰지 않고(피드별 독립 세션 사용) 58개 피드를
+        # 최대 30초씩 네트워크 대기하며 도는데, 그동안 이 세션이 열어둔 트랜잭션이
+        # Supavisor 커넥션을 그대로 붙잡고 있었다 (실측 idle in transaction 30분+).
+        # expire_on_commit=False라 아래에서 channels 속성 접근은 그대로 안전하다.
+        await db.commit()
+
         # 채널 정보를 plain dict로 복사 (세션 독립성 보장)
         channel_snapshots = []
         for ch in channels:

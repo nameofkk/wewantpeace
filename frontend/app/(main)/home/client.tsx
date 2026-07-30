@@ -179,7 +179,7 @@ function ReportContent() {
 
   const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErrorObj, isFetching: summaryFetching } = useImpactSummary(homeCountry ?? "", lang, storeHydrated);
   const { data: homeTension, dataUpdatedAt } = useTensionMine(homeCountry ? [homeCountry] : null);
-  const { data: allTension, isLoading: allTensionLoading } = useTensionAll();
+  const { data: allTension } = useTensionAll();
   const { data: watchlistTension } = useTensionMine(myCountries.length > 0 ? myCountries : null);
 
   const [activeTab, setActiveTab] = useState<"market" | "trade" | "travel" | "detail">("market");
@@ -320,8 +320,11 @@ function ReportContent() {
     } as TrendingItem));
   }, [summary, lang]);
 
-  // 하이드레이션 미완료 또는 로딩 중 → 스켈레톤
-  if (!storeHydrated || summaryLoading || allTensionLoading) {
+  // 하이드레이션 미완료 또는 주요 데이터(impact summary) 로딩 중 → 스켈레톤.
+  // /tension/all(allTensionLoading)은 대시보드 전체를 막지 않는다 —
+  // 이 쿼리 하나가 느리면(캐시 미스 시 수 초~십수 초) 홈 전체가 스켈레톤에 갇혔었다.
+  // allTension을 쓰는 지점은 전부 0/빈배열 폴백이 있어, 늦게 도착해도 값만 채워진다.
+  if (!storeHydrated || summaryLoading) {
     return <div className="p-4"><DashboardSkeleton /></div>;
   }
 

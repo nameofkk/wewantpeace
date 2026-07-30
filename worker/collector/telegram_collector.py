@@ -411,6 +411,12 @@ class TelegramCollector:
             for channel in channels:
                 try:
                     result = await self.collect_channel(channel, db, client, redis)
+                    # 채널 하나가 끝날 때마다 트랜잭션을 닫는다.
+                    # 예전에는 18개 채널 전체(네트워크 대기 포함)가 한 트랜잭션으로 묶여
+                    # 그동안 Supavisor 커넥션을 계속 붙잡고 있었다.
+                    # RSS 수집이 이미 피드별 커밋으로 도는 것과 같은 방식.
+                    # expire_on_commit=False라 raw_event_ids의 .id는 커밋 후에도 그대로 읽힌다.
+                    await db.commit()
                     results.append(result)
                     logger.info(
                         "Telegram 수집 완료: %s (collected=%d, skipped=%d)",
