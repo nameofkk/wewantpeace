@@ -6,7 +6,8 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Request, Response
-from sqlalchemy import select, func, distinct, text
+from sqlalchemy import select, func, distinct, text, bindparam, String
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 
@@ -60,38 +61,40 @@ async def weekly_summary(
         for row in top_clusters_q.all()
     ]
 
-    # TOP 10 긴장도 국가 (최신 값, raw_score DESC)
-    latest_tension_subq = (
-        select(
-            TensionIndex.country_code,
-            TensionIndex.raw_score,
-            TensionIndex.tension_level,
-            func.row_number()
-            .over(
-                partition_by=TensionIndex.country_code,
-                order_by=TensionIndex.time.desc(),
-            )
-            .label("rn"),
-        )
-        .subquery()
-    )
-    tension_q = await db.execute(
-        select(
-            latest_tension_subq.c.country_code,
-            latest_tension_subq.c.raw_score,
-            latest_tension_subq.c.tension_level,
-        )
-        .where(latest_tension_subq.c.rn == 1)
-        .order_by(latest_tension_subq.c.raw_score.desc())
-        .limit(10)
-    )
+    # 국가별 최신 긴장도 1건.
+    #
+    # 예전에는 row_number() OVER (PARTITION BY country_code ORDER BY time DESC)로
+    # tension_index(140만 행) 전체에 윈도우 함수를 돌렸고, 그걸 top_tension과
+    # crisis_countries에서 각각 한 번씩 — 즉 전수 스캔 2회 — 실행했다. 실측 50초.
+    # /tension/all과 같은 방식으로 국가마다 (country_code, time DESC) 인덱스에서
+    # 1행씩만 집어오고, 결과 하나를 두 용도로 재사용한다.
+    from backend.app.routers.tension import DEFAULT_COUNTRIES
+
+    latest_rows = (await db.execute(
+        text(
+            """
+            SELECT ti.country_code, ti.raw_score, ti.tension_level
+            FROM unnest(CAST(:codes AS text[])) AS c(country_code)
+            CROSS JOIN LATERAL (
+                SELECT t.country_code, t.raw_score, t.tension_level
+                FROM tension_index t
+                WHERE t.country_code = c.country_code
+                ORDER BY t."time" DESC
+                LIMIT 1
+            ) ti
+            ORDER BY ti.raw_score DESC
+            """
+        ).bindparams(bindparam("codes", type_=ARRAY(String))),
+        {"codes": list(DEFAULT_COUNTRIES)},
+    )).mappings().all()
+
     top_tension = [
         {
-            "country_code": row.country_code,
-            "raw_score": round(row.raw_score, 1),
-            "tension_level": row.tension_level,
+            "country_code": row["country_code"],
+            "raw_score": round(row["raw_score"], 1),
+            "tension_level": row["tension_level"],
         }
-        for row in tension_q.all()
+        for row in latest_rows[:10]
     ]
 
     # 통계 — 이번 주
@@ -105,11 +108,8 @@ async def weekly_summary(
         .where(IssueCluster.first_event_at >= cutoff)
     )).scalar() or 0
 
-    crisis_countries_q = await db.execute(
-        select(latest_tension_subq.c.country_code)
-        .where(latest_tension_subq.c.rn == 1, latest_tension_subq.c.raw_score >= 70)
-    )
-    crisis_countries = len(crisis_countries_q.all())
+    # 위와 같은 결과를 재사용 — 전수 스캔을 한 번 더 돌리지 않는다.
+    crisis_countries = sum(1 for row in latest_rows if (row["raw_score"] or 0) >= 70)
 
     # 통계 — 전주 (WoW 비교용)
     prev_cutoff = cutoff - timedelta(days=7)
@@ -152,54 +152,45 @@ async def tension_all(
     """전체 국가별 최신 긴장도 — 인증 불필요."""
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
 
-    # 각 국가별 최신 레코드 1건
-    latest_subq = (
-        select(
-            TensionIndex.country_code,
-            TensionIndex.raw_score,
-            TensionIndex.tension_level,
-            TensionIndex.event_score,
-            TensionIndex.accel_score,
-            TensionIndex.spillover_score,
-            TensionIndex.percentile_30d,
-            TensionIndex.time,
-            func.row_number()
-            .over(
-                partition_by=TensionIndex.country_code,
-                order_by=TensionIndex.time.desc(),
-            )
-            .label("rn"),
-        )
-        .subquery()
-    )
+    # 각 국가별 최신 레코드 1건.
+    # row_number() 윈도우는 tension_index(140만 행)를 전수 스캔한다 —
+    # 국가마다 (country_code, time DESC) 인덱스에서 1행씩만 집는 LATERAL로 대체.
+    from backend.app.routers.tension import DEFAULT_COUNTRIES
 
     rows = (await db.execute(
-        select(
-            latest_subq.c.country_code,
-            latest_subq.c.raw_score,
-            latest_subq.c.tension_level,
-            latest_subq.c.event_score,
-            latest_subq.c.accel_score,
-            latest_subq.c.spillover_score,
-            latest_subq.c.percentile_30d,
-            latest_subq.c.time,
-        )
-        .where(latest_subq.c.rn == 1)
-        .order_by(latest_subq.c.raw_score.desc())
-    )).all()
+        text(
+            """
+            SELECT ti.country_code, ti.raw_score, ti.tension_level,
+                   ti.event_score, ti.accel_score, ti.spillover_score,
+                   ti.percentile_30d, ti."time"
+            FROM unnest(CAST(:codes AS text[])) AS c(country_code)
+            CROSS JOIN LATERAL (
+                SELECT t.country_code, t.raw_score, t.tension_level,
+                       t.event_score, t.accel_score, t.spillover_score,
+                       t.percentile_30d, t."time"
+                FROM tension_index t
+                WHERE t.country_code = c.country_code
+                ORDER BY t."time" DESC
+                LIMIT 1
+            ) ti
+            ORDER BY ti.raw_score DESC
+            """
+        ).bindparams(bindparam("codes", type_=ARRAY(String))),
+        {"codes": list(DEFAULT_COUNTRIES)},
+    )).mappings().all()
 
     return {
         "count": len(rows),
         "data": [
             {
-                "country_code": r.country_code,
-                "raw_score": round(r.raw_score, 2),
-                "tension_level": r.tension_level,
-                "event_score": round(r.event_score, 2) if r.event_score else 0,
-                "accel_score": round(r.accel_score, 2) if r.accel_score else 0,
-                "spillover_score": round(r.spillover_score, 2) if r.spillover_score else 0,
-                "percentile_30d": round(r.percentile_30d, 2) if r.percentile_30d else 0,
-                "updated_at": r.time.isoformat(),
+                "country_code": r["country_code"],
+                "raw_score": round(r["raw_score"], 2),
+                "tension_level": r["tension_level"],
+                "event_score": round(r["event_score"], 2) if r["event_score"] else 0,
+                "accel_score": round(r["accel_score"], 2) if r["accel_score"] else 0,
+                "spillover_score": round(r["spillover_score"], 2) if r["spillover_score"] else 0,
+                "percentile_30d": round(r["percentile_30d"], 2) if r["percentile_30d"] else 0,
+                "updated_at": r["time"].isoformat(),
             }
             for r in rows
         ],
