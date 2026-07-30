@@ -45,6 +45,14 @@ async def main():
             "CREATE INDEX IF NOT EXISTS idx_ic_first_event_at "
             "ON issue_clusters (first_event_at DESC)",
         ),
+        # issue_clusters를 updated_at 기준으로 정렬/집계하는 경로가 Seq Scan을 타고 있었다.
+        # EXPLAIN ANALYZE 실측: 26,555행 Seq Scan 1,042ms (헬스체크 cluster_freshness,
+        # trending 대상 선별 등에서 반복 발생).
+        (
+            "idx_ic_updated_at",
+            "CREATE INDEX IF NOT EXISTS idx_ic_updated_at "
+            "ON issue_clusters (updated_at DESC)",
+        ),
     ]
 
     for name, sql in indexes:

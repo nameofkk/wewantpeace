@@ -228,6 +228,11 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
                         _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
                     _wait = min(_wait, 900.0)  # 최대 15분
                     _mark_rate_limited(_wait)
+                elif "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
+                    # 크레딧 소진은 재시도로 절대 안 풀린다. 예전에는 이걸 일반 429로 보고
+                    # 매 기사마다 다시 호출해 연속 실패만 쌓았다(실측 213건 연속).
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
                 else:
                     logger.warning("OpenAI 429 — Groq 차단 없이 다음 시도에서 재시도 (제목: %s)", title[:60])
                 return None
