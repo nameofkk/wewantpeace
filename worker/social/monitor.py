@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import AsyncSessionLocal
 from backend.app.core.redis import get_redis
+from worker.retention import BACKLOG_ALERT_THRESHOLD, UNPROCESSED_RETRY_WINDOW_HOURS
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +89,37 @@ async def _check_telegram_collection(db: AsyncSession) -> CheckResult:
 
 
 async def _check_backlog(db: AsyncSession) -> CheckResult:
-    """4. 미처리 백로그."""
+    """4. 미처리 백로그.
+
+    retry_unprocessed가 실제로 재시도하는 범위(최근 N시간) 안의 미처리 건만 센다.
+    예전에는 processed = false 를 전부 셌는데, 그 범위 밖의 건은 재시도도 삭제도
+    되지 않아 카운터에만 영구 누적됐고 경보가 절대 해제되지 않았다.
+    (자세한 배경은 worker/retention.py 주석 참고)
+    """
     result = await db.execute(
-        text("SELECT COUNT(*) FROM raw_events WHERE processed = false")
+        text(
+            "SELECT"
+            " COUNT(*) FILTER (WHERE collected_at >= NOW() - make_interval(hours => :win)) AS live,"
+            " COUNT(*) FILTER (WHERE collected_at <  NOW() - make_interval(hours => :win)) AS abandoned"
+            " FROM raw_events WHERE processed = false"
+        ),
+        {"win": UNPROCESSED_RETRY_WINDOW_HOURS},
     )
-    count = result.scalar() or 0
-    ok = count <= 300
+    row = result.one()
+    live, abandoned = row.live or 0, row.abandoned or 0
+    ok = live <= BACKLOG_ALERT_THRESHOLD
+
+    # 재시도 범위 밖 잔여분은 참고용으로만 붙인다 (경보 조건이 아님 —
+    # cleanup_old_data가 보존기간이 지나면 정리한다).
+    tail = f", 재시도범위 밖 {abandoned}건" if abandoned else ""
     return CheckResult(
         "backlog",
         ok,
-        f"미처리: {count}건" if ok else f"백로그 과다: {count}건 (>300)",
+        (
+            f"미처리: {live}건(최근 {UNPROCESSED_RETRY_WINDOW_HOURS}h){tail}"
+            if ok
+            else f"백로그 과다: {live}건 (최근 {UNPROCESSED_RETRY_WINDOW_HOURS}h, >{BACKLOG_ALERT_THRESHOLD}){tail}"
+        ),
     )
 
 

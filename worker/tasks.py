@@ -1267,8 +1267,11 @@ def retry_unprocessed(self):
         batch_limit = 10 if queue_len >= 100 else 50
 
         async with AsyncSessionLocal() as db:
-            # 최근 6시간 이내 미처리 항목만 (너무 오래된 것은 무시)
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+            # 재시도 범위 내 미처리 항목만 (그보다 오래된 것은 설계상 포기 —
+            # 대신 cleanup_old_data가 보존기간 후 삭제한다. worker/retention.py 참고)
+            from worker.retention import UNPROCESSED_RETRY_WINDOW_HOURS
+
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=UNPROCESSED_RETRY_WINDOW_HOURS)
             result = await db.execute(
                 select(RawEvent.id)
                 .where(
@@ -4620,15 +4623,24 @@ def cleanup_old_data(self):
         results = {"raw_events": 0, "noise_normalized": 0, "tension_index": 0}
 
         async with AsyncSessionLocal() as db:
-            # 1. 7일+ processed raw_events 배치 삭제 (Disk IO 방지)
-            cutoff_raw = datetime.now(timezone.utc) - timedelta(days=7)
+            # 1. 보존기간 지난 raw_events 배치 삭제 (Disk IO 방지)
+            #
+            # 예전에는 processed = true 만 지웠다. 그런데 retry_unprocessed는
+            # 최근 6시간 내 미처리 건만 재시도하므로, 그 범위를 벗어난 미처리 건은
+            # 재시도도 삭제도 되지 않고 영구히 남아 "백로그 과다" 경보를 계속
+            # 발생시켰다 (실측: 2026-06-07부터 5,547건 적체).
+            # 보존기간이 지난 건은 어차피 처리되지 않으므로 processed 여부와
+            # 무관하게 삭제한다. (worker/retention.py 참고)
+            from worker.retention import RAW_EVENT_RETENTION_DAYS
+
+            cutoff_raw = datetime.now(timezone.utc) - timedelta(days=RAW_EVENT_RETENTION_DAYS)
             while True:
                 async with db.begin():
                     r = await db.execute(
                         sa_text(
                             "DELETE FROM raw_events WHERE ctid IN "
-                            "(SELECT ctid FROM raw_events WHERE processed = true "
-                            "AND collected_at < :cutoff LIMIT :batch)"
+                            "(SELECT ctid FROM raw_events "
+                            "WHERE collected_at < :cutoff LIMIT :batch)"
                         ),
                         {"cutoff": cutoff_raw, "batch": BATCH_SIZE},
                     )
