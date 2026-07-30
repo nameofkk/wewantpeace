@@ -161,6 +161,11 @@ class GpsJamCollector:
                     db.add(sp)
                     result.collected += 1
 
+                    # 아래 sleep(6) + 다음 존 HTTP 대기 동안 트랜잭션을 열어두면
+                    # 그 시간 내내 Supavisor 커넥션이 묶인다 (실측 idle in transaction).
+                    # 존 하나 저장할 때마다 닫고 다음 루프에서 새로 연다.
+                    await db.commit()
+
                     # rate limit 존중
                     await asyncio.sleep(6)
 
