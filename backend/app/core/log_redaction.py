@@ -34,6 +34,26 @@ def redact(text: str) -> str:
     return text
 
 
+def _redact_arg(value: object) -> object:
+    """로그 인자 하나를 가린다.
+
+    문자열만 검사하면 안 된다. httpx는 URL을 str이 아니라 httpx.URL 객체로 넘긴다:
+        logger.info('HTTP Request: %s %s "%s %d %s"', request.method, request.url, ...)
+    이 경우 포매팅 시점에 str()이 불려 토큰이 그대로 찍힌다. 실제로 이것 때문에
+    1차 수정이 프로덕션에서 무력화됐다. 그래서 비문자열 인자도 str()로 확인한다.
+    """
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, (int, float, bool, type(None))):
+        return value
+    try:
+        text = str(value)
+    except Exception:
+        return value
+    cleaned = redact(text)
+    return cleaned if cleaned != text else value
+
+
 class RedactSecretsFilter(logging.Filter):
     """LogRecord의 메시지·인자에서 비밀값을 가린다 (레코드는 항상 통과시킴)."""
 
@@ -41,16 +61,13 @@ class RedactSecretsFilter(logging.Filter):
         try:
             if isinstance(record.msg, str):
                 record.msg = redact(record.msg)
+            elif record.msg is not None:
+                record.msg = _redact_arg(record.msg)
             if record.args:
                 if isinstance(record.args, dict):
-                    record.args = {
-                        k: (redact(v) if isinstance(v, str) else v)
-                        for k, v in record.args.items()
-                    }
+                    record.args = {k: _redact_arg(v) for k, v in record.args.items()}
                 elif isinstance(record.args, tuple):
-                    record.args = tuple(
-                        redact(a) if isinstance(a, str) else a for a in record.args
-                    )
+                    record.args = tuple(_redact_arg(a) for a in record.args)
         except Exception:
             # 로깅이 절대 예외로 죽지 않게 한다 — 가리기 실패해도 로그는 남긴다.
             pass
