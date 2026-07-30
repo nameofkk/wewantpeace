@@ -78,9 +78,27 @@ _is_worker = bool(_os.environ.get("CELERY_WORKER"))
 
 _txn_mode_connect_args: dict = {}
 if not _is_sqlite:
-    # asyncpg: prepared statement 캐시 비활성화 (transaction mode pooler 필수)
-    # statement_cache_size=0 → asyncpg 클라이언트 측 named prepared statement 억제
-    _txn_mode_connect_args = {"statement_cache_size": 0}
+    # ── Supavisor transaction mode에서 prepared statement 끄기 ────────────────
+    # 프로덕션 로그에서 실제로 터지던 예외:
+    #   asyncpg.exceptions.InvalidSQLStatementNameError:
+    #   prepared statement "__asyncpg_stmt_17d__" does not exist
+    #
+    # 원인: statement_cache_size는 asyncpg 자체 캐시만 끈다. SQLAlchemy asyncpg
+    # 다이얼렉트는 그와 별개로 DBAPI 커넥션마다 prepared statement를 100개까지
+    # 캐시한다(기본값). transaction mode 풀러에서는 트랜잭션마다 뒤쪽 PG 백엔드가
+    # 바뀔 수 있어, 앞 트랜잭션에서 prepare한 statement가 다음 트랜잭션에는 없다.
+    #   → prepared_statement_cache_size=0 으로 다이얼렉트 캐시까지 꺼야 한다.
+    #     (SQLAlchemy 문서상 dialect 인자가 아니라 DBAPI 인자라 connect_args로 넘긴다)
+    #   → prepared_statement_name_func: 이름을 매번 유일하게 만들어, 재사용된 PG
+    #     백엔드에 같은 이름이 남아 있을 때의 DuplicatePreparedStatementError도 막는다.
+    #
+    # 워커는 NullPool이라 매번 새 커넥션을 열어 이 문제를 우연히 피해 왔고,
+    # 커넥션을 재사용하는 백엔드(QueuePool)만 계속 터지고 있었다.
+    _txn_mode_connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{_uuid.uuid4()}__",
+    }
 
 if _is_sqlite:
     _engine_kwargs: dict = {}
