@@ -160,15 +160,19 @@ function ReportContent() {
   // Zustand persist hydration guard:
   // localStorage 복원 완료 전에 homeCountry="" 로 API 호출하면 홈 첫 로딩 에러 발생.
   // persist.hasHydrated()가 true가 될 때까지 쿼리를 비활성화해 정확한 homeCountry로 한 번만 호출.
+  // persist API는 서버 렌더 시점엔 붙어 있지 않을 수 있다.
+  // 그대로 useAppStore.persist.hasHydrated()를 부르면 SSR에서
+  // "Cannot read properties of undefined (reading 'hasHydrated')"로 /home 서버 렌더가 통째로 터진다.
+  // (dev 서버 로그로 재현 확인) → 옵셔널 체이닝으로 방어하고, 서버에서는 그냥 false로 시작한다.
   const [storeHydrated, setStoreHydrated] = useState(
-    () => useAppStore.persist.hasHydrated()
+    () => useAppStore.persist?.hasHydrated?.() ?? false
   );
   useEffect(() => {
-    if (useAppStore.persist.hasHydrated()) {
+    if (useAppStore.persist?.hasHydrated?.()) {
       setStoreHydrated(true);
       return;
     }
-    return useAppStore.persist.onFinishHydration(() => setStoreHydrated(true));
+    return useAppStore.persist?.onFinishHydration?.(() => setStoreHydrated(true));
   }, []);
 
   usePageTitle(lang, "tab_home");
