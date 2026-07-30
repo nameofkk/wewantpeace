@@ -390,6 +390,18 @@ export default function RootLayout({
             /* SSR onboarding: 세계지도 div가 HTML에 있으면 스플래시 숨김 → LCP/SI 즉시 */
             html:has(.ob-world-map) #__splash,
             html:has(.ob-world-map) #react-splash { display: none !important; }
+
+            /* 최후 안전장치 — JS가 실행되지 않아도 스플래시가 반드시 걷힌다.
+               #__splash는 지금까지 splash-screen.tsx의 JS로만 제거됐다. 그래서 번들이
+               실행되지 않으면(재배포 후 옛 HTML이 없어진 청크를 가리킴 / 청크 로드 실패 /
+               하이드레이션 예외) 이 fixed·z-index 9999 오버레이가 화면을 영원히 덮어
+               "첫 로딩 화면에서 계속 로딩중" 상태로 갇혔다. 실제로 재현 확인함.
+               정상 경로에서는 1초 내에 JS가 제거하므로 이 애니메이션은 보이지 않는다. */
+            @keyframes splash-failsafe {
+              0%, 88% { opacity: 1; visibility: visible; }
+              100% { opacity: 0; visibility: hidden; }
+            }
+            #__splash { animation: splash-failsafe 8s linear forwards; }
           ` }} />
         </div>
         <Providers>
