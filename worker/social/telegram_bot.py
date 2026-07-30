@@ -375,6 +375,30 @@ def start_polling_loop():
     logger.info("Telegram 봇 polling 스레드 시작")
 
 
+async def _clear_unauthorized_webhook(client) -> str | None:
+    """등록된 웹훅이 있으면 삭제하고 그 주소를 돌려준다. 없으면 None.
+
+    이 프로젝트는 getUpdates 폴링 전용이라 웹훅을 설정하는 코드가 존재하지 않는다.
+    따라서 웹훅이 걸려 있다는 것 자체가 제3자가 토큰을 쥐고 있다는 신호다.
+    (2026-07-30 실제 사고: 외부 도메인 웹훅이 걸려 봇의 모든 업데이트가 그쪽으로
+     넘어갔고, 그 결과 승인 버튼·명령이 전부 무응답이었다.)
+    """
+    try:
+        info = await client.get(
+            f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/getWebhookInfo"
+        )
+        url = (info.json().get("result") or {}).get("url") or ""
+        if not url:
+            return None
+        await client.get(
+            f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/deleteWebhook"
+        )
+        return url
+    except Exception as e:
+        logger.warning("웹훅 확인/삭제 실패: %s", e)
+        return None
+
+
 async def _poll_updates():
     """Telegram Bot API long polling."""
     import httpx
@@ -405,11 +429,26 @@ async def _poll_updates():
                     # 재시도하며 로그를 도배했다 — 프로덕션에서 6초 간격으로 계속 발생.
                     # 사람이 개입해야 하는 상황이므로 크게 물러서고 로그도 한 번만 남긴다.
                     if resp.status_code == 409:
+                        # 이 프로젝트는 폴링 전용이라 웹훅을 절대 등록하지 않는다.
+                        # 따라서 웹훅이 걸려 있다면 = 우리가 건 게 아니다 = 토큰 오남용이다.
+                        # (2026-07-30에 실제로 외부 도메인 웹훅이 걸려 모든 업데이트가
+                        #  가로채였고 봇 승인 버튼이 전부 죽어 있었다.)
+                        # 스스로 걷어내되, 조용히 넘어가지 말고 매번 크게 남긴다.
+                        hooked = await _clear_unauthorized_webhook(client)
+                        if hooked:
+                            logger.error(
+                                "[보안] 등록한 적 없는 텔레그램 웹훅을 발견해 삭제했습니다. "
+                                "봇 토큰이 유출됐을 가능성이 높습니다 — BotFather에서 즉시 재발급하세요. "
+                                "웹훅 주소: %s",
+                                hooked,
+                            )
+                            _backoff = 5
+                            continue
+                        # 웹훅이 아니라면 중복 폴러다 — 재시도로 풀리지 않으니 크게 물러선다.
                         if not _conflict_logged:
                             logger.error(
-                                "Telegram getUpdates 409 Conflict — 봇 버튼/승인이 동작하지 않습니다. "
-                                "웹훅이 등록돼 있거나 다른 인스턴스가 같은 토큰을 폴링 중입니다. "
-                                "getWebhookInfo로 확인 후 deleteWebhook 하거나 중복 폴러를 끄세요. 응답: %s",
+                                "Telegram getUpdates 409 Conflict — 다른 인스턴스가 같은 토큰을 "
+                                "폴링 중입니다. 중복 폴러를 끄세요. 응답: %s",
                                 resp.text[:300],
                             )
                             _conflict_logged = True
