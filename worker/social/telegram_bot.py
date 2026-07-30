@@ -388,6 +388,10 @@ async def _poll_updates():
     # 수정 대기 중인 post_id 추적 {chat_id: (post_id, created_at)}
     edit_pending: dict[int, tuple[uuid.UUID, datetime]] = {}
 
+    # 실패 시 백오프 상태 (409는 별도 처리 — 아래 참고)
+    _backoff = 5
+    _conflict_logged = False
+
     while True:
         try:
             async with httpx.AsyncClient(timeout=35.0) as client:
@@ -396,9 +400,27 @@ async def _poll_updates():
                     params={"offset": offset, "timeout": 30},
                 )
                 if resp.status_code != 200:
-                    logger.error("Telegram getUpdates 오류: %s", resp.text)
-                    await _sleep(5)
+                    # 409 Conflict는 재시도로 절대 풀리지 않는다 (웹훅이 걸려 있거나
+                    # 다른 인스턴스가 같은 토큰을 폴링 중). 예전에는 5초마다 무한
+                    # 재시도하며 로그를 도배했다 — 프로덕션에서 6초 간격으로 계속 발생.
+                    # 사람이 개입해야 하는 상황이므로 크게 물러서고 로그도 한 번만 남긴다.
+                    if resp.status_code == 409:
+                        if not _conflict_logged:
+                            logger.error(
+                                "Telegram getUpdates 409 Conflict — 봇 버튼/승인이 동작하지 않습니다. "
+                                "웹훅이 등록돼 있거나 다른 인스턴스가 같은 토큰을 폴링 중입니다. "
+                                "getWebhookInfo로 확인 후 deleteWebhook 하거나 중복 폴러를 끄세요. 응답: %s",
+                                resp.text[:300],
+                            )
+                            _conflict_logged = True
+                        await _sleep(300)
+                        continue
+                    logger.error("Telegram getUpdates 오류: %s", resp.text[:300])
+                    _backoff = min(_backoff * 2, 300)
+                    await _sleep(_backoff)
                     continue
+                _backoff = 5
+                _conflict_logged = False
 
                 data = resp.json()
                 for update in data.get("result", []):
