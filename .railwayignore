@@ -2,6 +2,12 @@
 frontend/node_modules/
 frontend/.next/
 frontend/.turbo/
+mobile/node_modules/
+mobile/.expo/
+
+# 모바일 네이티브 빌드 산출물 (prebuild/gradle 결과 — 수 GB, 서버 배포와 무관)
+mobile/android/
+mobile/ios/
 
 # Python virtual env
 backend/.venv/
