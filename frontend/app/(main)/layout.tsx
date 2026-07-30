@@ -30,6 +30,29 @@ function CountrySync() {
   return null;
 }
 
+/** 서버 plan을 localStorage(Zustand)에 동기화 — DB가 항상 진실의 원천
+ *
+ * userPlan은 store에 persist되는데, 서버값과 맞추는 코드가 /feed와 /settings 두 곳에만
+ * 있었다. 그래서 어드민에서 플랜을 올려도 그 두 페이지를 방문하기 전까지는
+ * localStorage에 남은 옛 값("free")이 계속 쓰였다.
+ * PaywallModal·UpgradeNudgeBanner·이슈상세가 store의 userPlan을 읽으므로
+ * Pro+ 계정이 Free로 보였다. CountrySync와 같은 방식으로 레이아웃에서 한 번만 맞춘다.
+ */
+function PlanSync() {
+  const { data: me } = useMe();
+  const setUserPlan = useAppStore((s) => s.setUserPlan);
+  const userPlan = useAppStore((s) => s.userPlan);
+
+  useEffect(() => {
+    const serverPlan = (me as { plan?: string } | undefined)?.plan;
+    if (serverPlan && serverPlan !== userPlan) {
+      setUserPlan(serverPlan as "free" | "pro" | "pro_plus");
+    }
+  }, [me, userPlan, setUserPlan]);
+
+  return null;
+}
+
 /** 로그인됐는데 등록 미완료(닉네임/약관동의 없음)인 유저를 등록 페이지로 리다이렉트 */
 function RegistrationGuard() {
   const router = useRouter();
@@ -88,6 +111,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       <CountrySync />
+      <PlanSync />
       <RegistrationGuard />
       <SessionTracker />
       <NewEventBanner />
