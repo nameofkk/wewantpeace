@@ -32,6 +32,19 @@ async def main():
             "CREATE INDEX IF NOT EXISTS idx_ic_key_window_lastev "
             "ON issue_clusters (cluster_key, window_end DESC, last_event_at DESC)",
         ),
+        # /public/weekly-summary의 주간 카운트가 Seq Scan을 타고 있었다.
+        # EXPLAIN ANALYZE 실측: normalized_events 410ms, issue_clusters 931ms
+        # (weekly-summary는 이 카운트를 이번 주/전주로 각각 2번씩 = 4회 실행)
+        (
+            "idx_ne_created_at",
+            "CREATE INDEX IF NOT EXISTS idx_ne_created_at "
+            "ON normalized_events (created_at DESC)",
+        ),
+        (
+            "idx_ic_first_event_at",
+            "CREATE INDEX IF NOT EXISTS idx_ic_first_event_at "
+            "ON issue_clusters (first_event_at DESC)",
+        ),
     ]
 
     for name, sql in indexes:
