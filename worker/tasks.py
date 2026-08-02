@@ -657,7 +657,9 @@ def prewarm_impact_summaries(self):
                 for plan in PLANS:
                     for lang in LANGS:
                         try:
-                            await _build_impact_summary(home, plan, lang, db)
+                            # force=True 필수 — 캐시 히트로 조기 반환하면
+                            # 만료 전 갱신이 불가능해져 워밍이 무의미해진다.
+                            await _build_impact_summary(home, plan, lang, db, force=True)
                             generated += 1
                         except Exception as e:
                             logger.warning(

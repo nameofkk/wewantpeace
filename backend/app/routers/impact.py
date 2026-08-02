@@ -271,15 +271,21 @@ class ImpactSummaryOut(BaseModel):
 
 
 async def _build_impact_summary(
-    home: str, user_plan: str, lang: str, db: AsyncSession,
+    home: str, user_plan: str, lang: str, db: AsyncSession, force: bool = False,
 ) -> dict:
-    """캐시 워밍에서도 호출 가능한 impact summary 핵심 로직."""
+    """캐시 워밍에서도 호출 가능한 impact summary 핵심 로직.
+
+    force=True면 캐시를 읽지 않고 항상 다시 만들어 덮어쓴다.
+    사전 워밍 태스크는 반드시 이 모드로 불러야 한다 — 캐시가 살아 있을 때
+    그냥 반환해버리면 만료 '전에' 갱신할 방법이 없어져서,
+    매 주기마다 "만료 → 실제 사용자가 재생성 비용(실측 8.8초)을 떠안음"이 반복된다.
+    """
     is_global = not home
 
     # 캐시 확인 (plan + lang별)
     redis = get_redis()
     cache_key = f"impact:summary:{_CACHE_VERSION}:{home or 'global'}:{user_plan}:{lang}"
-    if redis:
+    if redis and not force:
         try:
             cached = await redis.get(cache_key)
             if cached:
@@ -897,10 +903,13 @@ async def _build_impact_summary(
     # inf/nan float 제거 (JSON 직렬화 안전)
     response_data = _sanitize_floats(response_data)
 
-    # 30분 캐시
+    # TTL은 워밍 주기(25분)보다 넉넉히 길게 둔다.
+    # 30분이면 여유가 5분뿐이라, 워커 큐가 조금만 밀려도 만료 구간이 생기고
+    # 그 구간에 들어온 사용자가 재생성 비용을 그대로 기다린다.
+    # (2026-08-02 실측: 예열 태스크가 큐에 12분 이상 갇혀 홈이 8.8초 스켈레톤)
     if redis:
         try:
-            await redis.set(cache_key, json.dumps(response_data), ex=30 * 60)
+            await redis.set(cache_key, json.dumps(response_data), ex=90 * 60)
         except Exception:
             pass  # Redis 장애 시 캐시 저장 스킵
 
