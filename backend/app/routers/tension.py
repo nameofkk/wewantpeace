@@ -75,6 +75,61 @@ class TensionPeekItem(BaseModel):
 
 # ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
+async def _latest_by_codes(
+    codes: list[str], db: AsyncSession, before: Optional[datetime] = None,
+) -> dict[str, TensionIndex]:
+    """국가별 최신 tension_index 1건씩.
+
+    DISTINCT ON / row_number() OVER (PARTITION BY country_code)를 쓰면
+    조건에 맞는 행을 전부 훑은 뒤에야 국가별 1행을 고른다. tension_index는
+    140만 행이라 9개국 조회에 111,559행을 읽고 실측 6.9초가 나왔다.
+    (before를 준 24시간 전 조회는 같은 이유로 25.0초)
+    국가마다 (country_code, time DESC) 인덱스에서 1행씩 집어오면
+    각각 16ms / 30ms로 떨어진다. public.py도 같은 이유로 이미 이 방식이다.
+    """
+    if not codes:
+        return {}
+
+    # LATERAL / unnest는 Postgres 전용이다. 테스트는 SQLite로 도니
+    # 그쪽에서는 국가별 단순 조회로 떨어뜨린다 (데이터가 작아 성능 이슈 없음).
+    try:
+        is_pg = db.get_bind().dialect.name == "postgresql"
+    except Exception:
+        is_pg = False
+
+    if not is_pg:
+        out: dict[str, TensionIndex] = {}
+        for code in codes:
+            q = select(TensionIndex).where(TensionIndex.country_code == code)
+            if before is not None:
+                q = q.where(TensionIndex.time <= before)
+            row = (await db.execute(q.order_by(TensionIndex.time.desc()).limit(1))).scalars().first()
+            if row is not None:
+                out[code] = row
+        return out
+
+    where_time = 'AND t."time" <= :before' if before is not None else ""
+    stmt = text(
+        f"""
+        SELECT ti.*
+        FROM unnest(CAST(:codes AS text[])) AS c(country_code)
+        CROSS JOIN LATERAL (
+            SELECT t.*
+            FROM tension_index t
+            WHERE t.country_code = c.country_code
+            {where_time}
+            ORDER BY t."time" DESC
+            LIMIT 1
+        ) ti
+        """
+    ).bindparams(bindparam("codes", type_=ARRAY(String)))
+    params: dict = {"codes": list(codes)}
+    if before is not None:
+        params["before"] = before
+    rows = (await db.execute(select(TensionIndex).from_statement(stmt), params)).scalars().all()
+    return {row.country_code: row for row in rows}
+
+
 async def _latest_tension(country_code: str, db: AsyncSession) -> Optional[TensionIndex]:
     result = await db.execute(
         select(TensionIndex)
@@ -331,16 +386,8 @@ async def tension_mine(
         if pref:
             user_min_severity = pref.min_severity
 
-    # ── DB에서 국가별 최신 1건만 조회 (DISTINCT ON) ──
-    raw_result = await db.execute(
-        select(TensionIndex)
-        .where(TensionIndex.country_code.in_(codes))
-        .distinct(TensionIndex.country_code)
-        .order_by(TensionIndex.country_code, TensionIndex.time.desc())
-    )
-    tension_map: dict[str, TensionIndex] = {
-        row.country_code: row for row in raw_result.scalars().all()
-    }
+    # ── DB에서 국가별 최신 1건만 조회 ──
+    tension_map: dict[str, TensionIndex] = await _latest_by_codes(codes, db)
 
     # ── 데이터 없는 국가는 소수(≤5개)일 때만 온더플라이 계산 ──
     missing_codes = [c for c in codes if c not in tension_map]
@@ -357,14 +404,7 @@ async def tension_mine(
                         result = await calculate_country_tension(mc, calc_db)
                         if result:
                             _logger.info("tension fallback 완료: %s", mc)
-            raw_result2 = await db.execute(
-                select(TensionIndex)
-                .where(TensionIndex.country_code.in_(missing_codes))
-                .distinct(TensionIndex.country_code)
-                .order_by(TensionIndex.country_code, TensionIndex.time.desc())
-            )
-            for row in raw_result2.scalars().all():
-                tension_map[row.country_code] = row
+            tension_map.update(await _latest_by_codes(missing_codes, db))
         except Exception as e:
             _logger.warning("tension fallback 실패: %s", e)
 
@@ -376,24 +416,8 @@ async def tension_mine(
     delta_map: dict[str, float] = {}
     if active_codes:
         cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
-        # 각 국가별 24시간 전 가장 가까운 raw_score 조회
-        rn_24h = sa_func.row_number().over(
-            partition_by=TensionIndex.country_code,
-            order_by=TensionIndex.time.desc(),
-        ).label("rn")
-        subq_24h = (
-            select(TensionIndex.country_code, TensionIndex.raw_score, rn_24h)
-            .where(
-                TensionIndex.country_code.in_(active_codes),
-                TensionIndex.time <= cutoff_24h,
-            )
-            .subquery()
-        )
-        prev_result = await db.execute(
-            select(subq_24h).where(subq_24h.c.rn == 1)
-        )
-        for row in prev_result.all():
-            delta_map[row.country_code] = row.raw_score
+        prev_map = await _latest_by_codes(active_codes, db, before=cutoff_24h)
+        delta_map = {code: row.raw_score for code, row in prev_map.items()}
 
     results = []
     for code in codes:
