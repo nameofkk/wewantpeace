@@ -41,6 +41,17 @@ logger = logging.getLogger(__name__)
 KST = timezone(timedelta(hours=9))
 
 
+def _kst_boundary(dt: datetime) -> datetime:
+    """KST로 끊은 경계를 DB 비교용으로 UTC 정규화해서 반환.
+
+    Postgres(timestamptz)는 aware 값이면 알아서 맞춰주지만, 테스트 DB인 SQLite는
+    tzinfo를 버리고 벽시계 문자열로 저장/비교한다. KST aware 값을 그대로 넘기면
+    9시간 어긋나서, UTC 날짜와 KST 날짜가 다른 시간대(UTC 15:00~24:00)에
+    CI가 항상 깨진다. UTC로 맞춰두면 두 방언에서 같은 결과가 나온다.
+    """
+    return dt.astimezone(timezone.utc)
+
+
 def _today_start_kst() -> datetime:
     """한국시간 자정(오늘 0시)을 timestamptz 비교용 aware datetime으로 반환.
 
@@ -48,7 +59,7 @@ def _today_start_kst() -> datetime:
     UTC 자정으로 끊으면 경계가 한국시간 오전 9시라, 한국 새벽 0~9시 활동/가입이 전날로 새서
     월매출(month_start, 이미 KST)이나 운영자가 보는 '오늘'과 숫자가 어긋난다.
     """
-    return datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+    return _kst_boundary(datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0))
 
 
 # 프로모 구독 = platform이 'promo:'로 시작하고 amount=0인 무료 체험 구독.
@@ -111,7 +122,7 @@ async def bot_stats(
     now = datetime.now(timezone.utc)
     today_start = _today_start_kst()  # 한국시간 자정 기준 '오늘' (월매출 month_start와 동일 기준)
     # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
-    month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = _kst_boundary(datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0))
     total_users = (await db.execute(select(func.count()).select_from(User).where(User.status != "deleted"))).scalar() or 0
     new_today = (await db.execute(select(func.count()).select_from(User).where(User.created_at >= today_start, User.status != "deleted"))).scalar() or 0
     dau = (await db.execute(_dau_query(today_start))).scalar() or 0
@@ -323,7 +334,7 @@ async def get_stats(
     )).scalar() or 0
 
     # 이번달 1일 0시를 한국시간 기준으로 잡는다 (UTC로 끊으면 한국 새벽 0~9시 매출이 전달로 빠진다)
-    month_start = datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = _kst_boundary(datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0))
     monthly_revenue = (await db.execute(
         select(func.coalesce(func.sum(PaymentHistory.amount), 0))
         .where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start)
@@ -381,7 +392,7 @@ async def get_stats(
     # ── 주간 비교 (이번 주 vs 지난 주) — 2개 쿼리로 통합 ──
     # 주 경계도 한국시간 기준(월요일 0시 KST)으로 끊는다 — 일/월 단위 집계와 동일 기준
     now_kst = datetime.now(KST)
-    this_week_start = (now_kst - timedelta(days=now_kst.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    this_week_start = _kst_boundary((now_kst - timedelta(days=now_kst.weekday())).replace(hour=0, minute=0, second=0, microsecond=0))
     last_week_start = this_week_start - timedelta(days=7)
     last_week_end = this_week_start
 

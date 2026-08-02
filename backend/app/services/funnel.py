@@ -71,8 +71,12 @@ async def log_funnel_event(
                 AppEvent.name == name,
             )
             if once_per_day:
-                # 한국시간 자정 기준 '오늘' (timestamptz라 KST aware 값으로 비교하면 DB가 맞춰줌)
-                day_start = datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+                # 한국시간 자정 기준 '오늘'. UTC로 정규화해서 넘긴다 —
+                # Postgres(timestamptz)는 aware 값을 알아서 맞춰주지만 SQLite는
+                # tzinfo를 버려서 KST 그대로 넘기면 9시간 어긋난다.
+                day_start = datetime.now(KST).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ).astimezone(timezone.utc)
                 q = q.where(AppEvent.created_at >= day_start)
             q = q.limit(1)
             existing = (await db.execute(q)).first()

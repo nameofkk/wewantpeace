@@ -20,14 +20,12 @@ from backend.app.core.auth import KST
 from backend.app.models.app_event import AppEvent
 from backend.app.models.user import User
 from backend.app.models.subscription import PaymentHistory
-from backend.app.routers.admin import _dau_query
+from backend.app.routers.admin import _dau_query, _today_start_kst
 from backend.app.services.funnel import EV_DAILY_ACTIVE, compute_funnel_metrics
 
 UTC = timezone.utc
 
 
-def _today_start_kst() -> datetime:
-    return datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 async def _make_user(db, status="active", created_at=None) -> uuid.UUID:
