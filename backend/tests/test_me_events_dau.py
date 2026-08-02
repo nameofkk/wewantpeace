@@ -23,7 +23,7 @@ import backend.app.core.auth as auth_module
 from backend.app.core.auth import get_optional_user, KST
 from backend.app.models.app_event import AppEvent
 from backend.app.routers.me import track_event, EventBody
-from backend.app.routers.admin import _dau_query
+from backend.app.routers.admin import _dau_query, _today_start_kst
 from backend.app.services.funnel import (
     EV_DAILY_ACTIVE, EV_ACTIVATION, CORE_ACTION_EVENTS, compute_funnel_metrics,
 )
@@ -31,8 +31,6 @@ from backend.app.services.funnel import (
 UTC = timezone.utc
 
 
-def _today_start_kst() -> datetime:
-    return datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 async def _post_app_open(db, x_dev_uid: str):
