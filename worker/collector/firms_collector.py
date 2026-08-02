@@ -22,9 +22,25 @@ FIRMS_MAP_KEY = os.environ.get("FIRMS_MAP_KEY", "")
 FIRMS_CSV_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/{map_key}/{source}/world/2"
 
 # 필터 기준
-MIN_FRP = 10  # MW
+MIN_FRP = 10  # MW (MODIS)
 MIN_CONFIDENCE_MODIS = 50  # %
-VIIRS_NOMINAL = "nominal"
+
+# VIIRS는 375m 픽셀이라 1km인 MODIS보다 같은 화재를 훨씬 잘게 쪼개 잡는다.
+# 같은 임계(10MW)를 쓰면 30h 창 기준 MODIS의 1.85배(31,096행)가 들어오는데,
+# 실측(2026-08-03) 결과 FRP 10~20 구간이 행의 58%를 차지하면서
+# intensity 총량은 26%밖에 만들지 않았다 (intensity = min(1,frp/500)*conf).
+# 임계를 20으로 올리면 행은 42%만 남고 intensity는 74%가 남아
+# 유입이 MODIS의 0.78배로 눌린다.
+MIN_FRP_VIIRS = 20  # MW
+
+# VIIRS의 confidence는 CSV에서 한 글자로 온다: 'n'(nominal)/'h'(high)/'l'(low).
+# 'l'은 제외. 장문 표기도 함께 받는다.
+VIIRS_CONFIDENCE_MULTIPLIER = {
+    "n": 0.8,
+    "nominal": 0.8,
+    "h": 1.0,
+    "high": 1.0,
+}
 
 
 @dataclass
@@ -101,11 +117,13 @@ class FIRMSCollector:
                             result.skipped += 1
                             continue
                         conf_multiplier = conf_val / 100.0
+                        min_frp = MIN_FRP
                     else:  # VIIRS
-                        if conf_raw.lower() not in ("nominal", "high"):
+                        conf_multiplier = VIIRS_CONFIDENCE_MULTIPLIER.get(conf_raw.lower())
+                        if conf_multiplier is None:  # 'l'(low) 또는 알 수 없는 값
                             result.skipped += 1
                             continue
-                        conf_multiplier = 0.8 if conf_raw.lower() == "nominal" else 1.0
+                        min_frp = MIN_FRP_VIIRS
 
                     # FRP 필터
                     frp_str = cols[col_map.get("frp", -1)].strip() if "frp" in col_map else "0"
@@ -113,7 +131,7 @@ class FIRMSCollector:
                         frp = float(frp_str)
                     except ValueError:
                         frp = 0.0
-                    if frp < MIN_FRP:
+                    if frp < min_frp:
                         result.skipped += 1
                         continue
 
