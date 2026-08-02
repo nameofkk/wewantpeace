@@ -50,6 +50,12 @@ app.conf.update(
     broker_connection_retry_on_startup=True,
     # 이벤트 루프/asyncpg 풀 누적 상태 정리를 위한 프로세스 재생성
     worker_max_tasks_per_child=500,
+    # 폭주 태스크가 워커 슬롯을 독식하지 못하게 하는 상한.
+    # collect_firms가 105분씩 잡아 정규화가 굶어죽은 사고(2026-08-02) 재발 방지.
+    # 정상 최장 태스크는 collect_rss(실측 최대 1,398초)이므로 그 위에 여유를 두되,
+    # 폭주한 collect_firms(실측 최대 6,568초)는 확실히 잘리는 위치로 잡는다.
+    task_soft_time_limit=2400,  # 40분 — 태스크 내부에서 예외로 잡힘
+    task_time_limit=3000,       # 50분 — 강제 종료
     # Redis 소켓 타임아웃 설정
     broker_transport_options={"socket_timeout": 10, "socket_connect_timeout": 5},
 )

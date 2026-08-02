@@ -1278,7 +1278,10 @@ def retry_unprocessed(self):
                     RawEvent.processed == False,
                     RawEvent.collected_at >= cutoff,
                 )
-                .order_by(RawEvent.collected_at.asc())
+                # 최신 우선. 피드·SNS 게이트가 "최근 6시간" 신선도를 보므로
+                # 백로그를 오래된 것부터 갉으면 아무리 처리해도 화면은 계속 비어 있다.
+                # (2026-08-02: 3일치 백로그를 오래된 순으로 처리하다 피드가 빈 채로 방치됨)
+                .order_by(RawEvent.collected_at.desc())
                 .limit(batch_limit)
             )
             ids = [str(row[0]) for row in result.fetchall()]
