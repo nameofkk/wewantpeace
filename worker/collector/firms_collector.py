@@ -40,6 +40,7 @@ class FIRMSCollector:
 
     TIMEOUT = 60
     SENSORS = ["MODIS_NRT", "VIIRS_NOAA20_NRT"]
+    DEDUP_CHUNK = 1000  # IN (...) 한 번에 조회할 external_id 개수
 
     async def collect(self, db: AsyncSession, redis=None) -> FIRMSCollectResult:
         """FIRMS API에서 화재/폭발 열점 수집."""
@@ -49,6 +50,11 @@ class FIRMSCollector:
             return result
 
         from backend.app.models.signal_point import SignalPoint
+
+        # external_id -> SignalPoint 생성 인자.
+        # 모든 센서를 먼저 파싱해 후보를 모은 뒤 한 번에 중복조회한다.
+        # (행마다 SELECT를 날리면 워커/DB 리전이 달라 왕복 지연이 그대로 누적된다)
+        candidates: dict[str, dict] = {}
 
         for source in self.SENSORS:
             url = FIRMS_CSV_URL.format(map_key=FIRMS_MAP_KEY, source=source)
@@ -128,15 +134,12 @@ class FIRMSCollector:
 
                     external_id = f"firms:{source}:{acq_date}:{round(lat, 3)}:{round(lon, 3)}"
 
-                    # 중복 확인
-                    existing = await db.execute(
-                        select(SignalPoint).where(SignalPoint.external_id == external_id)
-                    )
-                    if existing.scalar_one_or_none():
+                    # 같은 배치 안의 중복 (좌표 반올림으로 충돌 가능) — UniqueViolation 예방
+                    if external_id in candidates:
                         result.skipped += 1
                         continue
 
-                    sp = SignalPoint(
+                    candidates[external_id] = dict(
                         signal_type="firms_hotspot",
                         external_id=external_id,
                         lat=lat,
@@ -148,12 +151,36 @@ class FIRMSCollector:
                         observed_at=observed_at,
                         expires_at=observed_at + timedelta(hours=24),
                     )
-                    db.add(sp)
-                    result.collected += 1
                 except (IndexError, ValueError):
                     result.skipped += 1
                     continue
 
+        if not candidates:
+            return result
+
+        # 기존 external_id를 청크 단위로 한 번에 조회.
+        # 아직 db.add()를 하지 않았으므로 autoflush가 끼어들 여지도 없다.
+        ids = list(candidates)
+        existing_ids: set[str] = set()
+        for i in range(0, len(ids), self.DEDUP_CHUNK):
+            rows = await db.execute(
+                select(SignalPoint.external_id).where(
+                    SignalPoint.external_id.in_(ids[i : i + self.DEDUP_CHUNK])
+                )
+            )
+            existing_ids.update(r[0] for r in rows)
+
+        for external_id, kwargs in candidates.items():
+            if external_id in existing_ids:
+                result.skipped += 1
+                continue
+            db.add(SignalPoint(**kwargs))
+            result.collected += 1
+
+        logger.info(
+            "FIRMS 중복조회: 후보 %d개 → 쿼리 %d회 (행별 조회였다면 %d회)",
+            len(ids), (len(ids) + self.DEDUP_CHUNK - 1) // self.DEDUP_CHUNK, len(ids),
+        )
         return result
 
     async def collect_all(self, db: AsyncSession, redis=None) -> list[FIRMSCollectResult]:
