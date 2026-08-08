@@ -3855,6 +3855,128 @@ def send_weekly_social_report(self):
 
 
 @app.task(
+    name="worker.tasks.send_daily_metrics_to_bosskit",
+    queue="process",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+)
+def send_daily_metrics_to_bosskit(self):
+    """Bosskit 지표 대시보드에 사업 지표 일일 전송.
+
+    /admin/bot-stats(도핑봇 전용)·compute_funnel_metrics와 동일한 정의를
+    그대로 재사용한다 — 이 값들은 이미 여러 곳에서 검증된 기준이라
+    새로 정의를 만들면 어드민 화면 숫자와 어긋날 위험이 있다.
+    """
+    import os
+    import httpx
+
+    BOSSKIT_INGEST_URL = (
+        "https://api.bosskit.me/metric-sources/"
+        "2349e3f8-8e9f-4e2f-a122-bb8964aa024b/"
+        "aa6e109b-e09a-4a22-9657-20c75548fd3c/ingest"
+    )
+
+    async def _run():
+        from sqlalchemy import select, func
+        from backend.app.models.subscription import Subscription, PaymentHistory
+        from backend.app.models.user import User, UserPushToken
+        from backend.app.models.community import Feedback
+        from backend.app.routers.admin import (
+            _active_not_expired, _IS_PROMO_SUB, _today_start_kst, _kst_boundary, KST, _dau_query,
+        )
+        from backend.app.services.funnel import compute_funnel_metrics
+
+        now = datetime.now(timezone.utc)
+        today_start = _today_start_kst()
+        month_start = _kst_boundary(
+            datetime.now(KST).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        )
+
+        async with AsyncSessionLocal() as db:
+            total_users = (await db.execute(
+                select(func.count()).select_from(User).where(User.status != "deleted")
+            )).scalar() or 0
+            new_today = (await db.execute(
+                select(func.count()).select_from(User)
+                .where(User.created_at >= today_start, User.status != "deleted")
+            )).scalar() or 0
+            dau = (await db.execute(_dau_query(today_start))).scalar() or 0
+            subscribers = (await db.execute(
+                select(func.count()).select_from(Subscription)
+                .where(_active_not_expired(now), ~_IS_PROMO_SUB)
+            )).scalar() or 0
+            promo_subscribers = (await db.execute(
+                select(func.count()).select_from(Subscription)
+                .where(_active_not_expired(now), _IS_PROMO_SUB)
+            )).scalar() or 0
+            monthly_revenue = (await db.execute(
+                select(func.coalesce(func.sum(PaymentHistory.amount), 0))
+                .where(PaymentHistory.status == "success", PaymentHistory.created_at >= month_start)
+            )).scalar() or 0
+            push_tokens = (await db.execute(
+                select(func.count()).select_from(UserPushToken)
+            )).scalar() or 0
+            feedback_count = (await db.execute(
+                select(func.count()).select_from(Feedback)
+            )).scalar() or 0
+
+            funnel = await compute_funnel_metrics(db, now)
+
+        subscribers = int(subscribers)
+        monthly_revenue = int(monthly_revenue)
+        arpu = round(monthly_revenue / subscribers, 0) if subscribers else 0
+
+        metrics = {
+            "전체 가입자": int(total_users),
+            "오늘 신규가입": int(new_today),
+            "일일 활성 사용자": int(dau),
+            "유료 구독자": subscribers,
+            "프로모 구독자": int(promo_subscribers),
+            "이번달 매출": monthly_revenue,
+            "구독자당 월매출": int(arpu),
+            "푸시 수신 가능 사용자": int(push_tokens),
+            "누적 피드백": int(feedback_count),
+            "활성화율": funnel["activation_rate"],
+            "유료전환율": funnel["conversion_rate"],
+            "1일 리텐션": funnel["retention_d1"],
+            "7일 리텐션": funnel["retention_d7"],
+            "30일 리텐션": funnel["retention_d30"],
+        }
+
+        key = os.environ.get("BOSSKIT_METRIC_INGEST_KEY", "")
+        if not key:
+            logger.warning("send_daily_metrics_to_bosskit: BOSSKIT_METRIC_INGEST_KEY 미설정 — 전송 스킵")
+            return {"status": "skipped", "reason": "no_key", "metrics": metrics}
+
+        # 인증 방식 미확정 — 배포 전 Bearer/X-API-Key/쿼리파라미터 등 여러 방식을
+        # 실제로 테스트했으나 전부 동일한 401을 반환해 스킴을 특정하지 못했다.
+        # 정확한 방식 확인 전까지는 실패해도 로그로만 남기고 태스크 자체는
+        # 재시도만 하도록 둔다(raise_for_status가 예외를 던지면 self.retry로 감).
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                BOSSKIT_INGEST_URL,
+                json={"metrics": metrics},
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            if resp.status_code >= 400:
+                logger.error(
+                    "send_daily_metrics_to_bosskit: 전송 실패 HTTP %d — %s",
+                    resp.status_code, resp.text[:300],
+                )
+                resp.raise_for_status()
+
+        logger.info("send_daily_metrics_to_bosskit: 전송 완료 %s", metrics)
+        return {"status": "ok", "metrics": metrics}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("send_daily_metrics_to_bosskit 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.aggregate_link_clicks",
     queue="process",
     bind=True,
