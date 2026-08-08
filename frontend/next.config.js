@@ -42,7 +42,13 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     optimizeCss: true,
+    // instrumentation.ts 활성화 — 메모리 가드용. Next 15에선 기본 활성화, 14.2는 opt-in 필요.
+    instrumentationHook: true,
   },
+  // self-host 기본 캐시 상한(50MB)을 명시. issues/[id]·[id]/og처럼 고유 ID가
+  // 수만 개인 동적 라우트가 계속 새 URL로 캐시되는 구조라, 상한이 안 걸리면
+  // 실측상 하루 ~0.5GB씩 무한정 늘어난다(2026-08-08, 2.46GB→3.77GB/2.65일).
+  cacheMaxMemorySize: 50 * 1024 * 1024,
   webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
       // 모던 브라우저 (Chrome 93+, Safari 15.4+) 에서 불필요한 폴리필 제거 → ~11KB 절감
