@@ -224,6 +224,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=23, day_of_week=0),  # 매주 일요일 23:00 UTC
         "options": {"queue": "process"},
     },
+    "send-daily-metrics-to-bosskit": {
+        "task": "worker.tasks.send_daily_metrics_to_bosskit",
+        "schedule": crontab(minute=30, hour=23),  # 매일 23:30 UTC = KST 08:30 (월매출 집계와 같은 날)
+        "options": {"queue": "process"},
+    },
     # ── 서비스 모니터링 ──
     "monitor-service-health": {
         "task": "worker.tasks.monitor_service_health",
