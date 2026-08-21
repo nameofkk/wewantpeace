@@ -3896,12 +3896,26 @@ async def get_weekly_pdf(
     user: User = Depends(plan_required("pro_plus")),
 ):
     """최신 주간 리포트 PDF URL (Pro+ 이상)."""
-    import os
+    import httpx
+    from backend.app.core import object_store
+
     now = datetime.now(timezone.utc)
     week_label = now.strftime("%Y-W%V")
-    supabase_url = os.getenv("SUPABASE_URL", "")
-    if not supabase_url:
+
+    # **있다고 말하기 전에 있는지 본다**(2026-08-21 수정).
+    #
+    # 예전엔 주소만 조립해서 `available=True`로 돌려줬다. 그런데 `weekly-reports` 버킷은
+    # **애초에 존재한 적이 없어서**, Pro+ 사장님은 눌러도 404를 받았다. 링크가 죽었다는 걸
+    # 화면은 몰랐다. 없는 걸 있다고 하는 게 제일 나쁜 실패라 실제로 확인하고 답한다.
+    if not object_store.is_configured():
         return WeeklyPdfOut(url=None, week=week_label, available=False)
 
-    pdf_url = f"{supabase_url}/storage/v1/object/public/weekly-reports/reports/{week_label}.pdf"
-    return WeeklyPdfOut(url=pdf_url, week=week_label, available=True)
+    pdf_url = f"{os.getenv('R2_PUBLIC_BASE', '').rstrip('/')}/weekly-reports/reports/{week_label}.pdf"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            head = await client.head(pdf_url)
+        exists = head.status_code == 200
+    except Exception:
+        exists = False
+
+    return WeeklyPdfOut(url=pdf_url if exists else None, week=week_label, available=exists)

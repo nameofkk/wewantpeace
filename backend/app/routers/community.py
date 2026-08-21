@@ -13,6 +13,7 @@ from sqlalchemy import select, func, or_, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_current_user, get_optional_user, get_db
+from backend.app.core import object_store
 from backend.app.core.config import settings
 from backend.app.core.limiter import limiter
 from backend.app.models.user import User
@@ -210,25 +211,16 @@ async def upload_image(
 
     filename = f"{uuid.uuid4()}.{ext}"
 
-    # Supabase Storage 업로드 (persistent)
-    supabase_url = os.getenv("SUPABASE_URL", "")
-    supabase_key = os.getenv("SUPABASE_SERVICE_KEY", "")
-    if supabase_url and supabase_key:
-        import httpx
-        bucket = "community-uploads"
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{supabase_url}/storage/v1/object/{bucket}/{filename}",
-                headers={
-                    "Authorization": f"Bearer {supabase_key}",
-                    "Content-Type": detected,
-                    "x-upsert": "true",
-                },
-                content=contents,
-            )
-            if resp.status_code not in (200, 201):
-                raise HTTPException(500, detail="이미지 업로드에 실패했습니다.")
-        url = f"{supabase_url}/storage/v1/object/public/{bucket}/{filename}"
+    # 오브젝트 저장소 업로드 (persistent)
+    #
+    # 2026-08-21에 Supabase Storage → Cloudflare R2로 옮겼다. Railway 버킷은 공개 URL을
+    # 못 줘서(presigned 최대 90일) 영구 주소가 필요한 이미지에 못 쓴다. 키 경로는
+    # `community-uploads/파일명`으로 **옛 Supabase 경로와 같은 모양**을 유지한다 — 그래야
+    # 이미 DB에 저장된 주소를 도메인만 바꿔 치환할 수 있다.
+    if object_store.is_configured():
+        url = await object_store.put_object(f"community-uploads/{filename}", contents, detected)
+        if not url:
+            raise HTTPException(500, detail="이미지 업로드에 실패했습니다.")
         return {"url": url}
 
     # Fallback: 로컬 저장 (개발용)
