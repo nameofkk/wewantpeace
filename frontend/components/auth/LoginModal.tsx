@@ -39,7 +39,13 @@ export function LoginModal({ onClose, message }: LoginModalProps) {
     try {
       await signInWithGoogle();
       onClose();
-    } catch {
+    } catch (e: unknown) {
+      // signInWithGoogle이 팝업 차단(브라우저 정책·광고 차단 확장 등)을 만나면
+      // 내부적으로 signInWithRedirect로 넘어가며 "redirect" 에러를 던진다 —
+      // 이 시점엔 이미 브라우저가 Google 인증 화면으로 이동 중이므로
+      // 여기서 /login으로 또 이동시키면 진행 중인 리다이렉트와 경쟁한다.
+      // 실제 로그인 상태는 useAuth()의 onIdTokenChanged가 복귀 후 전역으로 잡아준다.
+      if ((e as { message?: string })?.message === "redirect") return;
       router.push("/login");
     }
   }
