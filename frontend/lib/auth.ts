@@ -71,8 +71,21 @@ export async function signInWithGoogle(): Promise<FirebaseUser> {
   }
 
   // 웹 브라우저: signInWithPopup 사용 (정상 팝업)
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    // 팝업 차단(브라우저 팝업 차단 정책, 광고 차단 확장, 일부 보안 소프트웨어 등)이면
+    // signInWithRedirect로 폴백한다 — Firebase 공식 권장 패턴.
+    // 호출부는 React Native 경로와 동일하게 "redirect" 에러로 이 케이스를 구분해서
+    // 페이지 이동을 방해하지 않도록(예: 다른 곳으로 재이동) 처리해야 한다.
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+      await signInWithRedirect(auth, provider);
+      throw new Error("redirect");
+    }
+    throw e;
+  }
 }
 
 /**
@@ -115,8 +128,17 @@ export async function signInWithApple(): Promise<FirebaseUser> {
   }
 
   // 웹 브라우저: signInWithPopup 사용 (정상 팝업)
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code;
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+      await signInWithRedirect(auth, provider);
+      throw new Error("redirect");
+    }
+    throw e;
+  }
 }
 
 // 카카오 로그인
