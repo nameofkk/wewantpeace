@@ -43,7 +43,7 @@ async def _make_user(db, status="active", created_at=None) -> uuid.UUID:
 async def test_dau_excludes_soft_deleted_user(db):
     """탈퇴 유저가 오늘 daily_active를 남겼어도 DAU에 안 잡힌다."""
     today_start = _today_start_kst()
-    now = datetime.now(KST)
+    now = datetime.now(KST).astimezone(UTC)  # SQLite 문자열 비교 안전을 위해 UTC로 정규화
 
     active_uid = await _make_user(db, status="active")
     deleted_uid = await _make_user(db, status="deleted")
