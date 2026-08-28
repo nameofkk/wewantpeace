@@ -60,7 +60,11 @@ async def test_first_auth_logs_daily_active_once_per_day(db, monkeypatch):
 async def test_dau_query_counts_distinct_daily_active_users(db):
     """_dau_query는 오늘 daily_active가 있는 distinct 사용자 수를 센다."""
     today_start = _today_start_kst()
-    now = datetime.now(KST)
+    # UTC로 정규화해서 저장 — SQLite는 tz-offset이 섞인 timestamp를 문자열로 그대로
+    # 사전식 비교한다. KST(+09:00) 그대로 넣으면 UTC(+00:00)로 정규화된 today_start와
+    # 비교할 때 실제 순서와 반대로 나올 수 있다(오전 시간대에 왕왕 재현됨).
+    # 프로덕션도 AppEvent.created_at 기본값이 항상 UTC라 이게 실제 데이터 모양과도 맞다.
+    now = datetime.now(KST).astimezone(UTC)
     yesterday = now - timedelta(days=1)
 
     u1, u2, u3 = await _make_user(db), await _make_user(db), await _make_user(db)
@@ -81,7 +85,7 @@ async def test_dau_query_counts_distinct_daily_active_users(db):
 async def test_dau_query_ignores_other_event_names(db):
     """daily_active가 아닌 다른 이벤트(signup 등)는 DAU에 안 잡힌다."""
     today_start = _today_start_kst()
-    now = datetime.now(KST)
+    now = datetime.now(KST).astimezone(UTC)  # SQLite 문자열 비교 안전을 위해 UTC로 정규화
     u = await _make_user(db)
     db.add_all([
         AppEvent(user_id=u, name="signup", created_at=now, platform="web"),
