@@ -140,8 +140,15 @@ For all other topics: general
 - Multi-country: pick where the main action happens
 - If unclear or global (e.g. UN resolution, general policy): null
 
+## Korean title (title_ko):
+- Translate the EXACT title given (not the body) into a natural, fluent Korean news headline.
+- Write like a real Korean news outlet headline — concise, idiomatic, NOT a literal word-for-word translation.
+- Keep proper nouns (person/place/organization names) in standard Korean news transliteration.
+- Keep it under ~50 Korean characters when possible.
+- Never leave this field empty.
+
 CRITICAL: Respond with ONLY a valid JSON object. No explanation, no markdown, no extra text.
-Format: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null}"""
+Format: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "..."}"""
 
 
 _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
@@ -150,12 +157,17 @@ _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
 }
 
 
-def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str]]]:
+def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str], Optional[str]]]:
     """
-    GPT-4o-mini로 토픽 + sub_topic + severity + country_code 분류.
+    Groq/OpenAI로 토픽 + sub_topic + severity + country_code + title_ko 분류.
+
+    title_ko를 같은 호출에 실어 보내는 이유: 별도 구글 번역(deep_translator)이
+    Railway egress IP 기준 장시간 레이트리밋에 걸려 title_ko가 통째로 비는
+    문제(2026-09-15 실측 24시간 100%)가 있었다. 어차피 기사마다 한 번씩 부르는
+    분류 호출에 얹으면 추가 비용 없이 근본 해결된다.
 
     Returns:
-        (topic, sub_topic, severity, country_code) 또는 실패 시 None
+        (topic, sub_topic, severity, country_code, title_ko) 또는 실패 시 None
     """
     if not _ai_available():
         return None
@@ -176,9 +188,12 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
             ],
             temperature=0,
             # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 최종 JSON 전에
-            # reasoning 토큰을 먼저 쓴다(실측 137 reasoning + 29 JSON = 166 completion).
-            # max_tokens=100이면 reasoning 도중 잘려 json_validate_failed로 매번 실패한다.
-            max_tokens=400,
+            # reasoning 토큰을 먼저 쓰는데, 편차가 매우 크다(실측: 같은 기사도 286~413,
+            # 복잡한 기사는 726까지 관측됨 — title_ko 필드 추가 후 실측치).
+            # max_tokens=400에서도 "max completion tokens reached" 400 에러가
+            # 실제로 재현됐다. max_tokens는 상한일 뿐 실사용량만큼만 TPM을 쓰므로
+            # 넉넉히 잡아도 비용/레이트리밋에 불이익이 없다.
+            max_tokens=1000,
             response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content
@@ -214,7 +229,16 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
         else:
             ai_country = None
 
-        return topic, sub_topic, severity, ai_country
+        # title_ko 추출 (한글 포함 + 합리적 길이일 때만 사용, 아니면 폴백에 맡김)
+        ai_title_ko = data.get("title_ko")
+        if isinstance(ai_title_ko, str):
+            ai_title_ko = ai_title_ko.strip()
+            if not (1 <= len(ai_title_ko) <= 200 and re.search(r"[가-힣]", ai_title_ko)):
+                ai_title_ko = None
+        else:
+            ai_title_ko = None
+
+        return topic, sub_topic, severity, ai_country, ai_title_ko
 
     except Exception as _exc:
         # 429 → 서킷 브레이커 (Groq만 차단, OpenAI 429는 개별 재시도에 맡김)
@@ -2645,15 +2669,26 @@ def normalize(
     if lang not in ("en", "unknown") and text_for_analysis == raw_text:
         translation_status = "failed"
 
-    # AI 우선 분류 (토픽 + severity 동시), 실패 시 기존 규칙 폴백
-    _title_for_ai = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else _make_title(text_for_analysis)
-    ai_result = _classify_with_ai(_title_for_ai, text_for_analysis)
+    # 제목 결정: RSS 원본 title 우선 (있으면 번역), 없으면 본문 첫 문장 추출
+    # (AI 분류 호출보다 먼저 확정해서, 정확히 이 제목을 AI에게 한국어로도 번역시킨다)
+    if source_title and len(source_title.strip()) > 5:
+        raw_title = source_title.strip()[:200]
+        # 비영어 제목도 영어로
+        title_lang = _detect_language(raw_title)
+        title_en = _translate_to_english(raw_title, title_lang) if title_lang not in ("en", "unknown") else raw_title
+        title = _clean_title(title_en)[:120]
+    else:
+        title = _clean_title(_make_title(text_for_analysis))
+
+    # AI 우선 분류 (토픽 + severity + 한국어 제목 동시), 실패 시 기존 규칙 폴백
+    ai_result = _classify_with_ai(title, text_for_analysis)
 
     if ai_result is not None:
-        topic, sub_topic, severity, ai_country_code = ai_result
-        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, _title_for_ai[:60])
+        topic, sub_topic, severity, ai_country_code, ai_title_ko = ai_result
+        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, title[:60])
     else:
         ai_country_code = None
+        ai_title_ko = None
         # 폴백: 기존 키워드 기반 분류
         topic = _classify_topic(text_for_analysis)
         if topic == "unknown" and lang not in ("en", "unknown"):
@@ -2662,12 +2697,12 @@ def normalize(
                 topic = multilang_topic
         severity = _calculate_severity(text_for_analysis, topic, title=source_title)
         sub_topic = _classify_sub_topic(text_for_analysis, topic)
-        logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, _title_for_ai[:60])
+        logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, title[:60])
 
     # 엔터테인먼트/K-pop/관광 노이즈 후처리 — AI·규칙 분류 모두에 적용
     _combined_text = f"{source_title or ''} {text_for_analysis}"
     if _is_entertainment_noise(_combined_text, title=source_title):
-        logger.info("엔터테인먼트 노이즈 감지 → unknown/sev=0 (제목: %s)", _title_for_ai[:60])
+        logger.info("엔터테인먼트 노이즈 감지 → unknown/sev=0 (제목: %s)", title[:60])
         topic = "unknown"
         sub_topic = "general"
         severity = 0
@@ -2677,7 +2712,7 @@ def normalize(
     if ai_country_code:
         country_code = ai_country_code
         lat, lon = _get_country_coords(ai_country_code)
-        logger.debug("AI 국가코드 사용: %s (제목: %s)", ai_country_code, _title_for_ai[:60])
+        logger.debug("AI 국가코드 사용: %s (제목: %s)", ai_country_code, title[:60])
     else:
         country_code, lat, lon = _extract_geo(text_for_analysis, title=_raw_title_for_geo)
     geohash5 = _make_geohash(lat, lon)
@@ -2693,18 +2728,9 @@ def normalize(
     confidence = _calculate_confidence(source_tier, severity)
     dedup_key = _make_dedup_key(raw_text)  # 원문 기반으로 중복 검사
 
-    # 제목 결정: RSS 원본 title 우선 (있으면 번역), 없으면 본문 첫 문장 추출
-    if source_title and len(source_title.strip()) > 5:
-        raw_title = source_title.strip()[:200]
-        # 비영어 제목도 영어로
-        title_lang = _detect_language(raw_title)
-        title_en = _translate_to_english(raw_title, title_lang) if title_lang not in ("en", "unknown") else raw_title
-        title = _clean_title(title_en)[:120]
-    else:
-        title = _clean_title(_make_title(text_for_analysis))
-
-    # 한국어 제목: 뉴스 원제목(title)을 그대로 번역 (이벤트 타임라인 표시용)
-    title_ko = _translate_to_korean(title)
+    # 한국어 제목: AI 분류 호출에서 함께 받은 번역 우선(구글 번역 레이트리밋 회피),
+    # AI가 못 준 경우에만 구글 번역 폴백
+    title_ko = ai_title_ko or _translate_to_korean(title)
 
     # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 본문 앞 500자 한국어 번역
     body_ko: Optional[str] = None
