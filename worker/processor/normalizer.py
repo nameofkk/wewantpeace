@@ -2532,7 +2532,7 @@ def _make_dedup_key(text: str) -> str:
 
 
 _TAG_LINE_RE = re.compile(
-    r"^[^\w]*(ROUTINE|PRIORITY|UNVERIFIED|CONFIRMED|BREAKING|URGENT)\s*(\*\*)?\s*(?:[·\-–—:]|$)",
+    r"^[^\w]*(ROUTINE|PRIORITY|UNVERIFIED|CONFIRMED|BREAKING|URGENT|FLASH)\s*(\*\*)?\s*(?:[·\-–—:]|$)",
     re.IGNORECASE,
 )
 
