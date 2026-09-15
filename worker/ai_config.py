@@ -9,6 +9,10 @@ Groq 무료 티어 (openai/gpt-oss-120b, 2026-09 실측): RPD 14,400 / RPM 30 / 
 - 이 모델은 reasoning 모델이라 프롬프트 자체가 길면(분류 프롬프트 ~2,000 토큰)
   응답 전 reasoning 토큰을 크게 먹어(실측 200~730 변동) 분당 3콜 정도면 TPM 소진.
   → Gemini를 2차 폴백으로 추가한 이유 (TPM 여유가 훨씬 크고 reasoning 끌 수 있음).
+- 2026-09-15 추가 실측: 문서화 안 된 TPD(일일 총 토큰) 200,000도 있다.
+  분류 호출 하나가 프롬프트+완성 합쳐 ~2,200~2,750 토큰이므로 TPD만으로도
+  하루 ~80콜 안팎이 실질 상한 — RPD 14,400보다 TPD가 먼저 막힌다. 계정
+  전체(정규화+클러스터링+SNS 생성 전부 공유) 기준이라 실제 여유는 이보다 더 적다.
 Gemini 무료 티어 (gemini-3.5-flash-lite, OpenAI 호환 레이어):
   base_url=https://generativelanguage.googleapis.com/v1beta/openai/
   2026-09-15 실측: gemini-2.5-flash-lite/gemini-2.5-flash 전부 신규 계정에

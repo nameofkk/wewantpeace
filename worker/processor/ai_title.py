@@ -22,7 +22,7 @@ _TRANSLATION_STYLE_RE = re.compile(
     r")[.!?。…]?$"                               # 후행 마침표 허용
 )
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited, is_groq_rate_limited, USE_GROQ
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, get_current_provider as _get_ai_provider, is_available as _ai_available, mark_rate_limited as _mark_rate_limited
 
 _SYSTEM_PROMPT = """\
 You are a concise news headline writer for a Korean conflict/crisis monitoring app.
@@ -118,8 +118,12 @@ def generate_ai_title(
     # 본문 수집 (있는 것만, 최대 3개)
     bodies = [e["body"] for e in events if e.get("body")][:3]
 
+    provider = _get_ai_provider()
     try:
         client = _get_ai_client()
+        _extra_kwargs = {}
+        if provider == "gemini":
+            _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
             model=_get_ai_model(),
             messages=[
@@ -132,6 +136,7 @@ def generate_ai_title(
             # 더 필요하다. 200이면 부족해 json_validate_failed로 실패한다.
             max_tokens=500,
             response_format={"type": "json_object"},
+            **_extra_kwargs,
         )
         raw = resp.choices[0].message.content
         data = json.loads(raw)
@@ -160,8 +165,9 @@ def generate_ai_title(
                         {"role": "user", "content": retry_prompt},
                     ],
                     temperature=0.3,
-                    max_tokens=200,
+                    max_tokens=500,
                     response_format={"type": "json_object"},
+                    **_extra_kwargs,
                 )
                 raw2 = resp2.choices[0].message.content
                 data2 = json.loads(raw2)
@@ -184,23 +190,40 @@ def generate_ai_title(
         logger.info("AI 제목 생성: en=%s / ko=%s", title_en[:50], title_ko)
         return title_en, title_ko
     except Exception as _exc:
-        # 429 → 서킷 브레이커 (Groq만 차단, OpenAI 429는 개별 재시도에 맡김)
+        # 429/인증 실패 → 서킷 브레이커. provider는 호출 전에 이미 확정해뒀으므로
+        # (normalizer.py의 _classify_with_ai와 동일 패턴) 에러 메시지 문자열
+        # 추측 없이 정확히 어느 제공자를 배제해야 하는지 안다.
         try:
-            from openai import RateLimitError as _RateLimitError
+            from openai import RateLimitError as _RateLimitError, AuthenticationError as _AuthError
+            if isinstance(_exc, _AuthError):
+                if provider == "openai":
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_unavailable
+                    mark_gemini_unavailable(3600.0)
+                logger.warning("AI 인증 실패 (provider=%s) — 1시간 배제", provider)
+                return None
             if isinstance(_exc, _RateLimitError):
                 _exc_str = str(_exc)
-                _is_groq = "groq" in _exc_str.lower() or (USE_GROQ and not is_groq_rate_limited())
-                if _is_groq:
+                if provider == "groq":
                     _wait = 300.0  # 기본 5분
                     _m = re.search(r"try again in (\d+)m([\d.]+)s", _exc_str)
                     if _m:
                         _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
                     _wait = min(_wait, 900.0)  # 최대 15분
                     _mark_rate_limited(_wait)
-                else:
-                    logger.warning("OpenAI 429 — Groq 차단 없이 다음 시도에서 재시도")
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_rate_limited
+                    mark_gemini_rate_limited(60.0)
+                elif provider == "openai":
+                    if "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
+                        from worker.ai_config import mark_openai_unavailable
+                        mark_openai_unavailable(3600.0)
+                    else:
+                        logger.warning("OpenAI 429 — 차단 없이 다음 시도에서 재시도")
                 return None
         except Exception:
             pass
-        logger.exception("AI 제목 생성 실패")
+        logger.exception("AI 제목 생성 실패 (provider=%s)", provider)
         return None
