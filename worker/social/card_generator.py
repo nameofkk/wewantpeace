@@ -543,7 +543,10 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
     if not tmp_path:
         return None
 
-    # 즉시 Supabase Storage에 업로드 → public URL로 저장
+    # 즉시 R2에 업로드 → public URL로 저장.
+    # image_url이 로컬 경로로 남으면 Threads 등 http(s) URL을 요구하는 어댑터가
+    # 조용히 TEXT 모드로 떨어진다(threads_adapter.py) — 반드시 여기서 실제
+    # 공개 URL로 바뀌어야 한다.
     try:
         from worker.social.image_uploader import upload_image, is_configured
         if is_configured():
@@ -552,8 +555,9 @@ async def generate_card_for_post(post, clusters=None) -> str | None:
                 post.image_url = public_url
                 return public_url
     except Exception:
-        logger.warning("Supabase 업로드 실패, 로컬 경로 유지: %s", tmp_path)
+        logger.warning("R2 업로드 실패, 로컬 경로 유지: %s", tmp_path)
 
-    # Supabase 미설정/실패 시 로컬 경로 폴백
+    # R2 미설정/실패 시 로컬 경로 폴백 (이 경우 http(s) URL이 아니라 이미지 없는
+    # 텍스트 게시물로 나간다 — is_configured()가 False가 되는 일이 없어야 한다)
     post.image_url = tmp_path
     return tmp_path
