@@ -219,7 +219,17 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
     except Exception as _exc:
         # 429 → 서킷 브레이커 (Groq만 차단, OpenAI 429는 개별 재시도에 맡김)
         try:
-            from openai import RateLimitError as _RateLimitError
+            from openai import RateLimitError as _RateLimitError, AuthenticationError as _AuthError
+            if isinstance(_exc, _AuthError):
+                # 401(잘못된/폐기된 키)도 insufficient_quota와 마찬가지로 재시도로
+                # 절대 안 풀린다. 이걸 안 잡으면 Groq가 막힐 때마다(2026-09-15 실측:
+                # 신모델이 토큰을 더 써 Groq 서킷브레이커가 더 자주 뜀) get_client()가
+                # 매번 죽은 OpenAI로 폴백해 401만 반복해서 먹고, 그동안 Groq가
+                # 다시 풀렸는지조차 재확인 안 하고 낭비한다.
+                from worker.ai_config import mark_openai_unavailable
+                mark_openai_unavailable(3600.0)
+                logger.warning("OpenAI 인증 실패(401) — 1시간 배제, Groq만 사용: %s", str(_exc)[:150])
+                return None
             if isinstance(_exc, _RateLimitError):
                 _exc_str = str(_exc)
                 # Groq 429만 서킷 브레이커 적용 (OpenAI 429는 차단하지 않음)
