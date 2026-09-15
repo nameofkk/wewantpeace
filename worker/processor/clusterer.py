@@ -232,7 +232,7 @@ def _ai_same_event(
 
     Returns: True(같은 사건), False(다른 사건), None(API 실패)
     """
-    from worker.ai_config import is_available as _ai_ok, get_client as _get_client, get_model as _get_model
+    from worker.ai_config import is_available as _ai_ok, get_client as _get_client, get_model as _get_model, get_current_provider as _get_provider
     if not _ai_ok():
         return None
 
@@ -242,8 +242,12 @@ def _ai_same_event(
     if body_hint_b:
         user_msg += f"\nBody B (excerpt): {body_hint_b[:100]}"
 
+    provider = _get_provider()
     try:
         client = _get_client()
+        _extra_kwargs = {}
+        if provider == "gemini":
+            _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
             model=_get_model(),
             messages=[
@@ -256,13 +260,44 @@ def _ai_same_event(
             # json_validate_failed로 실패해 AI 매칭이 전부 폴백(분리)으로 떨어진다.
             max_tokens=250,
             response_format={"type": "json_object"},
+            **_extra_kwargs,
         )
         data = json.loads(resp.choices[0].message.content)
         result = data.get("same", False)
         logger.debug("AI 매칭 판정: %s vs %s → %s", title_a[:40], title_b[:40], result)
         return bool(result)
-    except Exception:
-        logger.warning("AI 매칭 판정 실패, 폴백 (분리)")
+    except Exception as _exc:
+        # 이 호출은 클러스터링 경계 판정에서만 쓰이지만 정규화(normalizer.py)와
+        # 같은 Groq/Gemini 계정을 공유한다. 여기서도 429/인증 실패를 서킷
+        # 브레이커에 반영해야, 이 호출이 먼저 막힌 걸 알아채는 경우에도
+        # 죽은 제공자를 계속 두드리지 않고 바로 다음 제공자로 넘어간다.
+        try:
+            from openai import RateLimitError as _RateLimitError, AuthenticationError as _AuthError
+            if isinstance(_exc, _AuthError):
+                if provider == "openai":
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_unavailable
+                    mark_gemini_unavailable(3600.0)
+            elif isinstance(_exc, _RateLimitError):
+                _exc_str = str(_exc)
+                if provider == "groq":
+                    from worker.ai_config import mark_rate_limited
+                    _wait = 300.0
+                    _m = re.search(r"try again in (\d+)m([\d.]+)s", _exc_str)
+                    if _m:
+                        _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
+                    mark_rate_limited(min(_wait, 900.0))
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_rate_limited
+                    mark_gemini_rate_limited(60.0)
+                elif provider == "openai" and ("insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str):
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+        except Exception:
+            pass
+        logger.warning("AI 매칭 판정 실패, 폴백 (분리) (provider=%s)", provider)
         return None
 
 
@@ -325,16 +360,6 @@ _COUNTRY_NAMES_KO: dict[str, str] = {
     "CL": "칠레", "AR": "아르헨티나", "BO": "볼리비아",
     "EC": "에콰도르", "UG": "우간다", "SN": "세네갈",
 }
-
-
-@lru_cache(maxsize=512)
-def _translate_cached(text: str) -> str | None:
-    """번역 결과 캐시 (동일 텍스트 중복 번역 방지)."""
-    try:
-        from deep_translator import GoogleTranslator
-        return GoogleTranslator(source="en", target="ko").translate(text[:200])
-    except Exception:
-        return None
 
 
 def _is_junk_title(title: str) -> bool:
@@ -925,7 +950,8 @@ def _make_cluster_title_ko(
         _, title_ko = _make_fallback_titles(topic, country_code)
         return title_ko
 
-    title_ko = _translate_cached(title)
+    from worker.processor.normalizer import _translate_to_korean
+    title_ko = _translate_to_korean(title)
     if not title_ko:
         logger.debug("한국어 번역 실패, 폴백 사용: %s", title[:50])
         _, title_ko = _make_fallback_titles(topic, country_code)

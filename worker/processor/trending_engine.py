@@ -283,12 +283,12 @@ def _is_junk_title(title: str) -> bool:
 
 
 def _translate_cached(title: str) -> str | None:
-    try:
-        from deep_translator import GoogleTranslator
-        result = GoogleTranslator(source="en", target="ko").translate(title[:200])
-        return result[:70] if result else None
-    except Exception:
-        return None
+    """Google Translate 직접 호출을 없애고 normalizer.py의 Redis 서킷브레이커·
+    페이싱·캐시가 적용된 _translate_to_korean으로 통일 — 예전엔 여기가
+    독립적으로 Google에 호출을 쏴서 normalizer.py의 차단 상태를 몰랐다."""
+    from worker.processor.normalizer import _translate_to_korean
+    result = _translate_to_korean(title)
+    return result[:70] if result else None
 
 
 async def _fix_junk_titles(db: AsyncSession, clusters: list[IssueCluster]) -> None:

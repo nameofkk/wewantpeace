@@ -12,7 +12,7 @@ from backend.app.models.social_post import SocialPost
 
 logger = logging.getLogger(__name__)
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, get_current_provider as _get_ai_provider, is_available as _ai_available
 
 # 국가코드 → 해시태그 매핑
 _COUNTRY_HASHTAGS: dict[str, str] = {
@@ -84,6 +84,10 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
         return None
     try:
         client = _get_ai_client(timeout=15.0)
+        provider = _get_ai_provider()
+        _extra_kwargs = {}
+        if provider == "gemini":
+            _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
             model=_get_ai_model(),
             messages=[
@@ -92,10 +96,18 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
             ],
             temperature=0.7,
             # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 본문 전에
-            # reasoning 토큰을 먼저 쓴다. 여유를 두지 않으면 본문이 중간에 잘린다.
-            max_tokens=600,
+            # reasoning 토큰을 먼저 쓴다. 2026-09-15 실측: max_tokens=600에서
+            # reasoning만 517토큰을 먹어 본문이 "www"에서 잘리거나(finish_reason=
+            # length) 완전히 빈 문자열로 나옴 — json_object 모드가 아니라 예외 없이
+            # 조용히 실패해(호출부는 `if not body:` 폴백으로 감쪽같이 넘어감)
+            # 발견이 늦었다. 다른 호출부와 동일하게 여유 있게 잡는다.
+            max_tokens=1200,
+            **_extra_kwargs,
         )
-        return (resp.choices[0].message.content or "").strip()
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            logger.warning("AI 응답 비어있음 (provider=%s, finish_reason=%s)", provider, resp.choices[0].finish_reason)
+        return content
     except Exception:
         logger.exception("AI 호출 실패")
         return None
