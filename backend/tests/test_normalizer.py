@@ -161,6 +161,19 @@ class TestMakeTitle:
         assert "PRIORITY" not in title
         assert "oil supertanker" in title
 
+    def test_skips_flash_tag_line(self):
+        """FLASH도 같은 채널이 쓰는 태그였다(2026-09-15 배포 직후 실측으로 추가 발견)."""
+        text = (
+            "⚠️ **UNVERIFIED** — single source, treat as unconfirmed\n"
+            "🔴 FLASH · 🇸🇾 MIDDLE EAST\n"
+            "**Syrian President Ahmad al-Sharaa announced that sanctions on Syria were lifted.**\n\n"
+            "Reliability C5: fairly reliable"
+        )
+        title = _make_title(text)
+        assert "FLASH" not in title
+        assert "UNVERIFIED" not in title
+        assert "Syrian President" in title
+
     def test_skips_double_tag_lines(self):
         """UNVERIFIED 줄 + PRIORITY 줄이 연달아 나오는 경우도 둘 다 건너뛴다."""
         text = (
