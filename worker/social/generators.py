@@ -91,7 +91,9 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.7,
-            max_tokens=300,
+            # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 본문 전에
+            # reasoning 토큰을 먼저 쓴다. 여유를 두지 않으면 본문이 중간에 잘린다.
+            max_tokens=600,
         )
         return (resp.choices[0].message.content or "").strip()
     except Exception:

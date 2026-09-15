@@ -20,7 +20,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+_GROQ_MODEL = "openai/gpt-oss-120b"
 _OPENAI_MODEL = "gpt-4o-mini"
 
 USE_GROQ = bool(GROQ_API_KEY)
