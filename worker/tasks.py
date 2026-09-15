@@ -129,8 +129,13 @@ def collect_telegram(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트", total)
@@ -189,8 +194,9 @@ def collect_rss(self):
                 if all_ids:
                     for i, raw_id in enumerate(all_ids):
                         process_raw_event.delay(raw_id)
-                        if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                            await asyncio.sleep(0.5)
+                        # 2026-09-16: AI 무료 티어 일일 한도 절약 위해 촘촘한 페이싱
+                        if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                            await asyncio.sleep(1.0)
                     logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
                 else:
                     logger.info("RSS 수집 완료: 총 %d개 새 이벤트", total)
@@ -244,8 +250,13 @@ def collect_gdelt(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("GDELT 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("GDELT 수집 완료: 총 %d개", total)
@@ -294,8 +305,13 @@ def collect_acled(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("ACLED 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("ACLED 수집 완료: 총 %d개", total)
@@ -344,8 +360,13 @@ def collect_reliefweb(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("ReliefWeb 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("ReliefWeb 수집 완료: 총 %d개", total)
@@ -393,8 +414,13 @@ def collect_usgs(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("USGS 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("USGS 수집 완료: 새 이벤트 없음")
@@ -460,8 +486,13 @@ def collect_travel_advisory(self):
                     raise
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 # 소스별 통계 로깅
                 for r in all_results:
                     logger.info(
@@ -1294,8 +1325,9 @@ def retry_unprocessed(self):
 
         for i, raw_id in enumerate(ids):
             process_raw_event.delay(raw_id)
-            if (i + 1) % 50 == 0 and i + 1 < len(ids):
-                await asyncio.sleep(0.5)
+            # 2026-09-16: AI 무료 티어 일일 한도 절약 위해 촘촘한 페이싱
+            if (i + 1) % 5 == 0 and i + 1 < len(ids):
+                await asyncio.sleep(1.0)
         logger.info("미처리 raw_events %d건 → process_raw_event 큐 등록", len(ids))
         return {"queued": len(ids)}
 
@@ -4654,8 +4686,13 @@ def collect_ucdp(self):
                 await db.commit()
                 for i, raw_id in enumerate(all_ids):
                     process_raw_event.delay(raw_id)
-                    if (i + 1) % 50 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(0.5)
+                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
+                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
+                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
+                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
+                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
+                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
+                        await asyncio.sleep(1.0)
                 logger.info("UCDP 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
                 logger.info("UCDP 수집 완료: 새 이벤트 없음")
