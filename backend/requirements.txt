@@ -17,7 +17,11 @@ redis==5.0.4
 # 수집
 httpx>=0.27.0,<1
 feedparser==6.0.11
-aiohttp==3.9.5
+aiohttp>=3.10,<4  # 3.9.5는 openai SDK의 벤더링된 httpx_aiohttp 전송계층이 참조하는
+                   # aiohttp.SocketTimeoutError가 없어 `import openai`부터 죽는다
+                   # (실측: get_client() 호출마다 AttributeError로 전부 폴백 처리됨).
+                   # openai는 >=1.30.0으로 안 고정돼 있어 계속 최신으로 올라가는데
+                   # aiohttp만 초기 커밋 값에 그대로 박혀 있었다.
 Telethon==1.37.0
 # NLP (Week 2)
 langdetect==1.0.9
