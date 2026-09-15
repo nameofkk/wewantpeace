@@ -1815,7 +1815,11 @@ def _get_translate_redis():
 _TRANSLATE_BLOCK_KEY = "translate:google_blocked"
 _TRANSLATE_PACE_KEY = "translate:last_call_ts"
 _TRANSLATE_MIN_INTERVAL = 0.25  # 전 프로세스 합산 최대 ~4/초 (구글 무료 한도 5/초보다 여유)
-_TRANSLATE_BLOCK_SECONDS = 90  # 429 감지 시 이 시간 동안 아예 시도하지 않음
+_TRANSLATE_BLOCK_SECONDS = 600  # 429 감지 시 이 시간 동안 아예 시도하지 않음.
+# 실측(2026-09-15): 90초는 너무 짧아 쿨다운 직후 재시도가 곧바로 다시 429를
+# 맞았다 — 구글의 IP 단위 차단이 "초당 5회" 순간 한도보다 오래 유지되는
+# 것으로 보인다. Groq 서킷브레이커(최대 15분, ai_config.py)와 비슷한
+# 수준으로 늘렸다.
 _mem_translate_blocked_until = 0.0
 
 
