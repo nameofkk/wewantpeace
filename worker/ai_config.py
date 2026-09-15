@@ -9,10 +9,14 @@ Groq 무료 티어 (openai/gpt-oss-120b, 2026-09 실측): RPD 14,400 / RPM 30 / 
 - 이 모델은 reasoning 모델이라 프롬프트 자체가 길면(분류 프롬프트 ~2,000 토큰)
   응답 전 reasoning 토큰을 크게 먹어(실측 200~730 변동) 분당 3콜 정도면 TPM 소진.
   → Gemini를 2차 폴백으로 추가한 이유 (TPM 여유가 훨씬 크고 reasoning 끌 수 있음).
-Gemini 무료 티어 (gemini-2.5-flash-lite, OpenAI 호환 레이어):
+Gemini 무료 티어 (gemini-3.5-flash-lite, OpenAI 호환 레이어):
   base_url=https://generativelanguage.googleapis.com/v1beta/openai/
-  `reasoning_effort="none"`로 thinking 토큰 자체를 끌 수 있다(2.5 계열 한정,
-  3.x 계열은 완전 비활성 불가 — 그래서 3.x가 아닌 2.5-flash-lite를 선택함).
+  2026-09-15 실측: gemini-2.5-flash-lite/gemini-2.5-flash 전부 신규 계정에
+  404("no longer available to new users") — 2.5 세대는 이미 신규 발급 종료됨.
+  gemini-3.5-flash-lite로 교체. reasoning_effort="none"은 3.x에서 400
+  에러(3.x는 완전 비활성 불가, "none"이 유효값이 아님) — 대신
+  reasoning_effort="minimal"이 실측 completion 45~108 토큰(Groq 200~730
+  대비 훨씬 안정적)으로 사실상 동일한 효과를 냄.
   정확한 RPM/TPM/RPD는 계정마다 달라 Google AI Studio 대시보드에서 확인 필요.
 """
 import logging
@@ -28,7 +32,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 _GROQ_MODEL = "openai/gpt-oss-120b"
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-_GEMINI_MODEL = "gemini-2.5-flash-lite"
+_GEMINI_MODEL = "gemini-3.5-flash-lite"
 _OPENAI_MODEL = "gpt-4o-mini"
 
 USE_GROQ = bool(GROQ_API_KEY)

@@ -183,9 +183,10 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
         client = _get_ai_client(timeout=30.0)
         _extra_kwargs = {}
         if provider == "gemini":
-            # Gemini 2.5 계열은 reasoning_effort="none"으로 thinking 토큰 자체를
-            # 끌 수 있다 (3.x 계열은 완전 비활성 불가라 2.5-flash-lite를 선택한 이유).
-            _extra_kwargs["reasoning_effort"] = "none"
+            # gemini-3.5-flash-lite는 reasoning_effort="none"을 거부한다(400,
+            # 3.x는 완전 비활성 불가). "minimal"이 실측상 사실상 동일 효과
+            # (completion 45~108 토큰, Groq 200~730 대비 훨씬 안정적).
+            _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
             model=_get_ai_model(),
             messages=[
