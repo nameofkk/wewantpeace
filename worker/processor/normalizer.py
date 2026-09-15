@@ -156,6 +156,78 @@ _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
     "sanctions": frozenset(["oil_energy", "trade_tariff", "general"]),
 }
 
+# 배치 분류용: 단건 프롬프트의 규칙(토픽 정의·severity 보정·국가코드 등) 본문을
+# 그대로 재사용하고, 마지막 "CRITICAL:" 응답 형식 지시만 N개짜리로 바꾼다 —
+# 규칙이 바뀌면 두 프롬프트가 따로 놀지 않도록 하나의 소스에서 파생시킨다.
+_AI_CLASSIFY_PROMPT_RULES = _AI_CLASSIFY_PROMPT.rsplit("\nCRITICAL:", 1)[0]
+
+_AI_CLASSIFY_BATCH_PROMPT = _AI_CLASSIFY_PROMPT_RULES + """
+
+You will be given MULTIPLE articles at once, each numbered "### Article N" in the
+user message. Classify EACH article independently using the rules above — do not
+let one article's content influence another's classification.
+
+CRITICAL: Respond with ONLY a valid JSON object (no explanation, no markdown, no
+extra text) containing a "results" array with EXACTLY one entry per input article,
+in the SAME ORDER as the input.
+Format: {"results": [{"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "..."}, ...]}"""
+
+
+_MALFORMED_UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{1,3})(?![0-9a-fA-F])")
+
+
+def _has_malformed_unicode_escape(raw: str) -> bool:
+    """Gemini가 드물게 한글 \\uXXXX 이스케이프를 3자리 이하로 잘못 뱉는 결함 탐지
+    (2026-09-16 실측: 10개 배치 중 1회 재현, `\\ub74` 처럼 자릿수 부족).
+
+    복구를 시도하지 않는 이유: 깨진 이스케이프만 제거하면 json.loads는 통과하지만
+    "빠른"이 "른"이 되는 식으로 글자가 통째로 빠진 채 조용히 DB에 들어간다 —
+    파싱 에러보다 눈에 안 띄는 오염이 더 나쁘다. 감지되면 배치 전체를 버리고
+    개별 폴백으로 넘긴다.
+    """
+    return bool(_MALFORMED_UNICODE_ESCAPE_RE.search(raw))
+
+
+def _parse_classify_entry(data: object) -> Optional[tuple[str, str, int, Optional[str], Optional[str]]]:
+    """AI 분류 응답 1건을 검증·정규화. 단건/배치 호출이 공유.
+
+    Returns: (topic, sub_topic, severity, country_code, title_ko) 또는 유효성
+    검증 실패 시 None.
+    """
+    if not isinstance(data, dict):
+        return None
+
+    topic = str(data.get("topic", "")).strip().lower()
+    severity = data.get("severity")
+
+    if topic not in _VALID_TOPICS:
+        return None
+    if not isinstance(severity, (int, float)) or severity < 0 or severity > 100:
+        return None
+    severity = max(0, min(100, int(severity)))
+
+    raw_sub = str(data.get("sub_topic", "general")).strip().lower()
+    valid_subs = _VALID_SUB_TOPICS.get(topic)
+    sub_topic = raw_sub if (valid_subs and raw_sub in valid_subs) else "general"
+
+    ai_country = data.get("country_code")
+    if ai_country and isinstance(ai_country, str):
+        ai_country = ai_country.strip().upper()
+        if len(ai_country) != 2 or not ai_country.isalpha():
+            ai_country = None
+    else:
+        ai_country = None
+
+    ai_title_ko = data.get("title_ko")
+    if isinstance(ai_title_ko, str):
+        ai_title_ko = ai_title_ko.strip()
+        if not (1 <= len(ai_title_ko) <= 200 and re.search(r"[가-힣]", ai_title_ko)):
+            ai_title_ko = None
+    else:
+        ai_title_ko = None
+
+    return topic, sub_topic, severity, ai_country, ai_title_ko
+
 
 def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str], Optional[str]]]:
     """
@@ -207,46 +279,15 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
         raw = resp.choices[0].message.content
         if not raw:
             return None
+        if _has_malformed_unicode_escape(raw):
+            logger.warning("AI 분류 응답에 깨진 유니코드 이스케이프 감지 — 폴백 (제목: %s)", title[:60])
+            return None
 
         data = json.loads(raw)
-
-        topic = data.get("topic", "").strip().lower()
-        severity = data.get("severity")
-
-        # 유효성 검증
-        if topic not in _VALID_TOPICS:
-            logger.warning("AI 토픽 유효하지 않음: %s (원문: %s)", topic, raw[:100])
-            return None
-        if not isinstance(severity, (int, float)) or severity < 0 or severity > 100:
-            logger.warning("AI severity 범위 초과: %s (원문: %s)", severity, raw[:100])
-            return None
-
-        severity = max(0, min(100, int(severity)))
-
-        # sub_topic 추출 (유효하지 않으면 general)
-        raw_sub = data.get("sub_topic", "general").strip().lower()
-        valid_subs = _VALID_SUB_TOPICS.get(topic)
-        sub_topic = raw_sub if (valid_subs and raw_sub in valid_subs) else "general"
-
-        # country_code 추출 (AI가 반환한 ISO 3166-1 alpha-2)
-        ai_country = data.get("country_code")
-        if ai_country and isinstance(ai_country, str):
-            ai_country = ai_country.strip().upper()
-            if len(ai_country) != 2 or not ai_country.isalpha():
-                ai_country = None
-        else:
-            ai_country = None
-
-        # title_ko 추출 (한글 포함 + 합리적 길이일 때만 사용, 아니면 폴백에 맡김)
-        ai_title_ko = data.get("title_ko")
-        if isinstance(ai_title_ko, str):
-            ai_title_ko = ai_title_ko.strip()
-            if not (1 <= len(ai_title_ko) <= 200 and re.search(r"[가-힣]", ai_title_ko)):
-                ai_title_ko = None
-        else:
-            ai_title_ko = None
-
-        return topic, sub_topic, severity, ai_country, ai_title_ko
+        parsed = _parse_classify_entry(data)
+        if parsed is None:
+            logger.warning("AI 분류 응답 유효성 검증 실패 (원문: %s)", raw[:150])
+        return parsed
 
     except Exception as _exc:
         # 429/인증 실패 → 서킷 브레이커. 어느 제공자를 방금 불렀는지는 호출 전에
@@ -278,7 +319,14 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
                     _mark_rate_limited(_wait)
                 elif provider == "gemini":
                     from worker.ai_config import mark_gemini_rate_limited
+                    # Gemini free tier는 "GenerateRequestsPerDayPerProjectPerModel"
+                    # 같은 일일 요청수 쿼터라(2026-09-15 실측: gemini-3.5-flash-lite
+                    # 하루 500건 하드캡), 에러 바디의 retryDelay/"retry in Xs"가
+                    # 토큰버킷 리필 간격을 알려준다 — 없으면 60초 기본값.
                     _wait = 60.0
+                    _m = re.search(r"retry in ([\d.]+)s", _exc_str)
+                    if _m:
+                        _wait = float(_m.group(1)) + 5
                     mark_gemini_rate_limited(_wait)
                 elif provider == "openai":
                     if "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
@@ -293,6 +341,118 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
             pass
         logger.exception("AI 분류 실패 (provider=%s, 제목: %s)", provider, title[:80])
         return None
+
+
+def _classify_batch_with_ai(
+    items: list[tuple[str, str]],
+) -> Optional[list[Optional[tuple[str, str, int, Optional[str], Optional[str]]]]]:
+    """N개 기사를 한 번의 AI 호출로 일괄 분류 (요청수 절약).
+
+    2026-09-16 실측으로 드러난 문제: Groq는 TPD 200,000(≈하루 80콜), Gemini는
+    RPD 500(하루 500건 하드캡)이라 무료 티어 둘을 합쳐도 실제 운영 물량
+    (~4,330콜/일)의 13%밖에 못 커버한다. 특히 Gemini는 병목이 토큰이 아니라
+    "요청 횟수"라서, 기사 여러 개를 한 콜에 묶으면 같은 500건으로 500×N건을
+    처리할 수 있다 — 벤더를 더 찾는 것보다 훨씬 큰 레버리지.
+
+    Args:
+        items: [(title, body), ...] — 프롬프트 총 토큰이 커지므로 8~10개
+            단위를 권장 (호출부가 청크로 나눠 넘길 것).
+
+    Returns:
+        items와 같은 길이·순서의 리스트, 각 원소는 성공 시 단건 _classify_with_ai와
+        동일한 5-tuple, 개별 항목만 검증 실패면 해당 자리만 None.
+        배치 호출 자체가 실패하거나(429/인증/파싱 불가) 응답 개수가 안 맞으면
+        전체를 None으로 반환 — 이 경우 호출부는 반드시 항목별 개별 폴백
+        (키워드 분류)으로 넘어가야 한다. 부분적으로 순서가 밀린 결과를 그대로
+        쓰면 엉뚱한 기사에 엉뚱한 title_ko가 붙는 사고가 나므로, 애매하면
+        전체 폐기가 항상 더 안전하다.
+    """
+    if not _ai_available():
+        return None
+    if not items:
+        return []
+
+    user_lines = [
+        f"### Article {i}\nTitle: {(title or '')[:200]}\nBody: {(body or '')[:500]}"
+        for i, (title, body) in enumerate(items, 1)
+    ]
+    user_text = "\n\n".join(user_lines)
+
+    provider = _get_ai_provider()
+    try:
+        client = _get_ai_client(timeout=60.0)
+        _extra_kwargs = {}
+        if provider == "gemini":
+            _extra_kwargs["reasoning_effort"] = "minimal"
+        resp = client.chat.completions.create(
+            model=_get_ai_model(),
+            messages=[
+                {"role": "system", "content": _AI_CLASSIFY_BATCH_PROMPT},
+                {"role": "user", "content": user_text},
+            ],
+            temperature=0,
+            # 단건 max_tokens=1000 실측(reasoning 편차 200~730) 기준으로 넉넉히
+            # 항목당 900 + 완충 500, 상한은 provider 컨텍스트 고려해 8000으로 캡.
+            max_tokens=min(900 * len(items) + 500, 8000),
+            response_format={"type": "json_object"},
+            **_extra_kwargs,
+        )
+        raw = resp.choices[0].message.content
+        if not raw:
+            return None
+        if _has_malformed_unicode_escape(raw):
+            logger.warning("배치 분류 응답에 깨진 유니코드 이스케이프 감지 — 전체 개별 폴백 (항목수=%d)", len(items))
+            return None
+
+        data = json.loads(raw)
+        entries = data.get("results") if isinstance(data, dict) else None
+        if not isinstance(entries, list) or len(entries) != len(items):
+            logger.warning(
+                "배치 분류 개수 불일치 (요청 %d, 응답 %s) — 전체 개별 폴백",
+                len(items), len(entries) if isinstance(entries, list) else type(entries).__name__,
+            )
+            return None
+
+        return [_parse_classify_entry(e) for e in entries]
+
+    except Exception as _exc:
+        # 서킷브레이커 처리는 단건 _classify_with_ai와 동일 — 배치도 같은
+        # Groq/Gemini 계정·같은 한도를 공유하므로 반드시 똑같이 반영해야 한다.
+        try:
+            from openai import RateLimitError as _RateLimitError, AuthenticationError as _AuthError
+            if isinstance(_exc, _AuthError):
+                if provider == "openai":
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_unavailable
+                    mark_gemini_unavailable(3600.0)
+                logger.warning("AI 배치 분류 인증 실패 (provider=%s) — 1시간 배제", provider)
+                return None
+            if isinstance(_exc, _RateLimitError):
+                _exc_str = str(_exc)
+                if provider == "groq":
+                    _wait = 300.0
+                    _m = re.search(r"try again in (\d+)m([\d.]+)s", _exc_str)
+                    if _m:
+                        _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
+                    _mark_rate_limited(min(_wait, 900.0))
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_rate_limited
+                    _wait = 60.0
+                    _m = re.search(r"retry in ([\d.]+)s", _exc_str)
+                    if _m:
+                        _wait = float(_m.group(1)) + 5
+                    mark_gemini_rate_limited(_wait)
+                elif provider == "openai" and ("insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str):
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+                return None
+        except Exception:
+            pass
+        logger.exception("AI 배치 분류 실패 (provider=%s, 항목수=%d)", provider, len(items))
+        return None
+
 
 # ── Sub-topic 키워드 기반 분류 ──────────────────────────────────────────────
 
@@ -2696,32 +2856,37 @@ def normalize(
     else:
         title = _clean_title(_make_title(text_for_analysis))
 
-    # AI 우선 분류 (토픽 + severity + 한국어 제목 동시), 실패 시 기존 규칙 폴백
-    ai_result = _classify_with_ai(title, text_for_analysis)
-
-    if ai_result is not None:
-        topic, sub_topic, severity, ai_country_code, ai_title_ko = ai_result
-        logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, title[:60])
-    else:
-        ai_country_code = None
-        ai_title_ko = None
-        # 폴백: 기존 키워드 기반 분류
-        topic = _classify_topic(text_for_analysis)
-        if topic == "unknown" and lang not in ("en", "unknown"):
-            multilang_topic = _classify_topic_multilang(raw_text, lang)
-            if multilang_topic:
-                topic = multilang_topic
-        severity = _calculate_severity(text_for_analysis, topic, title=source_title)
-        sub_topic = _classify_sub_topic(text_for_analysis, topic)
-        logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, title[:60])
-
-    # 엔터테인먼트/K-pop/관광 노이즈 후처리 — AI·규칙 분류 모두에 적용
+    # 엔터테인먼트/K-pop/관광 노이즈 사전필터 — AI 호출 전에 걸러서 호출 자체를
+    # 아낀다. 예전엔 AI 분류 뒤에 결과를 덮어쓰는 후처리로만 있었는데, 노이즈로
+    # 확정되면 어차피 topic=unknown/sev=0으로 강제되므로 AI에게 물어볼 필요가
+    # 없다 (2026-09-16: Groq/Gemini 무료 티어 일일 한도가 실제 운영 물량의
+    # ~13%밖에 안 된다는 게 실측으로 드러나 호출 하나하나가 아쉬운 자원이 됨).
     _combined_text = f"{source_title or ''} {text_for_analysis}"
-    if _is_entertainment_noise(_combined_text, title=source_title):
-        logger.info("엔터테인먼트 노이즈 감지 → unknown/sev=0 (제목: %s)", title[:60])
-        topic = "unknown"
-        sub_topic = "general"
-        severity = 0
+    _is_noise = _is_entertainment_noise(_combined_text, title=source_title)
+
+    if _is_noise:
+        logger.info("엔터테인먼트 노이즈 감지(AI 호출 스킵) → unknown/sev=0 (제목: %s)", title[:60])
+        topic, sub_topic, severity = "unknown", "general", 0
+        ai_country_code, ai_title_ko = None, None
+    else:
+        # AI 우선 분류 (토픽 + severity + 한국어 제목 동시), 실패 시 기존 규칙 폴백
+        ai_result = _classify_with_ai(title, text_for_analysis)
+
+        if ai_result is not None:
+            topic, sub_topic, severity, ai_country_code, ai_title_ko = ai_result
+            logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, title[:60])
+        else:
+            ai_country_code = None
+            ai_title_ko = None
+            # 폴백: 기존 키워드 기반 분류
+            topic = _classify_topic(text_for_analysis)
+            if topic == "unknown" and lang not in ("en", "unknown"):
+                multilang_topic = _classify_topic_multilang(raw_text, lang)
+                if multilang_topic:
+                    topic = multilang_topic
+            severity = _calculate_severity(text_for_analysis, topic, title=source_title)
+            sub_topic = _classify_sub_topic(text_for_analysis, topic)
+            logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, title[:60])
 
     # 국가코드: AI 우선, 키워드 폴백
     _raw_title_for_geo = source_title.strip()[:200] if source_title and len(source_title.strip()) > 5 else None
