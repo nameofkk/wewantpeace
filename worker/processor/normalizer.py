@@ -147,8 +147,14 @@ For all other topics: general
 - Keep it under ~50 Korean characters when possible.
 - Never leave this field empty.
 
+## Korean body summary (body_ko):
+- A concise Korean summary of the BODY text (not just a translation of the title), 2-3 sentences, natural fluent Korean.
+- Cover the key facts (who/what/where/casualties or impact if mentioned) — do not add facts not present in the body.
+- Keep it under ~300 Korean characters.
+- Never leave this field empty.
+
 CRITICAL: Respond with ONLY a valid JSON object. No explanation, no markdown, no extra text.
-Format: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "..."}"""
+Format: {"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "...", "body_ko": "..."}"""
 
 
 _VALID_SUB_TOPICS: dict[str, frozenset[str]] = {
@@ -170,7 +176,7 @@ let one article's content influence another's classification.
 CRITICAL: Respond with ONLY a valid JSON object (no explanation, no markdown, no
 extra text) containing a "results" array with EXACTLY one entry per input article,
 in the SAME ORDER as the input.
-Format: {"results": [{"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "..."}, ...]}"""
+Format: {"results": [{"topic": "...", "sub_topic": "...", "severity": N, "country_code": "XX" or null, "title_ko": "...", "body_ko": "..."}, ...]}"""
 
 
 _MALFORMED_UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{1,3})(?![0-9a-fA-F])")
@@ -188,11 +194,11 @@ def _has_malformed_unicode_escape(raw: str) -> bool:
     return bool(_MALFORMED_UNICODE_ESCAPE_RE.search(raw))
 
 
-def _parse_classify_entry(data: object) -> Optional[tuple[str, str, int, Optional[str], Optional[str]]]:
+def _parse_classify_entry(data: object) -> Optional[tuple[str, str, int, Optional[str], Optional[str], Optional[str]]]:
     """AI 분류 응답 1건을 검증·정규화. 단건/배치 호출이 공유.
 
-    Returns: (topic, sub_topic, severity, country_code, title_ko) 또는 유효성
-    검증 실패 시 None.
+    Returns: (topic, sub_topic, severity, country_code, title_ko, body_ko) 또는
+    유효성 검증 실패 시 None.
     """
     if not isinstance(data, dict):
         return None
@@ -226,20 +232,33 @@ def _parse_classify_entry(data: object) -> Optional[tuple[str, str, int, Optiona
     else:
         ai_title_ko = None
 
-    return topic, sub_topic, severity, ai_country, ai_title_ko
+    ai_body_ko = data.get("body_ko")
+    if isinstance(ai_body_ko, str):
+        ai_body_ko = ai_body_ko.strip()
+        if not (1 <= len(ai_body_ko) <= 800 and re.search(r"[가-힣]", ai_body_ko)):
+            ai_body_ko = None
+    else:
+        ai_body_ko = None
+
+    return topic, sub_topic, severity, ai_country, ai_title_ko, ai_body_ko
 
 
-def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str], Optional[str]]]:
+def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Optional[str], Optional[str], Optional[str]]]:
     """
-    Groq/OpenAI로 토픽 + sub_topic + severity + country_code + title_ko 분류.
+    Groq/Gemini/OpenAI로 토픽 + sub_topic + severity + country_code + title_ko
+    + body_ko 분류.
 
-    title_ko를 같은 호출에 실어 보내는 이유: 별도 구글 번역(deep_translator)이
-    Railway egress IP 기준 장시간 레이트리밋에 걸려 title_ko가 통째로 비는
-    문제(2026-09-15 실측 24시간 100%)가 있었다. 어차피 기사마다 한 번씩 부르는
-    분류 호출에 얹으면 추가 비용 없이 근본 해결된다.
+    title_ko/body_ko를 같은 호출에 실어 보내는 이유: 별도 구글 번역
+    (deep_translator)이 Railway egress IP 기준 장시간 레이트리밋에 걸려
+    title_ko가 통째로 비는 문제(2026-09-15 실측 24시간 100%)가 있었고,
+    2026-09-16 재확인해도 여전히 막혀있음(공유 IP 문제로 추정, 우리 쪽에서
+    직접 해소 불가). 어차피 기사마다 한 번씩 부르는 분류 호출에 얹으면
+    추가 비용 없이 구글 번역 의존 자체를 줄일 수 있다. body_ko도 같은
+    이유로 추가(2026-09-16) — 구글 번역은 실패 시에만 쓰는 최후 폴백으로 격하.
 
     Returns:
-        (topic, sub_topic, severity, country_code, title_ko) 또는 실패 시 None
+        (topic, sub_topic, severity, country_code, title_ko, body_ko) 또는
+        실패 시 None
     """
     if not _ai_available():
         return None
@@ -345,7 +364,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
 
 def _classify_batch_with_ai(
     items: list[tuple[str, str]],
-) -> Optional[list[Optional[tuple[str, str, int, Optional[str], Optional[str]]]]]:
+) -> Optional[list[Optional[tuple[str, str, int, Optional[str], Optional[str], Optional[str]]]]]:
     """N개 기사를 한 번의 AI 호출로 일괄 분류 (요청수 절약).
 
     2026-09-16 실측으로 드러난 문제: Groq는 TPD 200,000(≈하루 80콜), Gemini는
@@ -360,7 +379,7 @@ def _classify_batch_with_ai(
 
     Returns:
         items와 같은 길이·순서의 리스트, 각 원소는 성공 시 단건 _classify_with_ai와
-        동일한 5-tuple, 개별 항목만 검증 실패면 해당 자리만 None.
+        동일한 6-tuple, 개별 항목만 검증 실패면 해당 자리만 None.
         배치 호출 자체가 실패하거나(429/인증/파싱 불가) 응답 개수가 안 맞으면
         전체를 None으로 반환 — 이 경우 호출부는 반드시 항목별 개별 폴백
         (키워드 분류)으로 넘어가야 한다. 부분적으로 순서가 밀린 결과를 그대로
@@ -2867,17 +2886,18 @@ def normalize(
     if _is_noise:
         logger.info("엔터테인먼트 노이즈 감지(AI 호출 스킵) → unknown/sev=0 (제목: %s)", title[:60])
         topic, sub_topic, severity = "unknown", "general", 0
-        ai_country_code, ai_title_ko = None, None
+        ai_country_code, ai_title_ko, ai_body_ko = None, None, None
     else:
-        # AI 우선 분류 (토픽 + severity + 한국어 제목 동시), 실패 시 기존 규칙 폴백
+        # AI 우선 분류 (토픽 + severity + 한국어 제목/본문요약 동시), 실패 시 기존 규칙 폴백
         ai_result = _classify_with_ai(title, text_for_analysis)
 
         if ai_result is not None:
-            topic, sub_topic, severity, ai_country_code, ai_title_ko = ai_result
+            topic, sub_topic, severity, ai_country_code, ai_title_ko, ai_body_ko = ai_result
             logger.debug("AI 분류: topic=%s, sub=%s, severity=%d, country=%s (제목: %s)", topic, sub_topic, severity, ai_country_code, title[:60])
         else:
             ai_country_code = None
             ai_title_ko = None
+            ai_body_ko = None
             # 폴백: 기존 키워드 기반 분류
             topic = _classify_topic(text_for_analysis)
             if topic == "unknown" and lang not in ("en", "unknown"):
@@ -2913,12 +2933,14 @@ def normalize(
     # AI가 못 준 경우에만 구글 번역 폴백
     title_ko = ai_title_ko or _translate_to_korean(title)
 
-    # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 본문 앞 500자 한국어 번역
+    # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 AI 요약 우선(구글 번역
+    # 레이트리밋 회피 — 2026-09-16 재확인해도 여전히 막혀있어 title_ko와
+    # 같은 방식으로 격하), 없으면 구글 번역 폴백
     body_ko: Optional[str] = None
     if lang == "ko":
         body_ko = raw_text[:2000]
     else:
-        body_ko = _translate_to_korean(text_for_analysis[:500])
+        body_ko = ai_body_ko or _translate_to_korean(text_for_analysis[:500])
 
     entity_anchor: Optional[str] = country_code
     if not entity_anchor:
