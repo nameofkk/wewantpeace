@@ -175,7 +175,10 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
                 {"role": "user", "content": user_text},
             ],
             temperature=0,
-            max_tokens=100,
+            # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 최종 JSON 전에
+            # reasoning 토큰을 먼저 쓴다(실측 137 reasoning + 29 JSON = 166 completion).
+            # max_tokens=100이면 reasoning 도중 잘려 json_validate_failed로 매번 실패한다.
+            max_tokens=400,
             response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content
@@ -1791,30 +1794,140 @@ def _detect_language(text: str) -> str:
         return "unknown"
 
 
+# ── 번역 레이트리밋 서킷브레이커 + 캐시 ──────────────────────────────────────────
+# deep_translator가 쓰는 구글 번역 무료(비공식) 엔드포인트는 "초당 5회"를 넘기면
+# 차단한다. celery worker가 concurrency=4로 동시에 돌면서 아무 조율 없이 각자
+# 호출하다 보니 순간적으로 5/초를 넘겨 차단됐고, 한 번 차단되면 계속 요청을
+# 보내는 한 안 풀려서 실측 24시간 title_ko 100% 공백(1144/1144)까지 갔다.
+# ai_config.py의 Groq 서킷브레이커와 동일한 패턴: Redis로 전 프로세스가 상태 공유.
+_translate_redis_client = None
+
+
+def _get_translate_redis():
+    global _translate_redis_client
+    if _translate_redis_client is None:
+        import redis as _redis_lib
+        redis_url = os.getenv("REDIS_URL", os.getenv("REDIS_PRIVATE_URL", "redis://localhost:6379"))
+        _translate_redis_client = _redis_lib.from_url(redis_url, decode_responses=True, socket_timeout=2)
+    return _translate_redis_client
+
+
+_TRANSLATE_BLOCK_KEY = "translate:google_blocked"
+_TRANSLATE_PACE_KEY = "translate:last_call_ts"
+_TRANSLATE_MIN_INTERVAL = 0.25  # 전 프로세스 합산 최대 ~4/초 (구글 무료 한도 5/초보다 여유)
+_TRANSLATE_BLOCK_SECONDS = 90  # 429 감지 시 이 시간 동안 아예 시도하지 않음
+_mem_translate_blocked_until = 0.0
+
+
+def _is_translate_blocked() -> bool:
+    global _mem_translate_blocked_until
+    import time
+    if time.monotonic() < _mem_translate_blocked_until:
+        return True
+    try:
+        return bool(_get_translate_redis().exists(_TRANSLATE_BLOCK_KEY))
+    except Exception:
+        return False  # Redis 장애 시 차단 안 걸린 것으로 (fail-open)
+
+
+def _mark_translate_blocked() -> None:
+    global _mem_translate_blocked_until
+    import time
+    try:
+        _get_translate_redis().set(_TRANSLATE_BLOCK_KEY, "1", ex=_TRANSLATE_BLOCK_SECONDS)
+    except Exception:
+        pass
+    _mem_translate_blocked_until = time.monotonic() + _TRANSLATE_BLOCK_SECONDS
+
+
+def _translate_pace() -> None:
+    """여러 워커 프로세스가 공유하는 최소 호출 간격 유지 (429 예방)."""
+    import time
+    try:
+        r = _get_translate_redis()
+        now = time.time()
+        last = r.getset(_TRANSLATE_PACE_KEY, now)
+        if last:
+            elapsed = now - float(last)
+            if 0 <= elapsed < _TRANSLATE_MIN_INTERVAL:
+                time.sleep(_TRANSLATE_MIN_INTERVAL - elapsed)
+    except Exception:
+        pass  # Redis 장애 시 페이싱 없이 진행 (기존 동작과 동일)
+
+
+def _translate_cache_key(text: str, target: str) -> str:
+    return f"translate:cache:{target}:{hashlib.md5(text.encode('utf-8')).hexdigest()}"
+
+
+def _translate_cached(text: str, target: str) -> Optional[str]:
+    """동일 텍스트가 여러 채널에 중복 보도되는 경우가 많아 캐시로 요청량 자체를 줄인다."""
+    try:
+        return _get_translate_redis().get(_translate_cache_key(text, target))
+    except Exception:
+        return None
+
+
+def _translate_cache_store(text: str, target: str, result: str) -> None:
+    try:
+        _get_translate_redis().set(_translate_cache_key(text, target), result, ex=7 * 86400)
+    except Exception:
+        pass
+
+
+def _is_rate_limit_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return "too many requests" in msg or "429" in msg
+
+
 def _translate_to_english(text: str, lang: str) -> str:
-    """비영어 텍스트를 영어로 번역. 실패 시 원문 반환."""
+    """비영어 텍스트를 영어로 번역. 실패(429 포함) 시 원문 반환."""
     if lang in ("en", "unknown"):
         return text
+    chunk = text[:480]
+    cached = _translate_cached(chunk, "en")
+    if cached is not None:
+        return cached
+    if _is_translate_blocked():
+        return text  # 최근 429 — 시도 자체를 안 해서 낭비/추가 차단 방지
     try:
         from deep_translator import GoogleTranslator
-        # 번역 길이 제한 (무료 API 500자)
-        chunk = text[:480]
+        _translate_pace()
         translated = GoogleTranslator(source="auto", target="en").translate(chunk)
-        return translated or text
+        if translated:
+            _translate_cache_store(chunk, "en", translated)
+            return translated
+        return text
     except Exception as e:
-        logger.warning("번역 실패 (%s→en, %d자): %s", lang, len(text), e)
+        if _is_rate_limit_error(e):
+            _mark_translate_blocked()
+            logger.warning("번역 레이트리밋 — %d초간 번역 중단: %s", _TRANSLATE_BLOCK_SECONDS, e)
+        else:
+            logger.warning("번역 실패 (%s→en, %d자): %s", lang, len(text), e)
         return text
 
 
 def _translate_to_korean(text: str) -> Optional[str]:
-    """영어 텍스트를 한국어로 번역. 실패 시 None 반환."""
+    """영어 텍스트를 한국어로 번역. 실패(429 포함) 시 None 반환."""
+    chunk = text[:480]
+    cached = _translate_cached(chunk, "ko")
+    if cached is not None:
+        return cached
+    if _is_translate_blocked():
+        return None
     try:
         from deep_translator import GoogleTranslator
-        chunk = text[:480]
+        _translate_pace()
         result = GoogleTranslator(source="en", target="ko").translate(chunk)
-        return result or None
+        if result:
+            _translate_cache_store(chunk, "ko", result)
+            return result
+        return None
     except Exception as e:
-        logger.warning("한국어 번역 실패 (%d자): %s", len(text), e)
+        if _is_rate_limit_error(e):
+            _mark_translate_blocked()
+            logger.warning("번역 레이트리밋 — %d초간 번역 중단: %s", _TRANSLATE_BLOCK_SECONDS, e)
+        else:
+            logger.warning("한국어 번역 실패 (%d자): %s", len(text), e)
         return None
 
 
@@ -2404,9 +2517,31 @@ def _make_dedup_key(text: str) -> str:
     return hashlib.md5(" ".join(words).encode("utf-8")).hexdigest()
 
 
+_TAG_LINE_RE = re.compile(
+    r"^[^\w]*(ROUTINE|PRIORITY|UNVERIFIED|CONFIRMED|BREAKING|URGENT)\s*(\*\*)?\s*(?:[·\-–—:]|$)",
+    re.IGNORECASE,
+)
+
+
 def _make_title(text: str, max_len: int = 120) -> str:
-    sentences = re.split(r"[.!?\n]", text.strip())
-    title = (sentences[0].strip() if sentences else text.strip())
+    # 일부 텔레그램 경보 채널(예: War Monitor)은 실제 헤드라인 앞에
+    # "🟠 PRIORITY · MARITIME" / "⚠️ UNVERIFIED — ..." 같은 태그 줄을 먼저 쓴다.
+    # 첫 줄만 그대로 뽑으면 "PRIORITY · MARITIME"이 제목으로 저장되는 사고가 난다
+    # (실측: 2026-09-15, War Monitor 채널에서 24시간 231건).
+    # 그런 태그 줄은 건너뛰고 그 다음 실제 문장부터 제목을 뽑는다.
+    stripped = text.strip()
+    lines = stripped.split("\n")
+    skip = 0
+    for line in lines:
+        s = line.strip()
+        if s and _TAG_LINE_RE.match(s):
+            skip += 1
+        elif s:
+            break
+    remaining = "\n".join(lines[skip:]).strip() or stripped
+
+    sentences = re.split(r"[.!?\n]", remaining)
+    title = (sentences[0].strip() if sentences else remaining)
     return title[:max_len - 3] + "..." if len(title) > max_len else title
 
 

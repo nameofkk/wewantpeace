@@ -146,6 +146,48 @@ class TestMakeTitle:
         title = _make_title("Short title")
         assert title == "Short title"
 
+    def test_skips_priority_tag_line(self):
+        """War Monitor류 텔레그램 채널: 태그 줄이 헤드라인으로 뽑히던 회귀 방지.
+
+        2026-09-15 실측: 이 태그 줄만 첫 문장으로 뽑혀 "PRIORITY · MARITIME"이
+        24시간 231건 제목으로 저장됐다.
+        """
+        text = (
+            "🟠 PRIORITY · 🇮🇷 MARITIME\n"
+            "**The oil supertanker El Gaia struck Iranian mines in the Strait of Hormuz.**\n\n"
+            "Reliability C4: fairly reliable"
+        )
+        title = _make_title(text)
+        assert "PRIORITY" not in title
+        assert "oil supertanker" in title
+
+    def test_skips_double_tag_lines(self):
+        """UNVERIFIED 줄 + PRIORITY 줄이 연달아 나오는 경우도 둘 다 건너뛴다."""
+        text = (
+            "⚠️ **UNVERIFIED** — single source, treat as unconfirmed\n"
+            "🟠 PRIORITY · 🇷🇺 MARITIME\n"
+            "**A Russian frigate fired flares at a Danish military helicopter.**\n\n"
+            "Reliability B5"
+        )
+        title = _make_title(text)
+        assert "UNVERIFIED" not in title
+        assert "PRIORITY" not in title
+        assert "Russian frigate" in title
+
+    def test_does_not_skip_real_headline_starting_with_tag_word(self):
+        """'Breaking'으로 시작하되 태그 줄 패턴(구분자 바로 뒤)이 아니면 그대로 둔다."""
+        title = _make_title("Breaking News: missile strikes hit Kyiv overnight, officials say")
+        assert title.startswith("Breaking News")
+
+    def test_does_not_skip_other_channel_bold_emphasis(self):
+        """다른 채널이 문장 중 단어만 굵게 강조하는 형식은 그대로 첫 문장을 쓴다."""
+        text = (
+            '🇸🇦🇾🇪⚡️ — The Saudi Arabian Air Force continues to release videos.\n\n'
+            "In this episode, an **AH-64 Apache** helicopter fires its **M230** cannon."
+        )
+        title = _make_title(text)
+        assert "Saudi Arabian Air Force" in title
+
 
 # ── confidence 계산 ───────────────────────────────────────────────────────────
 
