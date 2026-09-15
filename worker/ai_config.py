@@ -1,14 +1,19 @@
 """
-Groq / OpenAI AI 클라이언트 설정.
+Groq / Gemini / OpenAI AI 클라이언트 설정.
 
-우선순위: Groq (무료) → OpenAI (유료 폴백)
-- Groq 429 시 Redis에 차단 상태 저장 → 모든 worker 프로세스가 공유
-- Groq 차단 중에는 OpenAI로 자동 폴백 (두 API 키 모두 있을 때)
+우선순위: Groq (무료) → Gemini (무료) → OpenAI (유료 폴백, 현재 401 키 이슈로 사실상 죽어있음)
+- 각 단계 429/오류 시 Redis에 차단 상태 저장 → 모든 worker 프로세스가 공유
+- 차단 중에는 다음 단계로 자동 폴백 (해당 API 키가 있을 때)
 
-Groq 무료 티어 (Llama 3.3 70B): 14,400 RPD / 30 RPM / 6,000 TPM
-- normalizer (~1,900/day), clusterer+ai_title (~2,400/day), generators (~30/day)
-- 합계 ~4,330/day → RPD 한도 대비 30%
-- TPM 위험: RSS 동시 수집 시 짧은 구간에 몰림 → 배치 지연으로 해소
+Groq 무료 티어 (openai/gpt-oss-120b, 2026-09 실측): RPD 14,400 / RPM 30 / TPM 8,000
+- 이 모델은 reasoning 모델이라 프롬프트 자체가 길면(분류 프롬프트 ~2,000 토큰)
+  응답 전 reasoning 토큰을 크게 먹어(실측 200~730 변동) 분당 3콜 정도면 TPM 소진.
+  → Gemini를 2차 폴백으로 추가한 이유 (TPM 여유가 훨씬 크고 reasoning 끌 수 있음).
+Gemini 무료 티어 (gemini-2.5-flash-lite, OpenAI 호환 레이어):
+  base_url=https://generativelanguage.googleapis.com/v1beta/openai/
+  `reasoning_effort="none"`로 thinking 토큰 자체를 끌 수 있다(2.5 계열 한정,
+  3.x 계열은 완전 비활성 불가 — 그래서 3.x가 아닌 2.5-flash-lite를 선택함).
+  정확한 RPM/TPM/RPD는 계정마다 달라 Google AI Studio 대시보드에서 확인 필요.
 """
 import logging
 import os
@@ -17,21 +22,22 @@ import time
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 _GROQ_MODEL = "openai/gpt-oss-120b"
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_GEMINI_MODEL = "gemini-2.5-flash-lite"
 _OPENAI_MODEL = "gpt-4o-mini"
 
 USE_GROQ = bool(GROQ_API_KEY)
+USE_GEMINI = bool(GEMINI_API_KEY)
 USE_OPENAI = bool(OPENAI_API_KEY)
 
-if USE_GROQ and USE_OPENAI:
-    logger.info("AI 클라이언트: Groq (Llama 3.3 70B) 우선, OpenAI (gpt-4o-mini) 폴백")
-elif USE_GROQ:
-    logger.info("AI 클라이언트: Groq (Llama 3.3 70B) 사용 (OpenAI 키 없음)")
-elif USE_OPENAI:
-    logger.info("AI 클라이언트: OpenAI (gpt-4o-mini) 사용 (Groq 키 없음)")
+_active = [name for name, on in (("Groq", USE_GROQ), ("Gemini", USE_GEMINI), ("OpenAI", USE_OPENAI)) if on]
+if _active:
+    logger.info("AI 클라이언트 우선순위: %s", " → ".join(_active))
 else:
     logger.warning("AI API 키 미설정 — AI 기능 비활성")
 
@@ -163,58 +169,128 @@ def is_openai_unavailable() -> bool:
         return False
 
 
+# ── Gemini 서킷 브레이커 ───────────────────────────────────────────────────────
+# Groq와 같은 이유(429 발생 시 일시 차단)와 OpenAI와 같은 이유(인증/쿼터 소진 시
+# 영구에 가깝게 배제)를 둘 다 가질 수 있어 두 종류 브레이커를 모두 둔다.
+
+_GEMINI_RATE_BLOCK_KEY = "ai:gemini_blocked"
+_mem_gemini_rate_blocked_until: float = 0.0
+_GEMINI_UNAVAILABLE_KEY = "ai:gemini_unavailable"
+_mem_gemini_unavailable_until: float = 0.0
+
+
+def mark_gemini_rate_limited(retry_after_seconds: float = 60.0) -> None:
+    """Gemini 429 발생 시 호출 — 일시 차단 (Groq 서킷 브레이커와 동일 패턴)."""
+    ttl = int(retry_after_seconds) + 15
+    global _mem_gemini_rate_blocked_until
+    _mem_gemini_rate_blocked_until = time.monotonic() + retry_after_seconds
+    try:
+        _get_redis_sync().set(_GEMINI_RATE_BLOCK_KEY, "1", ex=ttl)
+    except Exception:
+        pass
+    logger.warning("Gemini rate limit — %.0f초 차단, 다음 폴백 사용.", retry_after_seconds)
+
+
+def is_gemini_rate_limited() -> bool:
+    if time.monotonic() < _mem_gemini_rate_blocked_until:
+        return True
+    try:
+        return bool(_get_redis_sync().exists(_GEMINI_RATE_BLOCK_KEY))
+    except Exception:
+        return False
+
+
+def mark_gemini_unavailable(seconds: float = 3600.0) -> None:
+    """Gemini를 일정 시간 사용 불가로 표시 (인증 실패·쿼터 소진 등 재시도 무의미한 상태)."""
+    global _mem_gemini_unavailable_until
+    _mem_gemini_unavailable_until = time.monotonic() + seconds
+    try:
+        _get_redis_sync().set(_GEMINI_UNAVAILABLE_KEY, "1", ex=int(seconds))
+    except Exception:
+        pass
+    logger.warning("Gemini 사용 불가로 표시 (%.0f분) — 키/쿼터 확인 필요.", seconds / 60)
+
+
+def is_gemini_unavailable() -> bool:
+    if time.monotonic() < _mem_gemini_unavailable_until:
+        return True
+    try:
+        return bool(_get_redis_sync().exists(_GEMINI_UNAVAILABLE_KEY))
+    except Exception:
+        return False
+
+
+# ── 3단계 폴백 선택 (Groq → Gemini → OpenAI) ──────────────────────────────────
+# get_client()/get_model()/is_available()이 각자 같은 우선순위 로직을 중복 구현하면
+# 나중에 티어를 추가/변경할 때 한쪽만 고치는 실수가 나기 쉬워 한 곳(_select_provider)
+# 으로 모았다. get_current_provider()는 예외 처리에서 "방금 어느 제공자를 불렀는지"를
+# 문자열 추측(에러 메시지에 "groq" 포함 여부 등) 없이 정확히 알기 위해 노출한다.
+
+_PROVIDER_PRIORITY = ("groq", "gemini", "openai")
+
+_PROVIDER_CONFIGURED = {
+    "groq": lambda: USE_GROQ,
+    "gemini": lambda: USE_GEMINI,
+    "openai": lambda: USE_OPENAI,
+}
+
+_PROVIDER_BLOCKED = {
+    "groq": is_groq_rate_limited,
+    "gemini": lambda: is_gemini_rate_limited() or is_gemini_unavailable(),
+    "openai": is_openai_unavailable,
+}
+
+_PROVIDER_CLIENT_ARGS = {
+    "groq": (GROQ_API_KEY, _GROQ_BASE_URL),
+    "gemini": (GEMINI_API_KEY, _GEMINI_BASE_URL),
+    "openai": (OPENAI_API_KEY, None),
+}
+
+_PROVIDER_MODEL = {
+    "groq": _GROQ_MODEL,
+    "gemini": _GEMINI_MODEL,
+    "openai": _OPENAI_MODEL,
+}
+
+
+def get_current_provider():
+    """다음 호출에 실제로 쓰일 제공자("groq"/"gemini"/"openai") 반환, 키가 하나도
+    없으면 None. 차단되지 않은 첫 제공자를 우선하고, 전부 차단이면 그래도 우선순위
+    최상단(설정된 것 중)을 마지막 수단으로 한 번 더 시도한다 — 죽은 유료 API를
+    두드리는 것보다 일시 차단된 무료 API를 재시도하는 게 낫다는 기존 원칙 유지.
+    """
+    configured = [p for p in _PROVIDER_PRIORITY if _PROVIDER_CONFIGURED[p]()]
+    if not configured:
+        return None
+    for p in configured:
+        if not _PROVIDER_BLOCKED[p]():
+            return p
+    return configured[0]
+
+
 def get_client(timeout: float = 30.0):
-    """Groq 우선, Groq rate limited 시 OpenAI 폴백."""
+    """Groq → Gemini → OpenAI 순으로 사용 가능한 첫 제공자의 클라이언트 반환."""
     from openai import OpenAI
 
-    groq_blocked = is_groq_rate_limited()
-    openai_dead = USE_OPENAI and is_openai_unavailable()
-
-    if USE_GROQ and not groq_blocked:
-        return OpenAI(api_key=GROQ_API_KEY, base_url=_GROQ_BASE_URL, timeout=timeout)
-
-    if USE_OPENAI and not openai_dead:
-        if groq_blocked:
-            logger.debug("Groq 차단 중 → OpenAI gpt-4o-mini 사용")
-        return OpenAI(api_key=OPENAI_API_KEY, timeout=timeout)
-
-    # 마지막 수단: Groq (차단 상태라도).
-    # 크레딧이 없는 OpenAI를 부르는 것보다 rate limit 걸린 Groq를 한 번 더 두드리는 게 낫다.
-    if USE_GROQ:
-        if openai_dead:
-            logger.debug("OpenAI 사용 불가 → Groq 재시도 (차단 상태여도)")
-        return OpenAI(api_key=GROQ_API_KEY, base_url=_GROQ_BASE_URL, timeout=timeout)
-
-    if USE_OPENAI:
-        return OpenAI(api_key=OPENAI_API_KEY, timeout=timeout)
-
-    raise RuntimeError("AI API 키 미설정 — Groq, OpenAI 모두 없음")
+    provider = get_current_provider()
+    if provider is None:
+        raise RuntimeError("AI API 키 미설정 — Groq, Gemini, OpenAI 모두 없음")
+    api_key, base_url = _PROVIDER_CLIENT_ARGS[provider]
+    if base_url:
+        return OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    return OpenAI(api_key=api_key, timeout=timeout)
 
 
 def get_model() -> str:
     """현재 사용할 모델명 반환 (get_client와 같은 판정 순서를 따른다)."""
-    groq_blocked = is_groq_rate_limited()
-    openai_dead = USE_OPENAI and is_openai_unavailable()
-    if USE_GROQ and not groq_blocked:
-        return _GROQ_MODEL
-    if USE_OPENAI and not openai_dead:
-        return _OPENAI_MODEL
-    if USE_GROQ:
-        return _GROQ_MODEL
-    return _OPENAI_MODEL
+    provider = get_current_provider()
+    return _PROVIDER_MODEL.get(provider, _OPENAI_MODEL)
 
 
 def is_available() -> bool:
-    """AI 기능 사용 가능 여부.
-    - Groq 키 있음: True (차단 중이어도 마지막 수단으로 시도)
-    - Groq 없고 OpenAI 살아있음: True
-    - 모두 없음/사용불가: False
-    """
-    if USE_GROQ:
-        return True
-    if USE_OPENAI and not is_openai_unavailable():
-        return True
-    return False
+    """AI 기능 사용 가능 여부 (키가 하나라도 설정돼 있으면 True, 전부 차단 중이어도
+    마지막 수단으로 시도하므로 True)."""
+    return get_current_provider() is not None
 
 
 # 모듈 로드 시 이전 차단 키 정리

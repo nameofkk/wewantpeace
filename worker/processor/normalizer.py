@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # ── AI 기반 토픽+Severity 분류 ──────────────────────────────────────────────
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, is_available as _ai_available, mark_rate_limited as _mark_rate_limited, is_groq_rate_limited, USE_GROQ
+from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, get_current_provider as _get_ai_provider, is_available as _ai_available, mark_rate_limited as _mark_rate_limited
 
 if not _ai_available():
     logger.warning("AI key not set — falling back to keyword classification")
@@ -178,8 +178,14 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
 
     user_text = f"Title: {title[:200]}\n\nBody: {body[:500]}"
 
+    provider = _get_ai_provider()
     try:
         client = _get_ai_client(timeout=30.0)
+        _extra_kwargs = {}
+        if provider == "gemini":
+            # Gemini 2.5 계열은 reasoning_effort="none"으로 thinking 토큰 자체를
+            # 끌 수 있다 (3.x 계열은 완전 비활성 불가라 2.5-flash-lite를 선택한 이유).
+            _extra_kwargs["reasoning_effort"] = "none"
         resp = client.chat.completions.create(
             model=_get_ai_model(),
             messages=[
@@ -195,6 +201,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
             # 넉넉히 잡아도 비용/레이트리밋에 불이익이 없다.
             max_tokens=1000,
             response_format={"type": "json_object"},
+            **_extra_kwargs,
         )
         raw = resp.choices[0].message.content
         if not raw:
@@ -241,41 +248,49 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
         return topic, sub_topic, severity, ai_country, ai_title_ko
 
     except Exception as _exc:
-        # 429 → 서킷 브레이커 (Groq만 차단, OpenAI 429는 개별 재시도에 맡김)
+        # 429/인증 실패 → 서킷 브레이커. 어느 제공자를 방금 불렀는지는 호출 전에
+        # 이미 provider로 확정해뒀으므로(get_current_provider가 get_client와 같은
+        # 판정을 쓴다), 에러 메시지에 "groq" 포함 여부 같은 문자열 추측이 필요 없다.
         try:
             from openai import RateLimitError as _RateLimitError, AuthenticationError as _AuthError
             if isinstance(_exc, _AuthError):
-                # 401(잘못된/폐기된 키)도 insufficient_quota와 마찬가지로 재시도로
-                # 절대 안 풀린다. 이걸 안 잡으면 Groq가 막힐 때마다(2026-09-15 실측:
-                # 신모델이 토큰을 더 써 Groq 서킷브레이커가 더 자주 뜀) get_client()가
-                # 매번 죽은 OpenAI로 폴백해 401만 반복해서 먹고, 그동안 Groq가
-                # 다시 풀렸는지조차 재확인 안 하고 낭비한다.
-                from worker.ai_config import mark_openai_unavailable
-                mark_openai_unavailable(3600.0)
-                logger.warning("OpenAI 인증 실패(401) — 1시간 배제, Groq만 사용: %s", str(_exc)[:150])
+                # 인증 실패(401)는 insufficient_quota와 마찬가지로 재시도로 절대
+                # 안 풀린다. 이걸 안 잡으면 해당 제공자가 막힐 때마다 get_client()가
+                # 매번 죽은 키로 폴백해 401만 반복해서 먹는다.
+                if provider == "openai":
+                    from worker.ai_config import mark_openai_unavailable
+                    mark_openai_unavailable(3600.0)
+                    logger.warning("OpenAI 인증 실패(401) — 1시간 배제: %s", str(_exc)[:150])
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_unavailable
+                    mark_gemini_unavailable(3600.0)
+                    logger.warning("Gemini 인증 실패 — 1시간 배제: %s", str(_exc)[:150])
                 return None
             if isinstance(_exc, _RateLimitError):
                 _exc_str = str(_exc)
-                # Groq 429만 서킷 브레이커 적용 (OpenAI 429는 차단하지 않음)
-                _is_groq = "groq" in _exc_str.lower() or (USE_GROQ and not is_groq_rate_limited())
-                if _is_groq:
+                if provider == "groq":
                     _wait = 300.0  # 기본 5분 (이전 24시간에서 대폭 축소)
                     _m = re.search(r"try again in (\d+)m([\d.]+)s", _exc_str)
                     if _m:
                         _wait = int(_m.group(1)) * 60 + float(_m.group(2)) + 30
                     _wait = min(_wait, 900.0)  # 최대 15분
                     _mark_rate_limited(_wait)
-                elif "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
-                    # 크레딧 소진은 재시도로 절대 안 풀린다. 예전에는 이걸 일반 429로 보고
-                    # 매 기사마다 다시 호출해 연속 실패만 쌓았다(실측 213건 연속).
-                    from worker.ai_config import mark_openai_unavailable
-                    mark_openai_unavailable(3600.0)
-                else:
-                    logger.warning("OpenAI 429 — Groq 차단 없이 다음 시도에서 재시도 (제목: %s)", title[:60])
+                elif provider == "gemini":
+                    from worker.ai_config import mark_gemini_rate_limited
+                    _wait = 60.0
+                    mark_gemini_rate_limited(_wait)
+                elif provider == "openai":
+                    if "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
+                        # 크레딧 소진은 재시도로 절대 안 풀린다. 예전에는 이걸 일반 429로
+                        # 보고 매 기사마다 다시 호출해 연속 실패만 쌓았다(실측 213건 연속).
+                        from worker.ai_config import mark_openai_unavailable
+                        mark_openai_unavailable(3600.0)
+                    else:
+                        logger.warning("OpenAI 429 — 차단 없이 다음 시도에서 재시도 (제목: %s)", title[:60])
                 return None
         except Exception:
             pass
-        logger.exception("AI 분류 실패 (제목: %s)", title[:80])
+        logger.exception("AI 분류 실패 (provider=%s, 제목: %s)", provider, title[:80])
         return None
 
 # ── Sub-topic 키워드 기반 분류 ──────────────────────────────────────────────
