@@ -251,7 +251,10 @@ def _ai_same_event(
                 {"role": "user", "content": user_msg},
             ],
             temperature=0.0,
-            max_tokens=30,
+            # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 {"same":true}
+            # 하나 뱉기 전에 reasoning 토큰을 100+ 먼저 쓴다. 30이면 매번
+            # json_validate_failed로 실패해 AI 매칭이 전부 폴백(분리)으로 떨어진다.
+            max_tokens=250,
             response_format={"type": "json_object"},
         )
         data = json.loads(resp.choices[0].message.content)

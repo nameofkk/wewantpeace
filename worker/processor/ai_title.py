@@ -127,7 +127,10 @@ def generate_ai_title(
                 {"role": "user", "content": _build_user_prompt(titles, topic, country_code, bodies or None)},
             ],
             temperature=0.3,
-            max_tokens=200,
+            # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 reasoning 토큰을
+            # 먼저 쓰는 추론 모델이라 title_en/title_ko 두 필드 앞에 100+ 토큰이
+            # 더 필요하다. 200이면 부족해 json_validate_failed로 실패한다.
+            max_tokens=500,
             response_format={"type": "json_object"},
         )
         raw = resp.choices[0].message.content
