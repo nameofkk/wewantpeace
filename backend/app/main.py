@@ -21,6 +21,7 @@ from backend.app.routers import public as public_router
 from backend.app.routers import impact as impact_router
 from backend.app.routers import signals as signals_router
 from backend.app.routers import newsletter as newsletter_router
+from backend.app.routers import briefs as briefs_router
 from backend.app.routers import status as status_router
 import structlog
 
@@ -292,6 +293,7 @@ app.include_router(public_router.router)
 app.include_router(impact_router.router)
 app.include_router(signals_router.router)
 app.include_router(newsletter_router.router)
+app.include_router(briefs_router.router)
 app.include_router(status_router.router)
 
 

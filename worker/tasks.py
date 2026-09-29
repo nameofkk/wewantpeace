@@ -4310,6 +4310,45 @@ def detect_severity_outliers(self):
 
 
 @app.task(
+    name="worker.tasks.cleanup_brief_subscribers",
+    queue="process",
+    bind=True,
+    max_retries=1,
+)
+def cleanup_brief_subscribers(self):
+    """주간 브리프 구독자 정리 (매일).
+
+    개인정보처리방침 13조에 적은 약속을 지키는 작업이다.
+    - 수신거부 후 30일 지난 이메일 삭제
+    - 확인 링크를 7일 동안 안 누른 신청 삭제 (남의 주소로 신청된 것일 수 있다)
+    """
+
+    async def _run():
+        from sqlalchemy import delete, and_
+        from backend.app.models.brief_subscriber import BriefSubscriber
+
+        now = datetime.now(timezone.utc)
+        async with AsyncSessionLocal() as db:
+            async with db.begin():
+                gone = await db.execute(delete(BriefSubscriber).where(and_(
+                    BriefSubscriber.status == "unsubscribed",
+                    BriefSubscriber.unsubscribed_at < now - timedelta(days=30),
+                )))
+                stale = await db.execute(delete(BriefSubscriber).where(and_(
+                    BriefSubscriber.status == "pending",
+                    BriefSubscriber.created_at < now - timedelta(days=7),
+                )))
+        logger.info("cleanup_brief_subscribers: 수신거부 %d, 미확인 %d 삭제", gone.rowcount, stale.rowcount)
+        return {"unsubscribed": gone.rowcount, "pending": stale.rowcount}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("cleanup_brief_subscribers 오류: %s", exc)
+        raise self.retry(exc=exc)
+
+
+@app.task(
     name="worker.tasks.deactivate_stale_clusters",
     queue="process",
     bind=True,

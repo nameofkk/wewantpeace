@@ -485,6 +485,7 @@ export const translations = {
 
     // 국가별 이슈
     country_issues_title: "{country} 이슈",
+    country_brief_cta: "{country} 주간 요약 메일 받기 (무료, 주 1회)",
     country_issues_count: "{n}개 이슈 탐지",
     country_issues_error: "이슈를 불러올 수 없습니다.",
     country_issues_empty: "{country} 관련 이슈가 없습니다.",
@@ -2180,6 +2181,7 @@ export const translations = {
 
     // country issues
     country_issues_title: "{country} Issues",
+    country_brief_cta: "Get a weekly email brief on {country} (free, once a week)",
     country_issues_count: "{n} issues detected",
     country_issues_error: "Failed to load issues.",
     country_issues_empty: "No issues found for {country}.",

@@ -246,6 +246,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=5),  # 매일 05:00 UTC = KST 14:00
         "options": {"queue": "process"},
     },
+    "cleanup-brief-subscribers": {
+        "task": "worker.tasks.cleanup_brief_subscribers",
+        "schedule": crontab(minute=20, hour=6),  # 매일 06:20 UTC — 개인정보처리방침 13조 보유기간
+        "options": {"queue": "process"},
+    },
     "deactivate-stale-clusters": {
         "task": "worker.tasks.deactivate_stale_clusters",
         "schedule": crontab(minute=0, hour=6),  # 매일 06:00 UTC = KST 15:00

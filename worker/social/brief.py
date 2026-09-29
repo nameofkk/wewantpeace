@@ -352,10 +352,15 @@ def compose_alert_text(brief: dict, n_sources: int, cluster_id) -> str:
     return "\n\n".join([brief["headline"], _fit(brief["what"], max(room, 40)), footer])[:THREADS_LIMIT]
 
 
-def compose_sources_reply(source_names: list[str]) -> str | None:
+def compose_sources_reply(source_names: list[str], cc: str | None = None) -> str | None:
     if not source_names:
         return None
     shown = source_names[:5]
     rest = len(source_names) - len(shown)
     line = ", ".join(shown) + (f" and {rest} more" if rest > 0 else "")
-    return f"Sources for this brief: {line}.\n\nWe count a source once per outlet and leave out unverified channels."
+    text = f"Sources for this brief: {line}.\n\nWe count a source once per outlet and leave out unverified channels."
+    name = country_name(cc)
+    if name:
+        # 주간 브리프 이메일 구독 검증 실험 (2주) — 게시물 본문이 아니라 댓글에만
+        text += f"\n\nA weekly brief on {name} by email: {SITE}/brief?c={cc.upper()}&ref=threads"
+    return text

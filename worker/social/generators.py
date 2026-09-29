@@ -142,7 +142,7 @@ async def generate_kscore_alert(
         content_type="kscore_alert",
         lang="en",
         body_text=B.compose_alert_text(brief, ctx["n_sources"], cluster.id),
-        reply_text=B.compose_sources_reply(ctx["source_names"]),
+        reply_text=B.compose_sources_reply(ctx["source_names"], cluster.country_code),
         hashtags=[B.topic_tag_for(cluster.country_code, cluster.topic)],
         risk_level="high" if cluster.severity >= 70 else "medium",
         source_cluster_id=cluster.id,

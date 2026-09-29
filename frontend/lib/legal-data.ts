@@ -152,6 +152,10 @@ export const PRIVACY_KO = [
     title: "12. 개인정보의 해외 이전",
     content: `서비스 제공을 위해 다음과 같이 개인정보가 해외로 이전될 수 있습니다:\n• Firebase Authentication (Google LLC, 미국): 회원 인증 및 관리\n• Google Play (Google LLC, 미국): 인앱결제 처리 및 구독 관리\n• 이전되는 항목: Firebase UID, 이메일 주소, 결제 정보\n• 이전 방법: 네트워크를 통한 전송\n• 해당 업체의 개인정보보호 정책에 따라 보호됩니다.`,
   },
+  {
+    title: "13. 비회원 주간 브리프 구독",
+    content: `회원 가입 없이 나라별 주간 브리프를 구독하는 경우:\n• 수집 항목: 이메일 주소, 선택한 나라(최대 3개), 언어, 동의 시각, 유입 경로(예: threads)\n• 목적: 선택한 나라의 주간 브리프 발송\n• 근거: 구독 신청 시 받은 동의. 확인 메일의 링크를 눌러야 발송이 시작됩니다(이중 확인)\n• 보유 기간: 수신거부 시 발송 대상에서 즉시 제외, 수신거부 후 30일 안에 이메일 삭제\n• 발송 위탁: Resend (미국) — 이메일 발송 목적으로만 이메일 주소가 전달됩니다\n• 수신거부: 모든 메일 하단의 수신거부 링크 또는 ${CONTACT_EMAIL}\n• EU·영국 거주자는 열람·정정·삭제·처리 제한·이동권과 동의 철회권을 가지며, 거주국 감독기관에 민원을 제기할 수 있습니다.`,
+  },
 ];
 
 export const PRIVACY_EN = [
@@ -202,6 +206,10 @@ export const PRIVACY_EN = [
   {
     title: "12. International Transfer of Personal Information",
     content: `Personal information may be transferred overseas to provide the Service:\n• Firebase Authentication (Google LLC, USA): member authentication and management\n• Google Play (Google LLC, USA): in-app purchase processing and subscription management\n• Items transferred: Firebase UID, email address, payment information\n• Transfer method: transmission via network\n• Protected under each provider's privacy policies.`,
+  },
+  {
+    title: "13. Weekly Brief Subscription (No Account)",
+    content: `If you subscribe to a country brief without creating an account:\n• Data collected: email address, chosen countries (up to 3), language, time of consent, referral source (for example, threads)\n• Purpose: sending the weekly brief for the countries you chose\n• Legal basis: your consent when subscribing. Nothing is sent until you click the link in the confirmation email (double opt-in)\n• Retention: removed from sending immediately when you unsubscribe; the email address is deleted within 30 days of unsubscribing\n• Processor: Resend (USA), which receives your email address only to deliver the brief\n• Unsubscribe: the link at the bottom of every email, or ${CONTACT_EMAIL}\n• If you live in the EU or UK, you have the right to access, correct, delete, restrict and port your data, to withdraw consent at any time, and to complain to your local data protection authority.`,
   },
 ];
 

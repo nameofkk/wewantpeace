@@ -50,10 +50,12 @@ export default function CountryIssuesPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
   const lang = useAppStore((s) => s.lang);
-  const countryInfo = COUNTRY_MAP[code as keyof typeof COUNTRY_MAP];
+  // URL 은 소문자(/issues/country/ua)인데 COUNTRY_MAP 은 대문자 키 — 제목이 "ua 이슈"로 나왔다
+  const cc = (code || "").toUpperCase();
+  const countryInfo = COUNTRY_MAP[cc as keyof typeof COUNTRY_MAP];
   const displayName = lang === "en"
-    ? (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) || (countryInfo?.name ?? code); } catch { return countryInfo?.name ?? code; } })()
-    : (countryInfo?.name ?? code);
+    ? (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }).of(cc) || (countryInfo?.name ?? cc); } catch { return countryInfo?.name ?? cc; } })()
+    : (countryInfo?.name ?? cc);
   const countryName = countryInfo ? `${countryInfo.flag} ${displayName}` : displayName;
 
   const { data: clusters, isLoading, isError } = useQuery<ClusterOut[]>({
@@ -115,6 +117,14 @@ export default function CountryIssuesPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {/* 주간 브리프 구독 (2주 검증 실험) — 나라 페이지가 상세 화면 중 방문이 가장 많다 */}
+        <Link
+          href={`/brief?c=${code.toUpperCase()}&ref=country`}
+          className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+        >
+          <span>{t(lang, "country_brief_cta", { country: displayName })}</span>
+          <span aria-hidden>→</span>
+        </Link>
         {/* 긴장도 요약 섹션 */}
         {tensionData && (
           <div className="rounded-xl border border-border bg-card p-4">
