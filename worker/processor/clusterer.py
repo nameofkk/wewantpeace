@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 
 WINDOW_MINUTES = 1440  # 24시간 — 국제 뉴스 시차 고려, Filtered Jaccard로 오병합 방지
 MAX_CLUSTER_AGE_HOURS = 120  # 클러스터 절대 수명 상한 — 72→120h, 주요 이벤트는 5일간 지속
+SEVERITY_HALF_LIFE_HOURS = 48  # 클러스터 severity 가 최근 사건 기준이 되도록 과거 최고값을 감쇠
+
+
+def decayed_severity(current: int, last_event_at: datetime | None, now: datetime) -> int:
+    """과거 최고 severity 를 반감기로 줄인 값.
+
+    예전에는 severity 를 한 번 찍힌 최고값으로 영원히 유지해서 오래 이어지는 이슈가
+    전부 100에 붙어 버렸다(최근 48시간 21건 이상 클러스터 18개 중 18개가 90 이상).
+    새 이벤트가 들어올 때 max(새 이벤트, 감쇠된 과거 최고값)으로 갱신한다.
+    """
+    if not current or not last_event_at:
+        return current or 0
+    hours = max(0.0, (now - last_event_at).total_seconds() / 3600)
+    return int(round(current * 0.5 ** (hours / SEVERITY_HALF_LIFE_HOURS)))
 
 # geohash 없는 버킷("0000:topic")의 최대 이벤트 수 — 초과 시 새 클러스터 생성
 MAX_EVENTS_UNKNOWN_GEO = 2
@@ -1117,16 +1131,19 @@ async def assign_cluster(
 
     if cluster:
         n = cluster.event_count
+        prev_last_event_at = cluster.last_event_at
         cluster.event_count = n + 1
-        cluster.last_event_at = event.event_time
+        cluster.last_event_at = max(event.event_time, prev_last_event_at) if prev_last_event_at else event.event_time
         cluster.window_end = event.event_time + timedelta(minutes=WINDOW_MINUTES)
         # confidence: 이동 평균
         cluster.confidence = round(
             (cluster.confidence * n + event.confidence) / (n + 1), 3
         )
-        # severity: 최대값 유지
-        if event.severity > cluster.severity:
-            cluster.severity = event.severity
+        # severity: 감쇠된 과거 최고값과 새 이벤트 중 큰 값
+        cluster.severity = max(
+            event.severity,
+            decayed_severity(cluster.severity, prev_last_event_at, event.event_time),
+        )
         # independent_sources: trending_engine에서 실제 독립출처 수로 갱신
         # (여기서는 source_channel 중복 확인 불가 → 5분 주기 배치에서 정확히 계산)
         # source_tiers: 새 tier 추가
@@ -1273,6 +1290,22 @@ async def assign_cluster(
 
 # ── Post-hoc 클러스터 병합 (소규모 → 대규모) ──────────────────────────────────
 
+def can_merge_clusters(winner: IssueCluster, loser: IssueCluster, *, max_events: int) -> bool:
+    """두 클러스터를 합친 결과가 크기·기간 상한 안에 들어오는지.
+
+    예전 트렌딩 배치 병합은 winner 크기만 봤다. 그래서 오늘 생긴 작은 클러스터가 어제의
+    거대 클러스터(loser)를 통째로 흡수하고, 다음 날 또 새 클러스터가 그걸 흡수하는 식으로
+    3월 이벤트까지 끌고 다니는 1,000건짜리 이슈가 생겼다(9/29 기준 기간 14일 초과 활성 65개).
+    """
+    if (winner.event_count or 0) + (loser.event_count or 0) > max_events:
+        return False
+    firsts = [t for t in (winner.first_event_at, loser.first_event_at) if t]
+    lasts = [t for t in (winner.last_event_at, loser.last_event_at) if t]
+    if firsts and lasts and (max(lasts) - min(firsts)).total_seconds() > MAX_CLUSTER_AGE_HOURS * 3600:
+        return False
+    return True
+
+
 async def merge_fragmented_clusters(
     db: AsyncSession,
     *,
@@ -1337,6 +1370,9 @@ async def merge_fragmented_clusters(
         best_sim = -1.0
 
         for target in targets:
+            # 합친 크기·기간이 상한을 넘으면 제외 — window_end 를 늘려서 오래된 클러스터를 되살리지 않는다
+            if not can_merge_clusters(target, small, max_events=MAX_EVENTS_PER_CLUSTER):
+                continue
             sim = _title_similarity(
                 small.title, target.title,
                 ko_a=small.title_ko, ko_b=target.title_ko,

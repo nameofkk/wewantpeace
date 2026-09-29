@@ -1065,7 +1065,7 @@ def calculate_trending(self):
         from sqlalchemy import select, text
         from backend.app.models.issue_cluster import IssueCluster
         from worker.processor.trending_engine import _calc_kscore
-        from worker.processor.clusterer import _title_similarity
+        from worker.processor.clusterer import _title_similarity, can_merge_clusters
         from worker.processor.trending_engine import _is_junk_title
 
         _MERGE_TOPICS = {"conflict", "terror", "coup", "diplomacy", "maritime", "protest", "sanctions", "cyber"}
@@ -1102,6 +1102,9 @@ def calculate_trending(self):
 
         merged_total = 0
 
+        def _can_merge(winner, loser) -> bool:
+            return can_merge_clusters(winner, loser, max_events=_MAX_EVENTS)
+
         def _do_merge(winner, loser):
             """loser를 winner에 병합하는 공통 로직."""
             if _is_junk_title(winner.title or "") and not _is_junk_title(loser.title or ""):
@@ -1131,6 +1134,8 @@ def calculate_trending(self):
                 if (winner.last_event_at and loser.last_event_at
                         and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _TIME_WINDOW.total_seconds()):
                     continue
+                if not _can_merge(winner, loser):
+                    continue
                 topic = winner.topic or ""
                 if topic in _BROAD_TOPICS:
                     if _title_similarity(winner.title or "", loser.title or "") < 0.25:
@@ -1143,6 +1148,7 @@ def calculate_trending(self):
                 )
                 loser.severity = 0
                 loser.kscore = 0
+                loser.is_active = False  # 이벤트가 다 옮겨간 빈 껍데기
                 merged_total += 1
 
             age_hours = (datetime.now(timezone.utc) - winner.last_event_at).total_seconds() / 3600 if winner.last_event_at else 0.0
@@ -1198,6 +1204,8 @@ def calculate_trending(self):
                     )
                     if not in_same_group:
                         continue
+                    if not _can_merge(winner, loser):
+                        continue
                     # 시간 제한 (비용 낮은 검사를 유사도 전에 수행)
                     if (winner.last_event_at and loser.last_event_at
                             and abs((winner.last_event_at - loser.last_event_at).total_seconds()) > _cross_window_secs):
@@ -1222,6 +1230,7 @@ def calculate_trending(self):
                     )
                     loser.severity = 0
                     loser.kscore = 0
+                    loser.is_active = False
                     merged_ids.add(loser.id)
                     cross_merged += 1
 
@@ -4284,38 +4293,37 @@ def detect_severity_outliers(self):
 def deactivate_stale_clusters(self):
     """Stale 클러스터 자동 비활성화 (매일). T11
 
-    72시간 이상 이벤트 미추가 + severity < 30 → is_active=False.
-    severity 30 미만만 비활성화 (30-49 범위의 진행 중 분쟁은 보호).
+    - 72시간 이상 이벤트 미추가 + severity < 30 → is_active=False
+    - 수명 상한(MAX_CLUSTER_AGE_HOURS, 5일) 동안 이벤트가 없으면 severity 와 무관하게 종결
+
+    예전에는 첫 조건만 있었는데 severity 가 최고값으로 굳어 거의 다 30 이상이라
+    활성 클러스터가 3만 9천 개(그중 2만 7천 개는 한 달 넘게 조용함)까지 쌓였다.
+    진행 중인 분쟁은 새 이벤트가 들어오면서 새 클러스터로 이어진다.
     """
 
     async def _run():
-        from sqlalchemy import select, update, func
+        from sqlalchemy import select, update, func, or_, and_
         from backend.app.models.issue_cluster import IssueCluster
+        from worker.processor.clusterer import MAX_CLUSTER_AGE_HOURS
 
         now = datetime.now(timezone.utc)
         stale_cutoff = now - timedelta(hours=72)
+        dormant_cutoff = now - timedelta(hours=MAX_CLUSTER_AGE_HOURS)
+        stale_cond = and_(
+            IssueCluster.is_active == True,  # noqa: E712
+            or_(
+                and_(IssueCluster.last_event_at < stale_cutoff, IssueCluster.severity < 30),
+                IssueCluster.last_event_at < dormant_cutoff,
+            ),
+        )
 
         async with AsyncSessionLocal() as db:
             # 대상 클러스터 수 먼저 확인
-            count_q = await db.execute(
-                select(func.count(IssueCluster.id)).where(
-                    IssueCluster.is_active == True,  # noqa: E712
-                    IssueCluster.last_event_at < stale_cutoff,
-                    IssueCluster.severity < 30,  # 50→30: 심각도 30-49 분쟁 클러스터 보호
-                )
-            )
+            count_q = await db.execute(select(func.count(IssueCluster.id)).where(stale_cond))
             target_count = count_q.scalar() or 0
 
             if target_count > 0:
-                await db.execute(
-                    update(IssueCluster)
-                    .where(
-                        IssueCluster.is_active == True,  # noqa: E712
-                        IssueCluster.last_event_at < stale_cutoff,
-                        IssueCluster.severity < 30,  # 50→30
-                    )
-                    .values(is_active=False)
-                )
+                await db.execute(update(IssueCluster).where(stale_cond).values(is_active=False))
                 await db.commit()
 
             logger.info("deactivate_stale_clusters: %d개 비활성화", target_count)
