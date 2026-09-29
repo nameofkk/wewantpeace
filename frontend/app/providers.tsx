@@ -82,6 +82,48 @@ function NativePushClickHandler() {
   return null;
 }
 
+/**
+ * 방문 비콘 — 브라우저 탭 세션마다 1회 `visit` 이벤트.
+ *
+ * 누가 어디서 오는지를 우리 DB 로 직접 알기 위해 넣었다. 2026-09 진단 때는 이걸 알려고
+ * Railway HTTP 로그 13만 건을 내려받아 IP 를 나라로 바꾸고, 봇·데이터센터·JS 안 불러온
+ * 수집기를 걸러내야 했다(실제 사람은 하루 14명, 90% 해외).
+ * - 보내는 것: 들어온 사이트 도메인(주소 전체 아님), 첫 경로, ?ref= 값, 브라우저 언어, 시간대
+ * - 보내지 않는 것: IP, 쿼리 전체, 들어온 페이지의 전체 주소
+ * 자바스크립트를 실행하는 브라우저만 보내므로 봇 대부분이 자연히 빠진다.
+ */
+function VisitBeacon() {
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("wwp_visit_sent")) return;
+      sessionStorage.setItem("wwp_visit_sent", "1");
+    } catch {
+      return;
+    }
+    let refHost = "";
+    try {
+      if (document.referrer) {
+        const h = new URL(document.referrer).hostname;
+        if (h && h !== window.location.hostname) refHost = h;
+      }
+    } catch {}
+    let tz = "";
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch {}
+    const params = new URLSearchParams(window.location.search);
+    trackEvent("visit", {
+      ref_host: refHost,
+      ref: (params.get("ref") || params.get("utm_source") || "").slice(0, 32),
+      path: window.location.pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{id}").slice(0, 80),
+      lang: (navigator.language || "").slice(0, 16),
+      tz: tz.slice(0, 48),
+      mobile: /Mobi|Android|iPhone/i.test(navigator.userAgent),
+    });
+  }, []);
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -102,6 +144,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeSync />
       <FCMForegroundInit />
       <DailyActiveBootstrap />
+      <VisitBeacon />
       <NativePushClickHandler />
       {children}
       {process.env.NODE_ENV === "development" && (

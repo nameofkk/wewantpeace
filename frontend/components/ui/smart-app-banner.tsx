@@ -121,7 +121,7 @@ export function SmartAppBanner() {
   if (inApp) {
     return (
       <div className={cn(
-        "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300",
+        "fixed left-4 right-[68px] z-50 rounded-xl border border-border bg-card shadow-xl p-4 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-300",
         isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
       )}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20">
@@ -157,10 +157,11 @@ export function SmartAppBanner() {
   // 모바일/PC 브라우저: 스토어 다운로드 유도
   const storeLabel = lang === "en" ? "Install" : "설치";
 
-  // 한 줄짜리 바 — 예전 카드형은 피드 아래쪽 두 줄을 통째로 가렸다
+  // 한 줄짜리 바 — 예전 카드형은 피드 아래쪽 두 줄을 통째로 가렸다.
+  // 오른쪽 68px 는 같은 높이의 투어 도움말 버튼(TourHelpButton) 자리 — 닫기 버튼이 그 밑에 깔렸었다
   return (
     <div className={cn(
-      "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-lg px-3 py-2 flex items-center gap-2.5 animate-in slide-in-from-bottom-4 duration-300",
+      "fixed left-4 right-[68px] z-50 rounded-xl border border-border bg-card shadow-lg px-3 py-2 flex items-center gap-2.5 animate-in slide-in-from-bottom-4 duration-300",
       isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
     )}>
       <Smartphone className="h-4 w-4 text-primary shrink-0" />
