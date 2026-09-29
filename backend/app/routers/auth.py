@@ -467,7 +467,8 @@ async def register(
 
 
 @router.get("/check-nickname")
-async def check_nickname(nickname: str, db: AsyncSession = Depends(get_db)):
+@limiter.limit("20/minute")
+async def check_nickname(request: Request, response: Response, nickname: str, db: AsyncSession = Depends(get_db)):
     """닉네임 중복 확인."""
     result = await db.execute(select(User).where(User.nickname == nickname.strip()))
     exists = result.scalar_one_or_none() is not None

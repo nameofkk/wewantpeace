@@ -343,7 +343,8 @@ async def countries_list(
         .where(IssueCluster.is_active.is_(True))
     )).scalars().all()
 
-    all_codes = sorted(set(tension_cc) | set(cluster_cc))
+    # country_code 가 NULL 인 클러스터가 섞여 정렬에서 TypeError → 매 요청 500 이었다
+    all_codes = sorted(c for c in set(tension_cc) | set(cluster_cc) if c)
 
     return {
         "count": len(all_codes),

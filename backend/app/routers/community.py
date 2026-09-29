@@ -188,7 +188,10 @@ def _comment_to_out(c: Comment, nickname: Optional[str] = None) -> CommentOut:
 # ── 이미지 업로드 ──────────────────────────────────────────────────────────────
 
 @router.post("/upload")
+@limiter.limit("10/minute")
 async def upload_image(
+    request: Request,
+    response: Response,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
@@ -550,7 +553,10 @@ async def get_post(
 
 
 @router.patch("/posts/{post_id}", response_model=PostOut)
+@limiter.limit("20/minute")
 async def update_post(
+    request: Request,
+    response: Response,
     post_id: str,
     body: PostCreate,
     current_user: User = Depends(get_current_user),
@@ -568,6 +574,12 @@ async def update_post(
     if str(post.user_id) != str(current_user.id) and not current_user.is_admin():
         raise HTTPException(403, detail="수정 권한이 없습니다.")
 
+    # 생성과 같은 검증 — 예전엔 작성자가 PATCH 로 일반글을 공지로 바꿀 수 있었다
+    if body.post_type not in ("discussion", "question", "analysis", "notice"):
+        raise HTTPException(422, detail="유효하지 않은 게시글 유형입니다.")
+    if body.post_type == "notice" and post.post_type != "notice" and not current_user.is_admin():
+        raise HTTPException(403, detail="공지사항은 관리자만 작성할 수 있습니다.")
+
     post.title = body.title[:200]
     post.content = body.content
     post.post_type = body.post_type
@@ -581,7 +593,10 @@ async def update_post(
 
 
 @router.delete("/posts/{post_id}", status_code=204)
+@limiter.limit("30/minute")
 async def delete_post(
+    request: Request,
+    response: Response,
     post_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -628,7 +643,10 @@ async def toggle_pin(
 
 
 @router.post("/posts/{post_id}/react", status_code=200)
+@limiter.limit("60/minute")
 async def react_post(
+    request: Request,
+    response: Response,
     post_id: str,
     body: ReactionBody,
     current_user: User = Depends(get_current_user),
@@ -683,7 +701,10 @@ async def react_post(
 # ── 북마크 ────────────────────────────────────────────────────────────────────
 
 @router.post("/posts/{post_id}/bookmark", status_code=200)
+@limiter.limit("60/minute")
 async def toggle_bookmark(
+    request: Request,
+    response: Response,
     post_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -785,7 +806,10 @@ async def list_bookmarks(
 # ── 댓글 ─────────────────────────────────────────────────────────────────────
 
 @router.post("/posts/{post_id}/comments", response_model=CommentOut, status_code=201)
+@limiter.limit("20/minute")
 async def create_comment(
+    request: Request,
+    response: Response,
     post_id: str,
     body: CommentCreate,
     current_user: User = Depends(get_current_user),
@@ -857,7 +881,10 @@ async def list_comments(
 
 
 @router.patch("/comments/{comment_id}", response_model=CommentOut)
+@limiter.limit("20/minute")
 async def update_comment(
+    request: Request,
+    response: Response,
     comment_id: str,
     body: CommentCreate,
     current_user: User = Depends(get_current_user),
@@ -883,7 +910,10 @@ async def update_comment(
 
 
 @router.delete("/comments/{comment_id}", status_code=204)
+@limiter.limit("30/minute")
 async def delete_comment(
+    request: Request,
+    response: Response,
     comment_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -905,7 +935,10 @@ async def delete_comment(
 
 
 @router.post("/comments/{comment_id}/react", status_code=200)
+@limiter.limit("60/minute")
 async def react_comment(
+    request: Request,
+    response: Response,
     comment_id: str,
     body: ReactionBody,
     current_user: User = Depends(get_current_user),
@@ -946,7 +979,10 @@ async def react_comment(
 # ── 신고 ─────────────────────────────────────────────────────────────────────
 
 @router.post("/reports", status_code=201)
+@limiter.limit("10/minute")
 async def create_report(
+    request: Request,
+    response: Response,
     body: ReportCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

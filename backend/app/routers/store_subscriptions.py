@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -265,7 +266,7 @@ async def google_rtdn_webhook(
         logger.error("Google RTDN: GOOGLE_RTDN_WEBHOOK_TOKEN 미설정 — 웹훅 거부")
         raise HTTPException(403, detail="Webhook token not configured")
     request_token = request.query_params.get("token", "")
-    if not request_token or request_token != webhook_token:
+    if not request_token or not hmac.compare_digest(request_token.encode(), webhook_token.encode()):
         logger.warning("Google RTDN: 인증 실패 (잘못된 토큰)")
         raise HTTPException(403, detail="Forbidden")
 

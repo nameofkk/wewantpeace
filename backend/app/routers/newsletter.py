@@ -8,13 +8,12 @@ GET  /newsletter/archive/{log_id}       -- 특정 뉴스레터 HTML (public)
 GET  /newsletter/stats                  -- 구독자 수 (public)
 GET  /newsletter/sample?lang=kr|us      -- 샘플 뉴스레터 HTML (public)
 """
-from __future__ import annotations
 
 import hmac
 from hashlib import sha256
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -22,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import get_db
 from backend.app.core.config import settings
+from backend.app.core.limiter import limiter
 from backend.app.core.redis import get_redis
 from backend.app.models.user import User
 from backend.app.models.terms import UserConsent
@@ -69,7 +69,10 @@ async def _find_user_by_token(
 # ── GET /newsletter/unsubscribe ──────────────────────────────────────────────
 
 @router.get("/unsubscribe")
+@limiter.limit("10/minute")
 async def unsubscribe_info(
+    request: Request,
+    response: Response,
     token: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_db),
 ):
@@ -93,7 +96,9 @@ class UnsubscribeBody(BaseModel):
 
 
 @router.post("/unsubscribe")
+@limiter.limit("10/minute")
 async def unsubscribe_execute(
+    response: Response,
     body: UnsubscribeBody,
     request: Request,
     db: AsyncSession = Depends(get_db),

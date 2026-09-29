@@ -24,9 +24,11 @@ KST = timezone(timedelta(hours=9))
 # .env의 DISABLE_AUTH=true를 pydantic_settings를 통해 읽음 (os.getenv는 shell 환경변수만 봄)
 _disable_auth_raw = settings.disable_auth or os.getenv("DISABLE_AUTH", "false").lower() == "true"
 
-# ENVIRONMENT=production 이면 DISABLE_AUTH를 강제로 false
+# 프로덕션에서는 DISABLE_AUTH 금지. ENVIRONMENT 는 손으로 넣는 값이라 빠질 수 있으니
+# Railway 가 자동으로 넣는 RAILWAY_ENVIRONMENT 도 같이 본다 (config.py 의 SECRET_KEY 가드와 같은 방식).
 _environment = os.getenv("ENVIRONMENT", "development").lower()
-if _disable_auth_raw and _environment == "production":
+_on_railway = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+if _disable_auth_raw and (_environment == "production" or _on_railway):
     logger.critical(
         "🚨 DISABLE_AUTH=true detected in PRODUCTION environment — "
         "forcing auth back on. Set DISABLE_AUTH=false in production!"
