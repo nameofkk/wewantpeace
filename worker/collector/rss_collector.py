@@ -13,7 +13,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import feedparser
@@ -37,6 +37,11 @@ MIN_WORDS = 8
 
 # 최소 텍스트 길이 (글자 수)
 MIN_CHARS = 60
+
+# 발행 시각이 이보다 오래된 기사는 적재하지 않는다.
+# 구글 뉴스 검색형 피드가 몇 달 전 기사를 섞어 보내서, 3월 기사가 9월 이슈 타임라인에 올라왔다.
+# 발행 시각이 없는 항목은 수집 시각으로 대신하므로 이 필터에 걸리지 않는다.
+MAX_ARTICLE_AGE_HOURS = 72
 
 # 스팸 패턴 (정규식, re.IGNORECASE 적용)
 _SPAM_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
@@ -345,11 +350,17 @@ def _parse_datetime(entry: dict[str, Any]) -> Optional[datetime]:
     try:
         t = entry.get("published_parsed") or entry.get("updated_parsed")
         if t:
-            import time as time_mod
-            return datetime.fromtimestamp(time_mod.mktime(t), tz=timezone.utc)
+            # feedparser 의 struct_time 은 UTC — mktime(로컬 기준) 대신 timegm
+            import calendar
+            return datetime.fromtimestamp(calendar.timegm(t), tz=timezone.utc)
     except Exception:
         pass
     return None
+
+
+def _is_too_old(published_at: datetime, now: Optional[datetime] = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    return now - published_at > timedelta(hours=MAX_ARTICLE_AGE_HOURS)
 
 
 # ── 수집기 ───────────────────────────────────────────────────────────────────
@@ -511,7 +522,13 @@ class RSSCollector:
                 result.skipped += 1
                 continue
 
-            # 3. 중복 확인 (피드별 commit으로 pending INSERT 수 제한됨)
+            # 4. 오래된 기사 필터 (발행 시각이 있을 때만)
+            published_at = _parse_datetime(entry)
+            if published_at and _is_too_old(published_at):
+                result.skipped += 1
+                continue
+
+            # 5. 중복 확인 (피드별 commit으로 pending INSERT 수 제한됨)
             existing = await db.execute(
                 select(RawEvent).where(
                     RawEvent.source_type == "rss",
@@ -523,7 +540,7 @@ class RSSCollector:
                 continue
 
             collected_at = datetime.now(timezone.utc)
-            event_time = _parse_datetime(entry) or collected_at
+            event_time = published_at or collected_at
             image_url = _extract_image_url(entry)
             raw_metadata = {
                 "title": entry.get("title", "")[:512],
@@ -531,7 +548,7 @@ class RSSCollector:
                 "author": entry.get("author", ""),
                 "tags": [t.get("term", "") for t in entry.get("tags", [])],
                 "published": event_time.isoformat(),  # 실제 발행 시간 (정규화에서 사용)
-                "time_source": "parsed" if _parse_datetime(entry) else "collected_at",
+                "time_source": "parsed" if published_at else "collected_at",
             }
             if image_url:
                 raw_metadata["image_url"] = image_url

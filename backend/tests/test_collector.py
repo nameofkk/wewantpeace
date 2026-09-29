@@ -3,12 +3,13 @@
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import time
 
 from backend.app.models.source_channel import SourceChannel
 from backend.app.models.raw_event import RawEvent
 from worker.collector.telegram_collector import TelegramCollector
-from worker.collector.rss_collector import RSSCollector, _compute_guid, _extract_text
+from worker.collector.rss_collector import RSSCollector, _compute_guid, _extract_text, _is_too_old, _parse_datetime
 
 
 def _make_telethon_message(
@@ -278,7 +279,7 @@ class TestRSSCollectorIntegration:
                 "summary": "Multiple missile strikes targeting Ukrainian infrastructure confirmed by officials.",
                 "link": "https://reuters.com/test-001",
                 "published": "Tue, 22 Feb 2026 10:00:00 GMT",
-                "published_parsed": (2026, 2, 22, 10, 0, 0, 1, 53, 0),
+                "published_parsed": time.gmtime(time.time() - 3600),
             }
         ]
 
@@ -321,7 +322,7 @@ class TestRSSCollectorIntegration:
             "id": "bbc-unique-001",
             "summary": "Multiple reports confirm large-scale military operations across the eastern border region with significant civilian impact. Officials have called for immediate ceasefire negotiations.",
             "link": "https://bbc.co.uk/001",
-            "published_parsed": (2026, 2, 22, 10, 0, 0, 1, 53, 0),
+            "published_parsed": time.gmtime(time.time() - 3600),
         }
         mock_parsed = MagicMock()
         mock_parsed.bozo = False
@@ -392,3 +393,49 @@ class TestRSSCollectorIntegration:
             result = await collector.collect_feed(channel, db)
         assert result.skipped == 1
         assert result.collected == 0
+
+
+class TestOldArticleFilter:
+    """발행 72시간 넘은 기사는 적재하지 않는다 (3월 기사가 9월 타임라인에 올라온 문제)."""
+
+    def test_is_too_old_boundary(self):
+        now = datetime(2026, 9, 30, 12, 0, tzinfo=timezone.utc)
+        assert not _is_too_old(now - timedelta(hours=71), now)
+        assert _is_too_old(now - timedelta(hours=73), now)
+
+    def test_parse_datetime_is_utc(self):
+        entry = {"published_parsed": time.struct_time((2026, 9, 30, 10, 0, 0, 2, 273, 0))}
+        assert _parse_datetime(entry) == datetime(2026, 9, 30, 10, 0, tzinfo=timezone.utc)
+
+    @pytest.mark.asyncio
+    async def test_old_entry_skipped_but_undated_kept(self, db):
+        from sqlalchemy import select
+
+        channel = SourceChannel(
+            display_name="Google News search", tier="B", base_confidence=0.7, language="en",
+            topics=["conflict"], geo_focus=[], source_type="rss",
+            feed_url="https://news.google.com/rss/search?q=x", is_active=True,
+        )
+        db.add(channel)
+        await db.flush()
+
+        body = "Officials confirmed several missile strikes on energy infrastructure overnight in the region."
+        mock_parsed = MagicMock()
+        mock_parsed.bozo = False
+        mock_parsed.href = channel.feed_url
+        mock_parsed.status = 200
+        mock_parsed.entries = [
+            {"id": "old-1", "title": "Old strike report", "summary": body, "link": "https://x/old",
+             "published_parsed": time.gmtime(time.time() - 200 * 86400)},
+            {"id": "fresh-1", "title": "Fresh strike report", "summary": body + " fresh", "link": "https://x/fresh",
+             "published_parsed": time.gmtime(time.time() - 3600)},
+            {"id": "undated-1", "title": "Undated strike report", "summary": body + " undated", "link": "https://x/undated"},
+        ]
+
+        with patch("worker.collector.rss_collector.feedparser.parse", return_value=mock_parsed):
+            result = await RSSCollector().collect_feed(channel, db)
+
+        assert result.collected == 2
+        assert result.skipped == 1
+        rows = (await db.execute(select(RawEvent).where(RawEvent.source_type == "rss"))).scalars().all()
+        assert sorted(r.external_id for r in rows) == ["fresh-1", "undated-1"]

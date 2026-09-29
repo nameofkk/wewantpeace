@@ -3,6 +3,7 @@ pytest 픽스처 설정.
 - 비동기 SQLite(aiosqlite) 인메모리 DB
 - fakeredis Redis 목
 """
+import time
 import asyncio
 import os
 import sys
@@ -150,5 +151,5 @@ def sample_rss_entry():
         "summary": "Ukrainian officials confirmed multiple missile strikes targeting energy infrastructure in Kyiv on Tuesday.",
         "link": "https://reuters.com/article/test-123",
         "published": "Tue, 22 Feb 2026 10:00:00 GMT",
-        "published_parsed": (2026, 2, 22, 10, 0, 0, 1, 53, 0),
+        "published_parsed": time.gmtime(time.time() - 3600),
     }
