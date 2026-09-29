@@ -6,11 +6,12 @@ import { isInAppBrowser, isStandalone } from "@/lib/browser-detect";
 import { isNativeApp, isMobileBrowser, isAndroidBrowser, isIOSBrowser } from "@/lib/platform-detect";
 import { isTossMiniApp } from "@/lib/platform";
 import { useAppStore } from "@/lib/store";
-import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const DISMISS_KEY = "smart_app_banner_dismissed";
-const DISMISS_HOURS = 72; // 3일
+const DISMISS_HOURS = 24 * 14; // 2주
+const VISITS_KEY = "smart_app_banner_visits";
+const MIN_VISITS = 2; // 첫 방문에는 내용부터 보여 준다
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.wewantpeace.app";
 const PLAY_STORE_MARKET = "market://details?id=com.wewantpeace.app";
@@ -59,6 +60,17 @@ export function SmartAppBanner() {
 
     // iOS 전용 브라우저인데 App Store ID가 없으면 배너 표시 안 함
     if (isIOSBrowser() && !APP_STORE_ID) return;
+    // PC에서는 설치할 앱이 없으니 표시 안 함 (Play 스토어 웹 링크만 떴었다)
+    if (!isMobileBrowser()) return;
+
+    // 첫 방문자에게는 띄우지 않는다 — 들어오자마자 화면 아래를 가렸다
+    let visits = parseInt(localStorage.getItem(VISITS_KEY) || "0", 10);
+    if (!sessionStorage.getItem(VISITS_KEY)) {
+      sessionStorage.setItem(VISITS_KEY, "1");
+      visits += 1;
+      localStorage.setItem(VISITS_KEY, String(visits));
+    }
+    if (visits < MIN_VISITS) return;
 
     // 72시간 내 닫은 적 있으면 무시
     const dismissed = localStorage.getItem(DISMISS_KEY);
@@ -143,70 +155,31 @@ export function SmartAppBanner() {
   }
 
   // 모바일/PC 브라우저: 스토어 다운로드 유도
-  const isMobile = isMobileBrowser();
-  const storeLabel = isAndroidBrowser()
-    ? t(lang, "store_download_android")
-    : isIOSBrowser()
-      ? t(lang, "store_download_ios")
-      : lang === "en"
-        ? "Get the app"
-        : "앱 다운로드";
+  const storeLabel = lang === "en" ? "Install" : "설치";
 
+  // 한 줄짜리 바 — 예전 카드형은 피드 아래쪽 두 줄을 통째로 가렸다
   return (
     <div className={cn(
-      "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-xl p-4 animate-in slide-in-from-bottom-4 duration-300",
+      "fixed left-4 right-4 z-50 rounded-xl border border-border bg-card shadow-lg px-3 py-2 flex items-center gap-2.5 animate-in slide-in-from-bottom-4 duration-300",
       isTossMiniApp() ? "bottom-[calc(80px+env(safe-area-inset-bottom,0px))]" : "bottom-[72px]"
     )}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20">
-          <Smartphone className="h-5 w-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">
-            {lang === "en" ? "Get WeWantPeace app" : "WeWantPeace 앱 설치"}
-          </p>
-          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
-            {lang === "en"
-              ? "Get real-time alerts and a better experience"
-              : "실시간 알림과 더 나은 경험을 받아보세요"}
-          </p>
-        </div>
-        <button
-          onClick={handleDismiss}
-          className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          aria-label={lang === "ko" ? "닫기" : "Close"}
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* 스토어 배지 (공식 스타일) */}
-      <div className="flex gap-2 mt-3">
-        {(!isMobile || isAndroidBrowser()) && (
-          <button
-            onClick={() => { openPlayStore(); handleDismiss(); }}
-            className="flex-1 flex items-center gap-2 rounded-lg bg-black px-3 py-2 hover:bg-zinc-900 transition-colors border border-zinc-700"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white shrink-0"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.807 1.626a1 1 0 010 1.732l-2.807 1.626L15.206 12l2.492-2.492zM5.864 3.458L16.8 9.79l-2.302 2.302-8.635-8.635z"/></svg>
-            <div className="text-left">
-              <p className="text-[7px] text-zinc-400 leading-tight uppercase tracking-wider">{lang === "en" ? "GET IT ON" : "다운로드"}</p>
-              <p className="text-[13px] font-semibold text-white leading-tight tracking-tight">Google Play</p>
-            </div>
-          </button>
-        )}
-        {APP_STORE_URL && (!isMobile || isIOSBrowser()) && (
-          <button
-            onClick={() => { window.open(APP_STORE_URL, "_blank"); handleDismiss(); }}
-            className="flex-1 flex items-center gap-2 rounded-lg bg-black px-3 py-2 hover:bg-zinc-900 transition-colors border border-zinc-700"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white shrink-0"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-            <div className="text-left">
-              <p className="text-[7px] text-zinc-400 leading-tight uppercase tracking-wider">{lang === "en" ? "Download on the" : "다운로드"}</p>
-              <p className="text-[13px] font-semibold text-white leading-tight tracking-tight">App Store</p>
-            </div>
-          </button>
-        )}
-      </div>
+      <Smartphone className="h-4 w-4 text-primary shrink-0" />
+      <p className="flex-1 min-w-0 text-xs font-medium truncate">
+        {lang === "en" ? "Get alerts in the app" : "앱에서 알림 받기"}
+      </p>
+      <button
+        onClick={handleStoreClick}
+        className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+      >
+        {storeLabel}
+      </button>
+      <button
+        onClick={handleDismiss}
+        className="shrink-0 rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        aria-label={lang === "ko" ? "닫기" : "Close"}
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { t } from "@/lib/i18n";
 import { Megaphone, ChevronRight } from "lucide-react";
 import { communityPostPath } from "@/lib/toss-nav";
 
+const NOTICE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
 interface Notice {
   id: string;
   title: string;
@@ -29,9 +31,15 @@ export function NoticeTicker() {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (!notices || notices.length === 0) return null;
+  // 고정 공지라도 홈 상단에는 최근 것만 — 5월 공지가 9월까지 첫 화면에 남아 있었다.
+  // 영어 사용자에게는 영어 제목이 없는 한국어 전용 공지를 보이지 않는다.
+  const cutoff = Date.now() - NOTICE_MAX_AGE_MS;
+  const visible = (notices ?? []).filter(
+    (n) => new Date(n.created_at).getTime() >= cutoff && (lang !== "en" || !!n.title_en),
+  );
+  if (visible.length === 0) return null;
 
-  const latest = notices[0];
+  const latest = visible[0];
 
   return (
     <button
