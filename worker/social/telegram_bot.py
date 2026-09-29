@@ -93,7 +93,7 @@ async def send_review_message(post: SocialPost) -> bool:
             if SOCIAL_PLATFORM_X_ENABLED:
                 x_text = x_build_text(post)
                 x_msg = (
-                    f"<b>[X 미리보기]</b> {content_label}\n\n"
+                    f"[X 미리보기] {content_label}\n\n"
                     f"{x_text}\n\n"
                     f"{len(x_text)}/280자 | 리스크: {post.risk_level}"
                 )
@@ -116,7 +116,7 @@ async def send_review_message(post: SocialPost) -> bool:
             if SOCIAL_PLATFORM_THREADS_ENABLED:
                 threads_text = threads_build_text(post)
                 threads_msg = (
-                    f"<b>[Threads 미리보기]</b> {content_label}\n\n"
+                    f"[Threads 미리보기] {content_label}\n\n"
                     f"{threads_text}\n\n"
                     f"{len(threads_text)}/500자 | 리스크: {post.risk_level}"
                 )

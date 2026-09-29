@@ -1,7 +1,5 @@
-"""SNS 콘텐츠 생성기 — Daily Movers / KScore Alert / Weekly Recap (bilingual)."""
+"""SNS 콘텐츠 생성기 — Daily brief / 단건 브리프 / Week in review (영어, Threads)."""
 import logging
-import re
-import uuid
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import select, func
@@ -12,362 +10,152 @@ from backend.app.models.social_post import SocialPost
 
 logger = logging.getLogger(__name__)
 
-from worker.ai_config import get_client as _get_ai_client, get_model as _get_ai_model, get_current_provider as _get_ai_provider, is_available as _ai_available
+# ── 공통 ────────────────────────────────────────────────────────────────────
+# 2026-09-30 개편: 한·영 혼합 + 이모지 + BREAKING 톤 → 영어 정보형 브리프.
+# 본문·카드·출처 댓글 조립은 worker/social/brief.py, 카드 서식은 brief_card.py.
 
-# 국가코드 → 해시태그 매핑
-_COUNTRY_HASHTAGS: dict[str, str] = {
-    "UA": "#Ukraine", "RU": "#Russia", "IL": "#Israel", "PS": "#Palestine",
-    "IR": "#Iran", "CN": "#China", "TW": "#Taiwan", "KP": "#NorthKorea",
-    "KR": "#SouthKorea", "US": "#USA", "SY": "#Syria", "YE": "#Yemen",
-    "MM": "#Myanmar", "SD": "#Sudan", "ET": "#Ethiopia", "AF": "#Afghanistan",
-    "IQ": "#Iraq", "LB": "#Lebanon", "PK": "#Pakistan", "IN": "#India",
-    "JP": "#Japan", "TR": "#Turkey", "EG": "#Egypt", "SA": "#SaudiArabia",
-    "NG": "#Nigeria", "CD": "#Congo", "SO": "#Somalia", "LY": "#Libya",
-}
+def _initial_status() -> str:
+    """새 형식 첫 이틀은 텔레그램 승인을 거친다 (SOCIAL_REVIEW_UNTIL)."""
+    from worker.social.config import review_required
+    return "pending_review" if review_required() else "approved"
 
 
-def _clean_markdown(text: str) -> str:
-    """AI 응답에서 마크다운 포맷 제거 (DB 저장 전 정규화).
-
-    **bold** → bold, *italic* → text, __underline__ → text, _italic_ → text
-    """
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
-    text = re.sub(r'__(.+?)__', r'\1', text)
-    text = re.sub(r'_(.+?)_', r'\1', text)
-    return text
-
-
-def _risk_from_severity(severity: int) -> str:
-    if severity < 40:
-        return "low"
-    if severity < 70:
-        return "medium"
-    return "high"
+async def notify_pending(posts) -> None:
+    """승인 대기 게시물을 텔레그램 승인 봇에 올린다. DB 커밋 뒤에 불러야 버튼이 동작한다."""
+    from worker.social.telegram_bot import send_review_message
+    for post in posts:
+        if post is not None and post.status == "pending_review":
+            try:
+                await send_review_message(post)
+            except Exception:
+                logger.exception("승인 요청 전송 실패: post=%s", post.id)
 
 
-# v7: 토픽→해시태그 매핑
-_TOPIC_HASHTAGS: dict[str, list[str]] = {
-    "conflict": ["#Breaking", "#Conflict"],
-    "terror": ["#Breaking", "#Terror"],
-    "coup": ["#Breaking", "#Coup"],
-    "sanctions": ["#Sanctions", "#Geopolitics"],
-    "cyber": ["#CyberAttack", "#CyberSecurity"],
-    "protest": ["#Protest", "#Unrest"],
-    "diplomacy": ["#Diplomacy", "#Peace"],
-    "maritime": ["#Maritime", "#Security"],
-    "disaster": ["#Disaster", "#HumanitarianCrisis"],
-    "health": ["#HealthCrisis", "#Global"],
-}
+async def _already_exists(db: AsyncSession, dedup_key: str) -> bool:
+    existing = await db.execute(select(SocialPost.id).where(SocialPost.dedup_key == dedup_key))
+    return existing.scalar_one_or_none() is not None
 
 
-def _build_hashtags(country_codes: list[str], topic: str = "") -> list[str]:
-    """v7: 동적 토픽+국가 기반 해시태그 (고정 #WeWantPeace 제거)."""
-    tags: list[str] = []
-    # 토픽 기반 해시태그
-    topic_tags = _TOPIC_HASHTAGS.get(topic, [])
-    for t in topic_tags:
-        if t not in tags:
-            tags.append(t)
-    # 국가 기반 해시태그
-    for cc in country_codes:
-        tag = _COUNTRY_HASHTAGS.get(cc)
-        if tag and tag not in tags:
-            tags.append(tag)
-    # 최대 3개로 제한
-    return tags[:3] if tags else ["#WeWantPeace"]
-
-
-def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
-    if not _ai_available():
-        logger.warning("AI API 키 미설정, AI 생성 건너뜀")
-        return None
-    try:
-        client = _get_ai_client(timeout=15.0)
-        provider = _get_ai_provider()
-        _extra_kwargs = {}
-        if provider == "gemini":
-            _extra_kwargs["reasoning_effort"] = "minimal"
-        resp = client.chat.completions.create(
-            model=_get_ai_model(),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.7,
-            # openai/gpt-oss-120b(2026-09 Groq 모델 교체)는 추론 모델이라 본문 전에
-            # reasoning 토큰을 먼저 쓴다. 2026-09-15 실측: max_tokens=600에서
-            # reasoning만 517토큰을 먹어 본문이 "www"에서 잘리거나(finish_reason=
-            # length) 완전히 빈 문자열로 나옴 — json_object 모드가 아니라 예외 없이
-            # 조용히 실패해(호출부는 `if not body:` 폴백으로 감쪽같이 넘어감)
-            # 발견이 늦었다. 다른 호출부와 동일하게 여유 있게 잡는다.
-            max_tokens=1200,
-            **_extra_kwargs,
-        )
-        content = (resp.choices[0].message.content or "").strip()
-        if not content:
-            logger.warning("AI 응답 비어있음 (provider=%s, finish_reason=%s)", provider, resp.choices[0].finish_reason)
-        return content
-    except Exception:
-        logger.exception("AI 호출 실패")
-        return None
-
-
-async def _generate_card_for_post(
-    post: SocialPost,
-    clusters=None,
-):
-    """포스트에 카드 이미지 생성 (실패 시 기본 OG 이미지 폴백)."""
-    try:
-        from worker.social.card_generator import generate_card_for_post
-        await generate_card_for_post(post, clusters)
-    except Exception:
-        logger.warning("카드 이미지 생성 실패 (무시): post=%s", post.id)
-
-    # 카드 이미지 생성 실패 시 기본 OG 이미지를 폴백으로 설정
-    if not post.image_url:
-        post.image_url = "https://www.wewantpeace.live/og-default.png"
-
-
-# ── 공통 bilingual 시스템 프롬프트 ──────────────────────────────────────────
-
-_BILINGUAL_SYSTEM = (
-    "You write punchy, scroll-stopping bilingual social media posts about global conflicts "
-    "for WeWantPeace — a real-time conflict monitoring platform (Threads & Telegram).\n"
-    "Format — English first, blank line, Korean, blank line, CTA:\n"
-    "\n"
-    "[emoji] Headline in English\n"
-    "Key point 1 · Key point 2\n"
-    "\n"
-    "[emoji] 한국어 헤드라인\n"
-    "핵심 1 · 핵심 2\n"
-    "\n"
-    "→ Track live updates · 실시간 분석 확인\n"
-    "www.wewantpeace.live\n"
-    "\n"
-    "Rules:\n"
-    "- Body MUST be under 380 chars total (EN + KO combined)\n"
-    "- Use 1-2 relevant emojis (🔴⚡🌍🚨 etc.) for visual punch\n"
-    "- Use · or | as separators, NOT full sentences\n"
-    "- Be factual but impactful — hook the reader in 2 seconds\n"
-    "- Use line breaks for scannable layout\n"
-    "- End with a bilingual CTA line + site URL as shown above\n"
-    "- NO hashtags (added separately), NO labels like 'EN:'/'KO:'\n"
-    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages mixed in.\n"
-    "- Include specific facts: country name, numbers, actions — avoid vague phrases\n"
-    "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting\n"
-    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
-)
-
-_SPIKE_BILINGUAL_SYSTEM = (
-    "You write URGENT breaking news bilingual posts about global conflicts "
-    "for WeWantPeace — a real-time conflict monitoring platform (Threads & Telegram).\n"
-    "Format — English first, blank line, Korean, blank line, CTA:\n"
-    "\n"
-    "🚨 [BREAKING] Headline\n"
-    "Key detail · Impact\n"
-    "\n"
-    "🚨 [속보] 헤드라인\n"
-    "핵심 · 영향\n"
-    "\n"
-    "🔗 Full analysis · 상세 분석\n"
-    "www.wewantpeace.live\n"
-    "\n"
-    "Rules:\n"
-    "- Body MUST be under 380 chars total (EN + KO combined)\n"
-    "- Start with 🚨 for urgency\n"
-    "- Use · or | as separators\n"
-    "- Maximum impact in minimum words\n"
-    "- End with bilingual CTA + URL as shown\n"
-    "- NO hashtags, NO labels\n"
-    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
-    "- Include specific facts: numbers, locations, actors\n"
-    "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting\n"
-    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
-)
-
-_WEEKLY_BILINGUAL_SYSTEM = (
-    "You write weekly recap bilingual posts about global conflicts "
-    "for WeWantPeace — a real-time conflict monitoring platform (Threads & Telegram).\n"
-    "Format — English first, blank line, Korean, blank line, CTA:\n"
-    "\n"
-    "📊 Week in Review: [headline]\n"
-    "Top: Country1 · Country2 · Country3\n"
-    "\n"
-    "📊 주간 리뷰: [헤드라인]\n"
-    "상위: 국가1 · 국가2 · 국가3\n"
-    "\n"
-    "📈 Dive deeper · 더 알아보기\n"
-    "www.wewantpeace.live\n"
-    "\n"
-    "Rules:\n"
-    "- Body MUST be under 380 chars total (EN + KO combined)\n"
-    "- Highlight top 2-3 countries with stats\n"
-    "- Use · or | as separators\n"
-    "- Clean, scannable format\n"
-    "- End with bilingual CTA + URL as shown\n"
-    "- NO hashtags, NO labels\n"
-    "- Korean text must be pure Korean (한국어만). No Russian, Chinese, or other languages.\n"
-    "- Use specific numbers and country names\n"
-    "- NO markdown formatting: no **bold**, no *italic*, no _underline_, no __text__\n"
-    "- Plain text only — no special characters for formatting\n"
-    "- NEVER speculate or fabricate details not present in the provided data — if a specific fact is absent, omit it rather than guess"
-)
-
-
-# ── Daily Movers ─────────────────────────────────────────────────────────────
+# ── Daily brief ──────────────────────────────────────────────────────────────
 
 async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
-    """지난 24시간 severity 상위 3개 클러스터로 Daily Movers 포스트 생성 (bilingual)."""
+    """지난 24시간 주요 이슈 3개(나라 중복 없이, 출처 2곳 이상)를 일간 브리프로."""
+    from worker.social import brief as B
+    from worker.social.brief_card import list_html, attach_card
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     dedup_key = f"daily_movers:{today}"
-
-    existing = await db.execute(
-        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-    )
-    if existing.scalar_one_or_none():
-        logger.info("Daily Movers 이미 존재: %s", dedup_key)
+    if await _already_exists(db, dedup_key):
+        logger.info("Daily brief 이미 존재: %s", dedup_key)
         return None
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     result = await db.execute(
         select(IssueCluster)
         .where(
+            IssueCluster.is_active == True,  # noqa: E712
             IssueCluster.severity > 0,
             IssueCluster.last_event_at >= cutoff,
             IssueCluster.country_code.isnot(None),
         )
-        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
-        .limit(3)
+        .order_by(IssueCluster.kscore.desc(), IssueCluster.severity.desc())
+        .limit(30)
     )
-    top_clusters = result.scalars().all()
+    picked: list[tuple[IssueCluster, dict]] = []
+    seen_countries: set[str] = set()
+    for c in result.scalars().all():
+        if c.country_code in seen_countries or B.is_template_title(c):
+            continue
+        ctx = await B.gather_context(db, c, hours=24)
+        if ctx["n_sources"] < 2:
+            continue
+        picked.append((c, ctx))
+        seen_countries.add(c.country_code)
+        if len(picked) == 3:
+            break
 
-    if not top_clusters:
-        logger.info("Daily Movers: 최근 24시간 클러스터 없음")
+    if len(picked) < 2:
+        logger.info("Daily brief: 조건을 채우는 이슈가 2개 미만 — 건너뜀")
         return None
 
-    # 데이터 준비
-    items = []
-    country_codes = []
-    max_severity = 0
-    for i, c in enumerate(top_clusters, 1):
-        title_bi = f"{c.title}"
-        if c.title_ko and c.title_ko != c.title:
-            title_bi = f"{c.title} / {c.title_ko}"
-        items.append(f"{i}. [{c.country_code or '??'}] {title_bi} (severity: {c.severity})")
-        if c.country_code:
-            country_codes.append(c.country_code)
-        max_severity = max(max_severity, c.severity)
-
-    hashtags = _build_hashtags(country_codes, topic=top_clusters[0].topic or "")
-    risk = _risk_from_severity(max_severity)
-
-    user_prompt = "Summarize these top global issues:\n" + "\n".join(items)
-    body = _call_openai(_BILINGUAL_SYSTEM, user_prompt)
-
-    if not body:
-        # 폴백: bilingual compact
-        top = top_clusters[0]
-        en_title = top.title[:60] if len(top.title) > 60 else top.title
-        ko_title = (top.title_ko or top.title)[:60]
-        body = f"🌍 {en_title}\n\n🌍 {ko_title}"
-
-    body = _clean_markdown(body)
-    body = body + f"\n\n⚠️ Severity {max_severity}/100"
-    if len(body) > 500:
-        body = body[:497] + "..."
+    head = "Three developments from the last 24 hours:" if len(picked) == 3 else "Key developments from the last 24 hours:"
+    lines, items = [], []
+    for i, (c, ctx) in enumerate(picked, 1):
+        title = B._fit(B._clean(c.title), 110)
+        name = B.country_name(c.country_code)
+        lines.append(f"{i}. {name}: {title} ({ctx['n_sources']} sources)")
+        items.append({"country": name, "headline": title, "meta": f"{ctx['n_sources']} sources"})
+    foot = f"Full timelines: {B.SITE}/?ref=threads"
+    body = "\n\n".join([head, "\n".join(lines), foot])[: B.THREADS_LIMIT]
 
     post = SocialPost(
         content_type="daily_movers",
-        lang="bi",
+        lang="en",
         body_text=body,
-        hashtags=hashtags,
-        risk_level=risk,
-        source_cluster_id=top_clusters[0].id,
+        hashtags=["Geopolitics"],
+        risk_level="low",
+        source_cluster_id=picked[0][0].id,
         dedup_key=dedup_key,
-        status="approved",
+        status=_initial_status(),
     )
     db.add(post)
     await db.flush()
-    await _generate_card_for_post(post, top_clusters)
-    logger.info("Daily Movers [bi] 생성: %s (risk=%s)", post.id, risk)
+    await attach_card(post, list_html("Daily brief", "Last 24 hours", items))
+    logger.info("Daily brief 생성: %s (%d건, status=%s)", post.id, len(items), post.status)
     return post
 
 
-# ── KScore Alert (v7: Spike Alert 대체) ───────────────────────────────────
+# ── KScore alert → 단건 브리프 ────────────────────────────────────────────────
 
 async def generate_kscore_alert(
     cluster: IssueCluster,
     db: AsyncSession,
+    ctx: dict | None = None,
 ) -> SocialPost | None:
-    """v7: KScore 기반 긴급 포스트 생성 (SpikeEvent 파라미터 제거, bilingual)."""
-    # cluster_id + 날짜 기반 dedup — 같은 클러스터는 하루 1회만 포스트
+    """이슈 하나를 "무슨 일 / 왜 중요 / 지켜볼 점" 브리프로. 품질 게이트를 못 넘으면 None."""
+    from worker.social import brief as B
+    from worker.social.brief_card import alert_html, attach_card
+    from worker.social.config import SOCIAL_MIN_SOURCES
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     dedup_key = f"kscore_alert:{cluster.id}:{today}"
-
-    existing = await db.execute(
-        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-    )
-    if existing.scalar_one_or_none():
-        logger.info("KScore Alert 이미 존재: %s", dedup_key)
+    if await _already_exists(db, dedup_key):
+        logger.info("KScore brief 이미 존재: %s", dedup_key)
         return None
 
-    # 같은 클러스터의 최근 72시간 내 published 포스트가 있으면 중복 방지
-    published_cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
-    published_check = await db.execute(
-        select(SocialPost.id).where(
-            SocialPost.source_cluster_id == cluster.id,
-            SocialPost.content_type == "kscore_alert",
-            SocialPost.status == "published",
-            SocialPost.published_at >= published_cutoff,
-        ).limit(1)
-    )
-    if published_check.scalar_one_or_none():
-        logger.info("KScore Alert 72시간 내 이미 발행됨: cluster=%s", cluster.id)
+    ctx = ctx or await B.gather_context(db, cluster)
+    reason = B.quality_reject_reason(cluster, ctx, SOCIAL_MIN_SOURCES)
+    if reason:
+        logger.info("KScore brief 품질 게이트 탈락: cluster=%s reason=%s", cluster.id, reason)
         return None
 
-    country_codes = [cluster.country_code] if cluster.country_code else []
-    hashtags = _build_hashtags(country_codes, topic=cluster.topic or "")
-    risk = "high" if cluster.severity >= 70 else "medium"
-
-    title_en = cluster.title
-    title_ko = cluster.title_ko or cluster.title
-    country_label = cluster.country_code or "Unknown"
-
-    user_prompt = (
-        f"Breaking news:\n"
-        f"Title (EN): {title_en}\n"
-        f"Title (KO): {title_ko}\n"
-        f"Country: {country_label}\n"
-        f"Severity: {cluster.severity}/100\n"
-        f"KScore: {cluster.kscore:.1f}"
-    )
-
-    body = _call_openai(_SPIKE_BILINGUAL_SYSTEM, user_prompt)
-    if not body:
-        body = f"🚨 {title_en}\n\n🚨 {title_ko}"
-
-    body = _clean_markdown(body)
-    body = body + f"\n\n⚠️ Severity {cluster.severity}/100"
-    if len(body) > 500:
-        body = body[:497] + "..."
+    if B.recently_skipped(cluster.id):
+        return None
+    brief = B.build_brief(cluster, ctx)
+    if not brief:
+        # 예전엔 이모지 템플릿으로라도 내보냈다 — 이제는 안 내보낸다
+        logger.info("KScore brief 없음(AI 판단 skip 또는 실패) → 게시 안 함: cluster=%s", cluster.id)
+        B.remember_skip(cluster.id)
+        return None
 
     post = SocialPost(
         content_type="kscore_alert",
-        lang="bi",
-        body_text=body,
-        hashtags=hashtags,
-        risk_level=risk,
+        lang="en",
+        body_text=B.compose_alert_text(brief, ctx["n_sources"], cluster.id),
+        reply_text=B.compose_sources_reply(ctx["source_names"]),
+        hashtags=[B.topic_tag_for(cluster.country_code, cluster.topic)],
+        risk_level="high" if cluster.severity >= 70 else "medium",
         source_cluster_id=cluster.id,
         dedup_key=dedup_key,
-        status="approved",
+        status=_initial_status(),
     )
     db.add(post)
     await db.flush()
-    await _generate_card_for_post(post, [cluster])
-    logger.info("KScore Alert [bi] 생성: %s (risk=%s)", post.id, risk)
+    await attach_card(post, alert_html(
+        brief, country=B.country_name(cluster.country_code), n_sources=ctx["n_sources"],
+        source_names=ctx["source_names"], when=ctx.get("newest_event_at"),
+    ))
+    logger.info("KScore brief 생성: %s (sources=%d, status=%s)", post.id, ctx["n_sources"], post.status)
     return post
 
 
@@ -377,101 +165,78 @@ async def generate_spike_alert(spike, cluster, db):
     return await generate_kscore_alert(cluster, db)
 
 
-# ── Weekly Recap ─────────────────────────────────────────────────────────────
+# ── Week in review ───────────────────────────────────────────────────────────
 
 async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
-    """지난 7일 클러스터 통계 기반 주간 요약 포스트 생성 (bilingual)."""
+    """지난 7일 이슈가 가장 많았던 나라 4곳과 나라별 대표 이슈."""
+    from worker.social import brief as B
+    from worker.social.brief_card import list_html, attach_card
+
     now = datetime.now(timezone.utc)
     iso_cal = now.isocalendar()
     dedup_key = f"weekly_recap:{iso_cal.year}-W{iso_cal.week:02d}"
-
-    existing = await db.execute(
-        select(SocialPost).where(SocialPost.dedup_key == dedup_key)
-    )
-    if existing.scalar_one_or_none():
-        logger.info("Weekly Recap 이미 존재: %s", dedup_key)
+    if await _already_exists(db, dedup_key):
+        logger.info("Weekly recap 이미 존재: %s", dedup_key)
         return None
 
     cutoff = now - timedelta(days=7)
-
-    stats_result = await db.execute(
-        select(
-            IssueCluster.country_code,
-            func.count().label("event_count"),
-            func.avg(IssueCluster.severity).label("avg_severity"),
-        )
+    stats = (await db.execute(
+        select(IssueCluster.country_code, func.count().label("n"))
         .where(
-            IssueCluster.severity > 0,
+            IssueCluster.severity >= 40,
             IssueCluster.last_event_at >= cutoff,
             IssueCluster.country_code.isnot(None),
         )
         .group_by(IssueCluster.country_code)
-        .order_by(func.avg(IssueCluster.severity).desc())
-        .limit(10)
-    )
-    country_stats = stats_result.all()
+        .order_by(func.count().desc())
+        .limit(8)
+    )).all()
 
-    if not country_stats:
-        logger.info("Weekly Recap: 지난 7일 데이터 없음")
+    items, lines = [], []
+    for row in stats:
+        candidates = (await db.execute(
+            select(IssueCluster)
+            .where(
+                IssueCluster.country_code == row.country_code,
+                IssueCluster.last_event_at >= cutoff,
+            )
+            .order_by(IssueCluster.event_count.desc(), IssueCluster.kscore.desc())
+            .limit(5)
+        )).scalars().all()
+        top = next((c for c in candidates if not B.is_template_title(c)), None)
+        if not top:
+            continue
+        name = B.country_name(row.country_code)
+        title = B._fit(B._clean(top.title), 100)
+        items.append({"country": name, "headline": title, "meta": f"{row.n} issues tracked"})
+        lines.append(f"{name} ({row.n} issues): {title}")
+        if len(items) == 4:
+            break
+
+    if len(items) < 2:
+        logger.info("Weekly recap: 데이터 부족 — 건너뜀")
         return None
 
-    total_result = await db.execute(
-        select(func.count())
-        .select_from(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
-    )
-    total_clusters = total_result.scalar() or 0
-
-    country_codes = [s.country_code for s in country_stats[:5] if s.country_code]
-    hashtags = _build_hashtags(country_codes)
-
-    stats_lines = []
-    for s in country_stats[:5]:
-        stats_lines.append(f"- {s.country_code}: {s.event_count} events, avg severity {s.avg_severity:.0f}")
-
-    user_prompt = (
-        f"Weekly global conflict stats:\n"
-        f"Total {total_clusters} issue clusters\n"
-        f"Top countries:\n" + "\n".join(stats_lines)
-    )
-
-    body = _call_openai(_WEEKLY_BILINGUAL_SYSTEM, user_prompt)
-    if not body:
-        top3 = " · ".join(country_codes[:3])
-        body = (
-            f"📊 Week: {total_clusters} issues | {top3}\n\n"
-            f"📊 주간: {total_clusters}개 이슈 | {top3}"
-        )
-
-    body = _clean_markdown(body)
-    top_severity = int(country_stats[0].avg_severity) if country_stats else 0
-    body = body + f"\n\n⚠️ Severity {top_severity}/100"
-    if len(body) > 500:
-        body = body[:497] + "..."
+    start = (now - timedelta(days=7)).strftime("%b %d")
+    end = now.strftime("%b %d")
+    head = f"Week in review, {start} to {end}. Where the most activity was:"
+    foot = f"Country timelines: {B.SITE}/?ref=threads"
+    body = "\n\n".join([head, "\n".join(lines), foot])
+    while len(body) > B.THREADS_LIMIT and len(lines) > 2:
+        lines.pop()
+        body = "\n\n".join([head, "\n".join(lines), foot])
 
     post = SocialPost(
         content_type="weekly_recap",
-        lang="bi",
-        body_text=body,
-        hashtags=hashtags,
+        lang="en",
+        body_text=body[: B.THREADS_LIMIT],
+        hashtags=["Geopolitics"],
         risk_level="low",
         dedup_key=dedup_key,
-        status="approved",
+        status=_initial_status(),
     )
     db.add(post)
     await db.flush()
-
-    # 카드 배경/이슈용 top 3 클러스터 가져오기
-    top_clusters_result = await db.execute(
-        select(IssueCluster)
-        .where(
-            IssueCluster.severity > 0,
-            IssueCluster.last_event_at >= cutoff,
-        )
-        .order_by(IssueCluster.severity.desc())
-        .limit(3)
-    )
-    top_clusters = top_clusters_result.scalars().all()
-    await _generate_card_for_post(post, top_clusters or None)
-    logger.info("Weekly Recap [bi] 생성: %s", post.id)
+    await attach_card(post, list_html("Week in review", f"{start} – {end}", items))
+    logger.info("Weekly recap 생성: %s (status=%s)", post.id, post.status)
     return post

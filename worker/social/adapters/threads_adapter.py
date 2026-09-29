@@ -1,13 +1,10 @@
-"""Threads 어댑터 — Meta Graph API v22.0 (텍스트 + 이미지).
+"""Threads 어댑터 — Meta Graph API (텍스트 + 이미지).
 
-Threads 2026 알고리즘 최적화:
-- 500자 한도 (200~300자 최적 퍼포먼스)
-- 대화형/커뮤니티 톤 (뉴스 속보 < 맥락 설명 + 의견)
-- 답글(reply) > 좋아요 (13-20x 가치) → 질문으로 마무리
-- 포스팅 후 30~90분이 결정적 (초기 engagement)
-- 링크 페널티 없음 → URL 포함 가능
-- 해시태그 적절히 사용 (검색 발견용)
-- 홍보성 문구 ("좋아요 눌러주세요", "팔로우") 페널티
+2026-09-30 개편 (영어 정보형 브리프):
+- 본문은 생성기가 완성해서 넘긴다. 여기서는 마크다운·이모지만 걷고 500자로 자른다.
+  예전처럼 이모지 질문("💬 How will this affect...")·"🔗 wewantpeace.live" 를 덧붙이지 않는다.
+- 주제 태그는 본문 해시태그 대신 topic_tag 파라미터 1개 (post.hashtags[0]).
+- 게시 직후 댓글은 출처 목록(post.reply_text). 텔레그램 링크·한국어 홍보 문구는 뺐다.
 """
 import logging
 import os
@@ -28,76 +25,28 @@ def is_configured() -> bool:
     return bool(THREADS_USER_ID and THREADS_ACCESS_TOKEN)
 
 
-# content_type별 맥락적 대화 유도 (generic 질문은 bait로 분류될 수 있음)
-_ENGAGE_BY_TYPE = {
-    "kscore_alert": [
-        ("How will this affect the region?", "이 지역에 어떤 영향을 미칠까요?"),
-        ("Is de-escalation still possible here?", "아직 상황 완화가 가능할까요?"),
-        ("What's the bigger picture behind this?", "이 사건의 더 큰 맥락은 뭘까요?"),
-    ],
-    # 하위호환
-    "spike_alert": [
-        ("How will this affect the region?", "이 지역에 어떤 영향을 미칠까요?"),
-        ("Is de-escalation still possible here?", "아직 상황 완화가 가능할까요?"),
-        ("What's the bigger picture behind this?", "이 사건의 더 큰 맥락은 뭘까요?"),
-    ],
-    "daily_movers": [
-        ("Which of these changes concerns you most?", "이 중 가장 우려되는 변화는?"),
-        ("Any of these on your radar?", "이 중 주목하고 있던 이슈가 있나요?"),
-        ("What pattern do you see here?", "어떤 패턴이 보이시나요?"),
-    ],
-    "weekly_recap": [
-        ("What was the most significant development this week?", "이번 주 가장 중요한 변화는 뭐였을까요?"),
-        ("Anything missing from this recap?", "이 요약에서 빠진 게 있나요?"),
-        ("How does this week compare to the last?", "지난주와 비교하면 어떤가요?"),
-    ],
-}
-
-
 def _build_text(post: SocialPost) -> str:
-    """Threads 최적화 본문 (500자 한도).
+    """게시 본문 (500자). 링크는 남긴다 — 2026 기준 링크 불이익 없음."""
+    from worker.social.brief import strip_emoji
 
-    Threads 전용 톤:
-    - 대화형, 맥락 있는 설명 (원문 전체 유지)
-    - 대화 유도 질문으로 마무리
-    - URL 포함 (프로필 유입)
-    - 해시태그 없음 (Threads에서 불필요, 알고리즘 페널티 위험)
-    """
-    import hashlib
+    body = post.body_text or ""
+    body = re.sub(r"\*\*(.+?)\*\*", r"\1", body)
+    body = re.sub(r"__(.+?)__", r"\1", body)
+    body = strip_emoji(body)
+    body = re.sub(r"[ \t]+\n", "\n", body)
+    body = re.sub(r"\n{3,}", "\n\n", body).strip()
+    if len(body) > 500:
+        body = body[:499].rstrip() + "…"
+    return body
 
-    body = post.body_text
 
-    # 마크다운 방어적 제거 (AI가 가끔 ** 포함 → strip)
-    body = re.sub(r'\*\*(.+?)\*\*', r'\1', body)   # **bold** → bold
-    body = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', body)  # *italic* → text
-    body = re.sub(r'__(.+?)__', r'\1', body)         # __underline__ → text
-    body = re.sub(r'_(.+?)_', r'\1', body)           # _italic_ → text
-
-    # 기존 CTA/URL 라인 정리 (Threads 전용으로 교체)
-    body = re.sub(r'^[→🔗📈].*$', '', body, flags=re.MULTILINE).strip()
-    body = re.sub(r'https?://\S+', '', body).strip()
-    body = re.sub(r'www\.\S+', '', body).strip()
-    # 해시태그 제거 (Threads에서 해시태그 없이 운영)
-    body = re.sub(r'#\w+', '', body).strip()
-    body = re.sub(r'\n{3,}', '\n\n', body).strip()
-
-    # content_type에 맞는 맥락적 대화 유도 문구 (generic → 콘텐츠 연관)
-    engage_list = _ENGAGE_BY_TYPE.get(post.content_type, _ENGAGE_BY_TYPE["kscore_alert"])
-    idx = int(hashlib.md5(str(post.id).encode()).hexdigest(), 16) % len(engage_list)
-    en_q, ko_q = engage_list[idx]
-    engage = f"\n\n💬 {en_q}\n{ko_q}"
-
-    # Threads CTA: 링크만 (해시태그 없음)
-    link = "\n\n🔗 wewantpeace.live"
-
-    full_text = body + engage + link
-
-    # 500자 초과 시 잘라내기
-    if len(full_text) > 500:
-        max_body = 500 - len(engage) - len(link) - 3
-        full_text = f"{body[:max_body]}...{engage}{link}"
-
-    return full_text
+def _topic_tag(post: SocialPost) -> str | None:
+    """1~50자, 마침표·& 불가 (Threads API 제약)."""
+    tags = post.hashtags or []
+    if not tags:
+        return None
+    tag = tags[0].lstrip("#").replace(".", "").replace("&", "and").strip()
+    return tag[:50] or None
 
 
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
@@ -135,10 +84,22 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             else:
                 params["media_type"] = "TEXT"
 
+            tag = _topic_tag(post)
+            if tag:
+                params["topic_tag"] = tag
+
             create_resp = client.post(
                 f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads",
                 params=params,
             )
+            if create_resp.status_code != 200 and tag:
+                # 이미지 게시물의 topic_tag 지원 여부가 문서에 명시돼 있지 않다 → 태그 빼고 한 번 더
+                logger.warning("Threads topic_tag 포함 생성 실패, 태그 없이 재시도: %s", create_resp.text[:200])
+                params.pop("topic_tag", None)
+                create_resp = client.post(
+                    f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads",
+                    params=params,
+                )
             if create_resp.status_code != 200:
                 return None, f"Container 생성 실패: {create_resp.text[:200]}"
 
@@ -163,10 +124,11 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             thread_id = publish_resp.json().get("id")
             logger.info("Threads 발행 완료: thread_id=%s, post_id=%s", thread_id, post.id)
 
-            # v7: 댓글(reply) 자동 달기 — 이슈 링크 + 서비스 홍보
-            if thread_id and post.source_cluster_id:
+            # 출처 목록 댓글 (있을 때만)
+            reply_text = getattr(post, "reply_text", None)
+            if thread_id and reply_text:
                 try:
-                    _post_reply(client, thread_id, post.source_cluster_id)
+                    _post_reply(client, thread_id, reply_text)
                 except Exception as reply_err:
                     logger.warning("Threads 댓글 실패 (무시): %s", reply_err)
 
@@ -178,14 +140,10 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
         return None, error_msg
 
 
-def _post_reply(client, parent_thread_id: str, cluster_id) -> None:
-    """v7: 메인 포스트에 링크+홍보 댓글 달기."""
-    reply_text = (
-        f"🔗 Full analysis: https://www.wewantpeace.live/issues/{cluster_id}\n"
-        f"📡 Telegram: https://t.me/wewantpeace_live\n"
-        f"📊 Real-time conflict tracking · WeWantPeace\n"
-        f"상세 분석 보기 · 실시간 분쟁 모니터링"
-    )
+def _post_reply(client, parent_thread_id: str, reply_text: str) -> None:
+    """메인 게시물에 출처 목록 댓글 달기."""
+    from worker.social.brief import strip_emoji
+    reply_text = strip_emoji(reply_text)[:500]
 
     # Step 1: reply container 생성
     create_resp = client.post(

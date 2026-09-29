@@ -3280,7 +3280,7 @@ def generate_daily_social(self):
             logger.info("generate_daily_social: SOCIAL_AUTOGEN_ENABLED=false, 건너뜀")
             return {"status": "disabled"}
 
-        from worker.social.generators import generate_daily_movers
+        from worker.social.generators import generate_daily_movers, notify_pending
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -3288,7 +3288,8 @@ def generate_daily_social(self):
                 if not post:
                     return {"status": "skipped"}
 
-            logger.info("generate_daily_social: 자동 승인 생성 완료 post=%s", post.id)
+            await notify_pending([post])
+            logger.info("generate_daily_social: 생성 완료 post=%s status=%s", post.id, post.status)
             return {"status": "ok", "post_id": str(post.id)}
 
     try:
@@ -3316,7 +3317,8 @@ def generate_kscore_social(self):
         from sqlalchemy import select
         from backend.app.models.issue_cluster import IssueCluster
         from backend.app.models.social_post import SocialPost
-        from worker.social.generators import generate_kscore_alert
+        from worker.social.generators import generate_kscore_alert, notify_pending
+        from worker.social.config import SOCIAL_ALERTS_PER_DAY, SOCIAL_ALERT_MIN_GAP_HOURS
 
         created = 0
 
@@ -3345,6 +3347,23 @@ def generate_kscore_social(self):
                 )
                 already_posted |= {r[0] for r in published_ids_result.fetchall() if r[0] is not None}
 
+                # 하루 상한·최소 간격 — 예전엔 30분마다 최대 10건, 하루 33건이 나갔다.
+                # 거절·실패한 것은 세지 않는다.
+                day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+                recent = (await db.execute(
+                    select(SocialPost.created_at)
+                    .where(
+                        SocialPost.content_type == "kscore_alert",
+                        SocialPost.created_at >= day_ago,
+                        SocialPost.status.notin_(["rejected", "failed"]),
+                    )
+                    .order_by(SocialPost.created_at.desc())
+                )).scalars().all()
+                if len(recent) >= SOCIAL_ALERTS_PER_DAY:
+                    return {"status": "cap", "last24h": len(recent)}
+                if recent and datetime.now(timezone.utc) - recent[0] < timedelta(hours=SOCIAL_ALERT_MIN_GAP_HOURS):
+                    return {"status": "gap"}
+
                 query = (
                     select(IssueCluster)
                     .where(
@@ -3361,17 +3380,22 @@ def generate_kscore_social(self):
                 result = await db.execute(query)
                 clusters = result.scalars().all()
 
+                # 품질 게이트(출처 수·템플릿 제목·신선도)를 통과하는 첫 1건만.
+                # AI 호출은 한 번 실행에 2회까지 — 브리프 전용 모델 무료 할당량이 작다.
+                from worker.social.brief import ai_call_count
+                calls_before = ai_call_count()
                 posts_to_notify = []
                 for cluster in clusters:
                     post = await generate_kscore_alert(cluster, db)
                     if post:
                         posts_to_notify.append(post)
                         created += 1
+                        break
+                    if ai_call_count() - calls_before >= 2:
+                        break
 
-            # 자동 발행 모드: 리뷰 건너뛰고 즉시 approved 상태로 생성됨
-            # publish_approved_social 태스크가 2분 내 픽업하여 발행
-            if posts_to_notify:
-                logger.info("generate_kscore_social: %d건 자동 승인 생성 완료", len(posts_to_notify))
+            # 커밋 뒤에 승인 요청을 보내야 버튼을 눌렀을 때 게시물이 보인다
+            await notify_pending(posts_to_notify)
 
         return {"status": "ok", "created": created}
 
@@ -3594,7 +3618,7 @@ def generate_weekly_social(self):
         if not SOCIAL_AUTOGEN_ENABLED:
             return {"status": "disabled"}
 
-        from worker.social.generators import generate_weekly_recap
+        from worker.social.generators import generate_weekly_recap, notify_pending
 
         async with AsyncSessionLocal() as db:
             async with db.begin():
@@ -3602,7 +3626,8 @@ def generate_weekly_social(self):
                 if not post:
                     return {"status": "skipped"}
 
-            logger.info("generate_weekly_social: 자동 승인 생성 완료 post=%s", post.id)
+            await notify_pending([post])
+            logger.info("generate_weekly_social: 생성 완료 post=%s status=%s", post.id, post.status)
             return {"status": "ok", "post_id": str(post.id)}
 
     try:

@@ -20,6 +20,8 @@ class SocialPost(Base):
     content_type: Mapped[str] = mapped_column(String(32), nullable=False)
     lang: Mapped[str] = mapped_column(String(4), nullable=False)
     body_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Threads 게시 직후 다는 댓글 (출처 목록). 없으면 댓글 없음
+    reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     hashtags: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
     image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     risk_level: Mapped[str] = mapped_column(String(8), nullable=False, default="medium")
