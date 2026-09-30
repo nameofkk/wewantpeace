@@ -185,7 +185,8 @@ def point_html(*, num: int, label: str, body: str, photo: str, credit: str, i: i
 def end_html(*, lines: list[str], heading: str, country: str, cc: str, photo: str, i: int, n: int) -> str:
     items = "".join(f"<li>{_e(s)}</li>" for s in lines)
     cta = f"Get a weekly brief on {_e(country)}" if country else "Get a weekly conflict brief by email"
-    url = "wewantpeace.live/brief" + (f"?c={cc.upper()}" if cc else "")
+    # 카드에 찍는 주소는 사장님 지시로 wewantpeace.live 하나로 통일 (경로·파라미터 없이)
+    url = "wewantpeace.live"
     inner = (
         _top(i, n)
         + "<div class='content'>"

@@ -163,7 +163,11 @@ def quality_reject_reason(cluster, ctx: dict, min_sources: int) -> str | None:
 BRIEF_SYSTEM = (
     "You are an analyst writing a short, neutral conflict brief for an international "
     "English-speaking audience on Threads. Return a JSON object with exactly these keys: "
-    "skip, headline, highlight, dek, what, why, watch.\n"
+    "skip, headline, highlight, dek, lead, what, why, watch.\n"
+    "lead: the post text shown above the cards. One sentence, at most 200 characters, written like "
+    "a wire-service opening line: who did what, where, with a number if one is reported, and who "
+    "says so ('according to ...', '..., officials said') when the claim is not independently "
+    "confirmed. Use different wording from headline and what, because both appear on the cards.\n"
     "highlight: the 2 to 4 most important consecutive words copied exactly from headline "
     "(they are shown in a different colour on the cover card).\n"
     "dek: one short line under the headline on the cover, at most 90 characters, adding the key "
@@ -344,6 +348,7 @@ def build_brief(cluster, ctx: dict) -> dict | None:
     brief = {
         "headline": _fit(_clean(str(data.get("headline", ""))).rstrip("."), 90),
         "dek": _fit(_clean(str(data.get("dek", ""))).rstrip("."), 100),
+        "lead": _fit(_clean(str(data.get("lead", ""))), 230),
         "what": _fit(_clean(str(data.get("what", ""))), 190),
         "why": _fit(_clean(str(data.get("why", ""))), 150),
         "watch": _fit(_clean(str(data.get("watch", ""))), 130),
@@ -367,17 +372,13 @@ def _sources_line(source_names: list[str], limit: int = 3) -> str:
 def compose_alert_text(brief: dict, n_sources: int, cluster_id, source_names: list[str] | None = None) -> str:
     """Threads 본문 — 레퍼런스(Ground News·Politico·Al Jazeera·so informed)와 같은 틀.
 
-    헤드라인은 표지 카드에 있으니 반복하지 않는다. 뉴스 한 문장 + 맥락 한 문장 + 출처.
-    링크·지켜볼 점은 바로 아래 자기 답글로 (so informed·Novara 방식).
+    카드(헤드라인·무슨 일·왜 중요·지켜볼 점)에 있는 문장은 본문에 다시 쓰지 않는다.
+    통신사식 첫 문장(누가·무엇을·어디서·몇 명, 출처 표기) 하나 + 출처 줄. 링크는 자기 답글로.
+    예전엔 본문이 2·3장째 카드 문장을 그대로 복사해 넘기는 사람은 같은 글을 두 번 읽었다.
     """
-    parts = [brief["what"]]
-    if brief.get("why"):
-        parts.append(brief["why"])
+    lead = brief.get("lead") or brief["what"]
     src = f"Sources: {_sources_line(source_names)}." if source_names else f"{n_sources} independent sources."
-    text = "\n\n".join(parts + [src])
-    if len(text) > THREADS_LIMIT:
-        text = "\n\n".join([brief["what"], src])
-    return text[:THREADS_LIMIT]
+    return "\n\n".join([lead, src])[:THREADS_LIMIT]
 
 
 def compose_sources_reply(source_names: list[str], cc: str | None = None,

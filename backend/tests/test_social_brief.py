@@ -18,21 +18,19 @@ BRIEF = {
 }
 
 
-def test_caption_follows_reference_format():
-    """본문 = 뉴스 한 문장 + 맥락 한 문장 + 출처 (헤드라인은 표지 카드에 있어 반복하지 않고, 링크는 답글로)."""
-    text = B.compose_alert_text(BRIEF, 7, uuid.uuid4(), ["Reuters", "AP", "BBC", "NHK"])
-    assert len(text) <= 500
-    assert text.startswith(BRIEF["what"])
-    assert BRIEF["headline"] not in text
+def test_caption_is_lead_plus_sources_not_card_copy():
+    """본문 = 통신사식 첫 문장 + 출처. 카드에 있는 헤드라인·무슨 일·왜 중요 문장은 다시 쓰지 않는다."""
+    lead = "Eight US Marines were wounded when a cruise missile hit Al Asad air base in Iraq, the Pentagon said."
+    text = B.compose_alert_text(dict(BRIEF, lead=lead), 7, uuid.uuid4(), ["Reuters", "AP", "BBC", "NHK"])
+    assert text == lead + "\n\nSources: Reuters, AP, BBC and 1 more."
+    for card_text in (BRIEF["headline"], BRIEF["what"], BRIEF["why"], BRIEF["watch"]):
+        assert card_text not in text
     assert "http" not in text
-    assert text.endswith("Sources: Reuters, AP, BBC and 1 more.")
 
 
-def test_caption_drops_why_when_long():
-    long = dict(BRIEF, what="x " * 95, why="y " * 200)
-    text = B.compose_alert_text(long, 5, uuid.uuid4(), ["Reuters"])
-    assert len(text) <= 500
-    assert "y y" not in text
+def test_caption_falls_back_to_what_without_lead():
+    text = B.compose_alert_text(BRIEF, 5, uuid.uuid4(), ["Reuters"])
+    assert text.startswith(BRIEF["what"]) and len(text) <= 500
 
 
 def test_strip_emoji_and_clean():
@@ -49,7 +47,7 @@ def test_topic_tag_rules():
 
 
 def test_adapter_keeps_body_without_adding_emoji_or_telegram():
-    body = B.compose_alert_text(BRIEF, 14, uuid.uuid4())
+    body = B.compose_alert_text(BRIEF, 14, uuid.uuid4(), ["Reuters"])
     post = SimpleNamespace(body_text=body, content_type="kscore_alert", id=uuid.uuid4())
     out = threads_adapter._build_text(post)
     assert out == body
@@ -122,7 +120,7 @@ def test_alert_slides_structure():
     assert len(slides) == 5
     assert "<em>eight US Marines</em>" in slides[0] and "7 sources" in slides[0]
     assert "What happened" in slides[1] and "Why it matters" in slides[2] and "What to watch" in slides[3]
-    assert "Get a weekly brief on Iran" in slides[4] and "brief?c=IR" in slides[4]
+    assert "Get a weekly brief on Iran" in slides[4] and ">wewantpeace.live<" in slides[4] and "/brief" not in slides[4]
     assert "BBB" in slides[1] and "AAA" in slides[2]  # 2장뿐이면 돌려 쓴다
     assert "Photo: AP" in slides[1]
 
@@ -181,7 +179,8 @@ async def test_generate_kscore_alert_pending_during_review(db, monkeypatch):
     assert post.status == "pending_review"
     assert post.lang == "en"
     assert post.hashtags == ["Iran"]
-    assert post.reply_text.startswith("What to watch:")
+    assert post.reply_text.startswith("Full timeline and all sources:")
+    assert "What to watch" not in post.reply_text
     assert card.await_args.args[1][0].count("WEWANTPEACE") == 1  # 표지 장 HTML 이 넘어갔다
     assert len(post.body_text) <= 500
     card.assert_awaited_once()

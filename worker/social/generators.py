@@ -84,16 +84,18 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
         logger.info("Daily brief: 조건을 채우는 이슈가 2개 미만 — 건너뜀")
         return None
 
-    head = "Three developments from the last 24 hours:" if len(picked) == 3 else "Key developments from the last 24 hours:"
-    lines, items = [], []
+    items = []
     for i, (c, ctx) in enumerate(picked, 1):
         title = B._fit(B._clean(c.title), 110)
         name = B.country_name(c.country_code)
-        lines.append(f"{i}. {name}: {title}")
         items.append({"country": name, "headline": title, "meta": f"{ctx['n_sources']} sources",
                       "photos": ctx.get("photos") or []})
-    body = "\n\n".join([head, "\n".join(lines)])[: B.THREADS_LIMIT]
     countries = " · ".join(it["country"] for it in items)
+    # 항목 제목은 카드마다 있으니 본문은 한 줄 소개만 (Novara "Here are some of the key takeaways" 방식)
+    names = [it["country"] for it in items]
+    joined = ", ".join(names[:-1]) + f" and {names[-1]}" if len(names) > 1 else names[0]
+    body = (f"{len(items)} conflict stories from the last 24 hours, from {joined}, "
+            f"each checked against at least two independent outlets.")[: B.THREADS_LIMIT]
 
     post = SocialPost(
         content_type="daily_movers",
@@ -154,8 +156,8 @@ async def generate_kscore_alert(
         content_type="kscore_alert",
         lang="en",
         body_text=B.compose_alert_text(brief, ctx["n_sources"], cluster.id, ctx["source_names"]),
-        reply_text=B.compose_sources_reply(ctx["source_names"], cluster.country_code,
-                                           brief.get("watch"), cluster.id),
+        # 지켜볼 점은 4장째 카드에 있으니 답글엔 링크만
+        reply_text=B.compose_sources_reply(ctx["source_names"], cluster.country_code, None, cluster.id),
         hashtags=[B.topic_tag_for(cluster.country_code, cluster.topic)],
         risk_level="high" if cluster.severity >= 70 else "medium",
         source_cluster_id=cluster.id,
@@ -208,7 +210,7 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
         .limit(8)
     )).all()
 
-    items, lines = [], []
+    items = []
     for row in stats:
         candidates = (await db.execute(
             select(IssueCluster)
@@ -227,7 +229,6 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
         ctx = await B.gather_context(db, top, hours=24 * 7)
         items.append({"country": name, "headline": title, "meta": f"{row.n} issues tracked",
                       "photos": ctx.get("photos") or []})
-        lines.append(f"{name} ({row.n} issues): {title}")
         if len(items) == 4:
             break
 
@@ -237,11 +238,10 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
 
     start = (now - timedelta(days=7)).strftime("%b %d")
     end = now.strftime("%b %d")
-    head = f"Week in review, {start} to {end}. Where the most activity was:"
-    body = "\n\n".join([head, "\n".join(lines)])
-    while len(body) > B.THREADS_LIMIT and len(lines) > 2:
-        lines.pop()
-        body = "\n\n".join([head, "\n".join(lines)])
+    # 나라별 제목은 카드에 있으니 본문은 한 줄 소개만
+    names = [it["country"] for it in items]
+    joined = ", ".join(names[:-1]) + f" and {names[-1]}"
+    body = f"The week in conflict, {start} to {end}: where reporting was heaviest, from {joined}."
 
     post = SocialPost(
         content_type="weekly_recap",
