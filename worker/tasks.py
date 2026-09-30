@@ -3326,12 +3326,15 @@ def generate_kscore_social(self):
             async with db.begin():
                 cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
 
-                # 최근 72시간 내 생성되었거나 발행된 클러스터 제외 (중복 방지)
+                # 최근 72시간 내 생성되었거나 발행된 클러스터 제외 (중복 방지).
+                # 새 영어 브리프(lang=en)만 본다 — 옛 한·영 게시물까지 보면 배포 직후 큰 이슈가 전부
+                # 후보에서 빠져 출처 2곳짜리만 남았다 (09-30 첫 실행: 후보 2건 모두 품질 게이트 탈락).
                 dedup_cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
                 existing_ids_result = await db.execute(
                     select(SocialPost.source_cluster_id)
                     .where(
                         SocialPost.content_type == "kscore_alert",
+                        SocialPost.lang == "en",
                         SocialPost.created_at >= dedup_cutoff,
                     )
                 )
@@ -3341,6 +3344,7 @@ def generate_kscore_social(self):
                     select(SocialPost.source_cluster_id)
                     .where(
                         SocialPost.content_type == "kscore_alert",
+                        SocialPost.lang == "en",
                         SocialPost.status == "published",
                         SocialPost.published_at >= dedup_cutoff,
                     )
