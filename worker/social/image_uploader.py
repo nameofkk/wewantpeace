@@ -85,7 +85,7 @@ def _auth_headers(cfg: dict[str, str], method: str, path: str, payload: bytes, c
     }
 
 
-def upload_image(local_path: str, post_id: str) -> str | None:
+def upload_image(local_path: str, post_id: str, content_type: str = "image/png", ext: str = "png") -> str | None:
     """로컬 이미지 파일을 R2에 업로드하고 public URL 반환.
 
     Args:
@@ -107,13 +107,13 @@ def upload_image(local_path: str, post_id: str) -> str | None:
     try:
         import httpx
 
-        key = f"cards/{post_id}.png"
+        key = f"cards/{post_id}.{ext}"
         path = f"/{cfg['bucket']}/{quote(key)}"
 
         with open(local_path, "rb") as f:
             image_data = f.read()
 
-        headers = _auth_headers(cfg, "PUT", path, image_data, "image/png")
+        headers = _auth_headers(cfg, "PUT", path, image_data, content_type)
 
         with httpx.Client(timeout=30.0) as client:
             resp = client.put(f"{cfg['endpoint']}{path}", headers=headers, content=image_data)

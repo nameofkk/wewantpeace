@@ -3525,6 +3525,22 @@ class WeeklyReportOut(BaseModel):
     generated_at: str
 
 
+def _weekly_display_title(cluster, lang: str) -> str:
+    """한국어 제목이 '이란, 무장충돌 격화' 같은 자동 폴백이면 영어 원제목을 쓴다.
+
+    번역이 실패한 이슈는 title_ko 에 나라+토픽 틀 문구가 들어가서, 주간 리포트
+    10건 중 9건이 같은 문장으로 보였다 (2026-09-30 실제 화면).
+    """
+    from worker.processor.clusterer import _make_fallback_titles
+
+    title = cluster.title or ""
+    if lang == "ko" and cluster.title_ko:
+        _, fallback_ko = _make_fallback_titles(cluster.topic or "", cluster.country_code)
+        if cluster.title_ko.strip() != fallback_ko:
+            return cluster.title_ko
+    return title
+
+
 @router.get("/weekly-report", response_model=WeeklyReportOut)
 async def get_weekly_report(
     user: User = Depends(plan_required("pro_plus")),
@@ -3577,7 +3593,7 @@ async def get_weekly_report(
     for c, _, impact in scored_clusters[:10]:
         top_issues.append(WeeklyReportIssue(
             cluster_id=str(c.id),
-            title=c.title_ko if lang == "ko" and c.title_ko else c.title or "",
+            title=_weekly_display_title(c, lang),
             kscore=round(c.kscore or 0, 1),
             impact_score=impact,
             country_codes=[c.country_code] if c.country_code else [],

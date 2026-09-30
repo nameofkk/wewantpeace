@@ -229,7 +229,7 @@ def _parse_json(raw: str) -> dict | None:
         return None
 
 
-def _call_dedicated(system: str, user: str) -> dict | None:
+def _call_dedicated(system: str, user: str, max_tokens: int = 1500) -> dict | None:
     """브리프 전용 Gemini 모델 — 분류 파이프라인과 무료 할당량을 나눠 쓰지 않는다.
 
     Gemini 무료 할당량은 모델별로 따로다. 9/30 실측: 분류가 쓰는 3.5-flash-lite(하루 500건)와
@@ -250,7 +250,7 @@ def _call_dedicated(system: str, user: str) -> dict | None:
                 model=model,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                 temperature=0.3,
-                max_tokens=1500,
+                max_tokens=max_tokens,
                 response_format={"type": "json_object"},
                 reasoning_effort="low",
             )

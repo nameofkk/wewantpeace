@@ -6,8 +6,10 @@ import { useAuth, getFirebaseAuth } from "@/lib/auth";
 import { markOnboardingDone } from "@/lib/utils";
 import { SplashScreen } from "./splash-screen";
 
-/** 공유 링크로 접근 가능한 경로들 */
-const SHAREABLE_PATHS = ["/issues/", "/feed", "/map", "/tension"];
+/** 공유 링크로 접근 가능한 경로들.
+ * /brief 는 스레드 댓글·메일 확인 링크로 처음 들어오는 사람이 대부분이라
+ * 온보딩으로 튕기면 구독 양식·구독 확인을 끝내 못 본다. 약관·개인정보도 같은 이유. */
+const SHAREABLE_PATHS = ["/issues/", "/feed", "/map", "/tension", "/brief", "/privacy", "/terms"];
 
 function isShareablePage(pathname: string): boolean {
   return SHAREABLE_PATHS.some((p) => pathname.startsWith(p));
