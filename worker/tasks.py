@@ -3348,12 +3348,14 @@ def generate_kscore_social(self):
                 already_posted |= {r[0] for r in published_ids_result.fetchall() if r[0] is not None}
 
                 # 하루 상한·최소 간격 — 예전엔 30분마다 최대 10건, 하루 33건이 나갔다.
-                # 거절·실패한 것은 세지 않는다.
+                # 거절·실패한 것은 세지 않는다. 새 영어 브리프(lang=en)만 센다 —
+                # 옛 한·영 게시물(lang=bi)까지 세면 배포 직후 하루 동안 상한(31/4)에 걸려 한 건도 안 나갔다.
                 day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
                 recent = (await db.execute(
                     select(SocialPost.created_at)
                     .where(
                         SocialPost.content_type == "kscore_alert",
+                        SocialPost.lang == "en",
                         SocialPost.created_at >= day_ago,
                         SocialPost.status.notin_(["rejected", "failed"]),
                     )
