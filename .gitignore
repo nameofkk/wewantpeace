@@ -79,3 +79,9 @@ coverage/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# 기자·발송 명단 같은 개인정보 목록은 저장소에 두지 않는다 (2026-09-30 기록에서 전부 삭제함). 명단은 .secrets/ 에
+*send-list*.csv
+*journalist*email*
+*journalist-contacts*
+docs/**/*emails*.csv

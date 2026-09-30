@@ -80,6 +80,16 @@ async def main(apply: bool) -> None:
             if not apply:
                 continue
             async with conn.transaction():
+                # 되돌릴 수 있게 끊는 연결을 먼저 백업 표에 남긴다 (DB 안이라 재배포에도 남는다)
+                await conn.execute(
+                    "CREATE TABLE IF NOT EXISTS cluster_events_trim_bak "
+                    "(cluster_id uuid, event_id uuid, trimmed_at timestamptz DEFAULT now())"
+                )
+                await conn.execute(
+                    "INSERT INTO cluster_events_trim_bak (cluster_id, event_id) "
+                    "SELECT $1, unnest($2::uuid[])",
+                    c["id"], [e["id"] for e in drop],
+                )
                 await conn.execute(
                     "DELETE FROM cluster_events WHERE cluster_id = $1 AND event_id = ANY($2::uuid[])",
                     c["id"], [e["id"] for e in drop],
