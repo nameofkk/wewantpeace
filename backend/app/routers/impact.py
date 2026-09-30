@@ -3665,6 +3665,28 @@ async def get_weekly_report(
         else:
             highlight = f"No significant crisis this week. {home} tension: {current_score}/100."
 
+    # 이번 주 주간 브리핑 호가 있으면 AI 제목·서문을 쓴다 (worker/weekly — 뉴스레터와 같은 문장)
+    try:
+        from worker.weekly.edition import latest_edition
+        edition = await latest_edition(db)
+    except Exception:
+        edition = None
+    if edition is not None:
+        ed = edition.data or {}
+        lang_key = "ko" if lang == "ko" else "en"
+        titles = {}
+        for item in (ed.get("stories") or []) + (ed.get("also") or []) + (ed.get("easing") or []) + \
+                [c.get("top") for c in (ed.get("countries") or {}).values() if c.get("top")]:
+            head = (item.get(lang_key) or {}).get("headline")
+            if head:
+                titles.setdefault(item["cluster_id"], head)
+        for issue in top_issues:
+            if issue.cluster_id in titles:
+                issue.title = titles[issue.cluster_id]
+        intro = ((ed.get("intro") or {}).get(lang_key) or {}).get("intro")
+        if intro:
+            highlight = intro
+
     return WeeklyReportOut(
         week_start=week_start.isoformat(),
         week_end=now.isoformat(),

@@ -7,6 +7,9 @@ GET  /newsletter/archive                -- 발송된 뉴스레터 목록 (public
 GET  /newsletter/archive/{log_id}       -- 특정 뉴스레터 HTML (public)
 GET  /newsletter/stats                  -- 구독자 수 (public)
 GET  /newsletter/sample?lang=kr|us      -- 샘플 뉴스레터 HTML (public)
+GET  /newsletter/weekly/{week}?lang=     -- 주간 브리핑 웹판 (public, 개인 칸 없음)
+GET  /newsletter/weekly/{week}/feedback  -- 메일의 "유용했어요/별로예요" 기록
+GET/POST /newsletter/lang?t=&k=&lang=    -- 메일의 언어 바꾸기 (GET 은 확인 화면, POST 가 저장)
 """
 
 import hmac
@@ -235,3 +238,131 @@ async def newsletter_sample(
     html = chevron.render(template, data)
     await redis.set(cache_key, html, ex=86400)  # 24h
     return HTMLResponse(content=html)
+
+
+# ── 주간 브리핑 (2026-09-30) ───────────────────────────────────────────────
+
+_WEEK_RE = r"^\d{4}-W\d{2}$"
+
+
+def _simple_page(title: str, body: str, lang: str = "en") -> HTMLResponse:
+    html = (
+        f"<!doctype html><html lang='{lang}'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{title}</title></head>"
+        "<body style=\"margin:0;background:#EEF0F3;font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',"
+        "Segoe UI,Arial,sans-serif;color:#0F172A;\"><div style='max-width:480px;margin:60px auto;background:#fff;"
+        f"border-radius:14px;padding:28px 24px;'>{body}</div></body></html>"
+    )
+    return HTMLResponse(content=html)
+
+
+@router.get("/weekly/{week_key}")
+@limiter.limit("60/minute")
+async def weekly_web(request: Request, response: Response, week_key: str,
+                     lang: str = Query("en", pattern="^(en|ko)$"), db: AsyncSession = Depends(get_db)):
+    """주간 브리핑 웹판 — 메일의 '브라우저로 보기'·다른 언어판 링크가 여기로 온다."""
+    import re as _re
+    from backend.app.models.weekly_edition import WeeklyEdition
+    from worker.weekly.render import render_email
+
+    if week_key == "latest":
+        row = (await db.execute(select(WeeklyEdition).order_by(WeeklyEdition.created_at.desc()).limit(1))).scalar_one_or_none()
+    elif _re.match(_WEEK_RE, week_key):
+        row = (await db.execute(select(WeeklyEdition).where(WeeklyEdition.week_key == week_key))).scalar_one_or_none()
+    else:
+        row = None
+    if row is None:
+        raise HTTPException(404, detail="Edition not found")
+    mail = render_email(row.data, lang)
+    return HTMLResponse(content=mail["html"])
+
+
+@router.get("/weekly/{week_key}/feedback")
+@limiter.limit("30/minute")
+async def weekly_feedback(request: Request, response: Response, week_key: str,
+                          v: str = Query(..., pattern="^(good|bad)$"),
+                          lang: str = Query("en", pattern="^(en|ko)$"),
+                          t: str = Query("", max_length=40), db: AsyncSession = Depends(get_db)):
+    """메일의 '유용했어요/별로예요'. 받는 사람 토큰 앞 12자로 한 표만 (마지막 표가 남는다).
+
+    메일 보안 스캐너가 링크를 전부 열어 보는 경우가 있어 같은 토큰의 두 표가 몇 초 안에 들어오면
+    분석할 때 걸러야 한다 — 그래서 시각과 함께 AppEvent 로도 남긴다.
+    """
+    import re as _re
+    from backend.app.models.app_event import AppEvent
+
+    if not _re.match(_WEEK_RE, week_key):
+        raise HTTPException(404)
+    rid = _re.sub(r"[^0-9a-zA-Z]", "", t)[:12]
+    db.add(AppEvent(name="weekly_feedback", props={"week": week_key, "v": v, "lang": lang, "rid": rid}, platform="email"))
+    try:
+        if rid:
+            await get_redis().hset(f"weekly:fb:{week_key}", rid, v)
+    except Exception:
+        pass
+    await db.flush()
+    if lang == "ko":
+        return _simple_page("고마워요", "<h2 style='margin:0 0 8px;'>의견 고마워요</h2><p style='color:#5B6472;line-height:1.6;'>"
+                            "다음 호를 만들 때 참고할게요.</p><p><a href='https://www.wewantpeace.live/?ref=weekly'>WeWantPeace 열기</a></p>", "ko")
+    return _simple_page("Thanks", "<h2 style='margin:0 0 8px;'>Thanks for the feedback</h2><p style='color:#5B6472;line-height:1.6;'>"
+                        "It helps us shape the next issue.</p><p><a href='https://www.wewantpeace.live/?ref=weekly'>Open WeWantPeace</a></p>")
+
+
+async def _set_lang(db: AsyncSession, t: str, k: str, lang: str) -> bool:
+    from backend.app.models.brief_subscriber import BriefSubscriber
+    from backend.app.models.user import UserPreference
+
+    if k == "subscriber":
+        sub = (await db.execute(select(BriefSubscriber).where(BriefSubscriber.token == t))).scalar_one_or_none()
+        if not sub:
+            return False
+        sub.lang = lang
+        return True
+    user = await _find_user_by_token(t, db)
+    if not user:
+        return False
+    pref = (await db.execute(select(UserPreference).where(UserPreference.user_id == user.id))).scalar_one_or_none()
+    if pref is None:
+        db.add(UserPreference(user_id=user.id, language=lang))
+    else:
+        pref.language = lang
+    try:
+        # 회원 설정의 언어는 기본값(ko)이라 믿을 수 없어서, 직접 고른 사람을 따로 기억한다 (worker/weekly/send.py)
+        await get_redis().sadd("weekly:lang_chosen", str(user.id))
+    except Exception:
+        pass
+    return True
+
+
+@router.get("/lang")
+@limiter.limit("20/minute")
+async def weekly_lang_confirm(request: Request, response: Response,
+                              t: str = Query(..., min_length=10, max_length=64),
+                              k: str = Query("user", pattern="^(user|subscriber)$"),
+                              lang: str = Query(..., pattern="^(en|ko)$")):
+    """확인 화면만 — 메일 보안 스캐너가 링크를 미리 열어도 설정이 바뀌지 않게 저장은 POST 로."""
+    import html as _h
+    label = "앞으로 한국어판으로 받기" if lang == "ko" else "Send me the English edition from now on"
+    head = "한국어판으로 바꿀까요?" if lang == "ko" else "Switch to the English edition?"
+    body = (f"<h2 style='margin:0 0 16px;'>{head}</h2>"
+            f"<form method='post' action='/newsletter/lang?t={_h.escape(t)}&k={_h.escape(k)}&lang={lang}'>"
+            "<button type='submit' style='width:100%;padding:14px;border:0;border-radius:10px;background:#0B1220;"
+            f"color:#fff;font-size:16px;font-weight:700;cursor:pointer;'>{label}</button></form>")
+    return _simple_page(head, body, lang)
+
+
+@router.post("/lang")
+@limiter.limit("10/minute")
+async def weekly_lang_set(request: Request, response: Response,
+                          t: str = Query(..., min_length=10, max_length=64),
+                          k: str = Query("user", pattern="^(user|subscriber)$"),
+                          lang: str = Query(..., pattern="^(en|ko)$"),
+                          db: AsyncSession = Depends(get_db)):
+    ok = await _set_lang(db, t, k, lang)
+    if not ok:
+        raise HTTPException(404, detail="Invalid or expired link")
+    await db.flush()
+    if lang == "ko":
+        return _simple_page("바꿨어요", "<h2 style='margin:0 0 8px;'>다음 호부터 한국어로 보내드려요</h2>", "ko")
+    return _simple_page("Done", "<h2 style='margin:0 0 8px;'>You'll get the English edition from the next issue</h2>")

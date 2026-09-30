@@ -170,17 +170,6 @@ app.conf.beat_schedule = {
         "schedule": crontab(minute=0, hour=10),  # 매일 10:00 UTC = KST 19:00
         "options": {"queue": "process"},
     },
-    # ── 주간 리포트 (프론트엔드 UI 준비 완료 전까지 비활성화) ──
-    # "generate-weekly-pdf": {
-    #     "task": "worker.tasks.generate_weekly_pdf",
-    #     "schedule": crontab(minute=50, hour=8, day_of_week=1),  # 월요일 08:50 UTC (이메일 발송 10분 전)
-    #     "options": {"queue": "process"},
-    # },
-    # "send-weekly-report": {
-    #     "task": "worker.tasks.send_weekly_report",
-    #     "schedule": crontab(minute=0, hour=9, day_of_week=1),  # 매주 월요일 09:00 UTC = KST 18:00
-    #     "options": {"queue": "process"},
-    # },
     # ── Admin Ops v0.9 ──
     "snapshot-weekly-kpi": {
         "task": "worker.tasks.snapshot_weekly_kpi",
@@ -347,30 +336,22 @@ app.conf.beat_schedule = {
         "schedule": 25 * 60,  # 25분마다 (캐시 TTL 30분보다 빠르게)
         "options": {"queue": "process"},
     },
-    # ── 뉴스레터 시간대별 자동 발송 ──
-    "newsletter-send-asia": {
-        "task": "worker.tasks.send_newsletter_scheduled",
-        "schedule": crontab(minute=0, hour=0, day_of_week=1),  # Mon 00:00 UTC = 09:00 KST
-        "args": ["asia"],
+    # ── 주간 브리핑 (2026-09-30 통합: 옛 뉴스레터 초안·시간대별 발송·주간 리포트·PDF 대체) ──
+    "weekly-edition-build": {
+        "task": "worker.tasks.build_weekly_edition",
+        "schedule": crontab(minute=0, hour=20, day_of_week=0),  # 일 20:00 UTC = 월 05:00 KST
         "options": {"queue": "process"},
     },
-    "newsletter-send-europe": {
-        "task": "worker.tasks.send_newsletter_scheduled",
-        "schedule": crontab(minute=0, hour=8, day_of_week=1),  # Mon 08:00 UTC = 09:00 CET
-        "args": ["europe"],
+    "weekly-edition-send-ko": {
+        "task": "worker.tasks.send_weekly_edition",
+        "schedule": crontab(minute=0, hour=22, day_of_week=0),  # 일 22:00 UTC = 월 07:00 KST
+        "args": ["ko"],
         "options": {"queue": "process"},
     },
-    "newsletter-send-americas": {
-        "task": "worker.tasks.send_newsletter_scheduled",
-        "schedule": crontab(minute=0, hour=14, day_of_week=1),  # Mon 14:00 UTC = 09:00 EST
-        "args": ["americas"],
-        "options": {"queue": "process"},
-    },
-    # ── 뉴스레터 초안 자동 생성 (일요일 15:00 UTC = 월요일 00:00 KST) ──
-    # 월요일 발송 전에 어드민이 확인·편집할 시간 확보 (최소 9시간 전)
-    "generate-newsletter-draft": {
-        "task": "worker.tasks.generate_newsletter_draft",
-        "schedule": crontab(minute=0, hour=15, day_of_week=0),  # Sunday 15:00 UTC = Mon 00:00 KST
+    "weekly-edition-send-en": {
+        "task": "worker.tasks.send_weekly_edition",
+        "schedule": crontab(minute=0, hour=11, day_of_week=1),  # 월 11:00 UTC (영국 정오·미 동부 07시)
+        "args": ["en"],
         "options": {"queue": "process"},
     },
     # ── Beat heartbeat ──

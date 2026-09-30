@@ -48,7 +48,8 @@ T = {
         "easing_sub": "Diplomatic moves reported by at least three outlets this week.",
         "yours": "Countries you follow", "yours_sub": "The top story this week and the current US travel advisory.",
         "stories_n": "stories this week", "no_story": "No story reported by three or more outlets this week.",
-        "brent": "Brent crude", "wk": "vs a week ago", "stories": "stories tracked", "sources": "outlets read",
+        "brent": "Brent crude", "wk": "vs a week ago", "stories": "stories confirmed by 3+ outlets", "sources": "outlets read",
+        "switch_top": "한국어로 받기 (Get this in Korean)", "num_src": "Source",
         "useful": "Was this useful?", "yes": "Yes", "no": "Not really",
         "app_title": "Get an alert when a country you follow flares up",
         "app_body": "The WeWantPeace app sends one alert when a story is confirmed by several outlets, not every headline.",
@@ -68,7 +69,8 @@ T = {
         "easing_sub": "이번 주 매체 3곳 이상이 보도한 외교 움직임이에요.",
         "yours": "내가 고른 나라", "yours_sub": "이번 주 대표 기사와 미 국무부 여행경보 단계예요.",
         "stories_n": "건", "no_story": "이번 주 매체 3곳 이상이 보도한 기사가 없어요.",
-        "brent": "브렌트유", "wk": "지난주 대비", "stories": "추적한 이슈", "sources": "읽은 매체",
+        "brent": "브렌트유", "wk": "지난주 대비", "stories": "매체 3곳 이상 확인한 이슈", "sources": "읽은 매체",
+        "switch_top": "Get this in English", "num_src": "출처",
         "useful": "이번 브리핑 어땠나요?", "yes": "유용했어요", "no": "별로예요",
         "app_title": "고른 나라에 큰일이 생기면 바로 알려드려요",
         "app_body": "여러 매체가 확인한 소식만 한 번씩 알려드려요. 헤드라인마다 울리지 않아요.",
@@ -342,8 +344,9 @@ def _story_card(i: int, s: dict, data: dict, lang: str) -> str:
     if num and i > 1:
         num_html = (f'<tr><td style="padding:0 0 12px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>'
                     f'<td style="font-family:{FONT};font-size:40px;line-height:40px;font-weight:900;color:{RED};padding-right:12px;letter-spacing:-.02em;">{esc(num["value"])}</td>'
-                    f'<td style="font-family:{FONT};font-size:14px;line-height:18px;font-weight:700;color:{INK};">{esc(num[lang])}</td>'
-                    f'</tr></table></td></tr>')
+                    f'<td style="font-family:{FONT};font-size:14px;line-height:18px;font-weight:700;color:{INK};">{esc(num[lang])}'
+                    + (f'<div style="font-size:12px;font-weight:500;color:{MUTED};margin-top:2px;">{esc(t["num_src"])}: {esc(num.get("source"))}</div>' if num.get("source") else "")
+                    + '</td></tr></table></td></tr>')
     rows = []
     for key in ("what", "why", "watch"):
         if p.get(key):
@@ -451,6 +454,10 @@ def render_email(data: dict, lang: str, *, follow: list[str] | None = None,
             for k in ("what", "why", "watch") if p.get(k))
         if not hero:
             rows = f'<div style="font-size:24px;line-height:32px;font-weight:800;color:#fff;">{esc(p["headline"])}</div>' + rows
+        n1 = s1.get("number")
+        if hero and n1 and n1.get("source"):
+            rows = (f'<div style="font-size:12px;color:#94A3B8;">{esc(n1["value"])} {esc(n1[lang])} · '
+                    f'{esc(t["num_src"])}: {esc(n1["source"])}</div>') + rows
         src = sources_line(s1.get("source_names") or [], s1["n_sources"], lang)
         lead_text = (f'<tr><td style="padding:18px 28px 22px;font-family:{FONT};background:{NAVY};">{rows}'
                      f'<div style="margin-top:12px;font-size:13px;color:#94A3B8;">{esc(t["reported"])}: {esc(src)} · '
@@ -517,8 +524,13 @@ def render_email(data: dict, lang: str, *, follow: list[str] | None = None,
 
     subject = intro.get("subject") or (s1[lang]["headline"] if s1 else "WeWantPeace")
     preheader = intro.get("preheader") or ""
+    if switch_url:
+        lang_link = (f'<a href="{esc(switch_url)}" style="color:{INK};font-weight:700;text-decoration:underline;">'
+                     f'{esc(t["switch_top"])}</a>')
+    else:
+        lang_link = f'<a href="{esc(web_url(week, other))}" style="color:{MUTED};text-decoration:underline;">{esc(t["other_lang"])}</a>'
     top_links = (f'<a href="{esc(web_url(week, lang))}" style="color:{MUTED};text-decoration:underline;">{esc(t["view"])}</a>'
-                 f' &nbsp;·&nbsp; <a href="{esc(web_url(week, other))}" style="color:{MUTED};text-decoration:underline;">{esc(t["other_lang"])}</a>')
+                 f' &nbsp;·&nbsp; {lang_link}')
 
     html = f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

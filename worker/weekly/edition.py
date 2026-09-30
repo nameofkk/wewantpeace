@@ -133,10 +133,13 @@ STORY_SYSTEM = (
     "are headline style (명사형·개조식, e.g. '요르단강 서안 정착민, 팔레스타인 마을 습격') and never end with a "
     "sentence ending. Every Korean sentence in what/why/watch ends in polite 해요체 (-어요/-아요/-했어요/-예요/"
     "-이에요/-거예요); never use -습니다/-ㅂ니다/-다. Use Korean place names (가자지구, 요르단강 서안, 호르무즈 해협).\n"
+    "actors: list of the main countries, groups and officials named in the reports. The English and "
+    "Korean text must refer to exactly these actors (do not swap countries, e.g. UK is 영국, never 일본).\n"
     "number: the single most telling number reported this week, or null. Object with value (digits "
     "and at most one of + , . % only, e.g. '8', '100+', '720'), en (label under the number, at most 40 "
     "characters, e.g. 'US Marines wounded'), ko (at most 16 characters, e.g. '부상당한 미 해병'). Only "
-    "use a number that appears in the reports. Never compute or estimate one.\n"
+    "use a number that appears in the reports. Never compute or estimate one. Add source: the outlet "
+    "name exactly as written in the square brackets of the report that states the number.\n"
     "skip: true if the reports are not about armed conflict, security, political violence, sanctions "
     "or diplomacy with real-world consequences, or too thin to say what happened. Also true for "
     "business news such as defense contracts, arms procurement deals, company earnings or stock moves.\n"
@@ -185,10 +188,40 @@ def _cache_set(key: str, value: dict) -> None:
 
 
 _KO_RE = re.compile(r"[가-힣]")
+
+# 모델이 해요체 지시를 어기고 합니다체로 쓰는 경우가 잦다 (9/30 드라이런: 본문·서문 절반).
+# 규칙이 확실한 어미만 바꾸고, 나머지는 그대로 둔다 (틀리게 바꾸는 것보다 낫다).
+_KO_ENDINGS = [
+    (re.compile(r"(았|었|였|했|됐|겠|있|없|같)습니다"), r"\1어요"),
+    (re.compile(r"합니다"), "해요"),
+    (re.compile(r"됩니다"), "돼요"),
+    (re.compile(r"보입니다"), "보여요"),
+    (re.compile(r"했다\.(\s|$)"), r"했어요.\1"),
+]
+
+
+def _has_batchim(ch: str) -> bool:
+    code = ord(ch) - 0xAC00
+    return 0 <= code <= 11171 and code % 28 != 0
+
+
+def normalize_ko(text: str) -> str:
+    for pat, sub in _KO_ENDINGS:
+        text = pat.sub(sub, text)
+    # "…입니다" → 받침 있으면 "이에요", 없으면 "예요"
+    def _ipnida(m):
+        prev = m.group(1)
+        return prev + ("이에요" if _has_batchim(prev) else "예요")
+    return re.sub(r"([가-힣])입니다", _ipnida, text)
+
+
+def _strip_ko_headline(text: str) -> str:
+    """제목은 개조식 — 문장 어미로 끝나면 떼어 낸다 ('공격했습니다' → '공격')."""
+    return re.sub(r"(했|하였|됐|되었)(습니다|어요|다)$", "", text).rstrip()
 _BAD_RE = re.compile(r"[Ѐ-ӿ]")  # 키릴 — 모델이 원문 언어로 답할 때
 
 
-def clean_story_ai(data: dict | None) -> dict | None:
+def clean_story_ai(data: dict | None, source_names: list[str] | None = None) -> dict | None:
     """AI 응답을 검사·정리. 필수 칸이 비었거나 언어가 틀리면 None."""
     from worker.social import brief as B
 
@@ -207,6 +240,8 @@ def clean_story_ai(data: dict | None) -> dict | None:
             return None
         clean = {k: B._fit(B._clean(str(part.get(k, "") or "")).rstrip("." if k in ("headline", "short") else ""), n)
                  for k, n in lim.items()}
+        if lang == "ko":
+            clean = {k: (_strip_ko_headline(v) if k in ("headline", "short") else normalize_ko(v)) for k, v in clean.items()}
         if not clean["headline"] or not clean["what"]:
             return None
         joined = " ".join(clean.values())
@@ -223,8 +258,12 @@ def clean_story_ai(data: dict | None) -> dict | None:
             "value": str(num["value"]).strip(),
             "en": B._fit(B._clean(str(num.get("en", ""))), 44),
             "ko": B._fit(B._clean(str(num.get("ko", ""))), 20),
+            "source": B._clean(str(num.get("source", "")))[:60],
         }
-        if not out["number"]["en"] or not out["number"]["ko"]:
+        # 어느 매체가 말한 숫자인지 밝힐 수 없으면 싣지 않는다 (큰 숫자는 라벨이 틀리면 오보가 된다)
+        allowed = {n.lower() for n in (source_names or [])}
+        if not out["number"]["en"] or not out["number"]["ko"] or \
+                (allowed and out["number"]["source"].lower() not in allowed):
             out.pop("number")
     return out
 
@@ -251,7 +290,7 @@ def write_story(cluster, ctx: dict) -> tuple[dict | None, bool]:
     if cached:
         return cached, False
     data = B._call_dedicated(STORY_SYSTEM, _story_prompt(cluster, ctx), max_tokens=2500)
-    story = clean_story_ai(data)
+    story = clean_story_ai(data, ctx.get("source_names"))
     if story:
         _cache_set(key, story)
     return story, True
@@ -291,10 +330,12 @@ def write_intro(stories: list[dict], others: list[dict], easing_candidates: list
     for lang, lim in (("en", (80, 100, 360, 80)), ("ko", (40, 55, 200, 42))):
         part = data.get(lang) or {}
         lines = [B._fit(B._clean(str(x)), lim[3]) for x in (part.get("lines") or []) if str(x).strip()][:3]
+        if lang == "ko":
+            lines = [normalize_ko(x) for x in lines]
         item = {
             "subject": B._fit(B._clean(str(part.get("subject", ""))), lim[0]),
             "preheader": B._fit(B._clean(str(part.get("preheader", ""))), lim[1]),
-            "intro": B._fit(B._clean(str(part.get("intro", ""))), lim[2]),
+            "intro": (normalize_ko if lang == "ko" else str)(B._fit(B._clean(str(part.get("intro", ""))), lim[2])),
             "lines": lines,
         }
         bad = (lang == "en" and _KO_RE.search(" ".join([item["subject"], item["intro"]]))) or \

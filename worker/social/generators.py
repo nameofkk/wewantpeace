@@ -198,6 +198,22 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
         return None
 
     cutoff = now - timedelta(days=7)
+
+    # 이번 주 주간 브리핑 호(일 20:00 UTC 생성)가 있으면 그 기사 순서·AI 제목을 그대로 쓴다
+    items = []
+    try:
+        from worker.weekly.edition import latest_edition
+        edition = await latest_edition(db, max_age_days=2)
+    except Exception:
+        edition = None
+    if edition is not None and edition.status == "ready":
+        for s in (edition.data.get("stories") or [])[:4]:
+            photos = [(p["url"], p.get("credit") or "") for p in (s.get("photos") or []) if p.get("url")]
+            items.append({"country": B.country_name(s.get("cc")), "headline": s["en"]["headline"],
+                          "meta": f"{s['n_sources']} independent outlets", "photos": photos})
+    if len(items) >= 2:
+        return await _weekly_recap_post(db, now, dedup_key, items)
+
     stats = (await db.execute(
         select(IssueCluster.country_code, func.count().label("n"))
         .where(
@@ -235,6 +251,12 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
     if len(items) < 2:
         logger.info("Weekly recap: 데이터 부족 — 건너뜀")
         return None
+    return await _weekly_recap_post(db, now, dedup_key, items)
+
+
+async def _weekly_recap_post(db: AsyncSession, now: datetime, dedup_key: str, items: list[dict]) -> SocialPost:
+    from worker.social import brief as B
+    from worker.social.brief_card import list_slides, attach_carousel
 
     start = (now - timedelta(days=7)).strftime("%b %d")
     end = now.strftime("%b %d")

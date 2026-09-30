@@ -3871,82 +3871,30 @@ async def send_weekly_report_test(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """어드민 본인에게 테스트 발송."""
-    from mako.template import Template
-    import json as _json
+    """어드민 본인에게 이번 주 주간 브리핑 호를 테스트 발송 (한·영 두 통).
+
+    예전엔 Jinja 문법 템플릿을 Mako 로 렌더해 {% if %} 태그가 그대로 찍힌 메일이 갔다(2026-09-30 확인).
+    """
+    import asyncio as _asyncio
+    from worker.weekly.edition import latest_edition
+    from worker.weekly.render import render_email
+    from backend.app.core.mailer import send_email
 
     if not admin.email:
         raise HTTPException(400, detail="Admin email not found")
-
-    # 초안 로드
-    redis = await get_redis()
-    now = datetime.now(timezone.utc)
-    week_key = now.strftime("%Y-W%W")
-    raw = await redis.get(f"admin:weekly-report:draft:{week_key}")
-    draft = _json.loads(raw) if raw else {}
-
-    # 데이터 가져오기 (간소 버전 — draft API와 동일 로직)
-    cutoff = now - timedelta(days=7)
-    top_clusters_q = await db.execute(
-        select(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
-        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
-        .limit(10)
-    )
-    issues = top_clusters_q.scalars().all()
-
-    from sqlalchemy import func as sa_func
-    latest_tension_subq = (
-        select(
-            TensionIndex.country_code,
-            TensionIndex.raw_score,
-            TensionIndex.tension_level,
-            sa_func.row_number()
-            .over(partition_by=TensionIndex.country_code, order_by=TensionIndex.time.desc())
-            .label("rn"),
-        ).subquery()
-    )
-    tension_q = await db.execute(
-        select(
-            latest_tension_subq.c.country_code,
-            latest_tension_subq.c.raw_score,
-            latest_tension_subq.c.tension_level,
-        )
-        .where(latest_tension_subq.c.rn == 1)
-        .order_by(latest_tension_subq.c.raw_score.desc())
-        .limit(10)
-    )
-    tensions = [type("T", (), {"country_code": r.country_code, "raw_score": r.raw_score, "tension_level": r.tension_level}) for r in tension_q.all()]
-
-    total_events = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
-    )).scalar() or 0
-    new_clusters = (await db.execute(
-        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff, IssueCluster.severity > 0)
-    )).scalar() or 0
-
-    # 렌더링
-    import os
-    tpl_path = os.path.join(os.path.dirname(__file__), "..", "templates", "weekly_report.html")
-    tpl = Template(filename=tpl_path)
-    html = tpl.render(
-        lang="ko",
-        user=admin,
-        issues=issues,
-        tensions=tensions,
-        stats={"total_events": total_events, "new_clusters": new_clusters, "crisis_countries": 0},
-        is_pro=True,
-        editor_note=draft.get("editor_note_ko", ""),
-    )
-
-    # 발송
-    try:
-        _send_email(admin.email, "[TEST] WeWantPeace Weekly Report", html)
-    except Exception as e:
-        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
-
-    await _log_action(db, admin, "weekly_report_test_send")
-    return {"status": "ok", "sent_to": admin.email}
+    row = await latest_edition(db)
+    if row is None:
+        raise HTTPException(404, detail="이번 주 주간 브리핑 호가 아직 없습니다 (일 20:00 UTC 생성)")
+    loop = _asyncio.get_running_loop()
+    sent = 0
+    for lang in ("ko", "en"):
+        mail = render_email(row.data, lang)
+        ok = await loop.run_in_executor(None, lambda m=mail: send_email(admin.email, f"[TEST] {m['subject']}", m["html"], text=m["text"]))
+        sent += int(bool(ok))
+    if not sent:
+        raise HTTPException(500, detail="이메일 발송 실패")
+    await _log_action(db, admin, "weekly_report_test_send", detail={"week": row.week_key, "status": row.status})
+    return {"status": "ok", "sent_to": admin.email, "week": row.week_key, "edition_status": row.status}
 
 
 @router.post("/weekly-report/send")
@@ -3954,129 +3902,19 @@ async def send_weekly_report_all(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """전체 대상 주간 리포트 발송."""
-    from backend.app.core.config import settings
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    from mako.template import Template
-    import json as _json
+    """이번 주 호를 지금 발송 (자동 발송 토글과 무관하게, 한·영 두 판을 큐에 넣는다)."""
+    from worker.tasks import send_weekly_edition
+    from worker.weekly.edition import latest_edition
 
-    if not settings.smtp_user or not settings.smtp_password:
-        raise HTTPException(503, detail="SMTP not configured")
-
-    # 초안 로드
-    redis = await get_redis()
-    now = datetime.now(timezone.utc)
-    week_key = now.strftime("%Y-W%W")
-    raw = await redis.get(f"admin:weekly-report:draft:{week_key}")
-    draft = _json.loads(raw) if raw else {}
-
-    # 대상 유저
-    result = await db.execute(
-        select(User).where(
-            User.marketing_agreed_at != None, User.status != "deleted", User.email != None
-        )
-    )
-    users = result.scalars().all()
-    if not users:
-        raise HTTPException(400, detail="No recipients")
-
-    # 데이터
-    cutoff = now - timedelta(days=7)
-    top_clusters_q = await db.execute(
-        select(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.last_event_at >= cutoff)
-        .order_by(IssueCluster.severity.desc(), IssueCluster.kscore.desc())
-        .limit(10)
-    )
-    issues = top_clusters_q.scalars().all()
-
-    from sqlalchemy import func as sa_func
-    latest_tension_subq = (
-        select(
-            TensionIndex.country_code,
-            TensionIndex.raw_score,
-            TensionIndex.tension_level,
-            sa_func.row_number()
-            .over(partition_by=TensionIndex.country_code, order_by=TensionIndex.time.desc())
-            .label("rn"),
-        ).subquery()
-    )
-    tension_q = await db.execute(
-        select(
-            latest_tension_subq.c.country_code,
-            latest_tension_subq.c.raw_score,
-            latest_tension_subq.c.tension_level,
-        )
-        .where(latest_tension_subq.c.rn == 1)
-        .order_by(latest_tension_subq.c.raw_score.desc())
-        .limit(10)
-    )
-    tensions = [type("T", (), {"country_code": r.country_code, "raw_score": r.raw_score, "tension_level": r.tension_level}) for r in tension_q.all()]
-
-    total_events = (await db.execute(
-        select(func.count()).select_from(NormalizedEvent).where(NormalizedEvent.created_at >= cutoff)
-    )).scalar() or 0
-    new_clusters = (await db.execute(
-        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff, IssueCluster.severity > 0)
-    )).scalar() or 0
-
-    import os
-    tpl_path = os.path.join(os.path.dirname(__file__), "..", "templates", "weekly_report.html")
-    tpl = Template(filename=tpl_path)
-    stats_data = {"total_events": total_events, "new_clusters": new_clusters, "crisis_countries": 0}
-
-    # 로그 생성
-    log = MarketingEmailLog(
-        admin_id=admin.id,
-        subject="WeWantPeace Weekly Report",
-        body="[weekly-report]",
-        sent_count=0,
-        failed_count=0,
-        status="sending",
-    )
-    db.add(log)
-    await db.flush()
-
-    # 각 유저별 렌더링 + 발송
-    recipients = []
-    for u in users:
-        try:
-            lang = getattr(u, "lang", None) or "ko"
-            is_pro = getattr(u, "plan", "free") != "free"
-            note = draft.get(f"editor_note_{lang}", "") or draft.get("editor_note_ko", "")
-            html = tpl.render(
-                lang=lang,
-                user=u,
-                issues=issues,
-                tensions=tensions if is_pro else [],
-                stats=stats_data,
-                is_pro=is_pro,
-                editor_note=note,
-            )
-            subj = "WeWantPeace 주간 리포트" if lang == "ko" else "WeWantPeace Weekly Report"
-            recipients.append((u.email, subj, html))
-        except Exception:
-            pass
-
-    try:
-        result = _send_email_bulk(recipients)
-        sent = result["sent"]
-        failed = result["failed"]
-    except Exception as e:
-        log.status = "failed"
-        log.failed_count = len(users)
-        await db.flush()
-        raise HTTPException(500, detail=f"이메일 발송 실패: {str(e)}")
-
-    log.sent_count = sent
-    log.failed_count = failed
-    log.status = "completed"
-    await db.flush()
-    await _log_action(db, admin, "weekly_report_send", detail={"sent": sent, "failed": failed})
-
-    return {"status": "ok", "sent": sent, "failed": failed}
+    row = await latest_edition(db, max_age_days=2)
+    if row is None:
+        raise HTTPException(404, detail="보낼 호가 없습니다")
+    if row.status != "ready":
+        raise HTTPException(409, detail=f"호 상태가 {row.status} 입니다 (AI 브리프 부족 등) — 확인 후 다시 만들어 주세요")
+    for lang in ("ko", "en"):
+        send_weekly_edition.apply_async(args=[lang], kwargs={"force": True}, queue="process")
+    await _log_action(db, admin, "weekly_report_send", detail={"week": row.week_key, "queued": True})
+    return {"status": "queued", "sent": 0, "failed": 0, "week": row.week_key}
 
 
 @router.get("/weekly-report/history")

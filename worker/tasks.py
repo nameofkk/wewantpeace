@@ -2741,314 +2741,6 @@ def send_expired_trial_offers(self):
         raise self.retry(exc=exc)
 
 
-# ── 주간 리포트 PDF 생성 ─────────────────────────────────────────────────
-
-
-@app.task(
-    name="worker.tasks.generate_weekly_pdf",
-    queue="process",
-    bind=True,
-    max_retries=1,
-    default_retry_delay=300,
-)
-def generate_weekly_pdf(self):
-    """주간 리포트 PDF 생성 → Supabase 업로드."""
-    async def _run():
-        from sqlalchemy import text
-        from worker.report.pdf_generator import build_pdf, WeeklyReportData
-        from worker.report.pdf_uploader import upload_pdf
-
-        now = datetime.now(timezone.utc)
-        cutoff = now - timedelta(days=7)
-
-        async with AsyncSessionLocal() as db:
-            # 이벤트 수
-            r = await db.execute(text(
-                "SELECT COUNT(*) FROM normalized_events"
-                " WHERE event_time >= :cutoff AND is_duplicate = FALSE"
-            ), {"cutoff": cutoff})
-            total_events = r.scalar() or 0
-
-            # 신규 클러스터
-            r = await db.execute(text(
-                "SELECT COUNT(*) FROM issue_clusters"
-                " WHERE first_seen >= :cutoff AND is_active = TRUE"
-            ), {"cutoff": cutoff})
-            new_clusters = r.scalar() or 0
-
-            # 위기 국가 (severity >= 60)
-            r = await db.execute(text(
-                "SELECT COUNT(DISTINCT country_code) FROM issue_clusters"
-                " WHERE is_active = TRUE AND severity >= 60"
-            ))
-            crisis_countries = r.scalar() or 0
-
-            # TOP 10 이슈
-            r = await db.execute(text(
-                "SELECT title, title_ko, country_code, severity, topic"
-                " FROM issue_clusters"
-                " WHERE is_active = TRUE AND severity > 0"
-                " ORDER BY severity DESC, kscore DESC"
-                " LIMIT 10"
-            ))
-            top_issues = [
-                {"title": row[0], "title_ko": row[1], "country_code": row[2],
-                 "severity": row[3], "topic": row[4]}
-                for row in r.fetchall()
-            ]
-
-            # 긴장도 추이 (상위 5개국)
-            r = await db.execute(text(
-                "SELECT country_code, calculated_at, raw_score"
-                " FROM tension_indices"
-                " WHERE calculated_at >= :cutoff"
-                " AND country_code IN ("
-                "   SELECT country_code FROM tension_indices"
-                "   WHERE calculated_at >= :cutoff"
-                "   GROUP BY country_code"
-                "   ORDER BY MAX(raw_score) DESC"
-                "   LIMIT 5"
-                " )"
-                " ORDER BY calculated_at"
-            ), {"cutoff": cutoff})
-            tension_series = [
-                {"country_code": row[0], "time": row[1], "raw_score": row[2]}
-                for row in r.fetchall()
-            ]
-
-            # 토픽별 분포
-            r = await db.execute(text(
-                "SELECT topic, COUNT(*) cnt FROM normalized_events"
-                " WHERE event_time >= :cutoff AND is_duplicate = FALSE"
-                "   AND topic IS NOT NULL AND topic != 'unknown'"
-                " GROUP BY topic ORDER BY cnt DESC LIMIT 8"
-            ), {"cutoff": cutoff})
-            topic_distribution = {row[0]: row[1] for row in r.fetchall()}
-
-        data = WeeklyReportData(
-            week_start=cutoff,
-            week_end=now,
-            total_events=total_events,
-            new_clusters=new_clusters,
-            crisis_countries=crisis_countries,
-            top_issues=top_issues,
-            tension_series=tension_series,
-            topic_distribution=topic_distribution,
-            lang="ko",
-        )
-
-        pdf_buffer = build_pdf(data)
-        week_label = now.strftime("%Y-W%V")
-        filename = f"reports/{week_label}.pdf"
-        url = upload_pdf(pdf_buffer.read(), filename)
-
-        logger.info("generate_weekly_pdf 완료: url=%s", url)
-        return {"url": url, "week": week_label}
-
-    try:
-        return run_async(_run())
-    except Exception as exc:
-        logger.error("generate_weekly_pdf 오류: %s", exc)
-        raise self.retry(exc=exc)
-
-
-# ── 주간 리포트 이메일 발송 ───────────────────────────────────────────────
-
-
-async def _send_weekly_report_impl():
-    """매주 월요일 마케팅 동의 사용자에게 주간 리포트 이메일 발송."""
-    import smtplib
-    import os
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    import jinja2
-    from sqlalchemy import select, func, text
-    from backend.app.models.user import User, UserArea, UserPreference
-    from backend.app.models.issue_cluster import IssueCluster
-    from backend.app.models.tension_index import TensionIndex
-
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASS", "")
-    sender = os.getenv("SMTP_FROM", smtp_user)
-
-    if not smtp_user or not smtp_pass:
-        logger.warning("send_weekly_report: SMTP 설정 누락 (SMTP_USER/SMTP_PASS), 발송 중단")
-        return {"status": "skipped", "reason": "no_smtp_config"}
-
-    # Jinja2 템플릿 로드
-    template_path = os.path.join(
-        os.path.dirname(__file__),
-        "..", "backend", "app", "templates",
-    )
-    template_path = os.path.abspath(template_path)
-    jinja_env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(template_path),
-        autoescape=True,
-    )
-    template = jinja_env.get_template("weekly_report.html")
-
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(days=7)
-
-    # 전체 통계 (모든 사용자 공통)
-    async with AsyncSessionLocal() as db:
-        total_events_result = await db.execute(
-            text("""
-                SELECT COUNT(*) FROM normalized_events
-                WHERE event_time >= :cutoff AND is_duplicate = FALSE
-            """),
-            {"cutoff": cutoff},
-        )
-        total_events = total_events_result.scalar() or 0
-
-        new_clusters_result = await db.execute(
-            text("""
-                SELECT COUNT(*) FROM issue_clusters
-                WHERE created_at >= :cutoff AND severity > 0
-            """),
-            {"cutoff": cutoff},
-        )
-        new_clusters = new_clusters_result.scalar() or 0
-
-        crisis_countries_result = await db.execute(
-            text("""
-                SELECT COUNT(DISTINCT country_code) FROM issue_clusters
-                WHERE created_at >= :cutoff AND severity >= 70 AND country_code IS NOT NULL
-            """),
-            {"cutoff": cutoff},
-        )
-        crisis_countries = crisis_countries_result.scalar() or 0
-
-        global_stats = {
-            "total_events": total_events,
-            "new_clusters": new_clusters,
-            "crisis_countries": crisis_countries,
-        }
-
-        # TOP 10 이슈 클러스터 (전체 사용자 공통)
-        top_issues_result = await db.execute(
-            select(IssueCluster).where(
-                IssueCluster.severity > 0,
-                IssueCluster.last_event_at >= cutoff,
-            ).order_by(
-                IssueCluster.severity.desc(),
-                IssueCluster.kscore.desc(),
-            ).limit(10)
-        )
-        top_issues = top_issues_result.scalars().all()
-
-        # 마케팅 동의 사용자 전체 조회
-        users_result = await db.execute(
-            select(User).where(
-                User.marketing_agreed_at.isnot(None),
-                User.status == "active",
-                User.email.isnot(None),
-            )
-        )
-        all_users = users_result.scalars().all()
-
-    logger.info("send_weekly_report: 대상 사용자 %d명", len(all_users))
-
-    sent_total = 0
-    failed_total = 0
-    batch_size = 50
-
-    async with AsyncSessionLocal() as db:
-      for batch_start in range(0, len(all_users), batch_size):
-        batch = all_users[batch_start:batch_start + batch_size]
-
-        for user in batch:
-            try:
-                is_pro = user.plan in ("pro", "pro_plus")
-                lang = "ko"
-
-                # 사용자 언어 설정 조회
-                pref_result = await db.execute(
-                    select(UserPreference).where(UserPreference.user_id == user.id)
-                )
-                pref = pref_result.scalar_one_or_none()
-                if pref and pref.language:
-                    lang = pref.language
-
-                # Pro/Pro+ 사용자: 관심 국가 긴장도 조회
-                tensions = []
-                if is_pro:
-                    areas_result = await db.execute(
-                        select(UserArea).where(
-                            UserArea.user_id == user.id,
-                            UserArea.is_active == True,
-                            UserArea.country_code.isnot(None),
-                        )
-                    )
-                    user_areas = areas_result.scalars().all()
-                    country_codes = [a.country_code for a in user_areas if a.country_code]
-
-                    if country_codes:
-                        tension_result = await db.execute(
-                            text("""
-                                SELECT DISTINCT ON (country_code)
-                                    country_code, tension_level, raw_score
-                                FROM tension_index
-                                WHERE country_code = ANY(:codes)
-                                ORDER BY country_code, time DESC
-                            """),
-                            {"codes": country_codes},
-                        )
-                        tensions = [
-                            {
-                                "country_code": row.country_code,
-                                "tension_level": row.tension_level,
-                                "raw_score": row.raw_score,
-                            }
-                            for row in tension_result.fetchall()
-                        ]
-
-                # 템플릿 렌더링
-                subject_ko = "WeWantPeace 주간 리포트"
-                subject_en = "WeWantPeace Weekly Report"
-                subject = subject_ko if lang == "ko" else subject_en
-
-                html_body = template.render(
-                    user=user,
-                    issues=top_issues,
-                    tensions=tensions,
-                    stats=global_stats,
-                    is_pro=is_pro,
-                    lang=lang,
-                )
-
-                # 이메일 발송
-                _send_email(user.email, subject, html_body, sender)
-
-                sent_total += 1
-
-            except Exception as e:
-                logger.warning(
-                    "send_weekly_report: 발송 실패 [user=%s, email=%s]: %s",
-                    user.id, user.email, e,
-                )
-                failed_total += 1
-
-        # 배치 간 딜레이 (마지막 배치 제외)
-        if batch_start + batch_size < len(all_users):
-            import asyncio as _asyncio
-            await _asyncio.sleep(0.5)
-
-    logger.info(
-        "send_weekly_report 완료: sent=%d, failed=%d",
-        sent_total, failed_total,
-    )
-    return {"status": "ok", "sent": sent_total, "failed": failed_total}
-
-
-@app.task(name="worker.tasks.send_weekly_report", queue="process")
-def send_weekly_report():
-    """매주 월요일 주간 리포트 발송."""
-    return run_async(_send_weekly_report_impl())
-
-
 # ── Admin Ops v0.9: KPI Alert Email ──────────────────────────────────────────
 
 async def _send_kpi_alert_email(alerts: list[dict], week_start) -> None:
@@ -4932,246 +4624,78 @@ def cleanup_old_data(self):
         raise self.retry(exc=exc)
 
 
-# ── 뉴스레터 초안 자동 생성 ──────────────────────────────────────────────────
-@app.task(
-    bind=True,
-    name="worker.tasks.generate_newsletter_draft",
-    queue="process",
-    max_retries=1,
-    default_retry_delay=120,
-)
-def generate_newsletter_draft(self):
-    """월요일 자동 뉴스레터 초안 생성 (KR + EN)."""
-    import subprocess
-    import sys
-
-    _record_heartbeat("generate_newsletter_draft")
-
-    import redis as sync_redis
-    r = sync_redis.from_url(
-        os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
-        decode_responses=True,
-    )
-
-    # 현재 최대 vol 번호: latest_draft_vol 기반 (키 스캔 대신 안정적)
-    # 원자적 INCR로 vol 번호 할당 (동시 실행 시 중복 방지)
-    next_vol = r.incr("newsletter:latest_draft_vol")
-    logger.info("newsletter draft: allocated vol=%d", next_vol)
-
-    script_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "scripts",
-        "generate_newsletter_data.py",
-    )
-
-    results = {}
-    for lang in ["kr", "us"]:
-        try:
-            result = subprocess.run(
-                [sys.executable, script_path, "--vol", str(next_vol), "--lang", lang],
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env={**os.environ},
-            )
-            logger.info(
-                "newsletter draft %s: exit=%d", lang, result.returncode
-            )
-            if result.returncode != 0:
-                logger.error(
-                    "newsletter draft %s failed: %s",
-                    lang,
-                    result.stderr[:500],
-                )
-            results[lang] = {
-                "exit_code": result.returncode,
-                "stdout": result.stdout[-200:] if result.stdout else "",
-            }
-        except Exception as e:
-            logger.error("newsletter draft %s error: %s", lang, e)
-            results[lang] = {"error": str(e)}
-
-    # 성공 여부 확인 (INCR로 이미 할당됨 — 실패 시에도 vol은 소비됨)
-    any_success = any(
-        res.get("exit_code") == 0 for res in results.values() if "exit_code" in res
-    )
-    if any_success:
-        logger.info("newsletter draft vol=%d saved to Redis", next_vol)
-    else:
-        logger.error("newsletter draft 전부 실패, vol 번호 미업데이트")
-
-    return {"status": "ok" if any_success else "all_failed", "vol": next_vol, "results": results}
+# ── 주간 브리핑 (2026-09-30 통합) ────────────────────────────────────────────
+# 예전 generate_newsletter_draft / send_newsletter_scheduled / send_weekly_report / generate_weekly_pdf 를
+# 대신한다. 옛 뉴스레터는 AI 연결이 끊겨 7월부터 매주 대체 문구(가짜 일정·포화 지수)로 나갔다.
+# 호 만들기: worker/weekly/edition.py · 그리기: render.py · 보내기: send.py
 
 
-# ── 뉴스레터 시간대별 자동 발송 ────────────────────────────────────────────────
-@app.task(
-    bind=True,
-    name="worker.tasks.send_newsletter_scheduled",
-    queue="process",
-    max_retries=1,
-    default_retry_delay=120,
-)
-def send_newsletter_scheduled(self, tz_group: str):
-    """시간대 그룹별 뉴스레터 자동 발송.
+@app.task(bind=True, name="worker.tasks.build_weekly_edition", queue="process", max_retries=1, default_retry_delay=600)
+def build_weekly_edition(self):
+    """이번 주 호를 만들어 weekly_editions 에 저장 (일 20:00 UTC)."""
+    _record_heartbeat("build_weekly_edition")
 
-    tz_group: "asia", "europe", "americas"
-    """
-    _record_heartbeat("send_newsletter_scheduled")
-
-    TIMEZONE_GROUPS = {
-        "asia": [
-            "Asia/Seoul", "Asia/Tokyo", "Asia/Shanghai", "Asia/Hong_Kong",
-            "Asia/Singapore", "Asia/Taipei", "Asia/Kolkata", "Asia/Bangkok",
-            "Australia/Sydney", "Pacific/Auckland",
-        ],
-        "europe": [
-            "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Rome",
-            "Europe/Madrid", "Europe/Moscow", "Europe/Istanbul", "Europe/Warsaw",
-            "Africa/Cairo", "Africa/Lagos", "Africa/Johannesburg",
-        ],
-        "americas": [
-            "America/New_York", "America/Chicago", "America/Denver",
-            "America/Los_Angeles", "America/Sao_Paulo", "America/Mexico_City",
-            "America/Toronto", "America/Buenos_Aires",
-        ],
-    }
-
-    allowed_tz = TIMEZONE_GROUPS.get(tz_group, [])
-    if not allowed_tz:
-        logger.warning(f"Unknown tz_group: {tz_group}")
-        return {"error": f"Unknown tz_group: {tz_group}"}
-
-    async def _send():
-        from backend.app.core.config import settings
-        from backend.app.core.redis import get_redis
-        from backend.app.models.user import User, UserPreference
-        from sqlalchemy import select
-        import chevron
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        import hmac as _hmac
-        from hashlib import sha256 as _sha256
-        import json
-
-        redis = get_redis()
-
-        # 자동 발송 토글 확인 (기본값: ON)
-        auto_send = await redis.get("newsletter:auto_send")
-        if auto_send == "0":
-            logger.info(f"Auto-send disabled (tz_group={tz_group})")
-            return {"status": "auto_send_disabled"}
-
-        # 최신 draft vol 번호 가져오기
-        vol_match = await redis.get("newsletter:latest_draft_vol")
-        if not vol_match:
-            logger.info(f"No draft vol available (tz_group={tz_group})")
-            return {"status": "no_draft_ready"}
-
-        # Get draft data from Redis
-        draft_kr_raw = await redis.get(f"admin:newsletter:draft:vol{vol_match}-kr")
-        draft_en_raw = await redis.get(f"admin:newsletter:draft:vol{vol_match}-us")
-
-        if not draft_kr_raw and not draft_en_raw:
-            logger.warning(f"Draft not found for vol {vol_match}")
-            return {"status": "draft_not_found"}
-
-        draft_kr = json.loads(draft_kr_raw) if draft_kr_raw else None
-        draft_en = json.loads(draft_en_raw) if draft_en_raw else None
-
-        # Load templates
-        from pathlib import Path
-        tpl_dir = Path(__file__).parent.parent / "backend" / "app" / "templates" / "newsletter"
-
-        tpl_kr = None
-        tpl_en = None
-        kr_path = tpl_dir / "newsletter-v1-final-ko.html"
-        en_path = tpl_dir / "newsletter-v1-final-en.html"
-        if kr_path.exists():
-            tpl_kr = kr_path.read_text(encoding="utf-8")
-        if en_path.exists():
-            tpl_en = en_path.read_text(encoding="utf-8")
-
-        resend_key = os.environ.get("RESEND_API_KEY")
-        if not resend_key and (not settings.smtp_user or not settings.smtp_password):
-            logger.error("Neither RESEND_API_KEY nor SMTP configured, skipping newsletter send")
-            return {"status": "smtp_not_configured"}
-
+    async def _run():
+        from worker.weekly import edition, render
         async with AsyncSessionLocal() as db:
-            # Get users with marketing consent
-            result = await db.execute(
-                select(User, UserPreference).join(
-                    UserPreference, User.id == UserPreference.user_id, isouter=True
-                ).where(
-                    User.marketing_agreed_at != None,
-                    User.status != "deleted",
-                    User.email != None,
-                )
-            )
-            rows = result.all()
+            data = await edition.build_edition(db)
+        # sync_playwright 는 이벤트 루프 안에서 못 돈다
+        loop = asyncio.get_running_loop()
+        data["images"] = await loop.run_in_executor(None, lambda: render.build_images(data))
+        async with AsyncSessionLocal() as db:
+            row = await edition.save_edition(db, data)
+            await db.commit()
+            status = row.status
+        logger.info("주간 브리핑 %s 저장: status=%s stories=%d ai=%s", data["week_key"], status,
+                    len(data["stories"]), data["ai"])
+        return {"week": data["week_key"], "status": status, "stories": len(data["stories"]), "ai": data["ai"]}
 
-            # Filter by timezone group
-            users_to_send = []
-            for user, pref in rows:
-                user_tz = pref.timezone if pref else "Asia/Seoul"
-                if user_tz in allowed_tz:
-                    user_lang = pref.language if pref else "ko"
-                    users_to_send.append((user, user_lang))
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.exception("build_weekly_edition 실패")
+        raise self.retry(exc=exc)
 
-            if not users_to_send:
-                logger.info(f"No users in tz_group={tz_group}")
-                return {"status": "no_users", "tz_group": tz_group}
 
-            sent = 0
-            failed = 0
-            for user, user_lang in users_to_send:
-                try:
-                    if user_lang == "en" and tpl_en and draft_en:
-                        template = tpl_en
-                        data = draft_en
-                    elif tpl_kr and draft_kr:
-                        template = tpl_kr
-                        data = draft_kr
-                    else:
-                        continue
+@app.task(bind=True, name="worker.tasks.send_weekly_edition", queue="process", max_retries=0)
+def send_weekly_edition(self, lang: str, only: str | None = None, force: bool = False):
+    """이번 주 호를 lang 판 받는 사람에게 발송. ko=일 22:00 UTC(월 07시 KST), en=월 11:00 UTC.
 
-                    token = _hmac.new(settings.secret_key.encode(), str(user.id).encode(), _sha256).hexdigest()[:32]
-                    # apex(wewantpeace.live)는 DNS 레코드가 없어 열리지 않는다 — 반드시 www를 쓸 것.
-                    user_data = {**data, "unsubscribe_url": f"https://www.wewantpeace.live/unsubscribe?token={token}"}
-                    html = chevron.render(template, user_data)
+    newsletter:auto_send 가 "0" 이면 멈춘다 (관리자 토글·긴급 정지). status 가 ready 가 아니면
+    (AI 브리프 3건 미만 등) 보내지 않는다. only=이메일 하나에만 (관리자 테스트), 이때는 토글·중복 무시.
+    """
+    _record_heartbeat("send_weekly_edition")
 
-                    vol = data.get("vol_number", "?")
-                    subject = f"WeWantPeace Newsletter Vol.{vol}"
+    async def _run():
+        from backend.app.core.redis import get_redis
+        from worker.weekly import edition, send
 
-                    _send_email(user.email, subject, html)
-                    sent += 1
-                except Exception as e:
-                    logger.warning(f"Failed to send to {user.email}: {e}")
-                    failed += 1
+        if not only and not force:
+            if await get_redis().get("newsletter:auto_send") == "0":
+                logger.info("주간 브리핑 자동 발송 꺼짐 (newsletter:auto_send=0) — %s", lang)
+                return {"status": "auto_send_disabled"}
+        async with AsyncSessionLocal() as db:
+            row = await edition.latest_edition(db, max_age_days=2)
+            if row is None:
+                logger.warning("주간 브리핑: 보낼 호 없음 (%s)", lang)
+                return {"status": "no_edition"}
+            if row.status != "ready" and not only:
+                logger.warning("주간 브리핑 %s: status=%s — 발송 안 함", row.week_key, row.status)
+                return {"status": row.status, "week": row.week_key}
+            sent_col = "sent_ko_at" if lang == "ko" else "sent_en_at"
+            if getattr(row, sent_col) and not only:
+                return {"status": "already_sent", "week": row.week_key}
+            recipients = await send.collect_recipients(db)
+            data = row.data
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, lambda: send.send_edition(data, recipients, lang, only=only))
+        async with AsyncSessionLocal() as db:
+            row = await edition.latest_edition(db, max_age_days=2)
+            if not only and result["sent"]:
+                setattr(row, sent_col, datetime.now(timezone.utc))
+            await send.log_send(db, data, result)
+            await db.commit()
+        logger.info("주간 브리핑 발송 %s: %s", lang, result)
+        return result
 
-            # MarketingEmailLog 저장 (자동 발송 이력)
-            try:
-                from backend.app.models.community import MarketingEmailLog
-                vol = draft_kr.get("vol_number") if draft_kr else (draft_en.get("vol_number") if draft_en else "?")
-                log = MarketingEmailLog(
-                    admin_id=None,
-                    subject=f"WeWantPeace Newsletter Vol.{vol} (auto/{tz_group})",
-                    body=f"자동 발송: tz_group={tz_group}, sent={sent}, failed={failed}",
-                    sent_count=sent,
-                    failed_count=failed,
-                    status="completed" if sent > 0 else "failed",
-                )
-                db.add(log)
-                await db.commit()
-                logger.info("MarketingEmailLog 저장 완료: vol=%s, sent=%d, failed=%d", vol, sent, failed)
-            except Exception as log_err:
-                logger.error("MarketingEmailLog 저장 실패: %s", log_err)
-                try:
-                    await db.rollback()
-                except Exception:
-                    pass
-
-        logger.info(f"Newsletter sent: tz_group={tz_group}, sent={sent}, failed={failed}")
-        return {"status": "ok", "tz_group": tz_group, "sent": sent, "failed": failed}
-
-    return run_async(_send())
+    return run_async(_run())

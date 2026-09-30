@@ -250,7 +250,9 @@ async def security_headers(request: Request, call_next):
 
     # 뉴스레터 HTML(archive/sample)은 iframe 임베딩 허용
     path = request.url.path
-    if path.startswith("/newsletter/archive/") or path.startswith("/newsletter/sample"):
+    # 주간 브리핑 웹판·피드백·언어 바꾸기 화면도 메일과 같은 인라인 스타일 HTML 이다
+    if (path.startswith("/newsletter/archive/") or path.startswith("/newsletter/sample")
+            or path.startswith("/newsletter/weekly/") or path == "/newsletter/lang"):
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "

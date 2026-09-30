@@ -8,8 +8,9 @@ import { SplashScreen } from "./splash-screen";
 
 /** 공유 링크로 접근 가능한 경로들.
  * /brief 는 스레드 댓글·메일 확인 링크로 처음 들어오는 사람이 대부분이라
- * 온보딩으로 튕기면 구독 양식·구독 확인을 끝내 못 본다. 약관·개인정보도 같은 이유. */
-const SHAREABLE_PATHS = ["/issues/", "/feed", "/map", "/tension", "/brief", "/privacy", "/terms"];
+ * 온보딩으로 튕기면 구독 양식·구독 확인을 끝내 못 본다. 약관·개인정보도 같은 이유.
+ * /unsubscribe 는 메일의 수신거부 링크 — 처음 여는 기기에서도 반드시 열려야 한다. */
+const SHAREABLE_PATHS = ["/issues/", "/feed", "/map", "/tension", "/brief", "/privacy", "/terms", "/unsubscribe", "/newsletter"];
 
 function isShareablePage(pathname: string): boolean {
   return SHAREABLE_PATHS.some((p) => pathname.startsWith(p));
