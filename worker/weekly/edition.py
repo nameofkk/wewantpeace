@@ -131,8 +131,17 @@ STORY_SYSTEM = (
     "- what: 2 sentences, at most 260 characters (Korean: at most 130 characters). What happened this "
     "week, with numbers and places only if they appear in the reports, and who says so when a claim is "
     "not independently confirmed.\n"
-    "- why: 1 sentence, at most 170 characters (Korean: at most 85). Why it matters, grounded in the reports.\n"
-    "- watch: 1 sentence, at most 140 characters (Korean: at most 70). The next concrete thing to watch.\n"
+    "- why: 1 sentence, at most 170 characters (Korean: at most 85). Why it matters, with a concrete "
+    "consequence from the reports (who is affected, what changes). Make a person, government or group the "
+    "subject, not 'the incident' or 'this move'.\n"
+    "- watch: 1 sentence, at most 140 characters (Korean: at most 70). Name the next concrete event (a vote, a "
+    "deadline, a meeting, a response, a date). The label already says 'what to watch', so do not write "
+    "'remains to be seen', 'will be watched' (Korean: never '지켜봐야 해요', '주목해야', '관심이 쏠려요').\n"
+    "Banned English phrases: highlights, underscores, amid, growing tensions, volatile, landscape, in the wake of, "
+    "a stark reminder, plays a key role. Write like a wire-service reporter: short concrete sentences.\n"
+    "Korean watch sentences must not all end the same way (not every one '~할 예정이에요'). "
+    "Korean also bans: '이번 사건은 …을 보여줘요' (abstract subject + 보여주다), '-면서 …-고 있어요' used "
+    "twice, '~에서의', '~의 향방', '수포로 돌아갈', three or more words stacked before one noun.\n"
     "Korean style: natural Korean news explainer, not a literal translation. Korean headline and short "
     "are headline style (명사형·개조식, e.g. '요르단강 서안 정착민, 팔레스타인 마을 습격') and never end with a "
     "sentence ending. Every Korean sentence in what/why/watch ends in polite 해요체 (-어요/-아요/-했어요/-예요/"
@@ -162,7 +171,8 @@ INTRO_SYSTEM = (
     "Example: 'West Bank raids, a missile in Hormuz'.\n"
     "- preheader: one line shown after the subject in the inbox, at most 90 characters (Korean: 45), "
     "saying what the reader gets, e.g. 'Five stories, each confirmed by at least three outlets.'\n"
-    "- intro: two short sentences in a calm, human editor's voice that say what defined the week. "
+    "- intro: two short sentences in a calm, human editor's voice that say what defined the week, "
+    "naming places and facts. Never 'we track the latest developments', 'volatile regions' or similar filler. "
     "Korean: every sentence ends in polite 해요체 (-어요/-했어요/-예요); never -습니다/-다.\n"
     "- lines: exactly three strings, one line each (at most 70 characters; Korean at most 36), the week "
     "in three lines, each a complete thought.\n"
@@ -210,9 +220,30 @@ def _has_batchim(ch: str) -> bool:
     return 0 <= code <= 11171 and code % 28 != 0
 
 
+_HASNIDA = re.compile(r"니다(?=[.?!]?(\s|$))")
+
+
+def has_formal_ending(text: str) -> bool:
+    """합쇼체(-습니다/-ㅂ니다) 끝맺음이 남았나. 'ㅂ니다'는 받침이라 글자로는 안 잡혀 '니다'로 본다."""
+    return bool(_HASNIDA.search(text or ""))
+
+
+def _drop_b_batchim(m):
+    """'나타납니다' → '나타나요': 받침 ㅂ 을 떼고 '요'. 모음이 ㅏ/ㅓ/ㅐ/ㅔ/ㅕ 인 줄기만 (봅니다→보요 같은 오답 방지)."""
+    ch = m.group(1)
+    code = ord(ch) - 0xAC00
+    lead, vowel, tail = code // 588, (code % 588) // 28, code % 28
+    if tail != 17 or vowel not in (0, 4, 1, 5, 6):  # ㅂ받침, ㅏ ㅓ ㅐ ㅔ ㅕ
+        return m.group(0)
+    return chr(0xAC00 + lead * 588 + vowel * 28) + "요"
+
+
 def normalize_ko(text: str) -> str:
     for pat, sub in _KO_ENDINGS:
         text = pat.sub(sub, text)
+    text = re.sub(r"(주목|확인|결정|예상|전망|우려|기대)됩니다", r"\1돼요", text)
+    text = re.sub(r"해야 합니다", "해야 해요", text)
+    text = re.sub(r"([가-힣])니다(?=[.?!]?(\s|$))", _drop_b_batchim, text)
     # "…입니다" → 받침 있으면 "이에요", 없으면 "예요"
     def _ipnida(m):
         prev = m.group(1)
@@ -305,13 +336,24 @@ def fallback_intro(stories: list[dict]) -> dict:
     """AI 가 서문을 못 쓸 때 — 기사 짧은 제목을 그대로 잇는다 (지어낸 문장 없음)."""
     en_shorts = [s["en"]["short"] or s["en"]["headline"] for s in stories[:3]]
     ko_shorts = [s["ko"]["short"] or s["ko"]["headline"] for s in stories[:3]]
+    from worker.weekly.render import country
+    n = len(stories)
+    s1 = stories[0] if stories else None
+    en_intro = ko_intro = ""
+    if s1:
+        top = max(stories, key=lambda x: x.get("n_sources", 0))
+        en_intro = (f"The story reported by the most outlets this week ({top['n_sources']}) was "
+                    f"\u201c{top['en']['headline']}.\u201d Here are {n} stories, each confirmed by at least "
+                    f"{MIN_SOURCES} independent outlets.")
+        ko_intro = (f"이번 주 가장 많은 매체({top['n_sources']}곳)가 다룬 사건은 \u2018{top['ko']['headline']}\u2019이에요. "
+                    f"매체 {MIN_SOURCES}곳 이상이 확인한 {n}건을 골랐어요.")
     return {
-        "en": {"subject": ", ".join(en_shorts[:2]) + (" and more" if len(stories) > 2 else ""),
-               "preheader": f"{len(stories)} stories this week, each reported by at least {MIN_SOURCES} outlets.",
-               "intro": "", "lines": en_shorts},
-        "ko": {"subject": " · ".join(ko_shorts[:2]) + (" 외" if len(stories) > 2 else ""),
-               "preheader": f"이번 주 기사 {len(stories)}건, 모두 매체 {MIN_SOURCES}곳 이상이 보도했어요.",
-               "intro": "", "lines": ko_shorts},
+        "en": {"subject": ", ".join(en_shorts[:2]) + (" and more" if n > 2 else ""),
+               "preheader": f"{n} stories this week, each reported by at least {MIN_SOURCES} outlets.",
+               "intro": en_intro, "lines": en_shorts},
+        "ko": {"subject": " · ".join(ko_shorts[:2]) + (" 외" if n > 2 else ""),
+               "preheader": f"이번 주 기사 {n}건, 모두 매체 {MIN_SOURCES}곳 이상이 보도했어요.",
+               "intro": ko_intro, "lines": ko_shorts},
     }
 
 
@@ -337,6 +379,7 @@ def write_intro(stories: list[dict], others: list[dict], easing_candidates: list
         lines = [B._fit(B._clean(str(x)), lim[3]) for x in (part.get("lines") or []) if str(x).strip()][:3]
         if lang == "ko":
             lines = [normalize_ko(x) for x in lines]
+            part = dict(part, preheader=normalize_ko(str(part.get("preheader", ""))))
         item = {
             "subject": B._fit(B._clean(str(part.get("subject", ""))), lim[0]),
             "preheader": B._fit(B._clean(str(part.get("preheader", ""))), lim[1]),
@@ -381,6 +424,24 @@ async def week_numbers(db: AsyncSession, now: datetime, n_stories: int) -> dict:
             brent = {"now": round(now_px, 2), "then": round(then[1], 2), "now_date": now_date,
                      "then_date": then[0], "pct": round((now_px - then[1]) / then[1] * 100, 1)}
     return {"stories": n_stories, "outlets": int(outlets), "brent": brent}
+
+
+async def daily_counts(db: AsyncSession, cluster_id, now: datetime, days: int = 7) -> list[dict]:
+    """이 사건 보도가 날마다 몇 건 들어왔나 (D등급 제외). 차트 한 장의 재료 — 센 값 그대로."""
+    since = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (await db.execute(sa_text(
+        """
+        SELECT date_trunc('day', ne.event_time) AS d, count(*) AS n
+        FROM cluster_events ce JOIN normalized_events ne ON ne.id = ce.event_id
+        WHERE ce.cluster_id = :cid AND ne.event_time >= :since AND COALESCE(ne.source_tier, 'D') <> 'D'
+        GROUP BY 1 ORDER BY 1
+        """), {"cid": cluster_id, "since": since})).all()
+    by_day = {r[0].date().isoformat(): int(r[1]) for r in rows}
+    out = []
+    for i in range(days):
+        d = (since + timedelta(days=i)).date().isoformat()
+        out.append({"date": d, "n": by_day.get(d, 0)})
+    return out
 
 
 async def advisory_levels(db: AsyncSession) -> dict:
@@ -451,6 +512,7 @@ async def build_edition(db: AsyncSession, now: datetime | None = None, *, use_ai
             item.update({"en": {"headline": base["en"]["headline"], "short": "", "what": "", "why": "", "watch": ""},
                          "ko": {"headline": ko_head, "short": "", "what": "", "why": "", "watch": ""},
                          "number": None})
+        item["daily"] = await daily_counts(db, cluster.id, now)
         stories.append(item)
 
     # 토픽 라벨(diplomacy)은 체포·위협 기사도 섞여 있어(9/30 드라이런) 후보만 넉넉히 뽑고 AI 가 확인한 것만 싣는다
@@ -472,7 +534,8 @@ async def build_edition(db: AsyncSession, now: datetime | None = None, *, use_ai
     intro_ok = False
     titles_ko: dict = {}
     if use_ai and stories and story_ok:
-        others = easing + also + [c["top"] for c in countries.values() if c["top"]][:30]
+        # 제목 번역 몫은 12개까지 — 30개를 실었더니 응답이 늦어 세 모델 모두 시간 초과(10-01 드라이런 두 번)
+        others = (easing + also + [c["top"] for c in countries.values() if c["top"]])[:12]
         intro, titles_ko, intro_ok, easing_ids = write_intro([s for s in stories if s["ai"]] or stories, others, easing)
         # AI 가 '위협을 주고받는 외교' 기사도 완화로 골랐다 (9/30 두 번째 드라이런) — 제목으로 한 번 더 거른다
         easing = [e for e in easing if e["cluster_id"] in easing_ids
@@ -485,6 +548,17 @@ async def build_edition(db: AsyncSession, now: datetime | None = None, *, use_ai
     for item in easing + also + [c["top"] for c in countries.values() if c["top"]]:
         if not item["ko"]["headline"]:
             item["ko"]["headline"] = titles_ko.get(item["cluster_id"]) or item["en"]["headline"]
+
+    # 한국어판 윤문 (humanize-korean 룰북, 1콜) + 상투구 검사 — worker/weekly/polish.py
+    polish = {}
+    if use_ai and story_ok:
+        from worker.weekly import polish as P
+        polish = P.polish_ko({"intro": intro, "stories": stories})
+        polish["_en"] = P.polish_en({"intro": intro, "stories": stories})
+        calls += 1 + int("_retry" in polish) + int(any(v.get("how") == "ai" for v in polish["_en"].values() if isinstance(v, dict)))
+        slop = P.slop_report({"intro": intro, "stories": stories})
+    else:
+        slop = {}
 
     status_reason = None
     if story_ok < MIN_AI_STORIES:
@@ -505,6 +579,8 @@ async def build_edition(db: AsyncSession, now: datetime | None = None, *, use_ai
         "intro": intro,
         "images": {},
         "ai": {"calls": calls + (1 if intro_ok or (use_ai and story_ok) else 0), "story_ok": story_ok, "intro_ok": intro_ok},
+        "polish": polish,
+        "slop": slop,
     }
 
 

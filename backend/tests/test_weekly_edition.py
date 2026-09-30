@@ -134,9 +134,11 @@ def test_render_email_both_langs_no_template_leaks_or_false_claims():
             assert "file:///" not in html
             assert "https://x/unsub?token=t" in html
             assert mail["subject"] == data["intro"][lang]["subject"]
-            assert ("Countries you follow" in html or "내가 고른 나라" in html) == bool(follow)
+            assert ("COUNTRIES YOU FOLLOW" in html or "내가 고른 나라" in html) == bool(follow)
     ko = R.render_email(data, "ko")["html"]
-    assert "▼1.6%" in ko and "브렌트유" in ko  # 가격 표에서 계산한 주간 변화, 부호 그대로
+    assert "1.6% 내렸어요" in ko and "브렌트유" in ko  # 가격 표에서 계산한 주간 변화, 방향 그대로
+    en = R.render_email(data, "en")["html"]
+    assert "down 1.6%" in en
 
 
 def test_web_version_has_no_personal_links():
@@ -148,7 +150,7 @@ def test_web_version_has_no_personal_links():
 def test_map_svg_highlights_story_countries():
     svg = R.map_svg(_edition())
     assert svg.startswith("<svg") and svg.count("<circle") == 2
-    assert "#F6C9CB" in svg  # 이번 주 기사 나라
+    assert "#E9C9C6" in svg  # 이번 주 기사 나라
 
 
 def test_not_easing_filter():
@@ -156,3 +158,92 @@ def test_not_easing_filter():
     assert E.NOT_EASING_RE.search("Diplomatic efforts intensify as US and Iran trade threats of war")
     assert not E.NOT_EASING_RE.search("Russia and Ukraine agree prisoner exchange")
     assert not E.NOT_EASING_RE.search("Ceasefire talks resume in Doha")
+
+
+# ── 윤문 (humanize-korean 룰북) ──────────────────────────────────────────────
+
+from worker.weekly import polish as P  # noqa: E402
+
+
+def test_polish_accepts_style_change_keeps_facts():
+    before = "이번 사건은 미국과 영국 간의 엇갈린 입장을 보여줘요. 남성 5명이 체포됐어요."
+    after = "이번 사건으로 미국과 영국의 입장이 엇갈렸어요. 남성 5명이 체포됐어요."
+    assert P.accept(before, after)
+
+
+def test_polish_rejects_changed_numbers_or_names_or_register():
+    before = "RAF 페어포드 인근에서 남성 5명이 체포됐어요."
+    assert not P.accept(before, "RAF 페어포드 인근에서 남성 6명이 체포됐어요.")        # 숫자 바뀜
+    assert not P.accept(before, "페어포드 인근에서 남성 5명이 체포됐어요.")            # RAF 빠짐
+    assert not P.accept(before, "RAF 페어포드 인근에서 남성 5명이 체포되었습니다.")    # 합쇼체로 올라감
+    assert not P.accept(before, "RAF 페어포드 인근에서 남성 5명이 체포됐어요. 추가로 여러 정황이 드러났고 경찰은 배후를 캐고 있어요.")  # 내용 덧붙임
+
+
+def test_polish_apply_reverts_rejected_fields():
+    data = {"intro": {"ko": {"intro": "차분한 한 주였어요."}},
+            "stories": [{"ko": {"what": "5명이 다쳤어요.", "why": "긴장을 보여줘요.", "watch": "대응을 지켜봐야 해요."}}]}
+    rep = P.apply_ko(data, {"intro": "차분한 한 주였어요.", "s0.what": "6명이 다쳤어요.",
+                            "s0.watch": "정부가 이번 주 안에 대응을 내놓을지가 다음 관심사예요."})
+    assert data["stories"][0]["ko"]["what"] == "5명이 다쳤어요."          # 숫자 바뀐 윤문은 되돌림
+    assert data["stories"][0]["ko"]["watch"].startswith("정부가")
+    assert rep["s0.what"]["accepted"] is False and rep["s0.watch"]["accepted"] is True
+
+
+def test_polish_whole_text_change_gate():
+    """글 전체 변경률 50% 이상이면 전부 되돌린다 (humanize-korean 철칙 #4)."""
+    data = {"intro": {"ko": {"intro": "가"}}, "stories": [{"ko": {"what": "이란이 공격했어요.", "why": "위험해요.", "watch": "대응이 나와요."}}]}
+    rep = P.apply_ko(data, {"s0.what": "이란군이 새벽 기습을 감행했어요.", "s0.why": "해협 통항이 멈출 수 있어요.",
+                            "s0.watch": "미국 대응 수위가 다음 변수예요."})
+    assert rep["_whole"]["accepted"] is False
+    assert data["stories"][0]["ko"]["what"] == "이란이 공격했어요."
+
+
+def test_slop_report_flags_known_tells():
+    data = {"intro": {"en": {"intro": "We track the latest developments amid growing tensions."}, "ko": {"intro": ""}},
+            "stories": [{"en": {"why": "It highlights risks."}, "ko": {"watch": "대응을 지켜봐야 해요."}}]}
+    hits = P.slop_report(data)
+    assert {"amid", "highlights"} <= {h.lower() for h in hits["en"]}
+    assert "지켜봐야 해요" in hits["ko"]
+
+
+def test_formal_endings_normalized_or_flagged():
+    """'ㅂ니다'는 받침이라 글자로 안 잡힌다 — 10-01 드라이런에서 '나타납니다·주목됩니다'가 그대로 나갔다."""
+    assert E.normalize_ko("움직임이 나타납니다.") == "움직임이 나타나요."
+    assert E.normalize_ko("실행할지 주목됩니다.") == "실행할지 주목돼요."
+    assert E.normalize_ko("확인해야 합니다.") == "확인해야 해요."
+    assert E.has_formal_ending("사람들이 봅니다.")          # 못 고치는 건 남겨서 검사가 잡는다
+    assert not P.accept("대응을 지켜봐야 해요.", "대응을 지켜봐야 합니다.")
+    hits = P.slop_report({"intro": {}, "stories": [{"ko": {"watch": "사람들이 봅니다."}, "en": {}}]})
+    assert any(h.startswith("합쇼체") for h in hits["ko"])
+
+
+def test_polish_en_rule_and_ai_fix(monkeypatch):
+    from worker.social import brief as B
+    data = {"intro": {"en": {"intro": "Russia hit Ukraine's grid. Meanwhile, settler violence rose in the West Bank."}},
+            "stories": [{"en": {"watch": "Houthi threats to target Saudi infrastructure remain a critical risk."}}]}
+    monkeypatch.setattr(B, "_call_dedicated", lambda *a, **k: {
+        "s0.watch": "The Houthis have threatened to strike Saudi infrastructure next."})
+    rep = P.polish_en(data)
+    assert data["intro"]["en"]["intro"].endswith("Settler violence rose in the West Bank.")
+    assert data["stories"][0]["en"]["watch"].startswith("The Houthis")
+    assert rep["s0.watch"]["accepted"] is True
+
+
+def test_polish_ko_retries_leftover_tells(monkeypatch):
+    from worker.social import brief as B
+    whys = ["물가가 오르면서 불만이 커졌어요.", "교전이 이어지면서 피란민이 늘었어요.", "공습이 잦아지면서 학교가 문을 닫았어요."]
+    data = {"intro": {"ko": {"intro": "한 주였어요."}},
+            "stories": [{"ko": {"what": "일이 있었어요.", "why": w, "watch": "다음 회의가 10일에 열려요."}} for w in whys]}
+    calls = []
+
+    def fake(system, user, max_tokens=0):
+        calls.append(system)
+        if len(calls) == 1:
+            return {}  # 1차 윤문은 아무것도 안 고침
+        return {"s1.why": "교전이 이어져 피란민이 늘었어요.", "s2.why": "공습이 잦아졌어요. 학교가 문을 닫았어요."}
+    monkeypatch.setattr(B, "_call_dedicated", fake)
+    rep = P.polish_ko(data)
+    assert len(calls) == 2 and "-면서" in calls[1]
+    assert data["stories"][1]["ko"]["why"] == "교전이 이어져 피란민이 늘었어요."
+    assert rep["_retry"]["s1.why"]["accepted"] is True
+    assert data["stories"][2]["ko"]["why"] == "공습이 잦아졌어요. 학교가 문을 닫았어요."  # 두 문장으로 끊기는 허용

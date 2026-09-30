@@ -1,10 +1,14 @@
-"""주간 브리핑 그리기 — 머리 이미지·지도 PNG, 메일 HTML(표 기반·인라인 스타일), 텍스트판.
+"""주간 브리핑 그리기 — 지도·차트 PNG, 메일 HTML(표 기반·인라인 스타일), 텍스트판.
 
-디자인 근거 (2026-09-30 사장님 피드백 + 레퍼런스 실물 확인):
-- 옛 뉴스레터에서 눈에 띈 건 어두운 사진 머리, 큰 숫자, 색 카드, 칩이었다. 모양은 살리고 숫자는
-  전부 실제로 센 값으로 바꾼다(옛 "192개국 위기"는 포화된 지수였다).
-- Semafor: 번호 지도 + 번호 목록 / Uppity 머니레터: 맨 위 시세 한 줄 + 세 줄 요약 /
-  Axios: 굵은 라벨(Why it matters) / 뉴닉: 질문형 소제목(무슨 일이야?) 해요체.
+디자인 근거 (2026-10-01, 실제 메일 원본 27개를 캡처해 보고 치수를 잰 것):
+- 영어판 뼈대는 NYT The Morning (390px 폭 실측): 좌우 여백 16px, 가운데 제호, 날짜 Georgia 12px,
+  굵은 세리프 인사말, 두꺼운 검정 줄로 기사 구분, 헤드라인 28/31px 굵은 세리프, 본문 Georgia 17/25px #333,
+  사진 전폭 + 캡션 13px #666 · 사진 출처 11px #888, "FOUR MORE BIG STORIES" 산세리프 굵게 17px,
+  번호 헤드라인 24/31px.
+- 한국어판 글자는 뉴닉 데일리 (실측): 좌우 여백 12px, 항목 "분야 | 굵은 제목" 16/27px, 본문 14/24px #333,
+  사진 16:9 + 출처 12px #B6BBBF 오른쪽 정렬, 강조 링크 굵게.
+- 지도+번호 목록, 기사 옆 자체 차트는 Semafor Flagship.
+- 사진 위에 글자를 얹은 머리 이미지·알약 칩·색 테두리 카드·어두운 배경은 쓰지 않는다 (실제 뉴스레터 어디에도 없었다).
 - Gmail 은 <style> 을 걷어내는 경우가 많아 전부 인라인 스타일 + 표 레이아웃.
 """
 from __future__ import annotations
@@ -23,68 +27,75 @@ SITE = "https://www.wewantpeace.live"
 API = os.getenv("PUBLIC_API_BASE", "https://api.wewantpeace.live").rstrip("/")
 ASSETS = Path(__file__).parent / "assets"
 
-INK = "#0F172A"
-MUTED = "#5B6472"
-LINE = "#E5E7EB"
-RED = "#E5484D"
-NAVY = "#0B1220"
-GREEN = "#15803D"
-PAGE = "#EEF0F3"
-FONT = "-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR','Segoe UI',Roboto,Arial,sans-serif"
+ACCENT = "#B3261E"      # 강조색 하나 (라벨·링크·번호)
+INK = "#000000"
+BODY = "#333333"
+GRAY = "#666666"
+LIGHT = "#888888"
+RULE = "#DDDDDD"
+SERIF = "Georgia,'Times New Roman',serif"
+SANS_EN = "Arial,Helvetica,sans-serif"
+SANS_KO = "'Apple SD Gothic Neo','AppleSDGothic','Malgun Gothic','맑은 고딕','Noto Sans KR',sans-serif"
+
+# 언어별 글자 체계 (en = NYT The Morning 실측, ko = 뉴닉 실측)
+TYPE = {
+    "en": {"pad": 16, "font": SERIF, "label": SANS_EN, "title": 34, "intro": (18, 27, 700), "h1": (28, 31),
+           "h2": (24, 31), "body": (17, 25), "cap": 13, "credit": 11, "list": (17, 25)},
+    "ko": {"pad": 12, "font": SANS_KO, "label": SANS_KO, "title": 30, "intro": (15, 26, 400), "h1": (22, 33),
+           "h2": (17, 28), "body": (15, 26), "cap": 12, "credit": 12, "list": (15, 25)},
+}
 
 ADVISORY = {
-    1: ("#DCFCE7", "#166534", "Level 1 · Normal precautions", "1단계 · 일반 주의"),
-    2: ("#FEF9C3", "#854D0E", "Level 2 · Increased caution", "2단계 · 주의 강화"),
-    3: ("#FFEDD5", "#9A3412", "Level 3 · Reconsider travel", "3단계 · 여행 재고"),
-    4: ("#FEE2E2", "#991B1B", "Level 4 · Do not travel", "4단계 · 여행 금지"),
+    1: ("Level 1 · exercise normal precautions", "1단계 · 일반 주의"),
+    2: ("Level 2 · exercise increased caution", "2단계 · 주의 강화"),
+    3: ("Level 3 · reconsider travel", "3단계 · 여행 재고"),
+    4: ("Level 4 · do not travel", "4단계 · 여행 금지"),
 }
 
 T = {
     "en": {
-        "kicker": "WEEKLY BRIEF", "view": "View in browser", "other_lang": "한국어로 보기",
-        "three": "The week in three lines", "map": "Where it happened", "what": "What happened",
-        "why": "Why it matters", "watch": "What to watch", "reported": "Reported by", "more": "more",
-        "timeline": "Full timeline", "outlets": "outlets", "also": "Also this week", "easing": "Talks and ceasefires",
-        "easing_sub": "Diplomatic moves reported by at least three outlets this week.",
-        "yours": "Countries you follow", "yours_sub": "The top story this week and the current US travel advisory.",
-        "stories_n": "stories this week", "no_story": "No story reported by three or more outlets this week.",
-        "brent": "Brent crude", "wk": "vs a week ago", "stories": "stories confirmed by 3+ outlets", "sources": "outlets read",
-        "switch_top": "한국어로 받기 (Get this in Korean)", "num_src": "Source",
+        "title": "The Weekly Brief", "view": "View in browser", "other_lang": "한국어로 보기",
+        "switch_top": "한국어로 받기", "desk": "By the WeWantPeace desk",
+        "map": "THIS WEEK", "more": "FOUR MORE BIG STORIES", "else": "HERE'S WHAT ELSE HAPPENED",
+        "yours": "COUNTRIES YOU FOLLOW", "why": "Why it matters:", "watch": "What to watch:",
+        "reported": "Reported by", "timeline": "Full timeline", "outlets": "independent outlets",
+        "chart_title": "Reports on this story per day", "chart_src": "Chart: WeWantPeace · Source: {n} independent outlets",
+        "photo": "Photo", "stories_n": "{n} stories this week", "no_story": "No story reported by three or more outlets this week.",
+        "talks": "Talks", "markets": "Oil",
+        "brent": "Brent crude closed at ${now:.2f}, {dir} {pct:.1f}% from a week earlier.",
+        "up": "up", "down": "down",
         "useful": "Was this useful?", "yes": "Yes", "no": "Not really",
-        "app_title": "Get an alert when a country you follow flares up",
-        "app_body": "The WeWantPeace app sends one alert when a story is confirmed by several outlets, not every headline.",
-        "app_cta": "Get the Android app",
-        "how": "How we choose stories.",
+        "app": "Get one alert when a country you follow flares up, not every headline:",
+        "app_cta": "the WeWantPeace Android app",
+        "how": "How we choose stories:",
         "how_body": "WeWantPeace groups reports from more than 100 outlets into stories. A story appears here only if at least three independent outlets reported it this week. Photos belong to the outlets credited.",
         "why_get_user": "You get this because you agreed to receive WeWantPeace news.",
         "why_get_sub": "You get this because you asked for the weekly brief.",
         "switch": "Always send me the Korean edition", "unsub": "Unsubscribe",
-        "date_fmt": "%b %d",
     },
     "ko": {
-        "kicker": "주간 브리핑", "view": "브라우저로 보기", "other_lang": "Read in English",
-        "three": "이번 주 세 줄 요약", "map": "어디서 일어났나", "what": "무슨 일이야?",
-        "why": "왜 중요해?", "watch": "앞으로 볼 것", "reported": "보도", "more": "곳",
-        "timeline": "타임라인 보기", "outlets": "개 매체", "also": "이번 주 다른 소식", "easing": "협상·휴전 소식",
-        "easing_sub": "이번 주 매체 3곳 이상이 보도한 외교 움직임이에요.",
-        "yours": "내가 고른 나라", "yours_sub": "이번 주 대표 기사와 미 국무부 여행경보 단계예요.",
-        "stories_n": "건", "no_story": "이번 주 매체 3곳 이상이 보도한 기사가 없어요.",
-        "brent": "브렌트유", "wk": "지난주 대비", "stories": "매체 3곳 이상 확인한 이슈", "sources": "읽은 매체",
-        "switch_top": "Get this in English", "num_src": "출처",
+        "title": "주간 브리핑", "view": "잘림 없이 읽기", "other_lang": "Read in English",
+        "switch_top": "Get this in English", "desk": "WeWantPeace 편집팀",
+        "map": "이번 주 지도", "more": "이번 주 주요 뉴스", "else": "이번 주 다른 소식",
+        "yours": "내가 고른 나라", "why": "왜 중요해?", "watch": "앞으로 볼 것",
+        "reported": "보도", "timeline": "타임라인 자세히 보기", "outlets": "개 매체",
+        "chart_title": "이 사건 하루 보도 건수", "chart_src": "차트: WeWantPeace · 독립 매체 {n}곳 보도",
+        "photo": "사진", "stories_n": "이번 주 {n}건", "no_story": "이번 주 매체 3곳 이상이 보도한 기사가 없어요.",
+        "talks": "협상", "markets": "유가",
+        "brent": "브렌트유는 배럴당 {now:.2f}달러로 한 주 전보다 {pct:.1f}% {dir}어요.",
+        "up": "올랐", "down": "내렸",
         "useful": "이번 브리핑 어땠나요?", "yes": "유용했어요", "no": "별로예요",
-        "app_title": "고른 나라에 큰일이 생기면 바로 알려드려요",
-        "app_body": "여러 매체가 확인한 소식만 한 번씩 알려드려요. 헤드라인마다 울리지 않아요.",
+        "app": "고른 나라에 큰일이 생기면 한 번만 알려드려요.",
         "app_cta": "안드로이드 앱 받기",
         "how": "기사를 고르는 방법.",
-        "how_body": "WeWantPeace는 100곳이 넘는 매체의 보도를 사건 단위로 묶어요. 이번 주 서로 다른 매체 3곳 이상이 보도한 사건만 여기에 실어요. 사진 저작권은 표기된 매체에 있어요.",
+        "how_body": "WeWantPeace는 100곳이 넘는 매체의 보도를 사건 단위로 묶어요. 이번 주 서로 다른 매체 3곳 이상이 보도한 사건만 실어요. 사진 저작권은 표기된 매체에 있어요.",
         "why_get_user": "WeWantPeace 소식 받기에 동의하셔서 보내드려요.",
         "why_get_sub": "주간 브리핑을 신청하셔서 보내드려요.",
         "switch": "앞으로 영어판으로 받기", "unsub": "수신거부",
-        "date_fmt": "%m월 %d일",
     },
 }
 
-COUNTRY_KO_FALLBACK = {}
+_WD_KO = ["월", "화", "수", "목", "금", "토", "일"]
 
 
 def esc(s) -> str:
@@ -101,13 +112,19 @@ def country(cc: str | None, lang: str) -> str:
     return country_name(cc)
 
 
-def date_range(data: dict, lang: str) -> str:
-    fmt = T[lang]["date_fmt"]
-    s = datetime.fromisoformat(data["start"]).strftime(fmt)
-    e = datetime.fromisoformat(data["end"]).strftime(fmt)
+def issue_date(data: dict, lang: str) -> str:
+    """발행일 (end 다음 날 아침 발송이라 end 날짜를 쓴다)."""
+    d = datetime.fromisoformat(data["end"])
     if lang == "ko":
-        s, e = s.lstrip("0").replace("월 0", "월 "), e.lstrip("0").replace("월 0", "월 ")
-    return f"{s} – {e}"
+        return f"{d:%Y.%m.%d}. {_WD_KO[d.weekday()]}요일"
+    return f"{d:%B} {d.day}, {d.year}"
+
+
+def date_range(data: dict, lang: str) -> str:
+    s, e = datetime.fromisoformat(data["start"]), datetime.fromisoformat(data["end"])
+    if lang == "ko":
+        return f"{s.month}월 {s.day}일 – {e.month}월 {e.day}일"
+    return f"{s:%b} {s.day} – {e:%b} {e.day}"
 
 
 def story_url(cluster_id: str, week: str, lang: str) -> str:
@@ -126,49 +143,7 @@ def sources_line(names: list[str], n: int, lang: str) -> str:
     return ", ".join(shown) + (f" and {rest} more" if rest else "")
 
 
-# ── 이미지: 머리(사진+헤드라인)·지도 ─────────────────────────────────────────
-
-HERO_W, HERO_H = 1200, 760
-
-
-def hero_html(data: dict, lang: str, photo_data_uri: str | None) -> str:
-    s = data["stories"][0]
-    t = T[lang]
-    part = s[lang]
-    num = s.get("number")
-    big = esc(num["value"]) if num else str(s["n_sources"])
-    big_label = esc(num[lang]) if num else (f"독립 매체가 보도" if lang == "ko" else "independent outlets reported it")
-    bg = f"background-image:url('{photo_data_uri}');" if photo_data_uri else ""
-    credit = esc((s.get("photo") or {}).get("credit") or "")
-    font = "'Inter','Noto Sans KR',sans-serif"
-    return f"""<!doctype html><html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800;900&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{width:{HERO_W}px;height:{HERO_H}px;overflow:hidden;background:{NAVY};font-family:{font};color:#fff}}
-.bg{{position:absolute;inset:0;{bg}background-size:cover;background-position:center 30%}}
-.shade{{position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,18,32,.55) 0%,rgba(11,18,32,.15) 30%,rgba(11,18,32,.78) 62%,rgba(11,18,32,.97) 100%)}}
-.top{{position:absolute;top:44px;left:56px;right:56px;display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:.14em;font-size:22px}}
-.top .dot{{display:inline-block;width:12px;height:12px;border-radius:50%;background:{RED};margin-right:12px;vertical-align:middle}}
-.top .d{{font-weight:600;letter-spacing:.02em;opacity:.9}}
-.body{{position:absolute;left:56px;right:56px;bottom:56px}}
-.num{{display:flex;align-items:baseline;gap:22px;margin-bottom:22px}}
-.num b{{font-size:150px;line-height:.9;font-weight:900;letter-spacing:-.04em}}
-.num span{{font-size:32px;font-weight:700;color:#FFB4B6;max-width:560px;line-height:1.2}}
-.chips{{display:flex;gap:12px;margin-bottom:18px}}
-.chip{{font-size:22px;font-weight:700;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.14);letter-spacing:.02em}}
-.chip.r{{background:{RED}}}
-h1{{font-size:{56 if lang == 'en' else 58}px;line-height:1.14;font-weight:800;letter-spacing:-.015em;word-break:keep-all}}
-.cr{{position:absolute;right:56px;bottom:22px;font-size:16px;opacity:.7}}
-</style></head><body><div class="bg"></div><div class="shade"></div>
-<div class="top"><div><span class="dot"></span>WEWANTPEACE · {esc(t['kicker'])}</div><div class="d">{esc(date_range(data, lang))}</div></div>
-<div class="body">
-<div class="num"><b>{big}</b><span>{big_label}</span></div>
-<div class="chips"><span class="chip r">{esc(country(s['cc'], lang))}</span><span class="chip">{s['n_sources']}{esc(t['outlets']) if lang == 'ko' else ' ' + esc(t['outlets'])}</span></div>
-<h1>{esc(part['headline'])}</h1></div>
-{f'<div class="cr">Photo: {credit}</div>' if credit else ''}
-</body></html>"""
-
+# ── 이미지: 지도·차트 ────────────────────────────────────────────────────────
 
 MAP_W, MAP_H = 1200, 640
 
@@ -179,7 +154,7 @@ def _merc(lon: float, lat: float) -> tuple[float, float]:
 
 
 def map_svg(data: dict) -> str:
-    """번호 핀 지도 (외부 요청 없이 그리는 SVG). 이번 주 기사 나라는 붉게."""
+    """번호 핀 지도 (Semafor 'The World Today' 식). 외부 요청 없이 그린다."""
     pins = [(i + 1, s["lon"], s["lat"], s["cc"]) for i, s in enumerate(data["stories"])
             if s.get("lat") is not None and s.get("lon") is not None]
     geo = json.loads((ASSETS / "countries-110m.geojson").read_text(encoding="utf-8"))
@@ -190,41 +165,74 @@ def map_svg(data: dict) -> str:
         minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
     else:
         minx, maxx, miny, maxy = -20, 60, 0, 60
-    # 핀이 몰려 있어도 너무 확대되지 않게 최소 범위, 가장자리 여백
-    span_x = max(maxx - minx, 40)
-    span_y = max(maxy - miny, 22)
+    span_x, span_y = max(maxx - minx, 40), max(maxy - miny, 22)
     cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
-    pad = 1.35
-    scale = min(MAP_W / (span_x * pad), MAP_H / (span_y * pad))
+    scale = min(MAP_W / (span_x * 1.35), MAP_H / (span_y * 1.35))
 
     def proj(lon, lat):
         x, y = _merc(lon, lat)
         return MAP_W / 2 + (x - cx) * scale, MAP_H / 2 - (y - cy) * scale
 
-    def ring_path(ring):
-        pts = [proj(lon, lat) for lon, lat in ring]
-        return "M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in pts) + "Z"
-
     paths = []
     for f in geo["features"]:
         g = f.get("geometry") or {}
-        props = f.get("properties") or {}
-        iso2 = (props.get("cc") or props.get("ISO_A2") or "").upper()
+        iso2 = ((f.get("properties") or {}).get("cc") or "").upper()
         polys = g.get("coordinates") or []
         if g.get("type") == "Polygon":
             polys = [polys]
-        d = "".join(ring_path(r) for poly in polys for r in poly)
-        fill = "#F6C9CB" if iso2 in story_cc else "#DDE3EA"
+        d = "".join("M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in (proj(lo, la) for lo, la in ring)) + "Z"
+                    for poly in polys for ring in poly)
+        fill = "#E9C9C6" if iso2 in story_cc else "#E6E6E1"
         paths.append(f'<path d="{d}" fill="{fill}" stroke="#FFFFFF" stroke-width="1.2"/>')
     pin_svg = []
     for n, lon, lat, cc in pins:
         x, y = proj(lon, lat)
         pin_svg.append(
-            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="26" fill="{RED}" stroke="#fff" stroke-width="5"/>'
-            f'<text x="{x:.1f}" y="{y + 10:.1f}" text-anchor="middle" font-size="28" font-weight="800" '
-            f'font-family="Inter,Arial,sans-serif" fill="#fff">{n}</text>')
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="24" fill="{ACCENT}" stroke="#fff" stroke-width="4"/>'
+            f'<text x="{x:.1f}" y="{y + 9:.1f}" text-anchor="middle" font-size="26" font-weight="700" '
+            f'font-family="Georgia,serif" fill="#fff">{n}</text>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{MAP_W}" height="{MAP_H}" viewBox="0 0 {MAP_W} {MAP_H}">'
-            f'<rect width="100%" height="100%" fill="#F3F5F8"/>{"".join(paths)}{"".join(pin_svg)}</svg>')
+            f'<rect width="100%" height="100%" fill="#F7F7F4"/>{"".join(paths)}{"".join(pin_svg)}</svg>')
+
+
+CHART_W, CHART_H = 1200, 600
+
+
+def chart_svg(story: dict, lang: str) -> str:
+    """이 사건 하루 보도 건수 막대 차트 (Semafor 식: 제목·축·출처 줄·검정 띠)."""
+    t = T[lang]
+    days = story.get("daily") or []
+    font = "Arial,Helvetica,sans-serif" if lang == "en" else "'Noto Sans KR','Malgun Gothic',sans-serif"
+    top, left, right, bottom = 90, 80, 40, 120
+    w, h = CHART_W - left - right, CHART_H - top - bottom
+    peak = max([d["n"] for d in days] + [1])
+    step = 10 ** max(0, len(str(peak)) - 1)
+    ymax = math.ceil(peak / step) * step or 1
+    grid, bars = [], []
+    for k in range(5):
+        v = ymax * k / 4
+        y = top + h - h * k / 4
+        grid.append(f'<line x1="{left}" y1="{y:.1f}" x2="{left + w}" y2="{y:.1f}" stroke="#DDDDDD" stroke-width="2"/>'
+                    f'<text x="{left - 14}" y="{y + 9:.1f}" text-anchor="end" font-size="26" fill="#666" font-family="{font}">{int(v)}</text>')
+    n = max(len(days), 1)
+    bw = w / n * 0.62
+    for i, d in enumerate(days):
+        x = left + w / n * i + (w / n - bw) / 2
+        bh = h * d["n"] / ymax
+        color = ACCENT if i == n - 1 else "#3D3D3D"
+        dt = datetime.fromisoformat(d["date"])
+        label = f"{dt.month}/{dt.day}" if lang == "ko" else f"{dt:%b} {dt.day}"
+        bars.append(f'<rect x="{x:.1f}" y="{top + h - bh:.1f}" width="{bw:.1f}" height="{bh:.1f}" fill="{color}"/>'
+                    f'<text x="{x + bw / 2:.1f}" y="{top + h + 40}" text-anchor="middle" font-size="26" fill="#666" font-family="{font}">{label}</text>')
+    src = t["chart_src"].format(n=story.get("n_sources", 0))
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{CHART_W}" height="{CHART_H}" viewBox="0 0 {CHART_W} {CHART_H}">'
+            f'<rect width="100%" height="100%" fill="#FFFFFF"/>'
+            f'<text x="{left - 60}" y="52" font-size="32" font-weight="700" fill="#000" font-family="{font}">{esc(t["chart_title"])}</text>'
+            f'{"".join(grid)}{"".join(bars)}'
+            f'<text x="{left - 60}" y="{CHART_H - 42}" font-size="24" fill="#666" font-family="{font}">{esc(src)}</text>'
+            f'<rect x="{left - 60}" y="{CHART_H - 26}" width="{CHART_W - left + 60 - right}" height="26" fill="#000"/>'
+            f'<text x="{left - 48}" y="{CHART_H - 6}" font-size="18" font-weight="700" letter-spacing="2" fill="#fff" font-family="Arial,sans-serif">WEWANTPEACE</text>'
+            f'</svg>')
 
 
 def render_pngs(pages: list[tuple[str, int, int]]) -> list[bytes | None]:
@@ -276,10 +284,9 @@ def _first_photo(story: dict) -> tuple[str | None, dict | None]:
 
 
 def build_images(data: dict, upload: bool = True, save_dir: str | None = None) -> dict:
-    """머리 이미지(영·한)·지도를 그리고, 2·3번 기사 사진은 우리 저장소로 옮긴다.
+    """1~3번 기사 사진을 우리 저장소로 옮기고, 지도·1번 기사 차트(영·한)를 그린다.
 
-    upload=True 면 R2 주소, 아니면 로컬 파일 경로. 기사 사진을 매체 주소 그대로 메일에 넣으면
-    핫링크를 막는 곳(9/30 드라이런: 1번 기사 사진)에서 빈칸이 된다.
+    기사 사진을 매체 주소 그대로 메일에 넣으면 핫링크를 막는 곳에서 빈칸이 된다(9/30 드라이런).
     """
     import base64
 
@@ -288,24 +295,21 @@ def build_images(data: dict, upload: bool = True, save_dir: str | None = None) -
         return {}
     stamp = datetime.utcnow().strftime("%m%d%H%M")
     base = f"weekly-{data['week_key']}"
+    for i in range(min(3, len(stories))):
+        uri, ph = _first_photo(stories[i])
+        if uri and ph:
+            url = _store(base64.b64decode(uri.split(",", 1)[1]), f"{base}-s{i + 1}-{stamp}", "jpg", upload, save_dir)
+            stories[i]["photo"] = {"url": url, "credit": ph.get("credit")} if url else None
+        else:
+            stories[i]["photo"] = None
+    pages = [(f"<html><body style='margin:0'>{map_svg(data)}</body></html>", MAP_W, MAP_H)]
+    names = ["map"]
+    if stories[0].get("daily") and sum(d["n"] for d in stories[0]["daily"]) > 0:
+        for lang in ("en", "ko"):
+            pages.append((f"<html><body style='margin:0'>{chart_svg(stories[0], lang)}</body></html>", CHART_W, CHART_H))
+            names.append(f"chart_{lang}")
     images: dict = {}
-
-    hero_uri, hero_ph = _first_photo(stories[0])
-    stories[0]["photo"] = hero_ph
-    for i in (1, 2):
-        if i < len(stories):
-            uri, ph = _first_photo(stories[i])
-            if uri and ph:
-                url = _store(base64.b64decode(uri.split(",", 1)[1]), f"{base}-s{i + 1}-{stamp}", "jpg", upload, save_dir)
-                stories[i]["photo"] = {"url": url, "credit": ph.get("credit")} if url else None
-            else:
-                stories[i]["photo"] = None
-
-    svg = map_svg(data)
-    pages = [(hero_html(data, "en", hero_uri), HERO_W, HERO_H),
-             (hero_html(data, "ko", hero_uri), HERO_W, HERO_H),
-             (f"<html><body style='margin:0'>{svg}</body></html>", MAP_W, MAP_H)]
-    for name, png in zip(["hero_en", "hero_ko", "map"], render_pngs(pages)):
+    for name, png in zip(names, render_pngs(pages)):
         if png:
             url = _store(png, f"{base}-{name}-{stamp}", "png", upload, save_dir)
             if url:
@@ -315,95 +319,117 @@ def build_images(data: dict, upload: bool = True, save_dir: str | None = None) -
 
 # ── 메일 HTML ────────────────────────────────────────────────────────────────
 
-def _chip(text: str, bg: str, fg: str) -> str:
-    return (f'<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:{bg};color:{fg};'
-            f'font-size:12px;font-weight:700;line-height:16px;margin:0 6px 6px 0;">{esc(text)}</span>')
+def _row(inner: str, pad: int, top: int = 0, bottom: int = 0) -> str:
+    return f'<tr><td style="padding:{top}px {pad}px {bottom}px;">{inner}</td></tr>'
 
 
-def _section_title(text: str, sub: str = "") -> str:
-    return (f'<tr><td style="padding:30px 28px 10px;font-family:{FONT};">'
-            f'<div style="font-size:12px;font-weight:800;letter-spacing:.14em;color:{RED};text-transform:uppercase;">{esc(text)}</div>'
-            + (f'<div style="font-size:14px;color:{MUTED};margin-top:6px;line-height:20px;">{esc(sub)}</div>' if sub else "")
-            + "</td></tr>")
+def _para(text: str, ty: dict, color: str = BODY, weight: int = 400, margin: int = 16) -> str:
+    fs, lh = ty["body"]
+    return (f'<p style="margin:0 0 {margin}px;font-family:{ty["font"]};font-size:{fs}px;line-height:{lh}px;'
+            f'color:{color};font-weight:{weight};word-break:keep-all;">{text}</p>')
 
 
-def _story_card(i: int, s: dict, data: dict, lang: str) -> str:
+def _label(text: str, ty: dict, lang: str) -> str:
+    size = 17 if lang == "en" else 16
+    return (f'<div style="font-family:{ty["label"]};font-size:{size}px;line-height:25px;font-weight:700;color:{INK};'
+            f'letter-spacing:{".02em" if lang == "en" else "0"};">{esc(text)}</div>')
+
+
+def _photo(photo: dict | None, ty: dict, lang: str, alt: str) -> str:
+    if not photo or not photo.get("url"):
+        return ""
+    credit = photo.get("credit") or ""
+    if lang == "ko":
+        cap = (f'<div style="font-family:{ty["font"]};font-size:12px;line-height:20px;color:#B6BBBF;text-align:right;">'
+               f'©{esc(credit)}</div>') if credit else ""
+    else:
+        cap = (f'<div style="font-family:{SERIF};font-size:11px;line-height:16px;color:{LIGHT};margin-top:4px;">'
+               f'{esc(credit)}</div>') if credit else ""
+    return (f'<img src="{esc(photo["url"])}" width="568" alt="{esc(alt)}" '
+            f'style="display:block;width:100%;max-width:568px;height:auto;border:0;margin:0 0 6px;">{cap}')
+
+
+def _run_in(label: str, text: str, ty: dict) -> str:
+    return _para(f'<b style="color:{INK};">{esc(label)}</b> {esc(text)}', ty)
+
+
+def _link(text: str, url: str, ty: dict) -> str:
+    fs, lh = ty["body"]
+    return (f'<a href="{esc(url)}" style="font-family:{ty["font"]};font-size:{fs - 1}px;line-height:{lh}px;'
+            f'color:{ACCENT};font-weight:700;text-decoration:underline;">{esc(text)} →</a>')
+
+
+def _sources(s: dict, lang: str, ty: dict) -> str:
+    t = T[lang]
+    src = sources_line(s.get("source_names") or [], s["n_sources"], lang)
+    return (f'<div style="font-family:{ty["label"]};font-size:13px;line-height:19px;color:{GRAY};margin:0 0 6px;">'
+            f'{esc(t["reported"])}: {esc(src)}</div>')
+
+
+def _bar() -> str:
+    return '<div style="height:8px;line-height:8px;font-size:0;background:#000;">&nbsp;</div>'
+
+
+def _hair() -> str:
+    return f'<div style="height:1px;line-height:1px;font-size:0;background:{RULE};">&nbsp;</div>'
+
+
+def _lead_story(s: dict, data: dict, lang: str, ty: dict) -> str:
     t = T[lang]
     p = s[lang]
-    week = data["week_key"]
-    url = story_url(s["cluster_id"], week, lang)
-    photo = s.get("photo")
-    img = ""
-    if photo and i <= 3 and i > 1:  # 1번 기사 사진은 머리 이미지에 이미 있다
-        img = (f'<tr><td style="padding:0 0 14px;"><a href="{esc(url)}"><img src="{esc(photo["url"])}" width="544" alt="" '
-               f'style="display:block;width:100%;max-width:544px;height:auto;border-radius:10px;"></a>'
-               + (f'<div style="font-size:11px;color:{MUTED};margin-top:5px;">Photo: {esc(photo.get("credit"))}</div>' if photo.get("credit") else "")
-               + "</td></tr>")
-    num = s.get("number")
-    num_html = ""
-    if num and i > 1:
-        num_html = (f'<tr><td style="padding:0 0 12px;"><table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-                    f'<td style="font-family:{FONT};font-size:40px;line-height:40px;font-weight:900;color:{RED};padding-right:12px;letter-spacing:-.02em;">{esc(num["value"])}</td>'
-                    f'<td style="font-family:{FONT};font-size:14px;line-height:18px;font-weight:700;color:{INK};">{esc(num[lang])}'
-                    + (f'<div style="font-size:12px;font-weight:500;color:{MUTED};margin-top:2px;">{esc(t["num_src"])}: {esc(num.get("source"))}</div>' if num.get("source") else "")
-                    + '</td></tr></table></td></tr>')
-    rows = []
-    for key in ("what", "why", "watch"):
-        if p.get(key):
-            rows.append(f'<tr><td style="padding:0 0 10px;font-family:{FONT};font-size:15px;line-height:24px;color:{INK};">'
-                        f'<span style="font-weight:800;color:{RED if key == "what" else INK};">{esc(t[key])}</span> {esc(p[key])}</td></tr>')
-    chips = _chip(f"{i}", RED, "#fff") + _chip(country(s["cc"], lang), "#F1F5F9", INK) + \
-        _chip(f"{s['n_sources']}{t['outlets']}" if lang == "ko" else f"{s['n_sources']} {t['outlets']}", "#ECFDF5", GREEN)
-    src = sources_line(s.get("source_names") or [], s["n_sources"], lang)
-    return f"""
-<tr><td style="padding:10px 28px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border:1px solid {LINE};border-left:4px solid {RED if i == 1 else NAVY};border-radius:12px;">
-<tr><td style="padding:18px 20px 8px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:0 0 4px;font-family:{FONT};">{chips}</td></tr>
-<tr><td style="padding:0 0 12px;font-family:{FONT};font-size:21px;line-height:28px;font-weight:800;color:{INK};word-break:keep-all;">
-<a href="{esc(url)}" style="color:{INK};text-decoration:none;">{esc(p['headline'])}</a></td></tr>
-{img}{num_html}{''.join(rows)}
-<tr><td style="padding:2px 0 12px;font-family:{FONT};font-size:13px;line-height:19px;color:{MUTED};">
-{esc(t['reported'])}: {esc(src)} · <a href="{esc(url)}" style="color:#1D4ED8;font-weight:700;text-decoration:none;">{esc(t['timeline'])} →</a></td></tr>
-</table></td></tr></table></td></tr>"""
+    url = story_url(s["cluster_id"], data["week_key"], lang)
+    fs, lh = ty["h1"]
+    head = (f'<h1 style="margin:22px 0 14px;font-family:{ty["font"]};font-size:{fs}px;line-height:{lh}px;'
+            f'font-weight:700;color:{INK};word-break:keep-all;">'
+            f'<a href="{esc(url)}" style="color:{INK};text-decoration:none;">{esc(p["headline"])}</a></h1>')
+    body = ""
+    if p.get("what"):
+        body += _para(esc(p["what"]), ty)
+    if p.get("why"):
+        body += _run_in(t["why"], p["why"], ty)
+    if p.get("watch"):
+        body += _run_in(t["watch"], p["watch"], ty)
+    chart = ""
+    img = (data.get("images") or {}).get(f"chart_{lang}")
+    if img:
+        chart = (f'<img src="{esc(img)}" width="568" alt="{esc(t["chart_title"])}" '
+                 f'style="display:block;width:100%;max-width:568px;height:auto;border:0;margin:6px 0 18px;">')
+    return head + _photo(s.get("photo"), ty, lang, p["headline"]) + '<div style="height:14px;"></div>' + \
+        body + chart + _sources(s, lang, ty) + _link(t["timeline"], url, ty)
 
 
-def _list_block(items: list[dict], data: dict, lang: str, accent: str, first_border: bool = True) -> str:
-    out = []
-    for k, it in enumerate(items):
-        url = story_url(it["cluster_id"], data["week_key"], lang)
-        border = f"border-top:1px solid {LINE};" if (k or first_border) else ""
-        out.append(f'<tr><td style="padding:10px 0;{border}font-family:{FONT};">'
-                   f'<div style="font-size:12px;font-weight:800;color:{accent};letter-spacing:.04em;">{esc(country(it["cc"], lang))}'
-                   f' · <span style="color:{MUTED};font-weight:600;">{it["n_sources"]}{esc(T[lang]["outlets"]) if lang == "ko" else " " + esc(T[lang]["outlets"])}</span></div>'
-                   f'<a href="{esc(url)}" style="display:block;margin-top:3px;font-size:15px;line-height:22px;font-weight:700;color:{INK};text-decoration:none;word-break:keep-all;">{esc(it[lang]["headline"])}</a></td></tr>')
-    return "".join(out)
-
-
-def _yours_block(ccs: list[str], data: dict, lang: str) -> str:
+def _more_story(i: int, s: dict, data: dict, lang: str, ty: dict) -> str:
     t = T[lang]
-    cards = []
-    for cc in ccs[:3]:
-        entry = (data.get("countries") or {}).get(cc)
-        lv = (data.get("advisories") or {}).get(cc)
-        adv = ""
-        if lv in ADVISORY:
-            bg, fg, en, ko = ADVISORY[lv]
-            adv = _chip(ko if lang == "ko" else en, bg, fg)
-        if entry and entry.get("top"):
-            top = entry["top"]
-            url = story_url(top["cluster_id"], data["week_key"], lang)
-            n = entry["n"]
-            count = f"이번 주 {n}건" if lang == "ko" else f"{n} {t['stories_n']}"
-            body = (f'<a href="{esc(url)}" style="display:block;font-size:15px;line-height:22px;font-weight:700;color:{INK};text-decoration:none;word-break:keep-all;">{esc(top[lang]["headline"])}</a>'
-                    f'<div style="font-size:13px;color:{MUTED};margin-top:4px;">{esc(count)}</div>')
-        else:
-            body = f'<div style="font-size:14px;color:{MUTED};">{esc(t["no_story"])}</div>'
-        cards.append(f'<tr><td style="padding:14px 16px;border-top:1px solid {LINE};font-family:{FONT};">'
-                     f'<div style="font-size:16px;font-weight:800;color:{INK};margin-bottom:6px;">{esc(country(cc, lang))}</div>'
-                     f'{adv}{body}</td></tr>')
-    return "".join(cards)
+    p = s[lang]
+    url = story_url(s["cluster_id"], data["week_key"], lang)
+    fs, lh = ty["h2"]
+    if lang == "ko":
+        # 뉴닉 항목 제목: "분야 | 굵은 제목" — 분야 자리에 나라
+        title = f'{esc(country(s["cc"], lang))} | {esc(p["headline"])}'
+    else:
+        title = f'{i}. {esc(p["headline"])}'
+    head = (f'<h2 style="margin:26px 0 12px;font-family:{ty["font"]};font-size:{fs}px;line-height:{lh}px;'
+            f'font-weight:700;color:{INK if lang == "en" else BODY};word-break:keep-all;">'
+            f'<a href="{esc(url)}" style="color:inherit;text-decoration:none;">{title}</a></h2>')
+    photo = _photo(s.get("photo"), ty, lang, p["headline"]) if i <= 3 else ""
+    body = ""
+    if p.get("what"):
+        body += _para(esc(p["what"]), ty)
+    if p.get("why"):
+        body += _run_in(t["why"], p["why"], ty)
+    if p.get("watch"):
+        body += _run_in(t["watch"], p["watch"], ty)
+    return head + photo + ('<div style="height:12px;"></div>' if photo else "") + body + \
+        _sources(s, lang, ty) + _link(t["timeline"], url, ty)
+
+
+def _bullets(items: list[str], ty: dict) -> str:
+    fs, lh = ty["body"]
+    return "".join(
+        f'<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>'
+        f'<td valign="top" style="width:18px;font-family:{ty["font"]};font-size:{fs}px;line-height:{lh}px;color:{BODY};">•</td>'
+        f'<td style="font-family:{ty["font"]};font-size:{fs}px;line-height:{lh}px;color:{BODY};padding-bottom:12px;word-break:keep-all;">{it}</td>'
+        f'</tr></table>' for it in items)
 
 
 def render_email(data: dict, lang: str, *, follow: list[str] | None = None,
@@ -411,158 +437,152 @@ def render_email(data: dict, lang: str, *, follow: list[str] | None = None,
                  feedback_token: str = "", subscriber: bool = False) -> dict:
     """{subject, preheader, html, text}. follow=구독자가 고른 나라(없으면 칸 생략)."""
     t = T[lang]
+    ty = TYPE[lang]
+    pad = ty["pad"]
     week = data["week_key"]
     intro = (data.get("intro") or {}).get(lang) or {}
     stories = data.get("stories") or []
     images = data.get("images") or {}
     other = "en" if lang == "ko" else "ko"
-    fb = f"{API}/newsletter/weekly/{week}/feedback?lang={lang}&t={esc(feedback_token)}"
-
-    # 맨 위 어두운 띠: 세 줄 요약 + 실제 숫자 한 줄
-    lines = intro.get("lines") or [s[lang].get("short") or s[lang]["headline"] for s in stories[:3]]
-    three = "".join(
-        f'<tr><td style="padding:0 0 12px;font-family:{FONT};"><table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-        f'<td valign="top" style="width:30px;"><div style="width:24px;height:24px;border-radius:12px;background:{RED};color:#fff;font-size:13px;font-weight:800;line-height:24px;text-align:center;">{k}</div></td>'
-        f'<td style="font-size:16px;line-height:24px;color:#F8FAFC;font-weight:600;word-break:keep-all;">{esc(line)}</td></tr></table></td></tr>'
-        for k, line in enumerate(lines[:3], 1))
-    nums = data.get("numbers") or {}
-    ticks = []
-    br = nums.get("brent")
-    if br:
-        up = br["pct"] > 0
-        arrow = "▲" if up else ("▼" if br["pct"] < 0 else "–")
-        color = "#FCA5A5" if up else "#93C5FD"
-        ticks.append(f'{esc(t["brent"])} <b style="color:#fff;">${br["now"]:.2f}</b> '
-                     f'<span style="color:{color};font-weight:700;">{arrow}{abs(br["pct"]):.1f}%</span> <span style="color:#94A3B8;">{esc(t["wk"])}</span>')
-    if nums.get("stories"):
-        ticks.append(f'{esc(t["stories"])} <b style="color:#fff;">{nums["stories"]:,}</b>')
-    if nums.get("outlets"):
-        ticks.append(f'{esc(t["sources"])} <b style="color:#fff;">{nums["outlets"]:,}</b>')
-    tick_html = " &nbsp;·&nbsp; ".join(ticks)
-
-    hero = images.get(f"hero_{lang}")
     s1 = stories[0] if stories else None
-    hero_html_block = ""
-    if hero and s1:
-        hero_html_block = (f'<tr><td style="padding:0;"><a href="{esc(story_url(s1["cluster_id"], week, lang))}">'
-                           f'<img src="{esc(hero)}" width="600" alt="{esc(s1[lang]["headline"])}" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:14px 14px 0 0;"></a></td></tr>')
-    lead_text = ""
-    if s1:
-        p = s1[lang]
-        rows = "".join(
-            f'<div style="margin-top:10px;font-size:15px;line-height:24px;color:#E2E8F0;"><span style="font-weight:800;color:{"#FCA5A5" if k == "what" else "#fff"};">{esc(t[k])}</span> {esc(p[k])}</div>'
-            for k in ("what", "why", "watch") if p.get(k))
-        if not hero:
-            rows = f'<div style="font-size:24px;line-height:32px;font-weight:800;color:#fff;">{esc(p["headline"])}</div>' + rows
-        n1 = s1.get("number")
-        if hero and n1 and n1.get("source"):
-            rows = (f'<div style="font-size:12px;color:#94A3B8;">{esc(t["num_src"])} ({esc(n1["value"])}): '
-                    f'{esc(n1["source"])}</div>') + rows
-        src = sources_line(s1.get("source_names") or [], s1["n_sources"], lang)
-        lead_text = (f'<tr><td style="padding:18px 28px 22px;font-family:{FONT};background:{NAVY};">{rows}'
-                     f'<div style="margin-top:12px;font-size:13px;color:#94A3B8;">{esc(t["reported"])}: {esc(src)} · '
-                     f'<a href="{esc(story_url(s1["cluster_id"], week, lang))}" style="color:#93C5FD;font-weight:700;text-decoration:none;">{esc(t["timeline"])} →</a></div></td></tr>')
 
-    intro_html = ""
-    if intro.get("intro"):
-        intro_html = (f'<tr><td style="padding:24px 28px 4px;font-family:{FONT};font-size:17px;line-height:28px;color:{INK};word-break:keep-all;">'
-                      f'{esc(intro["intro"])}</td></tr>')
+    # 맨 위 작은 링크 (NYT: 12px Arial #666)
+    lang_link = (f'<a href="{esc(switch_url)}" style="color:{GRAY};text-decoration:underline;">{esc(t["switch_top"])}</a>'
+                 if switch_url else
+                 f'<a href="{esc(web_url(week, other))}" style="color:{GRAY};text-decoration:underline;">{esc(t["other_lang"])}</a>')
+    top = (f'<div style="text-align:center;font-family:{SANS_EN if lang == "en" else SANS_KO};font-size:12px;line-height:18px;color:{GRAY};">'
+           f'<a href="{esc(web_url(week, lang))}" style="color:{GRAY};text-decoration:underline;">{esc(t["view"])}</a>'
+           f' <span style="color:#DCDCDC;">|</span> {lang_link}</div>')
 
-    map_block = ""
+    # 제호 (NYT: 가운데, 위아래 얇은 줄, 날짜)
+    mast = (_hair() +
+            f'<div style="text-align:center;padding:18px 0 4px;font-family:{SANS_EN};font-size:12px;line-height:16px;'
+            f'letter-spacing:.18em;font-weight:700;color:{ACCENT};">WEWANTPEACE</div>'
+            f'<div style="text-align:center;font-family:{ty["font"]};font-size:{ty["title"]}px;line-height:{ty["title"] + 6}px;'
+            f'font-weight:700;color:{INK};">{esc(t["title"])}</div>'
+            f'<div style="text-align:center;padding:8px 0 16px;font-family:{ty["font"]};font-size:12px;line-height:16px;color:{BODY};">'
+            f'{esc(issue_date(data, lang))} · {esc(date_range(data, lang))}</div>' + _hair())
+
+    # 인사말 (NYT: 굵은 세리프 18/27 · 뉴닉: 보통 14~15)
+    ifs, ilh, iw = ty["intro"]
+    greet = "Good morning." if lang == "en" else "좋은 아침이에요."
+    intro_text = intro.get("intro") or ""
+    desk = (f'<div style="font-family:{ty["label"]};font-size:13px;line-height:18px;font-weight:600;color:{INK};margin:16px 0 10px;">'
+            f'{esc(t["desk"])}</div>')
+    intro_html = desk + (f'<p style="margin:0 0 18px;font-family:{ty["font"]};font-size:{ifs}px;line-height:{ilh}px;'
+                         f'font-weight:{iw};color:{INK if lang == "en" else BODY};word-break:keep-all;">'
+                         f'{"" if lang == "en" else "<b>"}{esc(greet)}{"" if lang == "en" else "</b>"} {esc(intro_text)}</p>')
+
+    # 이번 주 지도 + 번호 목록 (Semafor)
+    map_html = ""
     if images.get("map") and len(stories) > 1:
-        glance = "".join(
-            f'<tr><td style="padding:5px 0;font-family:{FONT};font-size:15px;line-height:22px;color:{INK};">'
-            f'<b style="color:{RED};">{k}</b>&nbsp;&nbsp;{esc(country(s["cc"], lang))} · {esc(s[lang].get("short") or s[lang]["headline"])}</td></tr>'
+        lfs, llh = ty["list"]
+        items = "".join(
+            f'<tr><td valign="top" style="width:26px;font-family:{ty["font"]};font-size:{lfs}px;line-height:{llh}px;color:{ACCENT};font-weight:700;">{k}.</td>'
+            f'<td style="font-family:{ty["font"]};font-size:{lfs}px;line-height:{llh}px;color:{INK};padding-bottom:4px;word-break:keep-all;">'
+            f'{esc(s[lang].get("short") or s[lang]["headline"])}'
+            f'<span style="color:{LIGHT};font-size:{lfs - 3}px;"> · {esc(country(s["cc"], lang))}</span></td></tr>'
             for k, s in enumerate(stories, 1))
-        map_block = (_section_title(t["map"]) +
-                     f'<tr><td style="padding:0 28px;"><img src="{esc(images["map"])}" width="544" alt="" style="display:block;width:100%;max-width:544px;height:auto;border-radius:10px;border:1px solid {LINE};"></td></tr>'
-                     f'<tr><td style="padding:10px 28px 0;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{glance}</table></td></tr>')
+        map_html = (_label(t["map"], ty, lang) +
+                    f'<img src="{esc(images["map"])}" width="568" alt="" style="display:block;width:100%;max-width:568px;height:auto;border:0;margin:10px 0 12px;">'
+                    f'<table role="presentation" cellpadding="0" cellspacing="0" width="100%">{items}</table>')
 
-    cards = "".join(_story_card(i, s, data, lang) for i, s in enumerate(stories, 1) if i > 1)
+    lead = _lead_story(s1, data, lang, ty) if s1 else ""
+    more = ""
+    if len(stories) > 1:
+        more = _label(t["more"], ty, lang) + "".join(_more_story(i, s, data, lang, ty) for i, s in enumerate(stories, 1) if i > 1)
 
-    easing = data.get("easing") or []
-    easing_block = ""
-    if easing:
-        easing_block = (_section_title(t["easing"], t["easing_sub"]) +
-                        f'<tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-                        f'style="background:#F0FDF4;border-radius:12px;"><tr><td style="padding:2px 16px 6px;">'
-                        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{_list_block(easing, data, lang, GREEN, first_border=False)}</table>'
-                        f'</td></tr></table></td></tr>')
-    also = data.get("also") or []
-    also_block = ""
-    if also:
-        also_block = (_section_title(t["also"]) +
-                      f'<tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{_list_block(also, data, lang, NAVY)}</table></td></tr>')
-    yours_block = ""
+    # 내가 고른 나라
+    yours = ""
     if follow:
-        yours_block = (_section_title(t["yours"], t["yours_sub"]) +
-                       f'<tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-                       f'style="border:1px solid {LINE};border-radius:12px;">{_yours_block(follow, data, lang)}</table></td></tr>')
+        rows = []
+        for cc in follow[:3]:
+            entry = (data.get("countries") or {}).get(cc)
+            lv = (data.get("advisories") or {}).get(cc)
+            adv = ADVISORY[lv][1 if lang == "ko" else 0] if lv in ADVISORY else ""
+            line = f'<b style="color:{INK};">{esc(country(cc, lang))}</b>'
+            if adv:
+                line += f' <span style="color:{GRAY};font-size:13px;">({esc(adv)})</span>'
+            if entry and entry.get("top"):
+                top_item = entry["top"]
+                u = story_url(top_item["cluster_id"], week, lang)
+                line += (f'<br><a href="{esc(u)}" style="color:{BODY};text-decoration:underline;">{esc(top_item[lang]["headline"])}</a>'
+                         f' <span style="color:{GRAY};font-size:13px;">· {esc(t["stories_n"].format(n=entry["n"]))}</span>')
+            else:
+                line += f'<br><span style="color:{GRAY};">{esc(t["no_story"])}</span>'
+            rows.append(line)
+        yours = _label(t["yours"], ty, lang) + '<div style="height:10px;"></div>' + _bullets(rows, ty)
 
-    feedback = (f'<tr><td style="padding:28px 28px 6px;font-family:{FONT};text-align:center;">'
-                f'<div style="font-size:15px;font-weight:700;color:{INK};margin-bottom:10px;">{esc(t["useful"])}</div>'
-                f'<a href="{fb}&v=good" style="display:inline-block;padding:9px 18px;margin:0 4px;border-radius:999px;background:#DCFCE7;color:#166534;font-size:14px;font-weight:700;text-decoration:none;">{esc(t["yes"])}</a>'
-                f'<a href="{fb}&v=bad" style="display:inline-block;padding:9px 18px;margin:0 4px;border-radius:999px;background:#F1F5F9;color:#475569;font-size:14px;font-weight:700;text-decoration:none;">{esc(t["no"])}</a></td></tr>')
+    # 이번 주 다른 소식 (NYT "Here's what else is happening")
+    else_items = []
+    for it in (data.get("easing") or []):
+        u = story_url(it["cluster_id"], week, lang)
+        else_items.append(f'<b style="color:{INK};">{esc(t["talks"])} · {esc(country(it["cc"], lang))}:</b> '
+                          f'<a href="{esc(u)}" style="color:{BODY};text-decoration:underline;">{esc(it[lang]["headline"])}</a>')
+    for it in (data.get("also") or []):
+        u = story_url(it["cluster_id"], week, lang)
+        else_items.append(f'<b style="color:{INK};">{esc(country(it["cc"], lang))}:</b> '
+                          f'<a href="{esc(u)}" style="color:{BODY};text-decoration:underline;">{esc(it[lang]["headline"])}</a>')
+    br = (data.get("numbers") or {}).get("brent")
+    if br and br.get("pct") is not None:
+        direction = t["up"] if br["pct"] > 0 else t["down"]
+        else_items.append(f'<b style="color:{INK};">{esc(t["markets"])}:</b> '
+                          + esc(t["brent"].format(now=br["now"], pct=abs(br["pct"]), dir=direction)))
+    else_html = (_label(t["else"], ty, lang) + '<div style="height:10px;"></div>' + _bullets(else_items, ty)) if else_items else ""
 
-    app = (f'<tr><td style="padding:24px 28px 8px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{NAVY};border-radius:14px;">'
-           f'<tr><td style="padding:22px 22px;font-family:{FONT};">'
-           f'<div style="font-size:17px;line-height:24px;font-weight:800;color:#fff;word-break:keep-all;">{esc(t["app_title"])}</div>'
-           f'<div style="font-size:14px;line-height:21px;color:#CBD5E1;margin-top:6px;word-break:keep-all;">{esc(t["app_body"])}</div>'
-           f'<a href="https://play.google.com/store/apps/details?id=com.wewantpeace.app&utm_source=newsletter&utm_campaign={week}" '
-           f'style="display:inline-block;margin-top:14px;padding:10px 18px;border-radius:10px;background:#fff;color:{NAVY};font-size:14px;font-weight:800;text-decoration:none;">{esc(t["app_cta"])} →</a>'
-           f'</td></tr></table></td></tr>')
+    fb = f"{API}/newsletter/weekly/{week}/feedback?lang={lang}&t={esc(feedback_token)}"
+    fs_b, lh_b = ty["body"]
+    feedback = (f'<p style="margin:0;font-family:{ty["font"]};font-size:{fs_b}px;line-height:{lh_b}px;color:{BODY};">'
+                f'{esc(t["useful"])} <a href="{fb}&v=good" style="color:{ACCENT};font-weight:700;">{esc(t["yes"])}</a>'
+                f' · <a href="{fb}&v=bad" style="color:{ACCENT};font-weight:700;">{esc(t["no"])}</a></p>')
+    app = (f'<p style="margin:10px 0 0;font-family:{ty["font"]};font-size:{fs_b}px;line-height:{lh_b}px;color:{BODY};word-break:keep-all;">'
+           f'{esc(t["app"])} <a href="https://play.google.com/store/apps/details?id=com.wewantpeace.app&utm_source=newsletter&utm_campaign={week}" '
+           f'style="color:{ACCENT};font-weight:700;">{esc(t["app_cta"])}</a></p>')
 
     why_get = t["why_get_sub"] if subscriber else t["why_get_user"]
     foot_links = []
     if switch_url:
-        foot_links.append(f'<a href="{esc(switch_url)}" style="color:{MUTED};">{esc(t["switch"])}</a>')
+        foot_links.append(f'<a href="{esc(switch_url)}" style="color:{GRAY};">{esc(t["switch"])}</a>')
     if unsubscribe_url:
-        foot_links.append(f'<a href="{esc(unsubscribe_url)}" style="color:{MUTED};">{esc(t["unsub"])}</a>')
-    footer = (f'<tr><td style="padding:24px 28px 30px;font-family:{FONT};font-size:12px;line-height:19px;color:{MUTED};">'
-              f'<b style="color:{INK};">{esc(t["how"])}</b> {esc(t["how_body"])}<br><br>{esc(why_get)} '
-              f'{" · ".join(foot_links)}<br>WeWantPeace · Seoul, South Korea</td></tr>')
+        foot_links.append(f'<a href="{esc(unsubscribe_url)}" style="color:{GRAY};">{esc(t["unsub"])}</a>')
+    footer = (f'<div style="font-family:{SANS_EN if lang == "en" else SANS_KO};font-size:12px;line-height:19px;color:{GRAY};">'
+              f'<b style="color:{BODY};">{esc(t["how"])}</b> {esc(t["how_body"])}<br><br>{esc(why_get)} '
+              f'{" · ".join(foot_links)}<br>WeWantPeace · Seoul, South Korea</div>')
 
     subject = intro.get("subject") or (s1[lang]["headline"] if s1 else "WeWantPeace")
     preheader = intro.get("preheader") or ""
-    if switch_url:
-        lang_link = (f'<a href="{esc(switch_url)}" style="color:{INK};font-weight:700;text-decoration:underline;">'
-                     f'{esc(t["switch_top"])}</a>')
-    else:
-        lang_link = f'<a href="{esc(web_url(week, other))}" style="color:{MUTED};text-decoration:underline;">{esc(t["other_lang"])}</a>'
-    top_links = (f'<a href="{esc(web_url(week, lang))}" style="color:{MUTED};text-decoration:underline;">{esc(t["view"])}</a>'
-                 f' &nbsp;·&nbsp; {lang_link}')
 
+    body_rows = [
+        _row(top, pad, 14, 12),
+        _row(mast, pad),
+        _row(intro_html, pad),
+        _row(map_html, pad, 6, 24) if map_html else "",
+        _row(_bar() + lead, pad, 4, 30) if lead else "",
+        _row(_bar() + '<div style="height:14px;"></div>' + more, pad, 0, 30) if more else "",
+        _row(_hair() + '<div style="height:20px;"></div>' + yours, pad, 0, 20) if yours else "",
+        _row(_hair() + '<div style="height:20px;"></div>' + else_html, pad, 0, 20) if else_html else "",
+        _row(_hair() + '<div style="height:18px;"></div>' + feedback + app, pad, 0, 24),
+        f'<tr><td style="padding:18px {pad}px 28px;background:#F4F4F4;">{footer}</td></tr>',
+    ]
     html = f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>{esc(subject)}</title></head>
-<body style="margin:0;padding:0;background:{PAGE};">
+<body style="margin:0;padding:0;background:#FFFFFF;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{esc(preheader)}&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAGE};">
-<tr><td align="center" style="padding:14px 10px 6px;font-family:{FONT};font-size:12px;color:{MUTED};">{top_links}</td></tr>
-<tr><td align="center" style="padding:0 10px 30px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:14px;">
-{hero_html_block}
-{lead_text}
-<tr><td style="padding:22px 28px 10px;background:{NAVY};font-family:{FONT};border-top:1px solid #1E293B;">
-<div style="font-size:12px;font-weight:800;letter-spacing:.14em;color:#FCA5A5;text-transform:uppercase;margin-bottom:14px;">{esc(t["three"])}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">{three}</table></td></tr>
-{f'<tr><td style="padding:12px 28px 16px;background:{NAVY};font-family:{FONT};font-size:13px;line-height:20px;color:#CBD5E1;border-top:1px solid #1E293B;">{tick_html}</td></tr>' if tick_html else ''}
-{intro_html}
-{map_block}
-{cards}
-{yours_block}
-{easing_block}
-{also_block}
-{feedback}
-{app}
-{footer}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFFFF;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;">
+{''.join(r for r in body_rows if r)}
 </table></td></tr></table></body></html>"""
 
-    text_lines = [subject, "", intro.get("intro", ""), ""]
+    text_lines = [subject, "", intro_text, ""]
     for i, s in enumerate(stories, 1):
         p = s[lang]
-        text_lines += [f"{i}. {p['headline']}"] + [f"   {t[k]} {p[k]}" for k in ("what", "why", "watch") if p.get(k)] + \
+        text_lines.append(f"{i}. {p['headline']}")
+        if p.get("what"):
+            text_lines.append(f"   {p['what']}")
+        text_lines += [f"   {t[k]} {p[k]}" for k in ("why", "watch") if p.get(k)] + \
                       [f"   {story_url(s['cluster_id'], week, lang)}", ""]
     if unsubscribe_url:
         text_lines += [f"{t['unsub']}: {unsubscribe_url}"]
