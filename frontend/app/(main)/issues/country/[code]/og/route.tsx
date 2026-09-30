@@ -37,7 +37,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
       });
       if (res.ok) {
         const detail = await res.json();
-        photo = await loadPhoto(photoCandidates(detail.events || [], top.image_url));
+        photo = await loadPhoto(photoCandidates(detail.events || [], top.image_url, top.title));
       }
     } catch {
       /* 사진 없이 */

@@ -81,16 +81,50 @@ export function cleanHeadline(raw: string, max = 96): string {
   return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:]$/, "") + "…";
 }
 
-type Ev = { image_url?: string | null; source_tier?: string | null; source_name?: string | null };
+type Ev = { image_url?: string | null; source_tier?: string | null; source_name?: string | null; title?: string | null };
 
-/** 믿을 만한 출처(A/B) 기사 사진부터. 미검증(D) 채널 사진은 쓰지 않는다 */
-export function photoCandidates(events: Ev[], fallback?: string | null): { url: string; credit: string }[] {
+// 기사 사진이 아닌 매체 로고·기본 공유 이미지 (배포 직후 실측: TASS 가 모든 기사에 로고 PNG 를 붙인다)
+const JUNK_IMG = /logo|placeholder|default[-_]?(image|share|og)|share[-_]?(image|img|default)|icon|avatar|sprite|whatsapp|blank|no[-_]?image/i;
+
+const STOP = new Set(["with", "from", "after", "over", "into", "that", "this", "their", "have", "were", "said",
+  "says", "amid", "against", "about", "more", "than", "they", "what", "when", "will", "been"]);
+function words(t?: string | null): Set<string> {
+  return new Set((t || "").toLowerCase().match(/[\p{L}]{4,}/gu)?.filter((w) => !STOP.has(w)) ?? []);
+}
+
+/** 기사 사진 후보 — 헤드라인과 제목이 겹치는 기사 사진부터, 같으면 믿을 만한 출처(A/B)부터.
+ *  한 이슈에 다른 사건 기사가 섞여 있어(팔레스타인 이슈에 이란 미사일 사진) 출처 등급만으로 고르면 엉뚱한 사진이 나왔다.
+ *  미검증(D) 채널 사진과 로고 이미지는 쓰지 않는다. */
+export function photoCandidates(events: Ev[], fallback?: string | null, headline?: string): { url: string; credit: string }[] {
   const rank: Record<string, number> = { A: 0, B: 1, C: 2 };
+  const hw = words(headline);
+  const overlap = (e: Ev) => {
+    let n = 0;
+    words(e.title).forEach((w) => { if (hw.has(w)) n += 1; });
+    return n;
+  };
+  // 같은 사진이 서로 다른 기사 3건 이상에 붙어 있으면 매체 피드의 공용 이미지다
+  // (Middle East Eye 피드가 이란 미사일 사진 한 장을 여러 기사에 붙여, 팔레스타인 정착민 기사 미리보기에 나왔다)
+  const titlesByImg = new Map<string, Set<string>>();
+  events.forEach((e) => {
+    if (!e.image_url) return;
+    const set = titlesByImg.get(e.image_url) ?? new Set<string>();
+    set.add((e.title || "").slice(0, 60));
+    titlesByImg.set(e.image_url, set);
+  });
+  const shared = (u: string) => (titlesByImg.get(u)?.size ?? 0) >= 3;
   const seen = new Set<string>();
   const out: { url: string; credit: string }[] = [];
   [...events]
-    .filter((e) => e.image_url && (e.source_tier || "D") !== "D")
-    .sort((a, b) => (rank[a.source_tier || ""] ?? 3) - (rank[b.source_tier || ""] ?? 3))
+    .filter((e) => e.image_url && (e.source_tier || "D") !== "D" && !JUNK_IMG.test(e.image_url) && !shared(e.image_url))
+    // 같은 사건(겹치는 단어 2개 이상)인지 먼저, 그 안에서는 출처 등급 먼저.
+    // 겹침 수만으로 고르면 제목이 똑같은 B등급 기사의 잘못 붙은 피드 사진(MEE: 정착민 기사에 이란 광고판)이 뽑혔다.
+    .sort((a, b) => {
+      const bucket = (e: Ev) => (overlap(e) >= 2 ? 0 : overlap(e) === 1 ? 1 : 2);
+      return (bucket(a) - bucket(b))
+        || ((rank[a.source_tier || ""] ?? 3) - (rank[b.source_tier || ""] ?? 3))
+        || (overlap(b) - overlap(a));
+    })
     .forEach((e) => {
       const u = e.image_url as string;
       if (u.startsWith("http") && !seen.has(u)) {
@@ -98,7 +132,9 @@ export function photoCandidates(events: Ev[], fallback?: string | null): { url: 
         out.push({ url: u, credit: e.source_name || "" });
       }
     });
-  if (fallback && fallback.startsWith("http") && !seen.has(fallback)) out.push({ url: fallback, credit: "" });
+  if (fallback && fallback.startsWith("http") && !seen.has(fallback) && !JUNK_IMG.test(fallback)) {
+    out.push({ url: fallback, credit: "" });
+  }
   return out;
 }
 

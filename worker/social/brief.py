@@ -72,6 +72,18 @@ def issue_url(cluster_id) -> str:
 
 # ── 출처 수집 ────────────────────────────────────────────────────────────────
 
+# 기사 사진이 아닌 매체 로고·기본 공유 이미지 (frontend/lib/server/og-card.tsx 와 같은 규칙)
+_JUNK_IMG = re.compile(
+    r"logo|placeholder|default[-_]?(image|share|og)|share[-_]?(image|img|default)|icon|avatar|sprite|whatsapp|blank|no[-_]?image",
+    re.I,
+)
+_STOP = {"with", "from", "after", "over", "into", "that", "this", "their", "have", "were", "said",
+         "says", "amid", "against", "about", "more", "than", "they", "what", "when", "will", "been"}
+
+
+def _words(text: str | None) -> set[str]:
+    return {w for w in re.findall(r"[^\W\d_]{4,}", (text or "").lower()) if w not in _STOP}
+
 async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
     """클러스터의 최근 이벤트·출처를 모은다.
 
@@ -113,18 +125,35 @@ async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
         body = re.sub(r"\s+", " ", r["body"] or "")[:280]
         reports.append(f"- [{r['display_name'] or 'unknown'}] {r['title']} — {body}")
 
-    # 카드뉴스 장마다 다른 기사 사진 — 믿을 만한 출처(A/B) 사진부터, 같은 사진은 한 번만
+    # 카드뉴스 장마다 다른 기사 사진 — 이슈 제목과 겹치는 기사 사진부터, 같으면 믿을 만한 출처(A/B)부터.
+    # 한 이슈에 다른 사건 기사가 섞여 있어(팔레스타인 이슈에 이란 미사일 사진) 등급만으로 고르면 엉뚱한 사진이 나왔고,
+    # TASS 처럼 모든 기사에 매체 로고 PNG 를 붙이는 곳도 있다 (2026-09-30 배포 직후 실측).
+    title_words = _words(getattr(cluster, "title", ""))
+    # 같은 사진이 서로 다른 기사 3건 이상에 붙어 있으면 매체 피드 공용 이미지 (Middle East Eye 실측)
+    titles_by_img: dict[str, set[str]] = {}
+    for r in rows:
+        if r["image_url"]:
+            titles_by_img.setdefault(r["image_url"], set()).add((r["title"] or "")[:60])
+    shared = {u for u, ts in titles_by_img.items() if len(ts) >= 3}
     photos: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for r in sorted(rows, key=lambda r: tier_rank.get(r["source_tier"], 3)):
+    def _photo_key(r):
+        # 같은 사건(겹치는 단어 2개 이상)인지 먼저, 그 안에서는 출처 등급 먼저 — og-card.tsx 와 같은 규칙
+        n = len(_words(r["title"]) & title_words)
+        return (0 if n >= 2 else 1 if n == 1 else 2, tier_rank.get(r["source_tier"], 3), -n)
+
+    for r in sorted(rows, key=_photo_key):
         url = r["image_url"]
         if not url or not url.startswith("http") or url in seen or (r["source_tier"] or "D") == "D":
             continue
+        if _JUNK_IMG.search(url) or url in shared:
+            continue
         seen.add(url)
         photos.append((url, r["display_name"] or ""))
+    # 클러스터 대표 사진은 섞인 기사에서 왔을 수 있어 맨 뒤 예비로만
     cover = getattr(cluster, "image_url", None)
-    if cover and cover.startswith("http") and cover not in seen:
-        photos.insert(0, (cover, ""))
+    if cover and cover.startswith("http") and cover not in seen and not _JUNK_IMG.search(cover):
+        photos.append((cover, ""))
 
     newest = rows[0]["event_time"] if rows else None
     return {

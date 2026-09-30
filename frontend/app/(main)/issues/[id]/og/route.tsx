@@ -48,7 +48,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const date = issue.last_event_at
     ? new Date(issue.last_event_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     : "";
-  const photo = await loadPhoto(photoCandidates(events, issue.image_url));
+  const photo = await loadPhoto(photoCandidates(events, issue.image_url, headline));
 
   return new ImageResponse(
     <CoverCard

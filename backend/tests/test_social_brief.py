@@ -208,3 +208,13 @@ async def test_generate_kscore_alert_skips_when_ai_fails(db):
     ctx = {"n_sources": 4, "source_names": ["Reuters"], "reports": [], "newest_event_at": now}
     with patch.object(B, "_call_ai_json", return_value=None):
         assert await generators.generate_kscore_alert(cluster, db, ctx=ctx) is None
+
+
+def test_photo_filter_skips_logos_and_prefers_matching_story():
+    """TASS 로고 PNG 같은 매체 기본 이미지는 쓰지 않는다 (2026-09-30 배포 직후 미리보기에 실제로 나옴)."""
+    assert B._JUNK_IMG.search("https://tass.com/img/blocks/common/tass_logo_share_eng.png")
+    assert B._JUNK_IMG.search("https://www.newarab.com/themes/custom/new_arab/images/Whatsapp-TNA-desktop.webp")
+    assert not B._JUNK_IMG.search("https://s.france24.com/media/display/dab256aa/w:1024/p:16x9/EN.jpg")
+    title = B._words("Israeli settlers attack Palestinian homes in Halhul")
+    assert len(B._words("Settlers attack West Bank village, Palestinian homes torched") & title) >= 3
+    assert len(B._words("Iranian-made Zolfaghar missile shown in Tehran") & title) == 0
