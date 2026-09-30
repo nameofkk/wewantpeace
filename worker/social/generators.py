@@ -31,6 +31,12 @@ async def notify_pending(posts) -> None:
                 logger.exception("승인 요청 전송 실패: post=%s", post.id)
 
 
+async def _in_thread(fn, *args, **kwargs):
+    import asyncio
+    import functools
+    return await asyncio.get_running_loop().run_in_executor(None, functools.partial(fn, *args, **kwargs))
+
+
 async def _already_exists(db: AsyncSession, dedup_key: str) -> bool:
     existing = await db.execute(select(SocialPost.id).where(SocialPost.dedup_key == dedup_key))
     return existing.scalar_one_or_none() is not None
@@ -41,7 +47,7 @@ async def _already_exists(db: AsyncSession, dedup_key: str) -> bool:
 async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
     """지난 24시간 주요 이슈 3개(나라 중복 없이, 출처 2곳 이상)를 일간 브리프로."""
     from worker.social import brief as B
-    from worker.social.brief_card import list_html, attach_card
+    from worker.social.brief_card import list_slides, attach_carousel
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     dedup_key = f"daily_movers:{today}"
@@ -83,15 +89,18 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
     for i, (c, ctx) in enumerate(picked, 1):
         title = B._fit(B._clean(c.title), 110)
         name = B.country_name(c.country_code)
-        lines.append(f"{i}. {name}: {title} ({ctx['n_sources']} sources)")
-        items.append({"country": name, "headline": title, "meta": f"{ctx['n_sources']} sources"})
-    foot = f"Full timelines: {B.SITE}/?ref=threads"
-    body = "\n\n".join([head, "\n".join(lines), foot])[: B.THREADS_LIMIT]
+        lines.append(f"{i}. {name}: {title}")
+        items.append({"country": name, "headline": title, "meta": f"{ctx['n_sources']} sources",
+                      "photos": ctx.get("photos") or []})
+    body = "\n\n".join([head, "\n".join(lines)])[: B.THREADS_LIMIT]
+    countries = " · ".join(it["country"] for it in items)
 
     post = SocialPost(
         content_type="daily_movers",
         lang="en",
         body_text=body,
+        reply_text=f"Full timelines for each story: {B.SITE}/?ref=threads\n\n"
+                   f"A weekly brief by email: {B.SITE}/brief?ref=threads",
         hashtags=["Geopolitics"],
         risk_level="low",
         source_cluster_id=picked[0][0].id,
@@ -100,7 +109,10 @@ async def generate_daily_movers(db: AsyncSession) -> SocialPost | None:
     )
     db.add(post)
     await db.flush()
-    await attach_card(post, list_html("Daily brief", "Last 24 hours", items))
+    slides = await _in_thread(list_slides, title=f"{len(items)} stories from the last 24 hours",
+                              dek=countries, kicker=datetime.now(timezone.utc).strftime("Daily brief · %b %d"),
+                              items=items)
+    await attach_carousel(post, slides)
     logger.info("Daily brief 생성: %s (%d건, status=%s)", post.id, len(items), post.status)
     return post
 
@@ -114,7 +126,7 @@ async def generate_kscore_alert(
 ) -> SocialPost | None:
     """이슈 하나를 "무슨 일 / 왜 중요 / 지켜볼 점" 브리프로. 품질 게이트를 못 넘으면 None."""
     from worker.social import brief as B
-    from worker.social.brief_card import alert_html, attach_card
+    from worker.social.brief_card import alert_slides, attach_carousel
     from worker.social.config import SOCIAL_MIN_SOURCES
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -141,8 +153,9 @@ async def generate_kscore_alert(
     post = SocialPost(
         content_type="kscore_alert",
         lang="en",
-        body_text=B.compose_alert_text(brief, ctx["n_sources"], cluster.id),
-        reply_text=B.compose_sources_reply(ctx["source_names"], cluster.country_code),
+        body_text=B.compose_alert_text(brief, ctx["n_sources"], cluster.id, ctx["source_names"]),
+        reply_text=B.compose_sources_reply(ctx["source_names"], cluster.country_code,
+                                           brief.get("watch"), cluster.id),
         hashtags=[B.topic_tag_for(cluster.country_code, cluster.topic)],
         risk_level="high" if cluster.severity >= 70 else "medium",
         source_cluster_id=cluster.id,
@@ -151,11 +164,14 @@ async def generate_kscore_alert(
     )
     db.add(post)
     await db.flush()
-    await attach_card(post, alert_html(
-        brief, country=B.country_name(cluster.country_code), n_sources=ctx["n_sources"],
-        source_names=ctx["source_names"], when=ctx.get("newest_event_at"),
-    ))
-    logger.info("KScore brief 생성: %s (sources=%d, status=%s)", post.id, ctx["n_sources"], post.status)
+    # 기사 사진 받기가 동기 네트워크 작업이라 이벤트 루프 밖에서 장을 만든다
+    slides = await _in_thread(alert_slides, brief, country=B.country_name(cluster.country_code),
+                              cc=cluster.country_code or "", n_sources=ctx["n_sources"],
+                              source_names=ctx["source_names"], photos=ctx.get("photos") or [],
+                              when=ctx.get("newest_event_at"))
+    await attach_carousel(post, slides)
+    logger.info("KScore brief 생성: %s (sources=%d, slides=%d, status=%s)",
+                post.id, ctx["n_sources"], len(post.image_urls or []), post.status)
     return post
 
 
@@ -170,7 +186,7 @@ async def generate_spike_alert(spike, cluster, db):
 async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
     """지난 7일 이슈가 가장 많았던 나라 4곳과 나라별 대표 이슈."""
     from worker.social import brief as B
-    from worker.social.brief_card import list_html, attach_card
+    from worker.social.brief_card import list_slides, attach_carousel
 
     now = datetime.now(timezone.utc)
     iso_cal = now.isocalendar()
@@ -208,7 +224,9 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
             continue
         name = B.country_name(row.country_code)
         title = B._fit(B._clean(top.title), 100)
-        items.append({"country": name, "headline": title, "meta": f"{row.n} issues tracked"})
+        ctx = await B.gather_context(db, top, hours=24 * 7)
+        items.append({"country": name, "headline": title, "meta": f"{row.n} issues tracked",
+                      "photos": ctx.get("photos") or []})
         lines.append(f"{name} ({row.n} issues): {title}")
         if len(items) == 4:
             break
@@ -220,16 +238,17 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
     start = (now - timedelta(days=7)).strftime("%b %d")
     end = now.strftime("%b %d")
     head = f"Week in review, {start} to {end}. Where the most activity was:"
-    foot = f"Country timelines: {B.SITE}/?ref=threads"
-    body = "\n\n".join([head, "\n".join(lines), foot])
+    body = "\n\n".join([head, "\n".join(lines)])
     while len(body) > B.THREADS_LIMIT and len(lines) > 2:
         lines.pop()
-        body = "\n\n".join([head, "\n".join(lines), foot])
+        body = "\n\n".join([head, "\n".join(lines)])
 
     post = SocialPost(
         content_type="weekly_recap",
         lang="en",
         body_text=body[: B.THREADS_LIMIT],
+        reply_text=f"Country timelines: {B.SITE}/?ref=threads\n\n"
+                   f"A weekly brief by email: {B.SITE}/brief?ref=threads",
         hashtags=["Geopolitics"],
         risk_level="low",
         dedup_key=dedup_key,
@@ -237,6 +256,8 @@ async def generate_weekly_recap(db: AsyncSession) -> SocialPost | None:
     )
     db.add(post)
     await db.flush()
-    await attach_card(post, list_html("Week in review", f"{start} – {end}", items))
+    slides = await _in_thread(list_slides, title="The week in conflict", dek=f"{start} to {end}",
+                              kicker="Week in review", items=items)
+    await attach_carousel(post, slides)
     logger.info("Weekly recap 생성: %s (status=%s)", post.id, post.status)
     return post

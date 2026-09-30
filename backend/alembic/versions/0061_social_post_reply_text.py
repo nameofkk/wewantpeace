@@ -8,6 +8,7 @@ Revises: 0060
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "0061"
 down_revision = "0060"
@@ -15,7 +16,10 @@ down_revision = "0060"
 
 def upgrade() -> None:
     op.add_column("social_posts", sa.Column("reply_text", sa.Text(), nullable=True))
+    # 카드뉴스(캐러셀) 장별 이미지 URL. image_url 은 표지(1장째)
+    op.add_column("social_posts", sa.Column("image_urls", postgresql.ARRAY(sa.String()), nullable=True))
 
 
 def downgrade() -> None:
+    op.drop_column("social_posts", "image_urls")
     op.drop_column("social_posts", "reply_text")

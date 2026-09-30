@@ -18,20 +18,21 @@ BRIEF = {
 }
 
 
-def test_alert_text_fits_threads_and_has_link():
-    cid = uuid.uuid4()
-    text = B.compose_alert_text(BRIEF, 14, cid)
+def test_caption_follows_reference_format():
+    """본문 = 뉴스 한 문장 + 맥락 한 문장 + 출처 (헤드라인은 표지 카드에 있어 반복하지 않고, 링크는 답글로)."""
+    text = B.compose_alert_text(BRIEF, 7, uuid.uuid4(), ["Reuters", "AP", "BBC", "NHK"])
     assert len(text) <= 500
-    assert text.startswith(BRIEF["headline"])
-    assert f"/issues/{cid}?ref=threads" in text
-    assert "14 independent sources" in text
+    assert text.startswith(BRIEF["what"])
+    assert BRIEF["headline"] not in text
+    assert "http" not in text
+    assert text.endswith("Sources: Reuters, AP, BBC and 1 more.")
 
 
-def test_alert_text_drops_optional_parts_when_long():
-    long = dict(BRIEF, what="x " * 95, why="y " * 70, watch="z " * 60)
-    text = B.compose_alert_text(long, 5, uuid.uuid4())
+def test_caption_drops_why_when_long():
+    long = dict(BRIEF, what="x " * 95, why="y " * 200)
+    text = B.compose_alert_text(long, 5, uuid.uuid4(), ["Reuters"])
     assert len(text) <= 500
-    assert "?ref=threads" in text
+    assert "y y" not in text
 
 
 def test_strip_emoji_and_clean():
@@ -94,10 +95,62 @@ def test_dedicated_model_first_then_shared():
         s.assert_called_once()
 
 
-def test_sources_reply():
-    reply = B.compose_sources_reply(["Reuters", "AP", "BBC", "Al Jazeera", "NHK", "DW", "France 24"])
-    assert reply.startswith("Sources for this brief: Reuters, AP, BBC, Al Jazeera, NHK and 2 more.")
+def test_self_reply_has_watch_link_and_brief():
+    cid = uuid.uuid4()
+    reply = B.compose_sources_reply(["Reuters"], "IR", BRIEF["watch"], cid)
+    assert reply.startswith("What to watch: " + BRIEF["watch"])
+    assert f"/issues/{cid}?ref=threads" in reply
+    assert "/brief?c=IR&ref=threads" in reply
     assert B.compose_sources_reply([]) is None
+
+
+def test_highlight_must_be_in_headline():
+    ctx = {"n_sources": 4, "reports": ["- [Reuters] x"]}
+    with patch.object(B, "_call_ai_json", return_value=dict(BRIEF, highlight="eight US Marines")):
+        assert B.build_brief(_cluster(), ctx)["highlight"] == "eight US Marines"
+    with patch.object(B, "_call_ai_json", return_value=dict(BRIEF, highlight="not in there")):
+        assert B.build_brief(_cluster(), ctx)["highlight"] == ""
+
+
+def test_alert_slides_structure():
+    """표지 / 무슨 일 / 왜 중요 / 지켜볼 점 / 출처·구독 5장, 사진은 장마다 돌려 쓴다."""
+    from worker.social import brief_card as C
+    with patch.object(C, "fetch_photo", side_effect=["data:image/jpeg;base64,AAA", "data:image/jpeg;base64,BBB", None]):
+        slides = C.alert_slides(dict(BRIEF, highlight="eight US Marines", dek="Pentagon says two evacuated"),
+                                country="Iran", cc="IR", n_sources=7, source_names=["Reuters", "AP"],
+                                photos=[("u1", "Reuters"), ("u2", "AP"), ("u3", "")])
+    assert len(slides) == 5
+    assert "<em>eight US Marines</em>" in slides[0] and "7 sources" in slides[0]
+    assert "What happened" in slides[1] and "Why it matters" in slides[2] and "What to watch" in slides[3]
+    assert "Get a weekly brief on Iran" in slides[4] and "brief?c=IR" in slides[4]
+    assert "BBB" in slides[1] and "AAA" in slides[2]  # 2장뿐이면 돌려 쓴다
+    assert "Photo: AP" in slides[1]
+
+
+def test_adapter_uses_carousel_for_multiple_slides():
+    from unittest.mock import MagicMock
+    calls = []
+
+    def fake_post(url, params=None):
+        calls.append(dict(params or {}))
+        r = MagicMock(status_code=200)
+        r.json.return_value = {"id": f"id{len(calls)}"}
+        return r
+
+    client = MagicMock()
+    client.post.side_effect = fake_post
+    post = SimpleNamespace(id=uuid.uuid4(), body_text="x", content_type="kscore_alert", hashtags=["Iran"],
+                           image_url="https://cdn/1.png", image_urls=["https://cdn/1.png", "https://cdn/2.png"],
+                           reply_text=None)
+    with patch.object(threads_adapter, "is_configured", return_value=True), \
+         patch.object(threads_adapter, "THREADS_USER_ID", "u"), \
+         patch.object(threads_adapter.time, "sleep"), \
+         patch("httpx.Client") as hc:
+        hc.return_value.__enter__.return_value = client
+        tid, err = threads_adapter.publish(post)
+    assert err is None
+    assert [c.get("is_carousel_item") for c in calls[:2]] == ["true", "true"]
+    assert calls[2]["media_type"] == "CAROUSEL" and calls[2]["children"] == "id1,id2"
 
 
 @pytest.mark.asyncio
@@ -116,24 +169,26 @@ async def test_generate_kscore_alert_pending_during_review(db, monkeypatch):
     db.add(cluster)
     await db.flush()
     ctx = {"n_sources": 5, "source_names": ["Reuters", "AP", "BBC", "Al Jazeera", "Military Times"],
-           "reports": ["- [Reuters] ..."], "newest_event_at": now - timedelta(hours=1)}
+           "reports": ["- [Reuters] ..."], "photos": [], "newest_event_at": now - timedelta(hours=1)}
 
     monkeypatch.setattr("worker.social.config.SOCIAL_REVIEW_UNTIL", (now + timedelta(hours=48)).isoformat())
     with patch.object(B, "_call_ai_json", return_value=BRIEF), \
-         patch("worker.social.brief_card.attach_card", new=AsyncMock(return_value=True)) as card:
+         patch("worker.social.brief_card.fetch_photo", return_value=None), \
+         patch("worker.social.brief_card.attach_carousel", new=AsyncMock(return_value=True)) as card:
         post = await generators.generate_kscore_alert(cluster, db, ctx=ctx)
 
     assert post is not None
     assert post.status == "pending_review"
     assert post.lang == "en"
     assert post.hashtags == ["Iran"]
-    assert post.reply_text.startswith("Sources for this brief: Reuters")
+    assert post.reply_text.startswith("What to watch:")
+    assert card.await_args.args[1][0].count("WEWANTPEACE") == 1  # 표지 장 HTML 이 넘어갔다
     assert len(post.body_text) <= 500
     card.assert_awaited_once()
 
     # 같은 날 같은 클러스터는 다시 만들지 않는다
     with patch.object(B, "_call_ai_json", return_value=BRIEF), \
-         patch("worker.social.brief_card.attach_card", new=AsyncMock(return_value=True)):
+         patch("worker.social.brief_card.attach_carousel", new=AsyncMock(return_value=True)):
         assert await generators.generate_kscore_alert(cluster, db, ctx=ctx) is None
 
 

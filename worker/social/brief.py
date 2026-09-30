@@ -81,7 +81,7 @@ async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
     rows = (await db.execute(
         sa_text(
             """
-            SELECT ne.title, ne.body, ne.event_time, ne.source_tier,
+            SELECT ne.title, ne.body, ne.event_time, ne.source_tier, ne.image_url,
                    sc.id AS channel_id, sc.display_name
             FROM cluster_events ce
             JOIN normalized_events ne ON ne.id = ce.event_id
@@ -113,11 +113,25 @@ async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
         body = re.sub(r"\s+", " ", r["body"] or "")[:280]
         reports.append(f"- [{r['display_name'] or 'unknown'}] {r['title']} — {body}")
 
+    # 카드뉴스 장마다 다른 기사 사진 — 믿을 만한 출처(A/B) 사진부터, 같은 사진은 한 번만
+    photos: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for r in sorted(rows, key=lambda r: tier_rank.get(r["source_tier"], 3)):
+        url = r["image_url"]
+        if not url or not url.startswith("http") or url in seen or (r["source_tier"] or "D") == "D":
+            continue
+        seen.add(url)
+        photos.append((url, r["display_name"] or ""))
+    cover = getattr(cluster, "image_url", None)
+    if cover and cover.startswith("http") and cover not in seen:
+        photos.insert(0, (cover, ""))
+
     newest = rows[0]["event_time"] if rows else None
     return {
         "n_sources": len(source_names),
         "source_names": source_names,
         "reports": reports,
+        "photos": photos[:6],
         "newest_event_at": newest,
     }
 
@@ -149,7 +163,11 @@ def quality_reject_reason(cluster, ctx: dict, min_sources: int) -> str | None:
 BRIEF_SYSTEM = (
     "You are an analyst writing a short, neutral conflict brief for an international "
     "English-speaking audience on Threads. Return a JSON object with exactly these keys: "
-    "skip, headline, what, why, watch.\n"
+    "skip, headline, highlight, dek, what, why, watch.\n"
+    "highlight: the 2 to 4 most important consecutive words copied exactly from headline "
+    "(they are shown in a different colour on the cover card).\n"
+    "dek: one short line under the headline on the cover, at most 90 characters, adding the key "
+    "fact the headline leaves out (a number, a place, who said it). No trailing period.\n"
     "skip: true if the reports are not about armed conflict, security, political violence, "
     "sanctions or diplomacy with real-world consequences (for example forum discussions, sports, "
     "entertainment, opinion pieces, product news or anniversaries), or if they are too thin to "
@@ -325,6 +343,7 @@ def build_brief(cluster, ctx: dict) -> dict | None:
         return None
     brief = {
         "headline": _fit(_clean(str(data.get("headline", ""))).rstrip("."), 90),
+        "dek": _fit(_clean(str(data.get("dek", ""))).rstrip("."), 100),
         "what": _fit(_clean(str(data.get("what", ""))), 190),
         "why": _fit(_clean(str(data.get("why", ""))), 150),
         "watch": _fit(_clean(str(data.get("watch", ""))), 130),
@@ -334,33 +353,48 @@ def build_brief(cluster, ctx: dict) -> dict | None:
     # 영어 브리프에 한글·키릴 문자가 섞이면 버린다 (모델이 가끔 원문 언어로 답함)
     if re.search(r"[가-힣Ѐ-ӿ]", " ".join(brief.values())):
         return None
+    hl = _clean(str(data.get("highlight", "")))
+    brief["highlight"] = hl if hl and hl.lower() in brief["headline"].lower() else ""
     return brief
 
 
-def compose_alert_text(brief: dict, n_sources: int, cluster_id) -> str:
-    """Threads 본문 (500자). 지켜볼 점은 자리가 있을 때만 — 카드에는 항상 들어간다."""
-    footer = f"{n_sources} independent sources. Full timeline: {issue_url(cluster_id)}"
-    parts = [brief["headline"], brief["what"]]
-    if brief.get("why"):
-        parts.append(f"Why it matters: {brief['why']}")
-    with_watch = parts + ([f"What to watch: {brief['watch']}"] if brief.get("watch") else [])
-    for candidate in (with_watch, parts, parts[:2]):
-        text = "\n\n".join(candidate + [footer])
-        if len(text) <= THREADS_LIMIT:
-            return text
-    room = THREADS_LIMIT - len(footer) - len(brief["headline"]) - 4
-    return "\n\n".join([brief["headline"], _fit(brief["what"], max(room, 40)), footer])[:THREADS_LIMIT]
-
-
-def compose_sources_reply(source_names: list[str], cc: str | None = None) -> str | None:
-    if not source_names:
-        return None
-    shown = source_names[:5]
+def _sources_line(source_names: list[str], limit: int = 3) -> str:
+    shown = source_names[:limit]
     rest = len(source_names) - len(shown)
-    line = ", ".join(shown) + (f" and {rest} more" if rest > 0 else "")
-    text = f"Sources for this brief: {line}.\n\nWe count a source once per outlet and leave out unverified channels."
+    return ", ".join(shown) + (f" and {rest} more" if rest > 0 else "")
+
+
+def compose_alert_text(brief: dict, n_sources: int, cluster_id, source_names: list[str] | None = None) -> str:
+    """Threads 본문 — 레퍼런스(Ground News·Politico·Al Jazeera·so informed)와 같은 틀.
+
+    헤드라인은 표지 카드에 있으니 반복하지 않는다. 뉴스 한 문장 + 맥락 한 문장 + 출처.
+    링크·지켜볼 점은 바로 아래 자기 답글로 (so informed·Novara 방식).
+    """
+    parts = [brief["what"]]
+    if brief.get("why"):
+        parts.append(brief["why"])
+    src = f"Sources: {_sources_line(source_names)}." if source_names else f"{n_sources} independent sources."
+    text = "\n\n".join(parts + [src])
+    if len(text) > THREADS_LIMIT:
+        text = "\n\n".join([brief["what"], src])
+    return text[:THREADS_LIMIT]
+
+
+def compose_sources_reply(source_names: list[str], cc: str | None = None,
+                          watch: str | None = None, cluster_id=None) -> str | None:
+    """본문 바로 아래 자기 답글 — 지켜볼 점, 전체 타임라인 링크, 주간 브리프 구독.
+
+    so informed·Novara 는 본문은 짧게 두고 자세한 내용과 링크를 자기 답글로 이어 단다.
+    """
+    parts = []
+    if watch:
+        parts.append(f"What to watch: {watch}")
+    if cluster_id:
+        parts.append(f"Full timeline and all sources: {issue_url(cluster_id)}")
+    elif source_names:
+        parts.append(f"Sources: {_sources_line(source_names, 5)}.")
     name = country_name(cc)
     if name:
-        # 주간 브리프 이메일 구독 검증 실험 (2주) — 게시물 본문이 아니라 댓글에만
-        text += f"\n\nA weekly brief on {name} by email: {SITE}/brief?c={cc.upper()}&ref=threads"
-    return text
+        # 주간 브리프 이메일 구독 검증 실험 (2주) — 게시물 본문이 아니라 답글에만
+        parts.append(f"A weekly brief on {name} by email: {SITE}/brief?c={cc.upper()}&ref=threads")
+    return "\n\n".join(parts)[:THREADS_LIMIT] if parts else None

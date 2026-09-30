@@ -115,10 +115,13 @@ async def send_review_message(post: SocialPost) -> bool:
             # 2. Threads 미리보기 메시지
             if SOCIAL_PLATFORM_THREADS_ENABLED:
                 threads_text = threads_build_text(post)
+                reply_preview = getattr(post, "reply_text", None)
+                n_slides = len(getattr(post, "image_urls", None) or [])
                 threads_msg = (
                     f"[Threads 미리보기] {content_label}\n\n"
                     f"{threads_text}\n\n"
-                    f"{len(threads_text)}/500자 | 리스크: {post.risk_level}"
+                    + (f"[자기 답글]\n{reply_preview}\n\n" if reply_preview else "")
+                    + f"{len(threads_text)}/500자 | 카드 {n_slides}장 | 리스크: {post.risk_level}"
                 )
                 threads_keyboard = {
                     "inline_keyboard": [[
@@ -153,6 +156,18 @@ async def send_review_message(post: SocialPost) -> bool:
                     ],
                 ]
             }
+
+            # 카드뉴스는 전 장을 앨범으로 먼저 보여 준다 (승인 버튼은 아래 요약 메시지에)
+            slides = [u for u in (getattr(post, "image_urls", None) or []) if u.startswith("http")]
+            if len(slides) >= 2:
+                try:
+                    await client.post(
+                        f"https://api.telegram.org/bot{SOCIAL_TG_BOT_TOKEN}/sendMediaGroup",
+                        json={"chat_id": SOCIAL_TG_CHAT_ID,
+                              "media": [{"type": "photo", "media": u} for u in slides[:10]]},
+                    )
+                except Exception:
+                    logger.warning("카드뉴스 앨범 전송 실패: post=%s", post.id)
 
             image_sent = False
             if post.image_url:

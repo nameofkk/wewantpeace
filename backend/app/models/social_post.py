@@ -24,6 +24,8 @@ class SocialPost(Base):
     reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     hashtags: Mapped[list[str]] = mapped_column(StringArray, nullable=False, default=list)
     image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # 카드뉴스(캐러셀) 장별 이미지. 2장 이상이면 Threads 에 CAROUSEL 로 올린다. image_url 은 표지
+    image_urls: Mapped[list[str] | None] = mapped_column(StringArray, nullable=True)
     risk_level: Mapped[str] = mapped_column(String(8), nullable=False, default="medium")
     source_cluster_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),

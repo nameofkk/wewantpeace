@@ -49,6 +49,24 @@ def _topic_tag(post: SocialPost) -> str | None:
     return tag[:50] or None
 
 
+def _create_carousel_items(client, urls: list[str]) -> tuple[list[str], str | None]:
+    """카드뉴스 장마다 is_carousel_item 컨테이너를 만든다 (Threads API: 2~20장)."""
+    ids = []
+    for u in urls:
+        r = client.post(
+            f"{_GRAPH_API_BASE}/{THREADS_USER_ID}/threads",
+            params={"media_type": "IMAGE", "image_url": u, "is_carousel_item": "true",
+                    "access_token": THREADS_ACCESS_TOKEN},
+        )
+        cid = r.json().get("id") if r.status_code == 200 else None
+        if not cid:
+            return [], f"Carousel item 생성 실패: {r.text[:200]}"
+        ids.append(cid)
+    # 장별 이미지 처리 대기 — 바로 묶으면 "media not ready" 로 실패한다
+    time.sleep(3 + len(ids))
+    return ids, None
+
+
 def publish(post: SocialPost) -> tuple[str | None, str | None]:
     """Threads에 포스트 발행 (2-step: create container → publish).
 
@@ -65,8 +83,10 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
 
         full_text = _build_text(post)
 
-        # 이미지 URL 확인 — public URL이면 IMAGE 모드
-        has_image = (
+        # 이미지 URL 확인 — public URL이면 IMAGE 모드, 2장 이상이면 카드뉴스(CAROUSEL)
+        slides = [u for u in (getattr(post, "image_urls", None) or [])
+                  if u and u.startswith(("http://", "https://"))][:20]
+        has_image = bool(slides) or bool(
             post.image_url
             and post.image_url.startswith(("http://", "https://"))
         )
@@ -78,9 +98,15 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
                 "access_token": THREADS_ACCESS_TOKEN,
             }
 
-            if has_image:
+            if len(slides) >= 2:
+                children, err = _create_carousel_items(client, slides)
+                if err:
+                    return None, err
+                params["media_type"] = "CAROUSEL"
+                params["children"] = ",".join(children)
+            elif has_image:
                 params["media_type"] = "IMAGE"
-                params["image_url"] = post.image_url
+                params["image_url"] = slides[0] if slides else post.image_url
             else:
                 params["media_type"] = "TEXT"
 
@@ -107,8 +133,8 @@ def publish(post: SocialPost) -> tuple[str | None, str | None]:
             if not container_id:
                 return None, "Container ID 누락"
 
-            # 컨테이너 처리 대기 (이미지일 때 더 오래 대기)
-            time.sleep(5 if has_image else 2)
+            # 컨테이너 처리 대기 (이미지·카드뉴스일 때 더 오래 대기)
+            time.sleep(8 if len(slides) >= 2 else 5 if has_image else 2)
 
             # Step 2: 발행
             publish_resp = client.post(
