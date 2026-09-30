@@ -456,8 +456,8 @@ def render_email(data: dict, lang: str, *, follow: list[str] | None = None,
             rows = f'<div style="font-size:24px;line-height:32px;font-weight:800;color:#fff;">{esc(p["headline"])}</div>' + rows
         n1 = s1.get("number")
         if hero and n1 and n1.get("source"):
-            rows = (f'<div style="font-size:12px;color:#94A3B8;">{esc(n1["value"])} {esc(n1[lang])} · '
-                    f'{esc(t["num_src"])}: {esc(n1["source"])}</div>') + rows
+            rows = (f'<div style="font-size:12px;color:#94A3B8;">{esc(t["num_src"])} ({esc(n1["value"])}): '
+                    f'{esc(n1["source"])}</div>') + rows
         src = sources_line(s1.get("source_names") or [], s1["n_sources"], lang)
         lead_text = (f'<tr><td style="padding:18px 28px 22px;font-family:{FONT};background:{NAVY};">{rows}'
                      f'<div style="margin-top:12px;font-size:13px;color:#94A3B8;">{esc(t["reported"])}: {esc(src)} · '

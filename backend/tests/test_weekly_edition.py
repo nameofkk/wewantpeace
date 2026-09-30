@@ -149,3 +149,10 @@ def test_map_svg_highlights_story_countries():
     svg = R.map_svg(_edition())
     assert svg.startswith("<svg") and svg.count("<circle") == 2
     assert "#F6C9CB" in svg  # 이번 주 기사 나라
+
+
+def test_not_easing_filter():
+    """AI 가 '위협을 주고받는 외교'를 협상·휴전으로 골랐다 (9/30 드라이런) — 제목으로 한 번 더 거른다."""
+    assert E.NOT_EASING_RE.search("Diplomatic efforts intensify as US and Iran trade threats of war")
+    assert not E.NOT_EASING_RE.search("Russia and Ukraine agree prisoner exchange")
+    assert not E.NOT_EASING_RE.search("Ceasefire talks resume in Doha")

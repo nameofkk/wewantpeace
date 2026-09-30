@@ -49,6 +49,10 @@ _CACHE_TTL = 7 * 24 * 3600
 BUSINESS_RE = re.compile(r"\b(contracts?|awards?|awarded|procurement|earnings|revenue|shares|stocks?|IPO|stake)\b", re.I)
 
 
+# 협상·휴전 칸에 넣지 않을 제목 (위협·공격·체포·제재·비난)
+NOT_EASING_RE = re.compile(r"\b(threat\w*|attack\w*|strike\w*|kill\w*|arrest\w*|sanction\w*|accus\w*|warn\w*|missile\w*|war)\b", re.I)
+
+
 def week_key(now: datetime) -> str:
     iso = now.isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
@@ -469,7 +473,9 @@ async def build_edition(db: AsyncSession, now: datetime | None = None, *, use_ai
     if use_ai and stories and story_ok:
         others = easing + also + [c["top"] for c in countries.values() if c["top"]][:30]
         intro, titles_ko, intro_ok, easing_ids = write_intro([s for s in stories if s["ai"]] or stories, others, easing)
-        easing = [e for e in easing if e["cluster_id"] in easing_ids][:EASING_STORIES]
+        # AI 가 '위협을 주고받는 외교' 기사도 완화로 골랐다 (9/30 두 번째 드라이런) — 제목으로 한 번 더 거른다
+        easing = [e for e in easing if e["cluster_id"] in easing_ids
+                  and not NOT_EASING_RE.search(e["en"]["headline"])][:EASING_STORIES]
     else:
         intro = fallback_intro(stories) if stories else {}
         easing = []  # AI 확인 없이는 싣지 않는다
