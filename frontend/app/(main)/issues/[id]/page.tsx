@@ -14,69 +14,59 @@ interface Props {
 const SITE_URL = "https://www.wewantpeace.live";
 const SITE_DESC = "195개국 분쟁·안보 실시간 모니터링 플랫폼";
 
+// 링크 미리보기·검색 메타데이터는 영어가 기본 (2026-09-30).
+// 예전엔 ?lang=en 이 없으면 한국어였고, 스레드 답글 링크(?ref=threads)에 lang 이 없어
+// 해외 사용자(실방문의 90%)가 한국어 제목·이미지를 봤다. 한국어는 ?lang=ko.
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const issue = await fetchIssueServer(params.id);
-  const lang = searchParams.lang === "en" ? "en" : "ko";
-  const isEn = lang === "en";
+  const isKo = searchParams.lang === "ko";
 
   if (!issue) {
+    const d = isKo ? SITE_DESC : "Real-time monitoring of conflicts across 195 countries";
     return {
       title: "WeWantPeace",
-      description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
+      description: d,
       openGraph: {
-        title: "WeWantPeace",
-        description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
-        type: "website",
-        url: SITE_URL,
-        siteName: "WeWantPeace",
-        images: [{ url: `${SITE_URL}/og-image.png?v=4` }],
+        title: "WeWantPeace", description: d, type: "website", url: SITE_URL, siteName: "WeWantPeace",
+        locale: "en_US", images: [{ url: `${SITE_URL}/og-image.png?v=5`, width: 1200, height: 630 }],
       },
-      twitter: {
-        card: "summary_large_image",
-        title: "WeWantPeace",
-        description: isEn ? "Real-time monitoring of conflicts across 195 countries" : SITE_DESC,
-        images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
-      },
+      twitter: { card: "summary_large_image", title: "WeWantPeace", description: d,
+        images: [{ url: `${SITE_URL}/og-image.png?v=5` }] },
     };
   }
 
-  const title = isEn ? (issue.title || issue.title_ko || "Issue") : (issue.title_ko || issue.title || "이슈");
-  const ogTitle = title;
-
-  const langSuffix = isEn ? "?lang=en" : "";
-  const ogImage = `${SITE_URL}/issues/${issue.id}/og${langSuffix}`;
-  const pageUrl = `${SITE_URL}/issues/${issue.id}${langSuffix}`;
-  const severity = issue.severity ?? 0;
-  const eventCount = issue.event_count ?? 0;
-  const desc = isEn
-    ? `Severity ${severity} · ${eventCount} reports · Real-time global conflict monitoring`
-    : `위기지수 ${severity} · ${eventCount}건 보도 · 실시간 세계 분쟁 모니터링`;
-
+  const titleEn = issue.title || issue.title_ko || "Conflict update";
+  const title = isKo ? (issue.title_ko || titleEn) : titleEn;
+  const ogImage = `${SITE_URL}/issues/${issue.id}/og`;
   const canonicalUrl = `${SITE_URL}/issues/${issue.id}`;
+  const sources = new Set(
+    (issue.events || []).filter((e) => (e.source_tier || "D") !== "D" && e.source_name).map((e) => e.source_name),
+  ).size;
+  const eventCount = issue.event_count ?? 0;
+  const descEn = `${sources > 0 ? `${sources} independent sources · ` : ""}${eventCount} reports · Live conflict tracking by WeWantPeace`;
+  const desc = isKo ? `독립 출처 ${sources}곳 · 보도 ${eventCount}건 · 실시간 세계 분쟁 모니터링` : descEn;
 
   return {
     title,
     description: desc,
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        ko: canonicalUrl,
-        en: `${canonicalUrl}?lang=en`,
-        "x-default": canonicalUrl,
-      },
+      languages: { en: canonicalUrl, ko: `${canonicalUrl}?lang=ko`, "x-default": canonicalUrl },
     },
     openGraph: {
-      title: ogTitle,
-      description: desc,
-      type: "website",
+      // 미리보기는 공유되는 곳(스레드 등)이 영어권이라 항상 영어
+      title: titleEn,
+      description: descEn,
+      type: "article",
       url: canonicalUrl,
       siteName: "WeWantPeace",
+      locale: "en_US",
       images: [{ url: ogImage, width: 1200, height: 630, type: "image/png" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: ogTitle,
-      description: desc,
+      title: titleEn,
+      description: descEn,
       images: [{ url: ogImage, width: 1200, height: 630 }],
     },
   };
@@ -93,14 +83,14 @@ export default async function Page({ params }: Props) {
     "@graph": [
       {
         "@type": "NewsArticle",
-        headline: issue.title_ko || issue.title,
-        alternativeHeadline: issue.title || issue.title_ko,
+        headline: issue.title || issue.title_ko,
+        alternativeHeadline: issue.title_ko || issue.title,
         datePublished: issue.first_event_at,
         dateModified: issue.last_event_at,
-        description: `Severity ${issue.severity}/100 crisis. ${issue.event_count} verified source reports. Real-time conflict monitoring by WeWantPeace.`,
+        description: `${issue.event_count} reports. Real-time conflict monitoring by WeWantPeace.`,
         url: pageUrl,
         mainEntityOfPage: pageUrl,
-        inLanguage: ["ko", "en"],
+        inLanguage: ["en", "ko"],
         about: {
           "@type": "Thing",
           name: issue.topic || "Global Conflict",
@@ -129,7 +119,7 @@ export default async function Page({ params }: Props) {
         itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: "https://www.wewantpeace.live" },
           { "@type": "ListItem", position: 2, name: "Issues", item: "https://www.wewantpeace.live/feed" },
-          { "@type": "ListItem", position: 3, name: issue.title_ko || issue.title, item: pageUrl },
+          { "@type": "ListItem", position: 3, name: issue.title || issue.title_ko, item: pageUrl },
         ],
       },
     ],

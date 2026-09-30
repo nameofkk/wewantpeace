@@ -80,6 +80,7 @@ class EventOut(BaseModel):
     source_tier: Optional[str]
     source_name: Optional[str] = None   # 출처 채널/매체명
     source_url: Optional[str] = None    # 원문 링크 (RSS: 기사 URL, Telegram: t.me 링크)
+    image_url: Optional[str] = None     # 기사 사진 — 링크 미리보기(OG) 배경 후보
     event_time: str
     country_code: Optional[str]
     entity_anchor: Optional[str]
@@ -161,6 +162,7 @@ def _event_to_out(
         source_tier=e.source_tier,
         source_name=sc.display_name if sc else None,
         source_url=_build_source_url(raw, sc),
+        image_url=getattr(e, "image_url", None),
         event_time=e.event_time.isoformat(),
         country_code=e.country_code,
         entity_anchor=e.entity_anchor,

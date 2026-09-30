@@ -33,48 +33,48 @@ const COUNTRY_NAMES: Record<string, { ko: string; en: string }> = {
   IQ: { ko: "이라크", en: "Iraq" },
 };
 
+// 링크 미리보기·검색 메타데이터는 영어가 기본 (2026-09-30). 한국어는 ?lang=ko.
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const code = params.code.toUpperCase();
-  const lang = searchParams.lang === "en" ? "en" : "ko";
-  const isEn = lang === "en";
+  const isKo = searchParams.lang === "ko";
   const country = COUNTRY_NAMES[code];
   const nameKo = country?.ko || code;
-  const nameEn = country?.en || code;
+  let nameEn = country?.en || code;
+  if (!country) {
+    try {
+      nameEn = new Intl.DisplayNames(["en"], { type: "region" }).of(code) || code;
+    } catch {
+      /* 코드 그대로 */
+    }
+  }
 
-  const title = isEn ? `${nameEn} Tension Index` : `${nameKo} 긴장도`;
-  const siteDesc = isEn
-    ? "Real-time monitoring of conflicts across 195 countries"
-    : "195개국 분쟁·안보 실시간 모니터링 플랫폼";
-
-  const langSuffix = isEn ? "?lang=en" : "";
-  const ogImage = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}/og${langSuffix}`;
-  const pageUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}${langSuffix}`;
-
+  const titleEn = `${nameEn}: live conflict tracker and weekly brief`;
+  const descEn = `What is happening in ${nameEn} right now, checked against multiple independent sources. Free weekly email brief.`;
+  const title = isKo ? `${nameKo} 긴장도` : titleEn;
+  const desc = isKo ? "195개국 분쟁·안보 실시간 모니터링 플랫폼" : descEn;
   const canonicalUrl = `https://www.wewantpeace.live/issues/country/${code.toLowerCase()}`;
+  const ogImage = `${canonicalUrl}/og`;
 
   return {
     title,
-    description: siteDesc,
+    description: desc,
     alternates: {
       canonical: canonicalUrl,
-      languages: {
-        ko: canonicalUrl,
-        en: `${canonicalUrl}?lang=en`,
-        "x-default": canonicalUrl,
-      },
+      languages: { en: canonicalUrl, ko: `${canonicalUrl}?lang=ko`, "x-default": canonicalUrl },
     },
     openGraph: {
-      title: `${title} | WeWantPeace`,
-      description: siteDesc,
+      title: `${titleEn} | WeWantPeace`,
+      description: descEn,
       type: "website",
       url: canonicalUrl,
       siteName: "WeWantPeace",
+      locale: "en_US",
       images: [{ url: ogImage, width: 1200, height: 630, type: "image/png" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | WeWantPeace`,
-      description: siteDesc,
+      title: `${titleEn} | WeWantPeace`,
+      description: descEn,
       images: [{ url: ogImage, width: 1200, height: 630 }],
     },
   };

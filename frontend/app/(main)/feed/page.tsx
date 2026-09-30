@@ -22,7 +22,11 @@ export const metadata: Metadata = {
     type: "website",
     url: `${SITE_URL}/feed`,
     siteName: "WeWantPeace",
+    locale: "en_US",
+    // openGraph 를 페이지에서 새로 적으면 루트의 이미지가 통째로 사라진다 — 여기서도 넣는다
+    images: [{ url: `${SITE_URL}/og-image.png?v=5`, width: 1200, height: 630 }],
   },
+  twitter: { card: "summary_large_image", images: [`${SITE_URL}/og-image.png?v=5`] },
 };
 
 export default function Page() {

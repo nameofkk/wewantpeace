@@ -34,19 +34,19 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    locale: "ko_KR",
-    alternateLocale: "en_US",
+    locale: "en_US",
+    alternateLocale: "ko_KR",
     url: SITE_URL,
     siteName: "WeWantPeace",
     title: "Live War Map & Conflict Tracker | WeWantPeace",
     description: "Track wars & conflicts in real time across 195 countries. Live map, Tension Index, AI analysis & alerts",
-    images: [{ url: `${SITE_URL}/og-image.png?v=4`, width: 1200, height: 630 }],
+    images: [{ url: `${SITE_URL}/og-image.png?v=5`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Live War Map & Conflict Tracker | WeWantPeace",
     description: "Track wars & conflicts in real time across 195 countries. Live map, Tension Index, AI analysis & alerts",
-    images: [{ url: `${SITE_URL}/og-image-twitter.png?v=4` }],
+    images: [{ url: `${SITE_URL}/og-image.png?v=5` }],
   },
   appleWebApp: {
     capable: true,
@@ -201,7 +201,7 @@ export default function RootLayout({
                     "Multi-source news aggregation (RSS, Telegram)",
                     "Bilingual interface (Korean/English)",
                   ],
-                  "screenshot": "https://www.wewantpeace.live/og-image.png?v=4",
+                  "screenshot": "https://www.wewantpeace.live/og-image.png?v=5",
                   "publisher": {
                     "@id": "https://www.wewantpeace.live/#organization",
                   },

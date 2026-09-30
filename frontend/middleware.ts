@@ -73,7 +73,7 @@ function botHtml(m: typeof META_KO) {
 <meta property="og:type" content="website">
 <meta property="og:title" content="${m.ogTitle}">
 <meta property="og:description" content="${m.ogDesc}">
-<meta property="og:image" content="${SITE}/og-image.png?v=4">
+<meta property="og:image" content="${SITE}/og-image.png?v=5">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="${SITE}">
@@ -83,7 +83,7 @@ function botHtml(m: typeof META_KO) {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${m.ogTitle}">
 <meta name="twitter:description" content="${m.ogDesc}">
-<meta name="twitter:image" content="${SITE}/og-image-twitter.png?v=4">
+<meta name="twitter:image" content="${SITE}/og-image.png?v=5">
 <meta name="google-site-verification" content="LJQ8sx_1VitFQTLo9e3oNys3rRVZdpIWAHuSYZtzrOo">
 <meta name="naver-site-verification" content="ce8b1e250ea44cedcdd2e4383a4d35d1f9252031">
 </head>
