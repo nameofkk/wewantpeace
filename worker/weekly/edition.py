@@ -156,9 +156,10 @@ INTRO_SYSTEM = (
     "You edit a weekly conflict newsletter. Given this week's stories, return a JSON object with keys "
     "en, ko, titles_ko.\n"
     "en and ko are objects with keys: subject, preheader, intro, lines.\n"
-    "- subject: the email subject line. Name the two or three biggest stories concretely, at most 70 "
-    "characters (Korean: at most 32 characters). No clickbait, no questions, no 'BREAKING', no emoji. "
-    "Example: 'West Bank raids, a missile in Hormuz and Ethiopia's new front'.\n"
+    "- subject: the email subject line. Name the two biggest stories concretely, at most 45 characters "
+    "(Korean: at most 22 characters). Shorter subject lines are opened more (beehiiv 2025: 0-20 characters "
+    "37.6% vs 80+ characters 28.7%). No clickbait, no questions, no 'BREAKING', no emoji. "
+    "Example: 'West Bank raids, a missile in Hormuz'.\n"
     "- preheader: one line shown after the subject in the inbox, at most 90 characters (Korean: 45), "
     "saying what the reader gets, e.g. 'Five stories, each confirmed by at least three outlets.'\n"
     "- intro: two short sentences in a calm, human editor's voice that say what defined the week. "
@@ -331,7 +332,7 @@ def write_intro(stories: list[dict], others: list[dict], easing_candidates: list
     if not isinstance(data, dict):
         return fb, {}, False, []
     intro = {}
-    for lang, lim in (("en", (80, 100, 360, 80)), ("ko", (40, 55, 200, 42))):
+    for lang, lim in (("en", (52, 100, 360, 80)), ("ko", (26, 55, 200, 42))):
         part = data.get(lang) or {}
         lines = [B._fit(B._clean(str(x)), lim[3]) for x in (part.get("lines") or []) if str(x).strip()][:3]
         if lang == "ko":
