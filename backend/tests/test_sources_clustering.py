@@ -55,3 +55,13 @@ def test_demonyms_and_institutions_are_not_places():
     assert _places("At least one Palestinian killed across Gaza") == set()
     assert _places("Pentagon and White House officials say") == set()
     assert _places("Strike near Khan Younis") != set()
+
+
+def test_rule_fallback_requires_topic_word_in_title():
+    """AI 한도가 바닥나 규칙 폴백으로 분류될 때, 제목에 그 토픽다운 단어가 없으면 버린다 (10-02 실측 오분류)."""
+    from worker.processor.normalizer import _title_fits_topic as fits
+    assert not fits("Dushanbe forum explores a new digital trade model for Central Asia", "maritime")
+    assert not fits("Wind, rain and frost: what weather to expect in Tajikistan in October", "disaster")
+    assert fits("Russian drone strike hits Kyiv school", "conflict")
+    assert fits("Protesters storm parliament in Nairobi", "protest")
+    assert fits("Death toll from Thailand floods climbs to 23", "disaster")

@@ -2822,6 +2822,32 @@ def _calculate_confidence(tier: str, severity: int) -> float:
 
 # ── 공개 API ─────────────────────────────────────────────────────────────────
 
+_TOPIC_TITLE_WORDS: dict[str, re.Pattern] = {
+    "conflict": re.compile(r"\b(war|wars|strikes?|airstrikes?|attack\w*|missiles?|rockets?|drones?|shell\w*|bomb\w*|troops|soldiers|"
+                           r"military|army|forces|fighting|clash\w*|killed|kills|dead|deaths?|wounded|injured|militants?|rebels?|"
+                           r"offensive|front ?line|ceasefire|truce|invasion|artillery|explosions?|blasts?|gunmen|ambush\w*|raids?)\b", re.I),
+    "terror": re.compile(r"\b(terror\w*|bomb\w*|suicide|militants?|jihadis\w*|extremis\w*|isis|al-shabaab|boko haram|hostages?|"
+                         r"kidnap\w*|attack\w*|gunmen)\b", re.I),
+    "coup": re.compile(r"\b(coup|junta|putsch|overthrow\w*|mutiny|seized power)\b", re.I),
+    "protest": re.compile(r"\b(protest\w*|demonstrat\w*|rall(y|ies)|riots?|unrest|strike|strikers|march(es|ed)?|uprising|"
+                          r"clash\w*|tear gas)\b", re.I),
+    "sanctions": re.compile(r"\b(sanction\w*|embargo\w*|tariffs?|export (ban|controls?)|blacklist\w*|asset freeze)\b", re.I),
+    "cyber": re.compile(r"\b(cyber\w*|hack\w*|ransomware|malware|breach\w*|ddos|phishing|spyware)\b", re.I),
+    "diplomacy": re.compile(r"\b(talks|summit|treaty|negotiat\w*|envoy|ambassador|diplomat\w*|foreign minister|peace|"
+                            r"accord|deal|visit\w*|meets?|meeting|summon\w*|expel\w*|ceasefire|agreement)\b", re.I),
+    "maritime": re.compile(r"\b(ship\w*|vessels?|tankers?|navy|naval|coast guard|maritime|port|strait|sea|piracy|pirates?|"
+                           r"fleet|warships?|seiz\w*)\b", re.I),
+    "disaster": re.compile(r"\b(earthquakes?|quake|floods?|flooding|cyclone|typhoon|hurricane|tsunami|landslides?|wildfires?|"
+                           r"volcan\w*|eruption|storm|drought|famine|evacuat\w*|death toll|disaster)\b", re.I),
+    "health": re.compile(r"\b(outbreak|epidemic|pandemic|cholera|ebola|mpox|measles|virus|disease|infections?|cases)\b", re.I),
+}
+
+
+def _title_fits_topic(title: str, topic: str) -> bool:
+    pat = _TOPIC_TITLE_WORDS.get(topic)
+    return True if pat is None else bool(pat.search(title or ""))
+
+
 def is_relevant(result: "NormalizeResult") -> bool:
     """
     정규화 결과가 서비스에 표시할 가치가 있는지 판단.
@@ -2906,6 +2932,11 @@ def normalize(
                     topic = multilang_topic
             severity = _calculate_severity(text_for_analysis, topic, title=source_title)
             sub_topic = _classify_sub_topic(text_for_analysis, topic)
+            # 규칙 폴백은 본문 어딘가의 단어 하나로 토픽을 정해서 일반 기사가 섞인다 (10-02 지역 매체 92곳 추가 직후
+            # 실측: '디지털 무역 포럼' → maritime, '10월 날씨' → disaster). 제목에 그 토픽다운 단어가 없으면 버린다.
+            if topic != "unknown" and lang in ("en", "unknown") and not _title_fits_topic(title, topic):
+                logger.debug("규칙 폴백 제목 검증 탈락: topic=%s (제목: %s)", topic, title[:60])
+                topic, sub_topic, severity = "unknown", "general", min(severity, 15)
             logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, title[:60])
 
     # 국가코드: AI 우선, 키워드 폴백
