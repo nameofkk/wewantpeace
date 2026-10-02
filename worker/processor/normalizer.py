@@ -2112,6 +2112,36 @@ def _is_rate_limit_error(e: Exception) -> bool:
     return "too many requests" in msg or "429" in msg
 
 
+_GTX_URL = "https://translate.googleapis.com/translate_a/single"
+
+
+def _google_translate(text: str, source: str, target: str) -> Optional[str]:
+    """구글 번역 공개 API(gtx). 실패하면 None, 429 면 차단 키를 건다.
+
+    2026-10-02: 그동안 쓰던 deep_translator(translate.google.com 모바일 페이지 긁기)는 Railway IP 에서
+    'TooManyRequests' 로 상시 막혀 있었고, 그 결과 아랍어·러시아어 채널 기사 221건 중 130건이 제목 번역 없이
+    원문으로 나갔다. 같은 서버에서 gtx 엔드포인트는 정상 응답해서 이걸 1순위로 쓴다.
+    """
+    import httpx
+    try:
+        _translate_pace()
+        resp = httpx.get(_GTX_URL, params={"client": "gtx", "sl": source, "tl": target, "dt": "t", "q": text},
+                         timeout=10.0, headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code == 429:
+            _mark_translate_blocked()
+            logger.warning("번역 레이트리밋(gtx) — %d초간 번역 중단", _TRANSLATE_BLOCK_SECONDS)
+            return None
+        if resp.status_code != 200:
+            logger.warning("번역 실패(gtx %s→%s): HTTP %s", source, target, resp.status_code)
+            return None
+        data = resp.json()
+        out = "".join(seg[0] for seg in (data[0] or []) if seg and seg[0])
+        return out.strip() or None
+    except Exception as e:
+        logger.warning("번역 실패(gtx %s→%s, %d자): %s", source, target, len(text), str(e)[:120])
+        return None
+
+
 def _translate_to_english(text: str, lang: str) -> str:
     """비영어 텍스트를 영어로 번역. 실패(429 포함) 시 원문 반환."""
     if lang in ("en", "unknown"):
@@ -2122,21 +2152,11 @@ def _translate_to_english(text: str, lang: str) -> str:
         return cached
     if _is_translate_blocked():
         return text  # 최근 429 — 시도 자체를 안 해서 낭비/추가 차단 방지
-    try:
-        from deep_translator import GoogleTranslator
-        _translate_pace()
-        translated = GoogleTranslator(source="auto", target="en").translate(chunk)
-        if translated:
-            _translate_cache_store(chunk, "en", translated)
-            return translated
-        return text
-    except Exception as e:
-        if _is_rate_limit_error(e):
-            _mark_translate_blocked()
-            logger.warning("번역 레이트리밋 — %d초간 번역 중단: %s", _TRANSLATE_BLOCK_SECONDS, e)
-        else:
-            logger.warning("번역 실패 (%s→en, %d자): %s", lang, len(text), e)
-        return text
+    translated = _google_translate(chunk, "auto", "en")
+    if translated:
+        _translate_cache_store(chunk, "en", translated)
+        return translated
+    return text
 
 
 def _translate_to_korean(text: str) -> Optional[str]:
@@ -2147,21 +2167,11 @@ def _translate_to_korean(text: str) -> Optional[str]:
         return cached
     if _is_translate_blocked():
         return None
-    try:
-        from deep_translator import GoogleTranslator
-        _translate_pace()
-        result = GoogleTranslator(source="en", target="ko").translate(chunk)
-        if result:
-            _translate_cache_store(chunk, "ko", result)
-            return result
-        return None
-    except Exception as e:
-        if _is_rate_limit_error(e):
-            _mark_translate_blocked()
-            logger.warning("번역 레이트리밋 — %d초간 번역 중단: %s", _TRANSLATE_BLOCK_SECONDS, e)
-        else:
-            logger.warning("한국어 번역 실패 (%d자): %s", len(text), e)
-        return None
+    result = _google_translate(chunk, "en", "ko")
+    if result:
+        _translate_cache_store(chunk, "ko", result)
+        return result
+    return None
 
 
 # 강력한 신호 키워드 (1개만 있어도 topic 분류 확정)
@@ -2962,16 +2972,18 @@ def normalize(
 
     # 한국어 제목: AI 분류 호출에서 함께 받은 번역 우선(구글 번역 레이트리밋 회피),
     # AI가 못 준 경우에만 구글 번역 폴백
-    title_ko = ai_title_ko or _translate_to_korean(title)
+    # 2026-10-02: 버려질 기사(관련 없음)까지 번역하던 호출을 줄인다 — 구글 무료 번역은 호출이 몰리면
+    # IP 단위로 막히고(deep_translator 경로가 상시 차단돼 있었다), 수집처를 157곳으로 늘리며 기사가 크게 늘었다.
+    _keep = topic != "unknown" or severity > 20
+    title_ko = ai_title_ko or (_translate_to_korean(title) if _keep else None)
 
-    # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 AI 요약 우선(구글 번역
-    # 레이트리밋 회피 — 2026-09-16 재확인해도 여전히 막혀있어 title_ko와
-    # 같은 방식으로 격하), 없으면 구글 번역 폴백
+    # 한국어 본문: 원문이 한국어면 직접 저장, 아니면 AI 요약 우선, 없으면 심각도 40 이상만 구글 번역
     body_ko: Optional[str] = None
     if lang == "ko":
         body_ko = raw_text[:2000]
     else:
-        body_ko = ai_body_ko or _translate_to_korean(text_for_analysis[:500])
+        body_ko = ai_body_ko or (_translate_to_korean(text_for_analysis[:500])
+                                 if topic != "unknown" and severity >= 40 else None)
 
     entity_anchor: Optional[str] = country_code
     if not entity_anchor:

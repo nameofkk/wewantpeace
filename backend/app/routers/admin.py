@@ -1116,8 +1116,8 @@ async def update_cluster(
         changes["title_ko"] = body.title_ko
         if body.title is None:
             try:
-                from deep_translator import GoogleTranslator
-                translated = GoogleTranslator(source="ko", target="en").translate(body.title_ko[:200])
+                from worker.processor.normalizer import _google_translate
+                translated = _google_translate(body.title_ko[:200], "ko", "en")
                 if translated:
                     cluster.title = translated[:200]
                     changes["title"] = cluster.title
@@ -1803,8 +1803,8 @@ def _is_junk(title: str) -> bool:
 
 def _translate(title: str) -> str | None:
     try:
-        from deep_translator import GoogleTranslator
-        result = GoogleTranslator(source="en", target="ko").translate(title[:200])
+        from worker.processor.normalizer import _google_translate
+        result = _google_translate(title[:200], "en", "ko")
         return result[:70] if result else None
     except Exception:
         return None

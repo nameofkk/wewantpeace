@@ -65,3 +65,25 @@ def test_rule_fallback_requires_topic_word_in_title():
     assert fits("Russian drone strike hits Kyiv school", "conflict")
     assert fits("Protesters storm parliament in Nairobi", "protest")
     assert fits("Death toll from Thailand floods climbs to 23", "disaster")
+
+
+def test_google_translate_parses_gtx_and_handles_429(monkeypatch):
+    """번역은 gtx 공개 API — 응답 조립, 429 면 차단 키, 실패하면 원문 유지."""
+    import httpx
+    from worker.processor import normalizer as N
+
+    class R:
+        def __init__(self, code, data=None):
+            self.status_code, self._d = code, data
+        def json(self):
+            return self._d
+    monkeypatch.setattr(N, "_translate_pace", lambda: None)
+    monkeypatch.setattr(N, "_translate_cached", lambda *a: None)
+    monkeypatch.setattr(N, "_translate_cache_store", lambda *a: None)
+    monkeypatch.setattr(N, "_is_translate_blocked", lambda: False)
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: R(200, [[["Drone attack ", "x"], ["in Colombia", "y"]], None, "es"]))
+    assert N._translate_to_english("Ataque con drones en Colombia", "es") == "Drone attack in Colombia"
+    marked = []
+    monkeypatch.setattr(N, "_mark_translate_blocked", lambda: marked.append(1))
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: R(429))
+    assert N._translate_to_english("Ataque", "es") == "Ataque" and marked

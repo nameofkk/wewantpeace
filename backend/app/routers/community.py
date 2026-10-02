@@ -26,8 +26,9 @@ router = APIRouter(prefix="/community", tags=["community"])
 def _translate_to_en_sync(text: str) -> str | None:
     """동기 번역 (스레드풀에서 실행)."""
     try:
-        from deep_translator import GoogleTranslator
-        return GoogleTranslator(source="ko", target="en").translate(text[:5000])
+        # deep_translator 경로는 Railway IP 에서 상시 막혀 있다 (2026-10-02) — 워커와 같은 gtx 경로
+        from worker.processor.normalizer import _google_translate
+        return _google_translate(text[:1500], "ko", "en")
     except Exception:
         return None
 
