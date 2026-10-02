@@ -94,7 +94,8 @@ async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
         sa_text(
             """
             SELECT ne.title, ne.body, ne.event_time, ne.source_tier, ne.image_url,
-                   sc.id AS channel_id, sc.display_name
+                   sc.id AS channel_id, sc.display_name,
+                   re.raw_metadata->>'aggregator' AS aggregator, re.raw_metadata->>'domain' AS domain
             FROM cluster_events ce
             JOIN normalized_events ne ON ne.id = ce.event_id
             LEFT JOIN raw_events re ON re.id = ne.raw_event_id
@@ -112,10 +113,15 @@ async def gather_context(db: AsyncSession, cluster, hours: int = 48) -> dict:
     for r in rows:
         if r["channel_id"] is None or (r["source_tier"] or "D") == "D":
             continue
-        rank = tier_rank.get(r["source_tier"], 3)
-        prev = channels.get(r["channel_id"])
+        # GDELT 같은 모음 채널은 채널 하나가 매체 수백 곳이라, 기사마다 붙은 매체 도메인을 따로 센다.
+        # 등급은 확인 안 된 매체라 C 로 본다 (이름 순서에서 우리 RSS 매체보다 뒤).
+        if r["aggregator"] and r["domain"]:
+            key, rank, name = ("dom", r["domain"]), 2, r["domain"]
+        else:
+            key, rank, name = r["channel_id"], tier_rank.get(r["source_tier"], 3), r["display_name"]
+        prev = channels.get(key)
         if prev is None or rank < prev[0]:
-            channels[r["channel_id"]] = (rank, r["display_name"])
+            channels[key] = (rank, name)
     source_names = [name for _, name in sorted(channels.values())]
 
     reports = []

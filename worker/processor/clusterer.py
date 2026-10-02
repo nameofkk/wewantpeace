@@ -990,6 +990,96 @@ def _make_cluster_title_ko(
     return short
 
 
+# ── 장소 충돌 거부권 (2026-10-02) ─────────────────────────────────────────────
+# 제목 단어 유사도만 보면 "killed", "Palestinians", "drone" 같은 흔한 단어를 공유하는 다른 사건이 붙는다
+# (실측: 시리아 쿠네이트라 공습 → 가자 택시 공습, 페오도시야 정유시설 → 오데사, 비시호로드 → 수미).
+# 3일치 2,661건 재현 실험에서 임계값을 올리면 같은 사건도 대거 쪼개졌고(25건 중 15건 오분리),
+# 장소가 서로 다를 때만 막으면 26건만 바뀌고 그중 약 20건이 맞게 갈라졌다(클러스터 수 1,914→1,926).
+# 장소는 normalizer.COUNTRY_MAP 의 도시·지역(좌표가 나라 중심과 다른 항목). 철자가 달라도(Kiev/Kyiv)
+# 좌표가 같으면 같은 곳으로 본다.
+PLACE_VETO_MAX_SIM = 0.35   # 제목이 이만큼 겹치면 장소가 달라도 같은 사건으로 둔다
+PLACE_NEAR_DEG = 0.6        # 위경도 0.6도(약 60km) 안이면 같은 곳
+
+
+# COUNTRY_MAP 에 없는 분쟁 지역 도시·지역 (클러스터링 판정 전용 — 나라 추출에는 안 쓴다). 좌표는 대략값.
+EXTRA_PLACES: dict[str, tuple[float, float]] = {
+    # 가자·서안
+    "gaza city": (31.50, 34.47), "khan younis": (31.35, 34.31), "khan yunis": (31.35, 34.31), "rafah": (31.29, 34.25),
+    "jabalia": (31.53, 34.48), "deir al-balah": (31.42, 34.35), "nuseirat": (31.45, 34.39), "beit lahia": (31.55, 34.50),
+    "jenin": (32.46, 35.30), "nablus": (32.22, 35.26), "hebron": (31.53, 35.10), "ramallah": (31.90, 35.20),
+    "tulkarm": (32.31, 35.03), "jalud": (32.07, 35.36), "halhul": (31.58, 35.10), "bethlehem": (31.70, 35.20),
+    "qalqilya": (32.19, 34.97), "masafer yatta": (31.40, 35.15), "al-aqsa": (31.78, 35.24),
+    # 레바논·시리아
+    "tyre": (33.27, 35.20), "sidon": (33.56, 35.37), "nabatieh": (33.38, 35.48), "baalbek": (34.01, 36.21),
+    "dahiyeh": (33.85, 35.51), "quneitra": (33.13, 35.82), "daraa": (32.62, 36.10), "idlib": (35.93, 36.63),
+    "latakia": (35.52, 35.78), "deir ez-zor": (35.34, 40.14), "raqqa": (35.95, 39.01), "suwayda": (32.71, 36.57),
+    "hasakah": (36.50, 40.75), "qamishli": (37.05, 41.23),
+    # 우크라이나·러시아
+    "sumy": (50.91, 34.80), "kherson": (46.64, 32.62), "mykolaiv": (46.97, 31.99), "dnipro": (48.46, 35.05),
+    "poltava": (49.59, 34.55), "chernihiv": (51.49, 31.29), "vinnytsia": (49.23, 28.47), "zhytomyr": (50.25, 28.66),
+    "lviv": (49.84, 24.03), "rivne": (50.62, 26.25), "lutsk": (50.75, 25.33), "kremenchuk": (49.07, 33.42),
+    "bila tserkva": (49.80, 30.12), "vyshhorod": (50.58, 30.49), "boryspil": (50.35, 30.95), "irpin": (50.52, 30.25),
+    "brovary": (50.51, 30.79), "pavlohrad": (48.53, 35.87), "kryvyi rih": (47.91, 33.39), "nikopol": (47.57, 34.40),
+    "kramatorsk": (48.72, 37.56), "sloviansk": (48.85, 37.60), "pokrovsk": (48.28, 37.18), "kostiantynivka": (48.53, 37.71),
+    "kupiansk": (49.71, 37.62), "uman": (48.75, 30.22), "cherkasy": (49.44, 32.06), "kropyvnytskyi": (48.51, 32.26),
+    "khmelnytskyi": (49.42, 26.99), "ternopil": (49.55, 25.59), "izmail": (45.35, 28.84), "feodosia": (45.03, 35.38),
+    "sevastopol": (44.62, 33.52), "belgorod": (50.60, 36.59), "kursk": (51.73, 36.19), "bryansk": (53.24, 34.37),
+    "novorossiysk": (44.72, 37.77), "tuapse": (44.10, 39.07), "konotop": (51.24, 33.20), "dymer": (50.79, 30.30),
+    "hostomel": (50.57, 30.21), "skvyra": (49.73, 29.66), "vasylkiv": (50.18, 30.32), "ovruch": (51.32, 28.81),
+    # 수단·예멘·아프리카
+    "el fasher": (13.63, 25.35), "omdurman": (15.64, 32.48), "port sudan": (19.62, 37.22), "nyala": (12.05, 24.88),
+    "el obeid": (13.18, 30.22), "sanaa": (15.37, 44.19), "aden": (12.79, 45.02), "hodeidah": (14.80, 42.95),
+    "marib": (15.46, 45.32), "taiz": (13.58, 44.02), "saada": (16.94, 43.76), "mekelle": (13.50, 39.47),
+    "goma": (-1.68, 29.22), "maiduguri": (11.85, 13.16), "mogadishu": (2.05, 45.32), "tripoli": (32.89, 13.19),
+    # 남·동남아시아
+    "peshawar": (34.01, 71.58), "quetta": (30.18, 66.98), "karachi": (24.86, 67.01), "khyber pakhtunkhwa": (34.5, 71.5),
+    "balochistan": (28.5, 65.5), "kandahar": (31.61, 65.71), "paktika": (32.5, 68.8), "khost": (33.34, 69.92),
+    "rakhine": (20.15, 92.90), "sagaing": (21.88, 95.98), "mandalay": (21.97, 96.08), "kashmir": (34.08, 74.80),
+    "manipur": (24.66, 93.91),
+}
+
+
+@lru_cache(maxsize=1)
+def _place_index():
+    from collections import Counter, defaultdict
+    from worker.processor.normalizer import COUNTRY_MAP
+
+    by_cc = defaultdict(Counter)
+    for _k, (cc, la, lo) in COUNTRY_MAP.items():
+        by_cc[cc][(round(la, 1), round(lo, 1))] += 1
+    centroid = {cc: c.most_common(1)[0][0] for cc, c in by_cc.items()}
+    places = {k: (la, lo) for k, (cc, la, lo) in COUNTRY_MAP.items()
+              if (round(la, 1), round(lo, 1)) != centroid[cc] and len(k) >= 4 and re.fullmatch(r"[a-z .'\-]+", k)}
+    # 나라 이름·국민 형용사(palestinian, israeli …)는 장소가 아니다 — 나라 중심 좌표와 달라도 뺀다
+    places = {k: v for k, v in places.items()
+              if _stem_word(k) not in _COUNTRY_STEMS and not re.search(r"(ian|ean|ese|ish|ic|i)$", k)}
+    # 기관·인물·건물 이름이 지명 사전에 섞여 있다 — 같은 사건이라도 '백악관 발표'와 '테헤란 공습'처럼 갈라지면 안 된다
+    for k in ("al-shabaab", "congress", "senate", "federal reserve", "nato", "oval office", "pentagon", "state department",
+              "wall street", "white house", "mar-a-lago", "yoon suk yeol", "yoon suk-yeol", "washington"):
+        places.pop(k, None)
+    places.update(EXTRA_PLACES)
+    pattern = re.compile(r"\b(" + "|".join(sorted(map(re.escape, places), key=len, reverse=True)) + r")\b")
+    return places, pattern
+
+
+def _places(title: str | None) -> set[tuple[float, float]]:
+    places, pattern = _place_index()
+    return {places[m] for m in pattern.findall((title or "").lower())}
+
+
+def places_conflict(event_title: str, cluster_titles: list[str]) -> bool:
+    """사건 제목과 클러스터(제목+최근 기사) 양쪽에 장소가 있는데 가까운 곳이 하나도 없으면 True."""
+    ev = _places(event_title)
+    if not ev:
+        return False
+    cl: set = set()
+    for t in cluster_titles:
+        cl |= _places(t)
+    if not cl:
+        return False
+    return not any(abs(a[0] - b[0]) <= PLACE_NEAR_DEG and abs(a[1] - b[1]) <= PLACE_NEAR_DEG for a in ev for b in cl)
+
+
 def _cluster_key(event: "NormalizedEvent") -> str:
     """
     클러스터 키 생성 전략 (우선순위):
@@ -1053,6 +1143,22 @@ async def assign_cluster(
     candidates = list(result.scalars().all())
     now = datetime.now(timezone.utc)
 
+    # 후보 클러스터마다 최근 기사 제목 8건 (장소 충돌 판정용) — 한 번에 조회
+    recent_titles: dict = {}
+    if candidates and _places(event.title):
+        from sqlalchemy import text as _sa_text
+        rows = (await db.execute(_sa_text(
+            """
+            SELECT cluster_id, title FROM (
+              SELECT ce.cluster_id, ne.title,
+                     row_number() OVER (PARTITION BY ce.cluster_id ORDER BY ne.event_time DESC) AS rn
+              FROM cluster_events ce JOIN normalized_events ne ON ne.id = ce.event_id
+              WHERE ce.cluster_id = ANY(:ids)
+            ) t WHERE rn <= 8
+            """), {"ids": [c.id for c in candidates]})).all()
+        for cid, t in rows:
+            recent_titles.setdefault(cid, []).append(t)
+
     # ── 후보 클러스터 중 최적 매칭 선택 ──────────────────────────────────────
     cluster: IssueCluster | None = None
     best_sim = -1.0
@@ -1095,6 +1201,11 @@ async def assign_cluster(
         threshold = MIN_TITLE_OVERLAP_HIGH_SEV \
             if event.severity >= 50 and cand.severity >= 50 \
             else MIN_TITLE_OVERLAP
+
+        # (2c) 장소 충돌 거부권 — 장소가 다르면 다른 사건 (AI 경계 판정도 건너뜀)
+        if sim < PLACE_VETO_MAX_SIM and places_conflict(event.title, [cand.title] + recent_titles.get(cand.id, [])):
+            logger.debug("장소 충돌로 병합 제외: event=%s / cluster=%s", event.title[:40], cand.title[:40])
+            continue
 
         if sim >= threshold and sim > best_sim:
             best_sim = sim

@@ -221,7 +221,7 @@ def collect_rss(self):
     default_retry_delay=120,
 )
 def collect_gdelt(self):
-    """GDELT DOC API 수집 (15분마다)."""
+    """GDELT GKG 15분 파일 수집 (15분마다) — worker/collector/gdelt_collector.py."""
     _record_heartbeat("collect_gdelt")
 
     async def _run():
@@ -259,6 +259,7 @@ def collect_gdelt(self):
                         await asyncio.sleep(1.0)
                 logger.info("GDELT 수집 완료: 총 %d개 → process_raw_event %d개 트리거", total, len(all_ids))
             else:
+                await db.commit()  # 처리한 15분 파일 표시(last_fetch_cursor)는 0건이어도 남긴다
                 logger.info("GDELT 수집 완료: 총 %d개", total)
             return {"total_collected": total}
 

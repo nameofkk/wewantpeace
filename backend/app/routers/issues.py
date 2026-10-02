@@ -133,7 +133,7 @@ def _build_source_url(raw: Optional[RawEvent], sc: Optional[SourceChannel]) -> O
     """raw_event + source_channel → 원문 URL 생성."""
     if not raw:
         return None
-    if raw.source_type == "rss":
+    if raw.source_type == "rss" or (raw.raw_metadata or {}).get("aggregator"):
         link = (raw.raw_metadata or {}).get("link", "")
         return link if link and link.startswith("http") else None
     if raw.source_type == "telegram":
@@ -160,7 +160,9 @@ def _event_to_out(
         severity=e.severity,
         confidence=round(e.confidence, 3),
         source_tier=e.source_tier,
-        source_name=sc.display_name if sc else None,
+        # GDELT 같은 모음 채널은 기사마다 실제 매체 도메인을 보여 준다 (출처 수도 매체 단위로 센다)
+        source_name=((raw.raw_metadata or {}).get("domain") if raw is not None and (raw.raw_metadata or {}).get("aggregator")
+                     else None) or (sc.display_name if sc else None),
         source_url=_build_source_url(raw, sc),
         image_url=getattr(e, "image_url", None),
         event_time=e.event_time.isoformat(),
