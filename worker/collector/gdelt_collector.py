@@ -242,12 +242,19 @@ class GDELTCollector:
             if not gkg_url:
                 result.errors.append("lastupdate 에 GKG 파일 없음")
                 return result
-            stamp = gkg_url.rsplit("/", 1)[-1].split(".")[0]
-            if source.last_fetch_cursor == stamp:
-                return result  # 이미 처리한 15분 파일
-            resp = await client.get(gkg_url)
-            if resp.status_code != 200:
-                result.errors.append(f"GKG HTTP {resp.status_code}")
+            latest = gkg_url.rsplit("/", 1)[-1].split(".")[0]
+            # lastupdate 에 올라온 직후엔 파일이 아직 없을 때가 있다(10-02 배포 직후 404) → 15분 전 파일로
+            from datetime import timedelta
+            prev = (datetime.strptime(latest, "%Y%m%d%H%M%S") - timedelta(minutes=15)).strftime("%Y%m%d%H%M%S")
+            resp, stamp = None, None
+            for cand in (latest, prev):
+                if source.last_fetch_cursor and cand <= source.last_fetch_cursor:
+                    break  # 이미 처리한 파일
+                r = await client.get(f"http://data.gdeltproject.org/gdeltv2/{cand}.gkg.csv.zip")
+                if r.status_code == 200:
+                    resp, stamp = r, cand
+                    break
+            if resp is None:
                 return result
         with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
             text = zf.read(zf.namelist()[0]).decode("utf-8", "replace")
