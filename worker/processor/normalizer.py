@@ -2944,7 +2944,8 @@ def normalize(
             sub_topic = _classify_sub_topic(text_for_analysis, topic)
             # 규칙 폴백은 본문 어딘가의 단어 하나로 토픽을 정해서 일반 기사가 섞인다 (10-02 지역 매체 92곳 추가 직후
             # 실측: '디지털 무역 포럼' → maritime, '10월 날씨' → disaster). 제목에 그 토픽다운 단어가 없으면 버린다.
-            if topic != "unknown" and lang in ("en", "unknown") and not _title_fits_topic(title, topic):
+            # 번역된 비영어 기사도 제목이 영어라 같은 검사를 한다 (번역 실패분만 제외)
+            if topic != "unknown" and translation_status != "failed" and not _title_fits_topic(title, topic):
                 logger.debug("규칙 폴백 제목 검증 탈락: topic=%s (제목: %s)", topic, title[:60])
                 topic, sub_topic, severity = "unknown", "general", min(severity, 15)
             logger.debug("규칙 폴백: topic=%s, sub=%s, severity=%d (제목: %s)", topic, sub_topic, severity, title[:60])
