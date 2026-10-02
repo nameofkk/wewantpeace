@@ -32,7 +32,10 @@ from backend.app.models.source_channel import SourceChannel
 
 logger = logging.getLogger(__name__)
 
-LASTUPDATE_URL = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
+# data.gdeltproject.org 는 CDN 이라, 파일이 올라오기 전에 요청하면 404 를 한 시간 캐시한다
+# (10-02 실측: Railway 에서 02:30~03:15 GKG 전부 404, 원본 저장소는 200). 원본(GCS)에서 직접 받는다.
+GDELT_BASE = "https://storage.googleapis.com/data.gdeltproject.org/gdeltv2/"
+LASTUPDATE_URL = GDELT_BASE + "lastupdate.txt"
 MAX_PER_RUN = 25
 
 # 분쟁 기사로 확정해 주는 테마 (GKG V1 Themes 필드)
@@ -250,7 +253,7 @@ class GDELTCollector:
             for cand in (latest, prev):
                 if source.last_fetch_cursor and cand <= source.last_fetch_cursor:
                     break  # 이미 처리한 파일
-                r = await client.get(f"http://data.gdeltproject.org/gdeltv2/{cand}.gkg.csv.zip")
+                r = await client.get(f"{GDELT_BASE}{cand}.gkg.csv.zip")
                 if r.status_code == 200:
                     resp, stamp = r, cand
                     break
