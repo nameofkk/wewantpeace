@@ -17,7 +17,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import feedparser
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 
 # 일부 사이트가 feedparser 기본 UA를 차단하므로 브라우저 UA 사용
 feedparser.USER_AGENT = (
@@ -380,9 +381,9 @@ class RSSCollector:
             count = await redis.incr(err_key)
             await redis.expire(err_key, 86400 * 7)  # 7일 TTL
             if count >= self.MAX_CONSECUTIVE_ERRORS:
-                source.is_active = False
-                db.add(source)
-                await db.flush()
+                await db.execute(
+                    update(SourceChannel).where(SourceChannel.id == source.id).values(is_active=False)
+                )
                 await redis.delete(err_key)
                 logger.warning(
                     "RSS 피드 자동 비활성화: %s (%s) — 연속 %d회 에러",
@@ -452,9 +453,9 @@ class RSSCollector:
                     not_found_count = 1
 
             if not_found_count >= 3:
-                source.is_active = False
-                db.add(source)
-                await db.flush()
+                await db.execute(
+                    update(SourceChannel).where(SourceChannel.id == source.id).values(is_active=False)
+                )
                 if redis is not None:
                     try:
                         await redis.delete(not_found_key)
@@ -480,9 +481,9 @@ class RSSCollector:
                 "RSS 피드 URL 자동 갱신: %s — %s → %s",
                 source.display_name, source.feed_url, final_url,
             )
-            source.feed_url = final_url
-            db.add(source)
-            await db.flush()
+            await db.execute(
+                update(SourceChannel).where(SourceChannel.id == source.id).values(feed_url=final_url)
+            )
 
         if parsed.bozo and not parsed.entries:
             result.errors.append(f"피드 오류: {parsed.bozo_exception}")
@@ -499,8 +500,14 @@ class RSSCollector:
         # 정상 수집 도달 → 에러 카운트 초기화
         await self._reset_error_count(redis, source)
 
+        seen_guids: set[str] = set()
         for entry in parsed.entries:
             guid = _compute_guid(entry)
+            # 같은 피드에 같은 글이 두 번 실려 오는 경우 (autoflush 를 꺼서 아래 중복 조회로는 안 잡힌다)
+            if guid in seen_guids:
+                result.skipped += 1
+                continue
+            seen_guids.add(guid)
             text = _extract_text(entry)
             entry_tags = [t.get("term", "") for t in entry.get("tags", [])]
 
@@ -615,19 +622,25 @@ class RSSCollector:
                 async with AsyncSessionLocal() as feed_db:
                     feed_db.autoflush = False
                     result = await self.collect_feed(ch, feed_db, redis=redis)
-                    if result.collected > 0:
-                        try:
-                            await feed_db.flush()
-                            await feed_db.commit()
-                        except Exception as db_err:
-                            await feed_db.rollback()
-                            logger.error(
-                                "RSS 피드 %s DB 저장 실패: %s",
-                                ch_name, db_err,
-                            )
-                            result.errors.append(f"DB 저장 실패: {db_err}")
-                            result.collected = 0
-                            result.raw_event_ids.clear()
+                    try:
+                        await feed_db.flush()
+                        await feed_db.commit()
+                    except IntegrityError:
+                        # 다른 회차가 같은 글을 먼저 넣은 경우 — 통째로 버리지 않고 한 건씩 다시 넣는다
+                        await feed_db.rollback()
+                        saved = await self._save_one_by_one(feed_db, result.raw_event_ids)
+                        result.skipped += result.collected - len(saved)
+                        result.collected = len(saved)
+                        result.raw_event_ids[:] = saved
+                    except Exception as db_err:
+                        await feed_db.rollback()
+                        logger.error(
+                            "RSS 피드 %s DB 저장 실패: %s",
+                            ch_name, db_err,
+                        )
+                        result.errors.append(f"DB 저장 실패: {str(db_err)[:300]}")
+                        result.collected = 0
+                        result.raw_event_ids.clear()
                 logger.info(
                     "RSS 수집 완료: %s (collected=%d, skipped=%d, errors=%s)",
                     ch_name,
@@ -654,6 +667,26 @@ class RSSCollector:
                     redis, snap["id"], "error", 0, 0, str(e),
                 )
         return results
+
+    @staticmethod
+    async def _save_one_by_one(db: AsyncSession, events: list) -> list:
+        """묶음 저장이 중복 키로 실패했을 때 한 건씩 저장. 이미 있는 글만 건너뛴다."""
+        saved = []
+        for old in events:
+            ev = RawEvent(
+                source_channel_id=old.source_channel_id, source_type=old.source_type,
+                external_id=old.external_id, raw_text=old.raw_text, raw_metadata=old.raw_metadata,
+                lang=old.lang, collected_at=old.collected_at,
+            )
+            try:
+                async with db.begin_nested():
+                    db.add(ev)
+                    await db.flush()
+                saved.append(ev)
+            except IntegrityError:
+                continue
+        await db.commit()
+        return saved
 
     @staticmethod
     async def _save_collect_status(

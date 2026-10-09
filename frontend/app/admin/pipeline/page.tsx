@@ -19,6 +19,8 @@ interface PipelineStats {
   total_sources: number;
   active_sources: number;
   error_sources: number;
+  silent_sources: number;
+  new_clusters_24h: number;
   rss_count: number;
   telegram_count: number;
   events_24h: number;
@@ -84,14 +86,23 @@ interface SourceItem {
 /* ─── health helpers ─── */
 type Health = "green" | "yellow" | "red";
 
+// 기준은 "비율"로 본다 — 수집처 240곳·하루 4천 건 규모에서 개수 기준(오류 3곳, 묶음 5개)은 늘 빨강이었다.
+// KScore 알림·긴장도는 세계 정세를 보여 주는 숫자라 파이프라인 고장 신호로 쓰지 않는다.
 function getStageHealth(stats: PipelineStats | undefined, stage: number): Health {
   if (!stats) return "green";
   switch (stage) {
-    case 0: return stats.error_sources > 3 ? "red" : stats.error_sources > 0 ? "yellow" : "green";
-    case 1: return stats.unclassified_rate > 0.1 ? "red" : stats.unclassified_rate > 0.05 ? "yellow" : "green";
+    case 0: {
+      const active = Math.max(1, stats.active_sources || 0);
+      if (stats.error_sources > active * 0.05) return "red";
+      return stats.error_sources > 0 || (stats.silent_sources || 0) > active * 0.15 ? "yellow" : "green";
+    }
+    case 1: return stats.unclassified_rate > 0.35 ? "red" : stats.unclassified_rate > 0.15 ? "yellow" : "green";
     case 2: return "green";
-    case 3: return stats.noise_clusters > 20 ? "red" : stats.noise_clusters > 10 ? "yellow" : "green";
-    case 4: return stats.spike_clusters > 5 ? "red" : stats.spike_clusters > 2 ? "yellow" : "green";
+    case 3: {
+      const noiseRate = stats.noise_clusters / Math.max(1, stats.new_clusters_24h || 0);
+      return noiseRate > 0.05 ? "red" : noiseRate > 0.02 ? "yellow" : "green";
+    }
+    case 4: return "green";
     case 5: {
       // Alert Delivery health
       const totalAlert = (stats.alert_sent_6h || 0) + (stats.alert_failed_6h || 0);
@@ -104,7 +115,7 @@ function getStageHealth(stats: PipelineStats | undefined, stage: number): Health
       return "green";
     }
     case 6: return "green"; // KScore (was 5)
-    case 7: return stats.crisis_countries > 3 ? "red" : stats.crisis_countries > 1 ? "yellow" : "green"; // Tension (was 6)
+    case 7: return "green"; // Tension (was 6)
     case 8: return "green"; // Trending (was 7)
     case 9: return stats.push_tokens === 0 ? "red" : "green"; // Push (was 8)
     case 10: return "green"; // Orphan (was 9)
@@ -410,8 +421,8 @@ export default function AdminPipelinePage() {
           <div className="grid grid-cols-2 gap-2">
             <Pill label={t(lang, "pipeline_active_sources")} value={`${stats?.active_sources ?? 0} / ${stats?.total_sources ?? 0}`} />
             <Pill label={t(lang, "pipeline_error_sources")} value={stats?.error_sources ?? 0} warn={(stats?.error_sources ?? 0) > 0} />
-            <Pill label="RSS" value={stats?.rss_count ?? 0} />
-            <Pill label="Telegram" value={stats?.telegram_count ?? 0} />
+            <Pill label={lang === "ko" ? "24시간 0건" : "Nothing in 24h"} value={stats?.silent_sources ?? 0} warn={(stats?.silent_sources ?? 0) > (stats?.active_sources ?? 0) * 0.15} />
+            <Pill label="RSS / Telegram" value={`${stats?.rss_count ?? 0} / ${stats?.telegram_count ?? 0}`} />
           </div>
           {errorSources.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -440,7 +451,7 @@ export default function AdminPipelinePage() {
         <StageCard index={1} lang={lang} health={getStageHealth(stats, 1)} sectionRef={(el) => (sectionRefs.current[1] = el)}>
           <div className="grid grid-cols-2 gap-2">
             <Pill label={t(lang, "pipeline_events_24h")} value={stats?.events_24h ?? 0} />
-            <Pill label={t(lang, "pipeline_unclassified")} value={`${((stats?.unclassified_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.unclassified_rate ?? 0) > 0.05} />
+            <Pill label={t(lang, "pipeline_unclassified")} value={`${((stats?.unclassified_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.unclassified_rate ?? 0) > 0.15} />
             <Pill label={t(lang, "pipeline_translation_fail")} value={`${((stats?.translation_fail_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.translation_fail_rate ?? 0) > 0.05} />
             <Pill label={t(lang, "pipeline_geo_fail")} value={`${((stats?.geo_fail_rate ?? 0) * 100).toFixed(1)}%`} warn={(stats?.geo_fail_rate ?? 0) > 0.1} />
           </div>
@@ -481,7 +492,7 @@ export default function AdminPipelinePage() {
         <StageCard index={3} lang={lang} health={getStageHealth(stats, 3)} sectionRef={(el) => (sectionRefs.current[3] = el)}>
           <div className="grid grid-cols-3 gap-2">
             <Pill label={t(lang, "pipeline_active_clusters")} value={stats?.active_clusters ?? 0} />
-            <Pill label={t(lang, "pipeline_noise_clusters")} value={stats?.noise_clusters ?? 0} warn={(stats?.noise_clusters ?? 0) > 10} />
+            <Pill label={t(lang, "pipeline_noise_clusters")} value={`${stats?.noise_clusters ?? 0} / ${stats?.new_clusters_24h ?? 0}`} warn={(stats?.noise_clusters ?? 0) > (stats?.new_clusters_24h ?? 0) * 0.02} />
             <Pill label={t(lang, "pipeline_kscore_alert_clusters")} value={stats?.spike_clusters ?? 0} />
           </div>
           {clusters.length > 0 && (
@@ -541,7 +552,7 @@ export default function AdminPipelinePage() {
 
         {/* Stage 4: KScore 알림 */}
         <StageCard index={4} lang={lang} health={getStageHealth(stats, 4)} sectionRef={(el) => (sectionRefs.current[4] = el)}>
-          <Pill label={t(lang, "pipeline_kscore_alert_clusters")} value={stats?.spike_clusters ?? 0} warn={(stats?.spike_clusters ?? 0) > 2} />
+          <Pill label={t(lang, "pipeline_kscore_alert_clusters")} value={stats?.spike_clusters ?? 0} />
           {spikeClusters.length > 0 ? (
             <div className="mt-2 space-y-1">
               {spikeClusters.map((c) => (
@@ -644,7 +655,7 @@ export default function AdminPipelinePage() {
 
         {/* Stage 7: 긴장도 */}
         <StageCard index={7} lang={lang} health={getStageHealth(stats, 7)} sectionRef={(el) => (sectionRefs.current[7] = el)}>
-          <Pill label={t(lang, "pipeline_crisis_countries")} value={stats?.crisis_countries ?? 0} warn={(stats?.crisis_countries ?? 0) > 1} />
+          <Pill label={t(lang, "pipeline_crisis_countries")} value={stats?.crisis_countries ?? 0} />
           {tensions.length > 0 && (
             <div className="mt-2 space-y-1">
               <p className="text-[10px] text-muted-foreground">{t(lang, "pipeline_top5_tension")}</p>

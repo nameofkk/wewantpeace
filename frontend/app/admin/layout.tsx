@@ -70,7 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/partners", icon: Handshake, labelKey: "admin_partners" },
       { href: "/admin/links", icon: Link2, labelKey: "admin_links" },
-      { href: "/admin/newsletter", icon: Newspaper, labelKey: "admin_newsletter" },
+      { href: "/admin/weekly", icon: Newspaper, labelKey: "admin_newsletter" },
       { href: "/admin/guide", icon: BookOpen, labelKey: "admin_guide" },
       { href: "/admin/social", icon: Share2, labelKey: "admin_social" },
     ],

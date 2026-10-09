@@ -247,3 +247,17 @@ def test_polish_ko_retries_leftover_tells(monkeypatch):
     assert data["stories"][1]["ko"]["why"] == "교전이 이어져 피란민이 늘었어요."
     assert rep["_retry"]["s1.why"]["accepted"] is True
     assert data["stories"][2]["ko"]["why"] == "공습이 잦아졌어요. 학교가 문을 닫았어요."  # 두 문장으로 끊기는 허용
+
+
+def test_user_lang_reason_matches_decision():
+    """관리자 화면의 '그 언어로 보내는 이유'는 발송기가 실제로 고른 언어와 같은 순서로 판정한다."""
+    from worker.weekly.send import decide_user_lang, user_lang_reason
+    cases = [
+        ("괴짜피스", None, "ko", False, "ko", "hangul_name"),
+        ("Ardak", None, "en", False, "en", "pref_en"),
+        ("Minsoo Kim", None, "ko", False, "en", "default"),
+        ("Travo", None, "ko", True, "ko", "chosen"),
+    ]
+    for nick, disp, pref, explicit, lang, reason in cases:
+        assert decide_user_lang(nick, disp, pref, explicit=explicit) == lang
+        assert user_lang_reason(nick, disp, pref, explicit=explicit) == reason

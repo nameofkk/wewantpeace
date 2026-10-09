@@ -33,6 +33,8 @@ interface SourceItem {
   is_active: boolean;
   created_at: string;
   collect_status: CollectStatus | null;
+  events_24h: number;
+  last_event_at: string | null;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -82,10 +84,13 @@ function catLabel(lang: Lang, cat: string): string {
   return t(lang, key) || cat.toUpperCase();
 }
 
-function StatusDot({ status }: { status: CollectStatus | null }) {
-  if (!status) return <span className="text-gray-500" title="Idle">&#9679;</span>;
-  if (status.status === "ok") return <span className="text-green-400" title="OK">&#9679;</span>;
-  return <span className="text-red-400" title="Error">&#9679;</span>;
+// 빨강 = 수집 오류, 노랑 = 접속은 되는데 24시간 동안 0건, 초록 = 24시간 안에 기사가 들어옴, 회색 = 꺼짐
+function StatusDot({ ch, lang }: { ch: SourceItem; lang: Lang }) {
+  const ko = lang === "ko";
+  if (!ch.is_active) return <span className="text-gray-500" title={ko ? "꺼짐" : "Off"}>&#9679;</span>;
+  if (ch.collect_status?.status === "error") return <span className="text-red-400" title={ko ? "수집 오류" : "Error"}>&#9679;</span>;
+  if (ch.events_24h > 0) return <span className="text-green-400" title={ko ? `24시간 ${ch.events_24h}건` : `${ch.events_24h} in 24h`}>&#9679;</span>;
+  return <span className="text-yellow-400" title={ko ? "24시간 동안 0건" : "Nothing in 24h"}>&#9679;</span>;
 }
 
 // 비활성 사유 추정
@@ -115,9 +120,10 @@ export default function AdminSourcesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const { data, isLoading } = useQuery<{ total: number; active_count: number; inactive_count: number; items: SourceItem[] }>({
-    queryKey: ["admin-sources", page, typeFilter, tierFilter, activeFilter],
+  const { data, isLoading } = useQuery<{ total: number; active_count: number; inactive_count: number; error_count: number; silent_count: number; items: SourceItem[] }>({
+    queryKey: ["admin-sources", page, typeFilter, tierFilter, activeFilter, statusFilter],
     queryFn: async () => {
       if (!user) throw new Error("Unauthorized");
       const token = await user.getIdToken();
@@ -125,6 +131,7 @@ export default function AdminSourcesPage() {
       if (typeFilter) params.append("source_type", typeFilter);
       if (tierFilter) params.append("tier", tierFilter);
       if (activeFilter) params.append("is_active", activeFilter);
+      if (statusFilter) params.append("status", statusFilter);
       const res = await fetch(`${API_BASE}/admin/sources?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -167,7 +174,7 @@ export default function AdminSourcesPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
         <div className="rounded-xl border border-border bg-card p-3 text-center">
           <p className="text-2xl font-bold">{activeCount + inactiveCount}</p>
           <p className="text-xs text-muted-foreground">{lang === "ko" ? "전체 소스" : "Total"}</p>
@@ -180,12 +187,22 @@ export default function AdminSourcesPage() {
           <p className="text-2xl font-bold text-red-400">{inactiveCount}</p>
           <p className="text-xs text-muted-foreground">{t(lang, "admin_source_inactive_count")}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3 text-center">
-          <p className="text-2xl font-bold text-blue-400">
-            {data?.items.filter(i => i.collect_status?.status === "error").length ?? 0}
-          </p>
-          <p className="text-xs text-muted-foreground">{t(lang, "admin_source_status_error")}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter(statusFilter === "error" ? "" : "error"); setPage(1); }}
+          className={cn("rounded-xl border bg-card p-3 text-center", statusFilter === "error" ? "border-red-400" : "border-border")}
+        >
+          <p className="text-2xl font-bold text-red-400">{data?.error_count ?? 0}</p>
+          <p className="text-xs text-muted-foreground">{lang === "ko" ? "수집 오류" : "Collect errors"}</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter(statusFilter === "silent" ? "" : "silent"); setPage(1); }}
+          className={cn("rounded-xl border bg-card p-3 text-center", statusFilter === "silent" ? "border-yellow-400" : "border-border")}
+        >
+          <p className="text-2xl font-bold text-yellow-400">{data?.silent_count ?? 0}</p>
+          <p className="text-xs text-muted-foreground">{lang === "ko" ? "24시간 0건" : "Nothing in 24h"}</p>
+        </button>
       </div>
 
       {/* Filters */}
@@ -273,6 +290,7 @@ export default function AdminSourcesPage() {
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_confidence")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_topics")}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_last_collected")}</th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{lang === "ko" ? "24시간" : "24h"}</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{t(lang, "admin_source_error")}</th>
                   <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">{t(lang, "admin_source_active_toggle")}</th>
                 </tr>
@@ -286,7 +304,7 @@ export default function AdminSourcesPage() {
                     <tr key={ch.id} className={cn("hover:bg-secondary/20", !ch.is_active && "opacity-50")}>
                       {/* 상태 dot */}
                       <td className="px-3 py-3 text-center text-sm">
-                        <StatusDot status={ch.is_active ? cs : null} />
+                        <StatusDot ch={ch} lang={lang} />
                       </td>
                       {/* 채널명 */}
                       <td className="px-3 py-3 max-w-[220px]">
@@ -388,6 +406,21 @@ export default function AdminSourcesPage() {
                           <span className="ml-1 text-green-400 text-[10px]">({cs.collected}/{cs.skipped})</span>
                         )}
                       </td>
+                      {/* 24시간 실제 수집 건수 (0건이면 마지막으로 들어온 날) */}
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">
+                        {ch.events_24h > 0 ? (
+                          <span>{ch.events_24h}</span>
+                        ) : (
+                          <span className={ch.is_active ? "text-yellow-400" : "text-muted-foreground"}>
+                            0
+                            <span className="block text-[10px] text-muted-foreground">
+                              {ch.last_event_at
+                                ? new Date(ch.last_event_at).toLocaleDateString(locale, { month: "short", day: "numeric" })
+                                : (lang === "ko" ? "14일 넘게 없음" : "none in 14d")}
+                            </span>
+                          </span>
+                        )}
+                      </td>
                       {/* 오류 */}
                       <td className="px-3 py-3 max-w-[150px]">
                         {cs?.error ? (
@@ -431,7 +464,7 @@ export default function AdminSourcesPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <StatusDot status={ch.is_active ? cs : null} />
+                        <StatusDot ch={ch} lang={lang} />
                         <p className="text-sm font-medium truncate">{ch.display_name}</p>
                       </div>
                       <p className="text-[10px] text-muted-foreground truncate mt-0.5">
@@ -496,6 +529,9 @@ export default function AdminSourcesPage() {
                       </p>
                     </div>
                   </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {lang === "ko" ? "24시간 수집" : "Collected in 24h"}: <span className={ch.events_24h > 0 ? "text-foreground" : "text-yellow-400"}>{ch.events_24h}</span>
+                  </p>
                   {cs?.error && <p className="mt-2 text-[10px] text-red-400 truncate">{cs.error}</p>}
                 </div>
               );

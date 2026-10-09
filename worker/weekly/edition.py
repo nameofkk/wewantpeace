@@ -595,6 +595,9 @@ async def save_edition(db: AsyncSession, data: dict):
     else:
         row.data = data
         row.status = status
+        # latest_edition 이 created_at 으로 "이번 호"를 찾는다 — 주중에 수동으로 먼저 만든 호를 일요일에 다시 만들면
+        # 날짜가 옛것으로 남아 발송기가 호를 못 찾았다
+        row.created_at = datetime.now(timezone.utc)
     await db.flush()
     return row
 

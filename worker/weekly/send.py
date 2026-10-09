@@ -36,12 +36,26 @@ class Recipient:
     kind: str                       # "user" | "subscriber"
     token: str                      # 수신거부·언어 바꾸기 토큰
     follow: list[str] = field(default_factory=list)
+    # 아래는 관리자 화면용 (발송에는 쓰지 않는다)
+    name: str = ""
+    since: datetime | None = None   # 회원=마케팅 동의 시각, 구독자=확인(또는 신청) 시각
+    lang_reason: str = ""           # chosen | hangul_name | pref_en | default | subscriber
 
 
 def user_token(user_id) -> str:
     """backend/app/routers/newsletter.py _generate_token 과 같은 값 (수신거부 페이지가 이걸로 찾는다)."""
     from backend.app.core.config import settings
     return hmac.new(settings.secret_key.encode(), str(user_id).encode(), sha256).hexdigest()[:32]
+
+
+def user_lang_reason(nickname: str | None, display_name: str | None, pref_lang: str | None,
+                     explicit: bool = False) -> str:
+    """decide_user_lang 이 그 언어를 고른 근거 (같은 순서로 판정)."""
+    if explicit and pref_lang in ("ko", "en"):
+        return "chosen"
+    if re.search(r"[가-힣]", f"{nickname or ''} {display_name or ''}"):
+        return "hangul_name"
+    return "pref_en" if pref_lang == "en" else "default"
 
 
 def decide_user_lang(nickname: str | None, display_name: str | None, pref_lang: str | None,
@@ -82,6 +96,9 @@ async def collect_recipients(db: AsyncSession) -> list[Recipient]:
             lang=decide_user_lang(user.nickname, user.display_name, pref.language if pref else None,
                                   explicit=str(user.id) in chosen),
             follow=areas.get(user.id, [])[:3],
+            name=user.nickname or user.display_name or "", since=user.marketing_agreed_at,
+            lang_reason=user_lang_reason(user.nickname, user.display_name, pref.language if pref else None,
+                                         explicit=str(user.id) in chosen),
         )
     for sub in (await db.execute(select(BriefSubscriber).where(BriefSubscriber.status == "active"))).scalars():
         email = sub.email.strip().lower()
@@ -91,7 +108,8 @@ async def collect_recipients(db: AsyncSession) -> list[Recipient]:
             r.follow = list(dict.fromkeys((sub.countries or []) + r.follow))[:3]
             continue
         out[email] = Recipient(email=email, kind="subscriber", token=sub.token,
-                               lang="ko" if sub.lang == "ko" else "en", follow=(sub.countries or [])[:3])
+                               lang="ko" if sub.lang == "ko" else "en", follow=(sub.countries or [])[:3],
+                               since=sub.confirmed_at or sub.created_at, lang_reason="subscriber")
     return list(out.values())
 
 

@@ -355,12 +355,7 @@ async def get_stats(
     )).scalar() or 0
 
     # 위기 국가 수 (tension_level=3)
-    crisis_countries_q = await db.execute(
-        select(TensionIndex.country_code)
-        .where(TensionIndex.tension_level == 3)
-        .group_by(TensionIndex.country_code)
-    )
-    crisis_countries = len(crisis_countries_q.all())
+    crisis_countries = await _current_crisis_countries(db)
 
     # 활성 푸시 토큰 수
     push_tokens = (await db.execute(
@@ -1505,13 +1500,37 @@ async def list_sources(
     source_type: Optional[str] = Query(None),
     tier: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
+    status: Optional[str] = Query(None, pattern="^(error|silent)$"),
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """소스 채널 목록 + Redis 수집 상태."""
+    """소스 채널 목록 + Redis 수집 상태. status=error(수집 오류) | silent(24시간 0건) 로 거를 수 있다."""
     import json as _json
 
+    # 채널별 실제 수집량 — 접속 성공(초록)인데 기사가 안 들어오는 곳을 가려낸다
+    activity: dict[int, dict] = {}
+    error_ids: set[int] = set()
+    silent_ids: set[int] = set()
+    try:
+        activity = await _source_activity(db)
+        day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        act_rows = (await db.execute(
+            select(SourceChannel.id, SourceChannel.created_at).where(SourceChannel.is_active == True)  # noqa: E712
+        )).all()
+        silent_ids = {
+            sid for sid, created in act_rows
+            if created < day_ago and not activity.get(sid, {}).get("events_24h")
+        }
+        if act_rows:
+            vals = await get_redis().mget([f"collect:status:{sid}" for sid, _ in act_rows])
+            error_ids = {sid for (sid, _), val in zip(act_rows, vals)
+                         if val and _json.loads(val).get("status") == "error"}
+    except Exception as e:
+        logger.debug("admin: %s", e)
+
     q = select(SourceChannel)
+    if status:
+        q = q.where(SourceChannel.id.in_((error_ids if status == "error" else silent_ids) or {-1}))
     if source_type:
         q = q.where(SourceChannel.source_type == source_type)
     if tier:
@@ -1550,6 +1569,8 @@ async def list_sources(
         "total": total,
         "active_count": active_count,
         "inactive_count": inactive_count,
+        "error_count": len(error_ids),
+        "silent_count": len(silent_ids),
         "items": [
             {
                 "id": ch.id,
@@ -1567,6 +1588,9 @@ async def list_sources(
                 "is_active": ch.is_active,
                 "created_at": ch.created_at.isoformat(),
                 "collect_status": collect_statuses.get(ch.id),
+                "events_24h": activity.get(ch.id, {}).get("events_24h", 0),
+                "last_event_at": (activity[ch.id]["last_event_at"].isoformat()
+                                  if activity.get(ch.id, {}).get("last_event_at") else None),
             }
             for ch in channels
         ],
@@ -2135,6 +2159,32 @@ async def list_email_logs(
     }
 
 
+async def _current_crisis_countries(db: AsyncSession) -> int:
+    """지금 위기(tension_level=3)인 나라 수 — 나라별 최근 24시간의 마지막 값만 본다.
+    예전엔 과거 이력 전체에서 한 번이라도 3이었던 나라를 다 세서 147개로 나왔다."""
+    try:
+        return (await db.execute(text(
+            "SELECT COUNT(*) FROM ("
+            " SELECT DISTINCT ON (country_code) country_code, tension_level FROM tension_index"
+            " WHERE time >= NOW() - INTERVAL '24 hours' ORDER BY country_code, time DESC"
+            ") t WHERE tension_level = 3"
+        ))).scalar() or 0
+    except Exception as e:
+        logger.debug("admin: %s", e)
+        return 0
+
+
+async def _source_activity(db: AsyncSession) -> dict[int, dict]:
+    """채널별 최근 24시간 수집 건수와 마지막 수집 시각 (최근 14일 안)."""
+    rows = await db.execute(text(
+        "SELECT source_channel_id, COUNT(*) FILTER (WHERE collected_at >= NOW() - INTERVAL '24 hours'),"
+        " MAX(collected_at) FROM raw_events"
+        " WHERE source_channel_id IS NOT NULL AND collected_at >= NOW() - INTERVAL '14 days'"
+        " GROUP BY source_channel_id"
+    ))
+    return {r[0]: {"events_24h": r[1], "last_event_at": r[2]} for r in rows.fetchall()}
+
+
 # ── 파이프라인 통합 통계 ──────────────────────────────────────────────────────
 
 @router.get("/pipeline/stats")
@@ -2171,6 +2221,18 @@ async def pipeline_stats(
                     st = _json.loads(val)
                     if st.get("status") == "error":
                         error_sources += 1
+    except Exception as e:
+        logger.debug("admin: %s", e)
+
+    # 접속은 되는데 24시간 동안 한 건도 안 들어온 소스
+    silent_sources = 0
+    try:
+        silent_sources = (await db.execute(text(
+            "SELECT COUNT(*) FROM source_channels s WHERE s.is_active"
+            " AND s.created_at < NOW() - INTERVAL '24 hours'"
+            " AND NOT EXISTS (SELECT 1 FROM raw_events e WHERE e.source_channel_id = s.id"
+            " AND e.collected_at >= NOW() - INTERVAL '24 hours')"
+        ))).scalar() or 0
     except Exception as e:
         logger.debug("admin: %s", e)
 
@@ -2232,13 +2294,19 @@ async def pipeline_stats(
     active_clusters = (await db.execute(
         select(func.count()).select_from(IssueCluster).where(IssueCluster.severity > 0)
     )).scalar() or 0
+    # 아래 셋은 최근 24시간 기준 — 예전엔 기간 조건이 없어 지금까지 쌓인 걸 전부 셌다
+    new_clusters_24h = (await db.execute(
+        select(func.count()).select_from(IssueCluster).where(IssueCluster.created_at >= cutoff_24h)
+    )).scalar() or 0
     noise_clusters = (await db.execute(
-        select(func.count()).select_from(IssueCluster).where(IssueCluster.severity == 0)
+        select(func.count()).select_from(IssueCluster)
+        .where(IssueCluster.severity == 0, IssueCluster.created_at >= cutoff_24h)
     )).scalar() or 0
     # v7: spike_clusters → high_kscore_clusters (KScore >= 5.0)
     spike_clusters = (await db.execute(
         select(func.count()).select_from(IssueCluster)
-        .where(IssueCluster.severity > 0, IssueCluster.kscore >= 5.0)
+        .where(IssueCluster.severity > 0, IssueCluster.kscore >= 5.0,
+               IssueCluster.is_active == True, IssueCluster.last_event_at >= cutoff_24h)  # noqa: E712
     )).scalar() or 0
 
     # 6) 푸시 토큰 통계
@@ -2255,12 +2323,7 @@ async def pipeline_stats(
     push_ios = platform_map.get("ios", 0)
 
     # 7) 위기 국가
-    crisis_q = await db.execute(
-        select(TensionIndex.country_code)
-        .where(TensionIndex.tension_level == 3)
-        .group_by(TensionIndex.country_code)
-    )
-    crisis_countries = len(crisis_q.all())
+    crisis_countries = await _current_crisis_countries(db)
 
     # ── alert delivery 통계 (최근 6시간) ──
     alert_sent_6h = 0
@@ -2340,6 +2403,8 @@ async def pipeline_stats(
         "total_sources": total_sources,
         "active_sources": active_sources,
         "error_sources": error_sources,
+        "silent_sources": silent_sources,
+        "new_clusters_24h": new_clusters_24h,
         "rss_count": rss_count,
         "telegram_count": telegram_count,
         "events_24h": events_24h,
@@ -3915,6 +3980,71 @@ async def send_weekly_report_all(
         send_weekly_edition.apply_async(args=[lang], kwargs={"force": True}, queue="process")
     await _log_action(db, admin, "weekly_report_send", detail={"week": row.week_key, "queued": True})
     return {"status": "queued", "sent": 0, "failed": 0, "week": row.week_key}
+
+
+@router.get("/weekly-report/recipients")
+async def weekly_report_recipients(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """주간 브리핑을 실제로 받게 되는 사람 목록 — 발송기(collect_recipients)와 같은 함수로 뽑는다."""
+    from backend.app.models.brief_subscriber import BriefSubscriber
+    from worker.weekly.edition import latest_edition
+    from worker.weekly.send import collect_recipients
+
+    recipients = await collect_recipients(db)
+    sub_rows = (await db.execute(
+        select(BriefSubscriber.status, func.count()).group_by(BriefSubscriber.status)
+    )).all()
+    subs = {status: cnt for status, cnt in sub_rows}
+
+    auto_send = False
+    try:
+        redis = get_redis()
+        auto_send = (await redis.get("newsletter:auto_send")) != "0"
+    except Exception as e:
+        logger.debug("admin: %s", e)
+
+    edition = None
+    row = await latest_edition(db)
+    if row is not None:
+        d = row.data or {}
+        edition = {
+            "week": row.week_key, "status": row.status,
+            "generated_at": d.get("generated_at") or row.created_at.isoformat(),
+            "stories": len(d.get("stories") or []),
+            "sent_ko_at": row.sent_ko_at.isoformat() if row.sent_ko_at else None,
+            "sent_en_at": row.sent_en_at.isoformat() if row.sent_en_at else None,
+        }
+
+    logs = (await db.execute(
+        select(MarketingEmailLog).where(MarketingEmailLog.subject.like("WeWantPeace Weekly %"))
+        .order_by(MarketingEmailLog.created_at.desc()).limit(20)
+    )).scalars().all()
+
+    items = list(recipients)
+    items.sort(key=lambda r: r.since or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return {
+        "total": len(recipients),
+        "ko": sum(1 for r in recipients if r.lang == "ko"),
+        "en": sum(1 for r in recipients if r.lang != "ko"),
+        "members": sum(1 for r in recipients if r.kind == "user"),
+        "subscribers": sum(1 for r in recipients if r.kind == "subscriber"),
+        "brief_signups": {"active": subs.get("active", 0), "pending": subs.get("pending", 0),
+                          "unsubscribed": subs.get("unsubscribed", 0)},
+        "auto_send": auto_send,
+        "edition": edition,
+        "history": [
+            {"id": str(l.id), "subject": l.subject, "sent": l.sent_count, "failed": l.failed_count,
+             "status": l.status, "created_at": l.created_at.isoformat()}
+            for l in logs
+        ],
+        "items": [
+            {"email": r.email, "name": r.name, "kind": r.kind, "lang": r.lang, "lang_reason": r.lang_reason,
+             "follow": r.follow, "since": r.since.isoformat() if r.since else None}
+            for r in items
+        ],
+    }
 
 
 @router.get("/weekly-report/history")

@@ -41,6 +41,9 @@ interface AdminStats {
 }
 
 interface PipelineStats {
+  active_sources: number;
+  silent_sources: number;
+  new_clusters_24h: number;
   error_sources: number;
   unclassified_rate: number;
   noise_clusters: number;
@@ -52,17 +55,26 @@ interface PipelineStats {
 const LEVEL_COLORS = ["#22c55e", "#eab308", "#f97316", "#ef4444"];
 
 /* ── health logic (같은 로직을 파이프라인과 공유) ── */
+// 기준은 "비율"로 본다 — 수집처 240곳·하루 4천 건 규모에서 개수 기준(오류 3곳, 묶음 5개)은 늘 빨강이었다.
+// KScore 알림·긴장도는 세계 정세를 보여 주는 숫자라 파이프라인 고장 신호로 쓰지 않는다.
 type Health = "green" | "yellow" | "red";
 function stageHealth(ps: PipelineStats | undefined, stage: number): Health {
   if (!ps) return "green";
   switch (stage) {
-    case 0: return ps.error_sources > 3 ? "red" : ps.error_sources > 0 ? "yellow" : "green";
-    case 1: return ps.unclassified_rate > 0.1 ? "red" : ps.unclassified_rate > 0.05 ? "yellow" : "green";
+    case 0: {
+      const active = Math.max(1, ps.active_sources || 0);
+      if (ps.error_sources > active * 0.05) return "red";
+      return ps.error_sources > 0 || (ps.silent_sources || 0) > active * 0.15 ? "yellow" : "green";
+    }
+    case 1: return ps.unclassified_rate > 0.35 ? "red" : ps.unclassified_rate > 0.15 ? "yellow" : "green";
     case 2: return "green";
-    case 3: return ps.noise_clusters > 20 ? "red" : ps.noise_clusters > 10 ? "yellow" : "green";
-    case 4: return ps.spike_clusters > 5 ? "red" : ps.spike_clusters > 2 ? "yellow" : "green";
+    case 3: {
+      const noiseRate = ps.noise_clusters / Math.max(1, ps.new_clusters_24h || 0);
+      return noiseRate > 0.05 ? "red" : noiseRate > 0.02 ? "yellow" : "green";
+    }
+    case 4: return "green";
     case 5: return "green";
-    case 6: return ps.crisis_countries > 3 ? "red" : ps.crisis_countries > 1 ? "yellow" : "green";
+    case 6: return "green";
     case 7: return "green";
     case 8: return ps.push_tokens === 0 ? "red" : "green";
     case 9: return "green";
