@@ -1626,7 +1626,7 @@ def sync_store_subscriptions(self):
     Webhook 누락 대비: Google/Apple API로 직접 구독 상태를 재확인.
     """
     async def _run():
-        from sqlalchemy import select
+        from sqlalchemy import select, or_
         from backend.app.models.subscription import Subscription
         from backend.app.models.user import User
 
@@ -1640,7 +1640,8 @@ def sync_store_subscriptions(self):
                 result = await db.execute(
                     select(Subscription).where(
                         Subscription.platform.in_(["android", "ios"]),
-                        Subscription.status.in_(["active", "grace_period", "billing_retry"]),
+                        Subscription.status.in_(["active", "trial", "cancelled", "grace_period", "billing_retry"]),
+                        or_(Subscription.expires_at.is_(None), Subscription.expires_at > now - timedelta(days=3)),
                     )
                 )
                 subs = result.scalars().all()
@@ -1669,6 +1670,18 @@ def sync_store_subscriptions(self):
                                 if state == "SUBSCRIPTION_STATE_EXPIRED":
                                     sub.status = "expired"
                                     sub.auto_renewing = False
+                                elif state == "SUBSCRIPTION_STATE_CANCELED":
+                                    # 자동 갱신만 끈 상태 — 만료일까지 유효 (예전엔 여기서 만료로 바꿔 결제 손님 권한을 뺏었다)
+                                    sub.status = "cancelled"
+                                    sub.auto_renewing = False
+                                    if not sub.cancelled_at:
+                                        try:
+                                            sub.cancelled_at = datetime.fromisoformat(
+                                                verify_result["cancel_time"].replace("Z", "+00:00"))
+                                        except (KeyError, ValueError, AttributeError):
+                                            sub.cancelled_at = now
+                                elif state == "SUBSCRIPTION_STATE_ACTIVE" and verify_result.get("in_free_trial"):
+                                    sub.status = "trial"
                                 elif state == "SUBSCRIPTION_STATE_IN_GRACE_PERIOD":
                                     sub.status = "grace_period"
                                 elif state == "SUBSCRIPTION_STATE_ON_HOLD":
@@ -1708,6 +1721,16 @@ def sync_store_subscriptions(self):
 
                         sub.updated_at = now
                         synced += 1
+
+                        # 스토어가 유효하다고 하는데 회원이 무료로 내려가 있으면 되돌린다 (잘못 만료시킨 결제 손님 자가 복구)
+                        if sub.status in ("active", "trial", "cancelled", "grace_period", "billing_retry")                                 and (not sub.expires_at or sub.expires_at > now):
+                            owner = (await db.execute(select(User).where(User.id == sub.user_id))).scalar_one_or_none()
+                            if owner and owner.plan == "free":
+                                owner.plan = sub.plan
+                                from backend.app.services.area_activation import sync_area_activation
+                                await sync_area_activation(owner.id, sub.plan, db)
+                                logger.warning("sync_store_subscriptions: 유효한 스토어 구독인데 무료였던 회원 복구 user=%s plan=%s",
+                                               owner.id, sub.plan)
 
                         # 만료된 구독의 사용자 플랜 다운그레이드
                         if sub.status in ("expired",) and (not sub.expires_at or sub.expires_at <= now):
@@ -1833,11 +1856,14 @@ def expire_subscriptions(self):
                             downgraded += 1
 
                 # Trial 만료 처리: status='trial' AND trial_end <= now
+                # 스토어(구글·애플) 체험은 빼고 sync_store_subscriptions 가 스토어 상태로 정한다 — 체험이 끝나 유료로
+                # 넘어간 손님을 갱신 알림이 늦었다는 이유로 만료시키지 않으려고
                 trial_expired_result = await db.execute(
                     select(Subscription).where(
                         Subscription.status == "trial",
                         Subscription.trial_end.isnot(None),
                         Subscription.trial_end <= now,
+                        Subscription.platform.notin_(["android", "ios"]),
                     )
                 )
                 trial_expired = 0

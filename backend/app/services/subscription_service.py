@@ -196,8 +196,14 @@ async def activate_store_subscription(
     auto_renewing: bool,
     raw_response: dict,
     db: AsyncSession,
+    is_trial: bool = False,
+    canceled: bool = False,
 ) -> Subscription:
-    """스토어 IAP 구독 활성화 (Google/Apple 공통)."""
+    """스토어 IAP 구독 활성화 (Google/Apple 공통).
+
+    is_trial: 스토어 무료 체험 기간 — 돈이 안 나갔으니 결제로 적지 않는다(예전엔 체험 시작을 $6.99 결제로 적었다).
+    canceled: 이미 자동 갱신을 끈 구독(복원 등) — 만료일까지는 쓸 수 있는 cancelled 로 둔다.
+    """
     # 상품 → 플랜 매핑
     if platform == "android":
         plan = google_product_to_plan(product_id)
@@ -228,10 +234,11 @@ async def activate_store_subscription(
         ).order_by(Subscription.created_at.desc()).limit(1)
     )
     existing_sub = existing_result.scalar_one_or_none()
+    status = "cancelled" if canceled else ("trial" if is_trial else "active")
 
     if existing_sub:
         # 기존 구독 갱신 (플랜 변경 포함)
-        existing_sub.status = "active"
+        existing_sub.status = status
         existing_sub.plan = plan
         existing_sub.store_product_id = product_id
         existing_sub.store_transaction_id = transaction_id
@@ -249,7 +256,7 @@ async def activate_store_subscription(
         sub = Subscription(
             user_id=user_id,
             plan=plan,
-            status="active",
+            status=status,
             platform=platform,
             store_product_id=product_id,
             store_transaction_id=transaction_id,
@@ -259,6 +266,8 @@ async def activate_store_subscription(
             started_at=now,
             expires_at=expires_at,
             next_billing_at=expires_at,
+            trial_start=now if is_trial else None,
+            trial_end=expires_at if is_trial else None,
         )
         db.add(sub)
         # 결제 기록 전에 flush해서 sub.id를 채운다.
@@ -267,16 +276,18 @@ async def activate_store_subscription(
         await db.flush()
 
     # 결제 기록 (verify 재시도/웹훅 경합에도 멱등 — 같은 거래 중복이면 조용히 건너뜀)
-    await _record_payment_idempotent(
-        db,
-        user_id=user_id,
-        subscription_id=sub.id,
-        amount=amount,
-        status="success",
-        platform=platform,
-        pg_transaction_id=transaction_id,
-        pg_response=raw_response,
-    )
+    # 무료 체험은 돈이 안 나갔다 — 체험이 끝나 첫 결제가 되면 RENEWED 알림에서 적힌다
+    if not is_trial:
+        await _record_payment_idempotent(
+            db,
+            user_id=user_id,
+            subscription_id=sub.id,
+            amount=amount,
+            status="success",
+            platform=platform,
+            pg_transaction_id=transaction_id,
+            pg_response=raw_response,
+        )
 
     # User.plan 업데이트
     user_result = await db.execute(select(User).where(User.id == user_id))
@@ -285,9 +296,10 @@ async def activate_store_subscription(
         user.plan = plan
         await sync_area_activation(user_id, plan, db)
 
-    # 퍼널 계측: 유료전환 (최초 1회)
-    from backend.app.services.funnel import log_funnel_event, EV_PAID
-    await log_funnel_event(db, EV_PAID, user_id, props={"plan": plan, "platform": platform}, once=True)
+    # 퍼널 계측: 유료전환 (최초 1회) — 무료 체험 시작은 유료전환이 아니다
+    if not is_trial:
+        from backend.app.services.funnel import log_funnel_event, EV_PAID
+        await log_funnel_event(db, EV_PAID, user_id, props={"plan": plan, "platform": platform}, once=True)
 
     await db.flush()
     return sub
@@ -353,6 +365,15 @@ async def handle_store_event(
         # 퍼널 계측: 유료전환 (최초 1회 — 갱신은 중복 적재 안 됨)
         from backend.app.services.funnel import log_funnel_event, EV_PAID
         await log_funnel_event(db, EV_PAID, sub.user_id, props={"plan": sub.plan, "platform": platform}, once=True)
+
+    elif event_type == "CANCELED" and expires_at and expires_at > now:
+        # 구글 SUBSCRIPTION_CANCELED = 자동 갱신을 껐다. 이미 낸 기간(expires_at)까지는 그대로 쓴다.
+        # 만료일이 지나면 EXPIRED 알림이나 sync_store_subscriptions 가 만료 처리한다.
+        sub.status = "cancelled"
+        sub.auto_renewing = False
+        sub.cancelled_at = now
+        sub.updated_at = now
+        sub.expires_at = expires_at
 
     elif event_type in ("CANCELED", "EXPIRED", "DID_FAIL_TO_RENEW", "REVOKE",
                          "SUBSCRIPTION_STATE_EXPIRED", "SUBSCRIPTION_STATE_REVOKED"):

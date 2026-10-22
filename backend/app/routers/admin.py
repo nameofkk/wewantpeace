@@ -70,15 +70,32 @@ _IS_PROMO_SUB = and_(Subscription.platform.like("promo:%"), Subscription.amount 
 
 
 def _active_not_expired(now: datetime):
-    """status='active'이고 아직 만료 안 된 구독을 거르는 조건.
+    """지금 돈을 낸 기간 안에 있는 구독을 거르는 조건.
 
-    status가 'active'여도 expires_at이 지난 좀비 구독은 뺀다.
-    expires_at이 NULL이면 만료 시각 자체가 안 잡힌 구독이라 유효한 걸로 본다(예: 만료 없는 web).
+    active 뿐 아니라 해지 예약(cancelled: 자동 갱신만 끔, 만료일까지 유효)·유예·결제 재시도도 센다.
+    2026-10-10 Pro+ 손님이 결제 2분 뒤 자동 갱신을 껐는데 active 만 세서 유료 구독 0 으로 보였다.
+    expires_at 이 지난 좀비 구독은 뺀다. NULL 이면 만료 시각이 없는 구독(예: web)이라 유효로 본다.
     """
     return and_(
-        Subscription.status == "active",
+        or_(
+            Subscription.status.in_(["active", "grace_period", "billing_retry"]),
+            # 만료일이 비정상적으로 먼 해지 구독(예: 2045년으로 찍힌 옛 웹 결제)은 세지 않는다
+            and_(Subscription.status == "cancelled", Subscription.expires_at.isnot(None),
+                 Subscription.expires_at < now + timedelta(days=400)),
+        ),
         or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
     )
+
+
+def _store_charged(pg_response) -> tuple[str | None, int | None]:
+    """구글이 실제로 청구한 통화·금액(최소 단위). 우리 금액표(USD)와 달리 손님 나라 통화다."""
+    try:
+        price = ((pg_response or {}).get("lineItems") or [{}])[0].get("autoRenewingPlan", {}).get("recurringPrice") or {}
+        if not price.get("currencyCode"):
+            return None, None
+        return price["currencyCode"], int(price.get("units", 0)) * 100 + round(int(price.get("nanos", 0)) / 10_000_000)
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return None, None
 
 
 def _dau_query(today_start: datetime):
@@ -911,6 +928,59 @@ async def list_subscriptions(
             for u, s in rows
         ],
     }
+
+
+@router.get("/payments")
+async def list_payments(
+    page: int = Query(1, ge=1),
+    platform: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, max_length=120),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """결제 내역 — 구독 상태와 상관없이 실제 결제(앱·웹)를 전부 보여 준다.
+
+    구독 목록(/subscriptions)은 '지금 유료 플랜인 회원'만 보여서, 결제했지만 만료·해지된 손님은 어드민
+    어디에도 안 보였다(2026-10-10 Pro+ 앱 결제).
+    """
+    stmt = (
+        select(PaymentHistory, User, Subscription)
+        .join(User, User.id == PaymentHistory.user_id)
+        .outerjoin(Subscription, Subscription.id == PaymentHistory.subscription_id)
+    )
+    if platform:
+        stmt = stmt.where(PaymentHistory.platform == platform)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(User.email.ilike(like), User.nickname.ilike(like), PaymentHistory.pg_transaction_id.ilike(like)))
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
+    rows = (await db.execute(
+        stmt.order_by(PaymentHistory.created_at.desc()).offset((page - 1) * 20).limit(20)
+    )).all()
+    platforms = [r[0] for r in (await db.execute(select(PaymentHistory.platform).distinct())).all()]
+    items = []
+    for p, u, s in rows:
+        # 무료 체험(0원)은 다음 결제 예정가가 실려 있어도 청구액이 아니다
+        cur, amt = _store_charged(p.pg_response) if p.amount else (None, None)
+        items.append({
+            "id": str(p.id),
+            "paid_at": p.created_at.isoformat(),
+            "email": u.email,
+            "nickname": u.nickname,
+            "user_plan": u.plan,
+            "platform": p.platform,
+            "status": p.status,
+            "amount": p.amount,
+            "currency": p.currency,
+            "charged_currency": cur,
+            "charged_amount": amt,
+            "order_id": p.pg_transaction_id,
+            "plan": s.plan if s else None,
+            "sub_status": s.status if s else None,
+            "expires_at": s.expires_at.isoformat() if s and s.expires_at else None,
+            "auto_renewing": s.auto_renewing if s else None,
+        })
+    return {"total": total, "platforms": sorted(platforms), "items": items}
 
 
 # ── 앱 설정 ──────────────────────────────────────────────────────────────────

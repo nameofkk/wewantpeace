@@ -98,6 +98,8 @@ async def google_verify(
         auto_renewing=result.get("auto_renewing", True),
         raw_response=result.get("raw", {}),
         db=db,
+        is_trial=bool(result.get("in_free_trial")),
+        canceled=bool(result.get("canceled")),
     )
 
     slog.info(

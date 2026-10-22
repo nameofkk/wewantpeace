@@ -8,6 +8,7 @@ import { Loader2, CreditCard, HelpCircle, ChevronDown } from "lucide-react";
 import { cn, formatMoneyFromCents } from "@/lib/utils";
 import { useAdminStore, API_BASE } from "@/lib/admin-utils";
 import { useAdminToast } from "@/components/ui/admin-toast";
+import PaymentsTable from "./payments-table";
 
 interface SubscriptionItem {
   id: string;
@@ -368,6 +369,8 @@ export default function AdminSubscriptionsPage() {
           </button>
         </div>
       )}
+
+      <PaymentsTable />
     </div>
   );
 }

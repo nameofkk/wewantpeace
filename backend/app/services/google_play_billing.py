@@ -72,11 +72,33 @@ async def verify_subscription(
         "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
     )
 
+    # CANCELED 는 "자동 갱신을 끔"이지 만료가 아니다 — 이미 낸 기간(expiryTime)까지는 써야 한다.
+    # 예전엔 valid=False 로 봐서 2026-10-10 Pro+ 결제(EUR 10.99)를 결제 2시간 뒤 만료 처리했다.
+    canceled_but_paid = False
+    if subscription_state == "SUBSCRIPTION_STATE_CANCELED" and expiry_time:
+        try:
+            from datetime import datetime, timezone
+            canceled_but_paid = datetime.fromisoformat(expiry_time.replace("Z", "+00:00")) > datetime.now(timezone.utc)
+        except (ValueError, AttributeError):
+            canceled_but_paid = False
+    item = line_items[0] if line_items else {}
+    offer_id = ((item.get("offerDetails") or {}).get("offerId") or "").lower()
+    # 지금 체험 기간인가: offerPhase 가 있으면 그걸 따르고, 없으면 "체험 혜택으로 산 첫 주기"(갱신 주문 번호 ..N 이 아직 없음)로 본다.
+    # offerId 는 체험이 끝나 유료로 넘어간 뒤에도 그대로 남아서 그것만 보면 유료 손님을 체험으로 잘못 센다.
+    if item.get("offerPhase"):
+        in_free_trial = "freeTrial" in item["offerPhase"]
+    else:
+        in_free_trial = "trial" in offer_id and ".." not in order_id
+    cancel_time = ((result.get("canceledStateContext") or {}).get("userInitiatedCancellation") or {}).get("cancelTime", "")
+
     return {
         "valid": subscription_state in (
             "SUBSCRIPTION_STATE_ACTIVE",
             "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
-        ),
+        ) or canceled_but_paid,
+        "canceled": subscription_state == "SUBSCRIPTION_STATE_CANCELED",
+        "cancel_time": cancel_time,
+        "in_free_trial": in_free_trial,
         "product_id": product_id,
         "expiry_time": expiry_time,
         "auto_renewing": auto_renewing,
