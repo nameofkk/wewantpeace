@@ -1737,6 +1737,12 @@ def sync_store_subscriptions(self):
 
                         sub.updated_at = now
                         synced += 1
+                        # 손님별 갱신 상태를 운영자가 로그로 확인할 수 있게 남긴다 (DB 직접 접속이 어려운 환경용)
+                        logger.info(
+                            "sync_store_subscriptions: sub=%s user=%s platform=%s plan=%s status=%s auto_renewing=%s expires_at=%s",
+                            sub.id, sub.user_id, sub.platform, sub.plan, sub.status, sub.auto_renewing,
+                            sub.expires_at.isoformat() if sub.expires_at else None,
+                        )
 
                         # 스토어가 유효하다고 하는데 회원이 무료로 내려가 있으면 되돌린다 (잘못 만료시킨 결제 손님 자가 복구)
                         if sub.status in ("active", "trial", "cancelled", "grace_period", "billing_retry")                                 and (not sub.expires_at or sub.expires_at > now):
