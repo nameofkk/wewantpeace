@@ -306,7 +306,7 @@ def _ai_same_event(
                     mark_rate_limited(min(_wait, 900.0))
                 elif provider == "gemini":
                     from worker.ai_config import mark_gemini_rate_limited
-                    mark_gemini_rate_limited(60.0)
+                    mark_gemini_rate_limited(60.0, _exc_str)
                 elif provider == "openai" and ("insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str):
                     from worker.ai_config import mark_openai_unavailable
                     mark_openai_unavailable(3600.0)

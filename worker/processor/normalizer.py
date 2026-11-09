@@ -274,9 +274,13 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
 
     user_text = f"Title: {title[:200]}\n\nBody: {body[:500]}"
 
-    provider = _get_ai_provider()
+    # Gemini 는 묶음 분류 몫으로 아낀다 (하루 500회 — 1건씩 쓰면 하루 물량의 8%)
+    from worker.ai_config import get_single_provider, get_client_for, get_model_for
+    provider = get_single_provider()
+    if provider is None:
+        return None
     try:
-        client = _get_ai_client(timeout=30.0)
+        client = get_client_for(provider, timeout=30.0)
         _extra_kwargs = {}
         if provider == "gemini":
             # gemini-3.5-flash-lite는 reasoning_effort="none"을 거부한다(400,
@@ -284,7 +288,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
             # (completion 45~108 토큰, Groq 200~730 대비 훨씬 안정적).
             _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
-            model=_get_ai_model(),
+            model=get_model_for(provider),
             messages=[
                 {"role": "system", "content": _AI_CLASSIFY_PROMPT},
                 {"role": "user", "content": user_text},
@@ -351,7 +355,7 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
                     _m = re.search(r"retry in ([\d.]+)s", _exc_str)
                     if _m:
                         _wait = float(_m.group(1)) + 5
-                    mark_gemini_rate_limited(_wait)
+                    mark_gemini_rate_limited(_wait, _exc_str)
                 elif provider == "openai":
                     if "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
                         # 크레딧 소진은 재시도로 절대 안 풀린다. 예전에는 이걸 일반 429로
@@ -470,7 +474,7 @@ def _classify_batch_with_ai(
                     _m = re.search(r"retry in ([\d.]+)s", _exc_str)
                     if _m:
                         _wait = float(_m.group(1)) + 5
-                    mark_gemini_rate_limited(_wait)
+                    mark_gemini_rate_limited(_wait, _exc_str)
                 elif provider == "openai" and ("insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str):
                     from worker.ai_config import mark_openai_unavailable
                     mark_openai_unavailable(3600.0)

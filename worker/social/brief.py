@@ -342,7 +342,7 @@ def _call_shared(system: str, user: str) -> dict | None:
                     wait = int(mm.group(1)) * 60 + float(mm.group(2)) + 30
                 mark_rate_limited(min(wait, 900.0))
             elif provider == "gemini":
-                mark_gemini_rate_limited(60.0)
+                mark_gemini_rate_limited(60.0, str(exc))
             logger.warning("브리프 AI 429 (%s) — 다음 제공자로 재시도", provider)
         except Exception:
             logger.exception("브리프 AI 호출 실패 (%s)", provider)

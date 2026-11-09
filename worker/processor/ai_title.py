@@ -218,7 +218,7 @@ def generate_ai_title(
                     _mark_rate_limited(_wait)
                 elif provider == "gemini":
                     from worker.ai_config import mark_gemini_rate_limited
-                    mark_gemini_rate_limited(60.0)
+                    mark_gemini_rate_limited(60.0, _exc_str)
                 elif provider == "openai":
                     if "insufficient_quota" in _exc_str or "exceeded your current quota" in _exc_str:
                         from worker.ai_config import mark_openai_unavailable

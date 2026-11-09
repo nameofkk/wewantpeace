@@ -69,3 +69,19 @@ def test_batch_prefers_gemini(monkeypatch):
     monkeypatch.setattr(ai_config, "is_gemini_rate_limited", lambda: True)
     monkeypatch.setattr(ai_config, "get_current_provider", lambda: "groq")
     assert ai_config.get_batch_provider() == "groq"
+
+
+def test_gemini_daily_quota_blocks_until_reset(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(ai_config, "mark_gemini_unavailable", lambda s: seen.setdefault("s", s))
+    ai_config.mark_gemini_rate_limited(60.0, "quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    assert 60 <= seen["s"] <= 25 * 3600
+
+
+def test_single_call_never_uses_gemini(monkeypatch):
+    monkeypatch.setitem(ai_config._PROVIDER_CONFIGURED, "groq", lambda: True)
+    monkeypatch.setitem(ai_config._PROVIDER_CONFIGURED, "openai", lambda: False)
+    monkeypatch.setitem(ai_config._PROVIDER_BLOCKED, "groq", lambda: True)
+    assert ai_config.get_single_provider() is None
+    monkeypatch.setitem(ai_config._PROVIDER_BLOCKED, "groq", lambda: False)
+    assert ai_config.get_single_provider() == "groq"

@@ -187,8 +187,24 @@ _GEMINI_UNAVAILABLE_KEY = "ai:gemini_unavailable"
 _mem_gemini_unavailable_until: float = 0.0
 
 
-def mark_gemini_rate_limited(retry_after_seconds: float = 60.0) -> None:
-    """Gemini 429 발생 시 호출 — 일시 차단 (Groq 서킷 브레이커와 동일 패턴)."""
+def seconds_until_gemini_daily_reset() -> float:
+    """Gemini 무료 일일 한도는 미국 태평양 자정에 초기화된다 (한국시간 16~17시)."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    nxt = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(60.0, (nxt - now).total_seconds() + 120)
+
+
+def mark_gemini_rate_limited(retry_after_seconds: float = 60.0, error_text: str = "") -> None:
+    """Gemini 429 발생 시 호출 — 일시 차단 (Groq 서킷 브레이커와 동일 패턴).
+
+    error_text 에 일일 한도(GenerateRequestsPerDay...) 초과가 보이면 초기화 시각까지 배제한다.
+    2026-11-09 실측: 하루 500회를 다 쓴 뒤에도 60초마다 다시 불러 429 만 받고 있었다.
+    """
+    if "PerDay" in (error_text or ""):
+        mark_gemini_unavailable(seconds_until_gemini_daily_reset())
+        return
     ttl = int(retry_after_seconds) + 15
     global _mem_gemini_rate_blocked_until
     _mem_gemini_rate_blocked_until = time.monotonic() + retry_after_seconds
@@ -327,3 +343,11 @@ def get_client_for(provider: str, timeout: float = 30.0):
 def get_model_for(provider: str) -> str:
     return _PROVIDER_MODEL.get(provider, _OPENAI_MODEL)
 
+
+def get_single_provider():
+    """기사 1건짜리 분류용 제공자. Gemini 는 하루 500회라 묶음 분류(get_batch_provider) 몫으로 남기고
+    Groq·OpenAI 만 쓴다. 둘 다 막혀 있으면 None — 호출하지 않고 바로 키워드 폴백."""
+    for p in ("groq", "openai"):
+        if _PROVIDER_CONFIGURED[p]() and not _PROVIDER_BLOCKED[p]():
+            return p
+    return None
