@@ -23,6 +23,8 @@ class _FakeRedis:
 
 def _setup(monkeypatch):
     r = _FakeRedis()
+    monkeypatch.setattr(ai_config, "is_gemini_unavailable", lambda: False)
+    monkeypatch.setattr(ai_config, "gemini_rate_block_remaining", lambda: 0.0)
     monkeypatch.setattr(ai_config, "_get_redis_sync", lambda: r)
     monkeypatch.setattr(nz, "_ai_available", lambda: True)
     monkeypatch.setattr(nz, "_translate_to_english", lambda t, lang: t)
@@ -67,8 +69,7 @@ def test_batch_prefers_gemini(monkeypatch):
     monkeypatch.setattr(ai_config, "is_gemini_unavailable", lambda: False)
     assert ai_config.get_batch_provider() == "gemini"
     monkeypatch.setattr(ai_config, "is_gemini_rate_limited", lambda: True)
-    monkeypatch.setattr(ai_config, "get_current_provider", lambda: "groq")
-    assert ai_config.get_batch_provider() == "groq"
+    assert ai_config.get_batch_provider() is None  # 묶음은 Groq 로 넘기지 않는다
 
 
 def test_gemini_daily_quota_blocks_until_reset(monkeypatch):
@@ -85,3 +86,20 @@ def test_single_call_never_uses_gemini(monkeypatch):
     assert ai_config.get_single_provider() is None
     monkeypatch.setitem(ai_config._PROVIDER_BLOCKED, "groq", lambda: False)
     assert ai_config.get_single_provider() == "groq"
+
+
+def test_prefetch_waits_out_gemini_minute_block(monkeypatch):
+    _setup(monkeypatch)
+    blocks = iter([30.0, 0.0])
+    slept = []
+    monkeypatch.setattr(ai_config, "gemini_rate_block_remaining", lambda: next(blocks, 0.0))
+    import time
+    monkeypatch.setattr(time, "sleep", lambda s: slept.append(s))
+    calls = []
+    def fake_batch(items):
+        calls.append(len(items))
+        return [("conflict", "airstrike", 70, "UA", "제목", "본문") for _ in items]
+    monkeypatch.setattr(nz, "_classify_batch_with_ai", fake_batch)
+    items = [(f"Drone strike hits Odesa port facility overnight {i}", f"Drone strike Odesa {i}") for i in range(10)]
+    assert nz.prefetch_ai_classification(items) == 10
+    assert slept and slept[0] >= 30

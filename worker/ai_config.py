@@ -325,11 +325,24 @@ except Exception:
 
 
 def get_batch_provider():
-    """묶음 분류용 제공자. Gemini 를 먼저 쓴다 — 무료 한도가 요청 '횟수'(하루 500)라 10건을 한 콜에
-    묶으면 그대로 10배가 되지만, Groq 는 분당 8,000 토큰이라 10건 묶음(~9,000 토큰)이 한 콜에 안 들어간다."""
+    """묶음 분류용 제공자. Gemini 만 쓴다 — 무료 한도가 요청 '횟수'(하루 500)라 10건을 한 콜에
+    묶으면 그대로 10배가 되지만, Groq 는 분당 8,000 토큰이라 10건 묶음(~9,000 토큰)이 한 콜에 안 들어간다
+    (2026-11-09 실측: Gemini 가 1분 막힌 사이 Groq 로 넘긴 묶음은 전부 429)."""
     if USE_GEMINI and not (is_gemini_rate_limited() or is_gemini_unavailable()):
         return "gemini"
-    return get_current_provider()
+    return None
+
+
+def gemini_rate_block_remaining() -> float:
+    """Gemini 분당 한도 차단이 풀릴 때까지 남은 초 (차단 아니면 0)."""
+    rem = max(0.0, _mem_gemini_rate_blocked_until - time.monotonic())
+    try:
+        ttl = _get_redis_sync().ttl(_GEMINI_RATE_BLOCK_KEY)
+        if ttl and ttl > 0:
+            rem = max(rem, float(ttl))
+    except Exception:
+        pass
+    return rem
 
 
 def get_client_for(provider: str, timeout: float = 30.0):

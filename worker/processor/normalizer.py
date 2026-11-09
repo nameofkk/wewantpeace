@@ -2996,12 +2996,28 @@ def prefetch_ai_classification(items: list[tuple[str, Optional[str]]]) -> int:
         seen.add(key)
         todo.append((title, text_for_analysis))
 
+    import time as _time
+    from worker.ai_config import is_gemini_unavailable, gemini_rate_block_remaining
     stored = 0
+    waited = 0.0
     for start in range(0, len(todo), AI_PREFETCH_CHUNK):
         chunk = todo[start:start + AI_PREFETCH_CHUNK]
-        results = _classify_batch_with_ai(chunk)
+        results = None
+        for _attempt in range(3):
+            if is_gemini_unavailable():
+                break  # 하루 한도 소진 — 초기화까지 기다릴 수 없다
+            # 다른 기능(이슈 묶기·제목)이 몰아 쓰면 Gemini 가 분당 한도로 1분 막힌다 — 풀릴 때까지 기다린다
+            rem = gemini_rate_block_remaining()
+            if rem > 0:
+                if waited + rem > 240:
+                    break
+                _time.sleep(rem + 1)
+                waited += rem + 1
+            results = _classify_batch_with_ai(chunk)
+            if results is not None:
+                break
         if results is None:
-            # 한도 초과·파싱 실패 — 남은 묶음도 같은 이유로 실패할 가능성이 커서 멈춘다
+            # 하루 한도·파싱 실패 등 — 남은 묶음도 같은 이유로 실패할 가능성이 커서 멈춘다
             break
         for (title, body), res in zip(chunk, results):
             if res is not None:
