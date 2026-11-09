@@ -105,10 +105,15 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('wewantpeace-release.keystore')
-            storePassword '111111'
-            keyAlias 'wewantpeace'
-            keyPassword '111111'
+            // 업로드 키는 저장소에 두지 않는다 (공개 저장소라 그대로 노출된다).
+            // ~/.gradle/gradle.properties 에 WWP_UPLOAD_STORE_FILE(절대경로)·WWP_UPLOAD_STORE_PASSWORD·
+            // WWP_UPLOAD_KEY_ALIAS·WWP_UPLOAD_KEY_PASSWORD 를 넣는다.
+            if (project.hasProperty('WWP_UPLOAD_STORE_FILE')) {
+                storeFile file(WWP_UPLOAD_STORE_FILE)
+                storePassword WWP_UPLOAD_STORE_PASSWORD
+                keyAlias WWP_UPLOAD_KEY_ALIAS
+                keyPassword WWP_UPLOAD_KEY_PASSWORD
+            }
         }
     }
     buildTypes {

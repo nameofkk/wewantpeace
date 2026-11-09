@@ -21,7 +21,7 @@ git push
 - DB: **Railway Postgres** (같은 Railway 프로젝트의 `Postgres` 서비스, 내부망 `postgres.railway.internal` 전용 — 외부 공개 주소 없음). Redis 도 Railway.
   - Supabase `smxitufpgfuzepldglfo` 는 이관 전 옛 DB (INACTIVE) — 조회하지 말 것
   - 운영 데이터 확인: `railway logs -s worker` / `railway logs -s backend`, 또는 `railway ssh -s Postgres` (22번 포트가 열린 환경에서만)
-- Google Play 업로드 키: `mobile/android/app/wewantpeace-release.keystore` (RSA). `signing-key.jks`(EC)는 Play 가 받지 않는다
+- Google Play 업로드 키: 저장소 밖에 보관 (빌드 시 ~/.gradle/gradle.properties 의 WWP_UPLOAD_*). 옛 키(wewantpeace-release.keystore, signing-key.jks)는 공개 저장소 기록에 노출돼 2026-11 재설정 요청
 
 ## railway.json 주의사항
 - `railway.json`은 **backend** 서비스용으로 유지 (`Dockerfile.backend`)

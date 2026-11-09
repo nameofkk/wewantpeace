@@ -53,10 +53,13 @@ def twaManifest = [
 android {
     signingConfigs {
         release {
-            storeFile file('../signing-key.jks')
-            storePassword 'wewantpeace2024'
-            keyAlias 'wewantpeace'
-            keyPassword 'wewantpeace2024'
+            // 옛 TWA 빌드용. 키·비밀번호는 저장소에 두지 않는다 (~/.gradle/gradle.properties 의 WWP_UPLOAD_*)
+            if (project.hasProperty('WWP_UPLOAD_STORE_FILE')) {
+                storeFile file(WWP_UPLOAD_STORE_FILE)
+                storePassword WWP_UPLOAD_STORE_PASSWORD
+                keyAlias WWP_UPLOAD_KEY_ALIAS
+                keyPassword WWP_UPLOAD_KEY_PASSWORD
+            }
         }
     }
     compileSdkVersion 36
