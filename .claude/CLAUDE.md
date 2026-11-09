@@ -18,7 +18,10 @@ git push
 - Backend: `https://backend-production-3af7.up.railway.app`
 - Frontend: `https://frontend-production-f0dd.up.railway.app` (커스텀 도메인: `www.wewantpeace.live`)
 - Railway project: `proud-purpose` (ID: `8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed`)
-- DB: Supabase `smxitufpgfuzepldglfo` (ap-northeast-2)
+- DB: **Railway Postgres** (같은 Railway 프로젝트의 `Postgres` 서비스, 내부망 `postgres.railway.internal` 전용 — 외부 공개 주소 없음). Redis 도 Railway.
+  - Supabase `smxitufpgfuzepldglfo` 는 이관 전 옛 DB (INACTIVE) — 조회하지 말 것
+  - 운영 데이터 확인: `railway logs -s worker` / `railway logs -s backend`, 또는 `railway ssh -s Postgres` (22번 포트가 열린 환경에서만)
+- Google Play 업로드 키: `mobile/android/app/wewantpeace-release.keystore` (RSA). `signing-key.jks`(EC)는 Play 가 받지 않는다
 
 ## railway.json 주의사항
 - `railway.json`은 **backend** 서비스용으로 유지 (`Dockerfile.backend`)
