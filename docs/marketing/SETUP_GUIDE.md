@@ -11,7 +11,7 @@
 # Railway GraphQL API로 환경변수 추가 (한 번에 하나씩)
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{
     "query": "mutation { variableUpsert(input: { projectId: \"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\", environmentId: \"92d7e229-1071-4b32-a12c-8336ef7be7d5\", serviceId: \"2ee51089\", name: \"변수명\", value: \"값\" }) }"
   }'
@@ -105,17 +105,17 @@ Telegram은 API 제한이 거의 없고, 봇 생성 즉시 사용 가능하여 �
 # 실행 예시 (3개 명령 순차 실행)
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"TELEGRAM_BROADCAST_BOT_TOKEN\",value:\"봇토큰\"})}"}'
 
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"TELEGRAM_BROADCAST_CHANNEL_ID\",value:\"채널ID\"})}"}'
 
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"SOCIAL_PLATFORM_TELEGRAM_CHANNEL_ENABLED\",value:\"true\"})}"}'
 ```
 
@@ -201,7 +201,7 @@ for VAR_PAIR in \
   VALUE="${VAR_PAIR#*:}"
   curl -s -X POST https://backboard.railway.app/graphql/v2 \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+    -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
     -d "{\"query\":\"mutation{variableUpsert(input:{projectId:\\\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\\\",environmentId:\\\"92d7e229-1071-4b32-a12c-8336ef7be7d5\\\",serviceId:\\\"2ee51089\\\",name:\\\"$NAME\\\",value:\\\"$VALUE\\\"})}\"}"
 done
 ```
@@ -303,17 +303,17 @@ done
 ```bash
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"LINKEDIN_ACCESS_TOKEN\",value:\"토큰값\"})}"}'
 
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"LINKEDIN_ORG_ID\",value:\"조직ID\"})}"}'
 
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{"query":"mutation{variableUpsert(input:{projectId:\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\",environmentId:\"92d7e229-1071-4b32-a12c-8336ef7be7d5\",serviceId:\"2ee51089\",name:\"SOCIAL_PLATFORM_LINKEDIN_ENABLED\",value:\"true\"})}"}'
 ```
 
@@ -434,7 +434,7 @@ for VAR_PAIR in \
   VALUE="${VAR_PAIR#*:}"
   curl -s -X POST https://backboard.railway.app/graphql/v2 \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+    -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
     -d "{\"query\":\"mutation{variableUpsert(input:{projectId:\\\"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\\\",environmentId:\\\"92d7e229-1071-4b32-a12c-8336ef7be7d5\\\",serviceId:\\\"2ee51089\\\",name:\\\"$NAME\\\",value:\\\"$VALUE\\\"})}\"}"
 done
 ```

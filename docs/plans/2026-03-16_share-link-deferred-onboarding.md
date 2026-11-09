@@ -408,7 +408,7 @@ cd ~/Projects/wewantpeace && git push
 ```bash
 cd ~/Projects/wewantpeace
 cat railway.json | grep dockerfilePath  # frontend용인지 확인
-RAILWAY_API_TOKEN=383ab19c-f63d-4ad0-ae47-ef816b79645b /home/krshin7/.npm-global/bin/railway up --service frontend --detach
+RAILWAY_API_TOKEN=$RAILWAY_API_TOKEN /home/krshin7/.npm-global/bin/railway up --service frontend --detach
 ```
 
 **Step 3: 토스 .ait 빌드 (선택)**

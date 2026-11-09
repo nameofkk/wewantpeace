@@ -15,6 +15,43 @@ from backend.app.core.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
+
+def _ai_source_title(source_type: str | None, meta: dict | None) -> str | None:
+    """process_raw_event 가 normalize(source_title=...)에 넘기는 제목과 같은 값."""
+    if source_type in ("rss", "api") and meta:
+        return meta.get("title") or None
+    return None
+
+
+def _needs_ai(source_type: str | None, meta: dict | None) -> bool:
+    """구조화 API 기사(GDELT/ACLED 등 topic 이 이미 있음)는 AI 분류를 건너뛴다."""
+    meta = meta or {}
+    return not (source_type == "api" and meta.get("structured_topic")
+                and meta["structured_topic"] != "unknown")
+
+
+async def _dispatch_with_ai_prefetch(raw_events) -> int:
+    """RawEvent 들을 AI_PREFETCH_CHUNK 건씩 묶어 미리 분류(캐시)한 뒤 process_raw_event 에 넘긴다.
+
+    기사 1건 = AI 1콜이면 무료 한도가 하루 물량의 몇 %밖에 안 된다(2026-11-09 실측 Gemini 성공 0).
+    묶음 1콜로 10건을 분류하고, 묶음 호출이 실패해도 기사는 그대로 넘어가 단건/키워드 폴백을 탄다.
+    """
+    from worker.processor.normalizer import prefetch_ai_classification, AI_PREFETCH_CHUNK
+
+    evs = [e for e in raw_events if getattr(e, "id", None)]
+    for start in range(0, len(evs), AI_PREFETCH_CHUNK):
+        chunk = evs[start:start + AI_PREFETCH_CHUNK]
+        items = [(e.raw_text, _ai_source_title(e.source_type, e.raw_metadata))
+                 for e in chunk if _needs_ai(e.source_type, e.raw_metadata)]
+        if items:
+            try:
+                await asyncio.to_thread(prefetch_ai_classification, items)
+            except Exception as e:
+                logger.warning("AI 묶음 분류 실패 — 단건 처리로 진행: %s", e)
+        for e in chunk:
+            process_raw_event.delay(str(e.id))
+    return len(evs)
+
 # ── Sync Redis (heartbeat 기록용) ─────────────────────────────────────────────
 _sync_redis_client: _sync_redis.Redis | None = None
 
@@ -117,26 +154,15 @@ def collect_telegram(self):
                 except Exception:
                     await db.rollback()
                     raise
-                all_ids = []
-                for r in results:
-                    for raw_ev in r.raw_event_ids:
-                        if raw_ev.id:
-                            all_ids.append(str(raw_ev.id))
+                all_evs = [raw_ev for r in results for raw_ev in r.raw_event_ids if raw_ev.id]
                 try:
                     await db.commit()
                 except Exception:
                     await db.rollback()
                     raise
-                for i, raw_id in enumerate(all_ids):
-                    process_raw_event.delay(raw_id)
-                    # 2026-09-16: 무료 AI 티어(Groq/Gemini) 일일 한도가 실제
-                    # 운영 물량의 13%뿐이라 짧은 순간에 몰아치는 디스패치가
-                    # 순간 레이트리밋을 더 자주 유발한다. 50개마다 0.5초였던
-                    # 기존 페이싱을 5개마다 1초로 촘촘히 해 같은 총 지연 예산
-                    # 안에서 버스트를 더 잘게 쪼갠다 (근본 해결은 배칭/사전필터).
-                    if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
-                        await asyncio.sleep(1.0)
-                logger.info("Telegram 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
+                # 10건씩 AI 묶음 분류 후 디스패치 (묶음 호출 자체가 페이싱 역할)
+                n = await _dispatch_with_ai_prefetch(all_evs)
+                logger.info("Telegram 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, n)
             else:
                 logger.info("Telegram 수집 완료: 총 %d개 새 이벤트", total)
             return {"total_collected": total, "channels": len(results)}
@@ -186,18 +212,11 @@ def collect_rss(self):
                 results = await collector.collect_all(db, redis=redis)
                 total = sum(r.collected for r in results)
                 # 처리 파이프라인 체이닝 (이미 commit 완료된 이벤트만)
-                all_ids = []
-                for r in results:
-                    for raw_ev in r.raw_event_ids:
-                        if raw_ev.id:
-                            all_ids.append(str(raw_ev.id))
-                if all_ids:
-                    for i, raw_id in enumerate(all_ids):
-                        process_raw_event.delay(raw_id)
-                        # 2026-09-16: AI 무료 티어 일일 한도 절약 위해 촘촘한 페이싱
-                        if (i + 1) % 5 == 0 and i + 1 < len(all_ids):
-                            await asyncio.sleep(1.0)
-                    logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, len(all_ids))
+                all_evs = [raw_ev for r in results for raw_ev in r.raw_event_ids if raw_ev.id]
+                if all_evs:
+                    # 10건씩 AI 묶음 분류 후 디스패치 (묶음 호출 자체가 페이싱 역할)
+                    n = await _dispatch_with_ai_prefetch(all_evs)
+                    logger.info("RSS 수집 완료: 총 %d개 새 이벤트 → process_raw_event %d개 트리거", total, n)
                 else:
                     logger.info("RSS 수집 완료: 총 %d개 새 이벤트", total)
                 return {"total_collected": total, "feeds": len(results)}
@@ -1316,7 +1335,7 @@ def retry_unprocessed(self):
 
             cutoff = datetime.now(timezone.utc) - timedelta(hours=UNPROCESSED_RETRY_WINDOW_HOURS)
             result = await db.execute(
-                select(RawEvent.id)
+                select(RawEvent)
                 .where(
                     RawEvent.processed == False,
                     RawEvent.collected_at >= cutoff,
@@ -1327,19 +1346,16 @@ def retry_unprocessed(self):
                 .order_by(RawEvent.collected_at.desc())
                 .limit(batch_limit)
             )
-            ids = [str(row[0]) for row in result.fetchall()]
+            evs = list(result.scalars().all())
 
-        if not ids:
+        if not evs:
             logger.info("미처리 raw_events 없음 — skip")
             return {"queued": 0}
 
-        for i, raw_id in enumerate(ids):
-            process_raw_event.delay(raw_id)
-            # 2026-09-16: AI 무료 티어 일일 한도 절약 위해 촘촘한 페이싱
-            if (i + 1) % 5 == 0 and i + 1 < len(ids):
-                await asyncio.sleep(1.0)
-        logger.info("미처리 raw_events %d건 → process_raw_event 큐 등록", len(ids))
-        return {"queued": len(ids)}
+        # 10건씩 AI 묶음 분류 후 디스패치 (세션은 expire_on_commit=False 라 닫힌 뒤에도 속성 접근 가능)
+        n = await _dispatch_with_ai_prefetch(evs)
+        logger.info("미처리 raw_events %d건 → process_raw_event 큐 등록", n)
+        return {"queued": n}
 
     try:
         return run_async(_run())

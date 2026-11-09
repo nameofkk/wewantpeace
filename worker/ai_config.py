@@ -306,3 +306,24 @@ try:
     _clear_stale_block()
 except Exception:
     pass
+
+
+def get_batch_provider():
+    """묶음 분류용 제공자. Gemini 를 먼저 쓴다 — 무료 한도가 요청 '횟수'(하루 500)라 10건을 한 콜에
+    묶으면 그대로 10배가 되지만, Groq 는 분당 8,000 토큰이라 10건 묶음(~9,000 토큰)이 한 콜에 안 들어간다."""
+    if USE_GEMINI and not (is_gemini_rate_limited() or is_gemini_unavailable()):
+        return "gemini"
+    return get_current_provider()
+
+
+def get_client_for(provider: str, timeout: float = 30.0):
+    from openai import OpenAI
+    api_key, base_url = _PROVIDER_CLIENT_ARGS[provider]
+    if base_url:
+        return OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    return OpenAI(api_key=api_key, timeout=timeout)
+
+
+def get_model_for(provider: str) -> str:
+    return _PROVIDER_MODEL.get(provider, _OPENAI_MODEL)
+

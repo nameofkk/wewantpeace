@@ -199,7 +199,7 @@ git commit -m "feat(community): add cursor-based pagination for infinite scroll"
 
 ```bash
 cd ~/Projects/wewantpeace
-RAILWAY_API_TOKEN=383ab19c-f63d-4ad0-ae47-ef816b79645b /home/krshin7/.npm-global/bin/railway up --service backend --detach
+RAILWAY_API_TOKEN=$RAILWAY_API_TOKEN /home/krshin7/.npm-global/bin/railway up --service backend --detach
 ```
 
 ---

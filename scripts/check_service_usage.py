@@ -20,9 +20,8 @@ from typing import Any
 import httpx
 
 # ── Railway 설정 ──────────────────────────────────────────
-RAILWAY_API_TOKEN = os.getenv(
-    "RAILWAY_API_TOKEN", "383ab19c-f63d-4ad0-ae47-ef816b79645b"
-)
+# 토큰은 환경변수로만 받는다 (공개 저장소라 코드에 적으면 그대로 노출된다)
+RAILWAY_API_TOKEN = os.getenv("RAILWAY_API_TOKEN", "")
 RAILWAY_PROJECT_ID = os.getenv(
     "RAILWAY_PROJECT_ID", "8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed"
 )
@@ -34,9 +33,7 @@ RAILWAY_WORKSPACE_ID = os.getenv(
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # ── 텔레그램 알림 설정 ───────────────────────────────────
-TG_BOT_TOKEN = os.getenv(
-    "SOCIAL_TG_BOT_TOKEN", "8797103470:AAGmkofyFZZyxELIS3Id28jlMJPyjJSewp8"
-)
+TG_BOT_TOKEN = os.getenv("SOCIAL_TG_BOT_TOKEN", "")
 TG_CHAT_ID = os.getenv("ADMIN_TG_CHAT_ID", "-1003790789028")
 
 # ── 경고 임계값 ──────────────────────────────────────────

@@ -260,11 +260,16 @@ def _classify_with_ai(title: str, body: str) -> Optional[tuple[str, str, int, Op
         (topic, sub_topic, severity, country_code, title_ko, body_ko) 또는
         실패 시 None
     """
-    if not _ai_available():
-        return None
-
     # 빈 입력 방어
     if not title and not body:
+        return None
+
+    # 수집 직후 묶음 분류(prefetch_ai_classification)로 이미 받은 결과가 있으면 그대로 쓴다
+    cached = _ai_cls_cache_get(title, body)
+    if cached is not None:
+        return cached
+
+    if not _ai_available():
         return None
 
     user_text = f"Title: {title[:200]}\n\nBody: {body[:500]}"
@@ -397,14 +402,17 @@ def _classify_batch_with_ai(
     ]
     user_text = "\n\n".join(user_lines)
 
-    provider = _get_ai_provider()
+    from worker.ai_config import get_batch_provider, get_client_for, get_model_for
+    provider = get_batch_provider()
+    if provider is None:
+        return None
     try:
-        client = _get_ai_client(timeout=60.0)
+        client = get_client_for(provider, timeout=60.0)
         _extra_kwargs = {}
         if provider == "gemini":
             _extra_kwargs["reasoning_effort"] = "minimal"
         resp = client.chat.completions.create(
-            model=_get_ai_model(),
+            model=get_model_for(provider),
             messages=[
                 {"role": "system", "content": _AI_CLASSIFY_BATCH_PROMPT},
                 {"role": "user", "content": user_text},
@@ -2874,19 +2882,12 @@ def is_relevant(result: "NormalizeResult") -> bool:
     return result.severity > 20
 
 
-def normalize(
-    raw_text: str,
-    source_tier: str,
-    collected_at: datetime,
-    source_title: Optional[str] = None,
-    published_at: Optional[datetime] = None,
-    image_url: Optional[str] = None,
-) -> NormalizeResult:
-    """
-    RawEvent 텍스트 → NormalizeResult (동기).
+def _prepare_ai_input(raw_text: str, source_title: Optional[str]) -> tuple[str, str, str, str, bool]:
+    """AI 분류에 넘길 (언어, 번역 상태, 분석용 본문, 제목, 노이즈 여부)를 만든다.
 
-    source_title: RSS entry.title 등 원본 제목 (있으면 본문 추출 제목보다 우선).
-    published_at: 실제 기사/메시지 발행 시간. 없으면 collected_at 사용.
+    normalize()와 prefetch_ai_classification()이 같은 함수를 써야 한다 — 미리 묶어
+    분류한 결과는 (제목, 본문) 해시로 찾으므로 한 글자라도 다르면 캐시를 못 찾는다.
+    번역은 Redis 번역 캐시를 타서 두 번째 호출은 네트워크를 쓰지 않는다.
     """
     lang = _detect_language(raw_text)
 
@@ -2917,7 +2918,111 @@ def normalize(
     # 없다 (2026-09-16: Groq/Gemini 무료 티어 일일 한도가 실제 운영 물량의
     # ~13%밖에 안 된다는 게 실측으로 드러나 호출 하나하나가 아쉬운 자원이 됨).
     _combined_text = f"{source_title or ''} {text_for_analysis}"
-    _is_noise = _is_entertainment_noise(_combined_text, title=source_title)
+    is_noise = _is_entertainment_noise(_combined_text, title=source_title)
+    return lang, translation_status, text_for_analysis, title, is_noise
+
+
+# ── 묶음 분류 결과 캐시 ─────────────────────────────────────────────────────────
+# 2026-11-09 실측(워커 로그 1시간): Groq 성공 11 / 429 211, Gemini 성공 0 / 429 66.
+# 기사 1건마다 AI 1콜이라 하루 ~6,400콜인데 무료 한도는 Gemini 하루 500콜·Groq 하루 ~80콜 →
+# AI 분류가 사실상 멈춰 키워드 폴백만 돌았고 미분류가 28%까지 올랐다.
+# _classify_batch_with_ai(10건 1콜)는 만들어 두고 호출하는 곳이 없었다. 수집 직후 묶어서
+# 분류해 결과를 여기 넣어 두면 process_raw_event 의 단건 호출이 캐시에서 꺼내 쓴다.
+_AI_CLS_CACHE_PREFIX = "ai:cls:"
+_AI_CLS_CACHE_TTL = 6 * 3600
+AI_PREFETCH_CHUNK = 10
+
+
+def _ai_cls_cache_key(title: str, body: str) -> str:
+    # _classify_with_ai 가 AI에 실제로 보내는 잘린 입력과 같은 범위로 키를 만든다
+    h = hashlib.sha1(f"{(title or '')[:200]}\n{(body or '')[:500]}".encode("utf-8")).hexdigest()
+    return _AI_CLS_CACHE_PREFIX + h
+
+
+def _ai_cls_cache_get(title: str, body: str):
+    try:
+        from worker.ai_config import _get_redis_sync
+        raw = _get_redis_sync().get(_ai_cls_cache_key(title, body))
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        v = json.loads(raw)
+        if isinstance(v, list) and len(v) == 6:
+            return (v[0], v[1], int(v[2]), v[3], v[4], v[5])
+    except Exception:
+        pass
+    return None
+
+
+def _ai_cls_cache_put(title: str, body: str, result) -> None:
+    try:
+        from worker.ai_config import _get_redis_sync
+        _get_redis_sync().set(_ai_cls_cache_key(title, body), json.dumps(list(result), ensure_ascii=False),
+                              ex=_AI_CLS_CACHE_TTL)
+    except Exception:
+        pass
+
+
+def prefetch_ai_classification(items: list[tuple[str, Optional[str]]]) -> int:
+    """[(raw_text, source_title), ...]를 AI_PREFETCH_CHUNK 건씩 묶어 분류해 캐시에 넣는다.
+
+    노이즈·이미 캐시된 기사는 건너뛴다. 묶음 호출이 실패하면 아무것도 넣지 않고
+    끝낸다 — 그 기사들은 process_raw_event 에서 예전처럼 단건 호출/키워드 폴백을 탄다.
+    Returns: 캐시에 넣은 건수.
+    """
+    if not items or not _ai_available():
+        return 0
+    todo: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for raw_text, source_title in items:
+        if not raw_text:
+            continue
+        try:
+            _lang, _ts, text_for_analysis, title, is_noise = _prepare_ai_input(raw_text, source_title)
+        except Exception as e:
+            logger.debug("prefetch 입력 준비 실패 (무시): %s", e)
+            continue
+        if is_noise or (not title and not text_for_analysis):
+            continue
+        key = _ai_cls_cache_key(title, text_for_analysis)
+        if key in seen or _ai_cls_cache_get(title, text_for_analysis) is not None:
+            continue
+        seen.add(key)
+        todo.append((title, text_for_analysis))
+
+    stored = 0
+    for start in range(0, len(todo), AI_PREFETCH_CHUNK):
+        chunk = todo[start:start + AI_PREFETCH_CHUNK]
+        results = _classify_batch_with_ai(chunk)
+        if results is None:
+            # 한도 초과·파싱 실패 — 남은 묶음도 같은 이유로 실패할 가능성이 커서 멈춘다
+            break
+        for (title, body), res in zip(chunk, results):
+            if res is not None:
+                _ai_cls_cache_put(title, body, res)
+                stored += 1
+    if todo:
+        logger.info("AI 묶음 분류: 대상 %d건 → 캐시 %d건", len(todo), stored)
+    return stored
+
+
+def normalize(
+    raw_text: str,
+    source_tier: str,
+    collected_at: datetime,
+    source_title: Optional[str] = None,
+    published_at: Optional[datetime] = None,
+    image_url: Optional[str] = None,
+) -> NormalizeResult:
+    """
+    RawEvent 텍스트 → NormalizeResult (동기).
+
+    source_title: RSS entry.title 등 원본 제목 (있으면 본문 추출 제목보다 우선).
+    published_at: 실제 기사/메시지 발행 시간. 없으면 collected_at 사용.
+    """
+    lang, translation_status, text_for_analysis, title, _is_noise = _prepare_ai_input(raw_text, source_title)
 
     if _is_noise:
         logger.info("엔터테인먼트 노이즈 감지(AI 호출 스킵) → unknown/sev=0 (제목: %s)", title[:60])

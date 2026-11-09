@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # ── Railway GraphQL API ──────────────────────────────────────────────────────
 RAILWAY_API_TOKEN = os.getenv(
-    "RAILWAY_API_TOKEN", "383ab19c-f63d-4ad0-ae47-ef816b79645b"
+    "RAILWAY_API_TOKEN", ""
 )
 RAILWAY_PROJECT_ID = "8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed"
 RAILWAY_ENV_ID = "92d7e229-1071-4b32-a12c-8336ef7be7d5"

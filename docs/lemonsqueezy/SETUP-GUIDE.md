@@ -39,7 +39,7 @@ LEMONSQUEEZY_WELCOME_DISCOUNT=WELCOME30
 ```bash
 curl -s -X POST https://backboard.railway.app/graphql/v2 \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 383ab19c-f63d-4ad0-ae47-ef816b79645b" \
+  -H "Authorization: Bearer $RAILWAY_API_TOKEN" \
   -d '{
     "query": "mutation { variableUpsert(input: { projectId: \"8c67cb03-6ad1-40ef-8cfc-47bf2954a1ed\", environmentId: \"92d7e229-1071-4b32-a12c-8336ef7be7d5\", serviceId: \"81e6a83e\", name: \"LEMONSQUEEZY_WELCOME_DISCOUNT\", value: \"WELCOME30\" }) }"
   }'
