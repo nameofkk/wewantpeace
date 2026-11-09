@@ -1,6 +1,11 @@
 import { MetadataRoute } from "next";
 
-export const revalidate = 120;
+// 2026-11-09: ISR(revalidate=120)로 두었더니 빌드 때 API 를 못 불러 만든 빈 결과(정적 18개)가 계속 나갔다
+// (서치 콘솔: 이슈 페이지 전부 "Google에 알려지지 않은 URL"). 요청마다 만들고, API 응답은 10분 메모리 캐시.
+export const dynamic = "force-dynamic";
+
+let _issuesCache: { at: number; data: Issue[] } | null = null;
+const ISSUES_TTL_MS = 10 * 60 * 1000;
 
 const BASE_URL = "https://www.wewantpeace.live";
 
@@ -8,23 +13,29 @@ interface Issue {
   id: string;
   slug?: string;
   severity: number;
+  topic?: string;
   country_code?: string;
   updated_at?: string;
   last_event_at?: string;
 }
 
 async function fetchIssues(): Promise<Issue[]> {
+  if (_issuesCache && Date.now() - _issuesCache.at < ISSUES_TTL_MS) return _issuesCache.data;
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   try {
-    const res = await fetch(`${apiUrl}/issues?limit=2000`, {
-      next: { revalidate: 120 },
-    });
-    if (!res.ok) return [];
+    const res = await fetch(`${apiUrl}/issues?limit=2000`, { cache: "no-store" });
+    if (!res.ok) {
+      console.error(`sitemap: /issues ${res.status}`);
+      return _issuesCache?.data ?? [];
+    }
     const data = await res.json();
-    return Array.isArray(data) ? data : (data.items ?? data.results ?? []);
-  } catch {
-    return [];
+    const list: Issue[] = Array.isArray(data) ? data : (data.items ?? data.results ?? []);
+    if (list.length) _issuesCache = { at: Date.now(), data: list };
+    return list;
+  } catch (e) {
+    console.error("sitemap: /issues 실패", e);
+    return _issuesCache?.data ?? [];
   }
 }
 
@@ -73,15 +84,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  // severity 20 이상 이슈만 포함
+  // severity 20 이상, 분류된 이슈만 포함 (미분류 일반 기사는 "크롤링됨 - 색인 안 됨"만 늘린다)
   const issuePages: MetadataRoute.Sitemap = issues
-    .filter((issue) => issue.severity >= 20)
+    .filter((issue) => issue.severity >= 20 && issue.topic !== "unknown")
     .map((issue) => {
-      const mod = issue.updated_at || issue.last_event_at;
+      const modRaw = issue.updated_at || issue.last_event_at;
+      // 일부 매체가 시간대를 틀리게 줘 미래 시각이 들어온다 — 사이트맵 lastmod 는 지금 이후일 수 없다
+      const mod = modRaw ? new Date(Math.min(new Date(modRaw).getTime(), now.getTime())) : undefined;
       const priority = issue.severity >= 70 ? 0.9 : issue.severity >= 50 ? 0.8 : 0.7;
       return {
         url: `${BASE_URL}/issues/${issue.slug ?? issue.id}`,
-        lastModified: mod ? new Date(mod) : undefined,
+        lastModified: mod,
         changeFrequency: (issue.severity >= 60 ? "hourly" : "daily") as "hourly" | "daily",
         priority,
       };

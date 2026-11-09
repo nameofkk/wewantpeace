@@ -95,7 +95,20 @@ ${m.body}
 </html>`;
 }
 
+const APEX_HOST = "wewantpeace.live";
+
 export function middleware(request: NextRequest) {
+  // www 없는 주소는 www 로 영구 이동 — 같은 페이지가 두 주소로 열리면 서치 콘솔이 중복 페이지로 잡고,
+  // 2026-11-04 에는 구글이 www 없는 주소에서 404 를 받았다 (URL 검사 결과).
+  const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "")
+    .split(",")[0].trim().split(":")[0].toLowerCase();
+  if (host === APEX_HOST) {
+    const { pathname, search } = request.nextUrl;
+    return NextResponse.redirect(`${SITE}${pathname}${search}`, 301);
+  }
+  // 아래 봇 HTML·온보딩 처리는 첫 페이지 전용
+  if (request.nextUrl.pathname !== "/") return;
+
   const ua = request.headers.get("user-agent") || "";
 
   if (KOREAN_BOT_RE.test(ua)) {
@@ -123,5 +136,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/",
+  // www 이동 검사 때문에 모든 페이지에 걸되, 빌드 정적 파일은 제외
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
